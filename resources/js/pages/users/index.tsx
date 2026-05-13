@@ -29,6 +29,7 @@ import {
     index as usersIndex, 
     destroy as destroyUser 
 } from '@/actions/App/Http/Controllers/UserController';
+import { usePage } from '@inertiajs/react';
 
 interface User {
     id: number;
@@ -53,6 +54,7 @@ interface Props {
 }
 
 export default function UsersIndex({ users, filters }: Props) {
+    const { auth } = usePage<any>().props;
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -163,14 +165,18 @@ export default function UsersIndex({ users, filters }: Props) {
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}>
-                                                    <Edit2 className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteClick(user)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                            {user.id !== auth.user.id ? (
+                                                <div className="flex justify-end gap-2">
+                                                    <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}>
+                                                        <Edit2 className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteClick(user)}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground italic pr-2">Tú</span>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -206,7 +212,7 @@ export default function UsersIndex({ users, filters }: Props) {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-white hover:bg-destructive/90">
                             Desactivar
                         </AlertDialogAction>
                     </AlertDialogFooter>

@@ -1,4 +1,5 @@
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import HeadingSheet from '@/components/heading-sheet';
 import CustomerForm from './customer-form';
 
 interface Customer {
@@ -26,14 +27,10 @@ export default function CustomerSheet({ customer, open, onOpenChange }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="w-full sm:max-w-[540px] overflow-y-auto">
-                <SheetHeader>
-                    <SheetTitle className='text-2xl'>{customer ? 'Editar Cliente' : 'Nuevo Cliente'}</SheetTitle>
-                    <SheetDescription>
-                        {customer 
-                            ? 'Actualice la información del cliente aquí.' 
-                            : 'Complete los campos para registrar un nuevo cliente.'}
-                    </SheetDescription>
-                </SheetHeader>
+                <HeadingSheet 
+                    title={customer ? 'Editar Cliente' : 'Nuevo Cliente'}
+                    description={customer ? 'Actualice la información del cliente aquí.' : 'Complete los campos para registrar un nuevo cliente.'}
+                />
                 <CustomerForm 
                     customer={customer || undefined} 
                     onSuccess={() => onOpenChange(false)} 

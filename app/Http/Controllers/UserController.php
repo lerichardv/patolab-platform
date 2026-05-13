@@ -49,6 +49,11 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        // Don't allow editing self through this controller
+        if ($user->id === auth()->id()) {
+            return redirect()->back()->withErrors(['error' => 'No puedes editar tu propio usuario desde aquí. Usa los ajustes de perfil.']);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
