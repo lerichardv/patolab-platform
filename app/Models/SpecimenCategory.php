@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class SpecimenCategory extends Model
 {
+    use Auditable;
     use HasFactory;
 
     protected $table = 'specimen_category';
@@ -19,6 +22,11 @@ class SpecimenCategory extends Model
         'name',
         'unit',
         'quantity',
+        'active',
+    ];
+
+    protected $casts = [
+        'active' => 'boolean',
     ];
 
     public function specimens(): HasMany

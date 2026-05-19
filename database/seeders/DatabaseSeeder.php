@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             SequenceSeeder::class,
             StorageSeeder::class,
             ProductSeeder::class,
+            CaiRangeSeeder::class,
         ]);
     }
 }

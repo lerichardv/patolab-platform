@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,9 +14,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  */
 class Specimen extends Model
 {
+    use Auditable;
     use HasFactory;
 
     protected $table = 'specimen';
+
+    public const STATUS_COLORS = [
+        'received' => '#3b82f6',           // blue-500
+        'macroscopic_review' => '#8b5cf6', // violet-500
+        'processing' => '#f59e0b',         // amber-500
+        'microscopic_review' => '#d946ef', // fuchsia-500
+        'finalized' => '#10b981',          // emerald-500
+        'delivered' => '#64748b',          // slate-500
+        'cancelled' => '#ef4444',          // red-500
+    ];
 
     protected $fillable = [
         'customer',
@@ -26,12 +39,22 @@ class Specimen extends Model
         'diagnosis',
         'clinical_notes',
         'status',
+		'priority_id',
         'active',
     ];
 
     protected $casts = [
         'active' => 'boolean',
     ];
+
+    protected $appends = [
+        'status_color',
+    ];
+
+    public function getStatusColorAttribute(): string
+    {
+        return self::STATUS_COLORS[$this->status] ?? '#cbd5e1';
+    }
 
     public function customerRelation(): BelongsTo
     {
@@ -57,10 +80,13 @@ class Specimen extends Model
     {
         return $this->belongsTo(Referrer::class, 'referrer');
     }
-
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class, 'specimen_products', 'specimen', 'product')
             ->withTimestamps();
+    }
+	public function priority(): BelongsTo
+    {
+        return $this->belongsTo(Priority::class, 'priority_id');
     }
 }

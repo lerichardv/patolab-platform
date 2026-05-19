@@ -15,11 +15,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
     Route::resource('customers', CustomerController::class);
     Route::resource('users', UserController::class);
+    Route::post('specimens/update-order', [\App\Http\Controllers\SpecimenController::class, 'updateOrder'])->name('specimens.update-order');
+    Route::resource('specimens', \App\Http\Controllers\SpecimenController::class);
+    Route::resource('specimen-categories', \App\Http\Controllers\SpecimenCategoryController::class);
     Route::resource('specimen-types', \App\Http\Controllers\SpecimenTypeController::class);
     Route::resource('specimen-type-examinations', \App\Http\Controllers\SpecimenTypeExaminationController::class);
     Route::resource('referrers', \App\Http\Controllers\ReferrerController::class);
     Route::resource('referrer-types', \App\Http\Controllers\ReferrerTypeController::class);
     Route::resource('locations', \App\Http\Controllers\LocationController::class);
+    Route::resource('cai-ranges', \App\Http\Controllers\CaiRangeController::class);
     Route::resource('sequences', \App\Http\Controllers\SequenceController::class);
     Route::resource('storages', \App\Http\Controllers\StorageController::class);
     Route::resource('products', \App\Http\Controllers\ProductController::class);

@@ -15,7 +15,9 @@ import {
 import { dashboard, testPage } from '@/routes';
 import { index as customersIndex } from '@/actions/App/Http/Controllers/CustomerController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
+import { index as specimensIndex } from '@/actions/App/Http/Controllers/SpecimenController';
 import { index as specimenTypesIndex } from '@/actions/App/Http/Controllers/SpecimenTypeController';
+import { index as specimenCategoriesIndex } from '@/actions/App/Http/Controllers/SpecimenCategoryController';
 import { index as specimenTypeExaminationsIndex } from '@/actions/App/Http/Controllers/SpecimenTypeExaminationController';
 import { index as referrersIndex } from '@/actions/App/Http/Controllers/ReferrerController';
 import { index as referrerTypesIndex } from '@/actions/App/Http/Controllers/ReferrerTypeController';
@@ -25,7 +27,8 @@ import { index as inventoriesIndex } from '@/actions/App/Http/Controllers/Invent
 import { index as productsIndex } from '@/actions/App/Http/Controllers/ProductController';
 import { index as storagesIndex } from '@/actions/App/Http/Controllers/StorageController';
 import { index as inventoryMovementsIndex } from '@/actions/App/Http/Controllers/InventoryMovementController';
-import { Beaker, BookOpen, Contact, FolderGit2, LayoutGrid, Users, ShieldCheck, FlaskConical, Microscope, UserRound, Tag, MapPin, Hash, Warehouse, PackageSearch, Package, ClipboardList, History } from 'lucide-react';
+import { index as caiRangesIndex } from '@/actions/App/Http/Controllers/CaiRangeController';
+import { Beaker, BookOpen, Contact, FolderGit2, LayoutGrid, Users, ShieldCheck, FlaskConical, Microscope, UserRound, Tag, MapPin, Hash, Warehouse, PackageSearch, Package, ClipboardList, History, Receipt } from 'lucide-react';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -33,6 +36,11 @@ const mainNavItems: NavItem[] = [
         title: 'Resumen',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Muestras',
+        href: specimensIndex(),
+        icon: Microscope,
     },
 ];
 
@@ -88,6 +96,10 @@ const adminNavItems: NavItem[] = [
                         href: specimenTypeExaminationsIndex(),
                     },
                     {
+                        title: 'Categorías',
+                        href: specimenCategoriesIndex(),
+                    },
+                    {
                         title: 'Secuencias',
                         href: sequencesIndex(),
                     },
@@ -112,6 +124,21 @@ const adminNavItems: NavItem[] = [
                 title: 'Sucursales',
                 href: locationsIndex(),
                 icon: MapPin,
+            },
+            {
+                title: 'Facturación',
+                href: '#',
+                icon: Receipt,
+                items: [
+                    {
+                        title: 'Rangos de Facturación',
+                        href: caiRangesIndex(),
+                    },
+                    {
+                        title: 'Facturas',
+                        href: '#',
+                    },
+                ],
             },
             {
                 title: 'Usuarios del sistema',
