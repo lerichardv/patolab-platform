@@ -1,16 +1,16 @@
-import { useState } from 'react';
 import { useForm } from '@inertiajs/react';
+import { Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import type { FormEventHandler } from 'react';
+import { toast } from 'sonner';
+import { update as updateProduct, store as storeProduct } from '@/actions/App/Http/Controllers/ProductController';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { FormEventHandler } from 'react';
-import InputError from '@/components/input-error';
-import { Plus, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { update as updateProduct, store as storeProduct } from '@/actions/App/Http/Controllers/ProductController';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Price {
     id?: number;
@@ -51,6 +51,7 @@ export default function ProductForm({ product, onSuccess }: Props) {
     const handleAddPrice = () => {
         if (!newPrice || isNaN(Number(newPrice)) || Number(newPrice) < 0) {
             toast.error('Por favor, ingrese un precio válido.');
+
             return;
         }
 

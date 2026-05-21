@@ -1,17 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { Edit2, Microscope, Plus, Search, Trash2 } from 'lucide-react';
-import CategorySheet from './category-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as specimenCategoriesIndex, 
+    destroy as destroySpecimenCategory 
+} from '@/actions/App/Http/Controllers/SpecimenCategoryController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -23,12 +18,17 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
-    index as specimenCategoriesIndex, 
-    destroy as destroySpecimenCategory 
-} from '@/actions/App/Http/Controllers/SpecimenCategoryController';
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import CategorySheet from './category-sheet';
 
 interface Category {
     id: number;
@@ -66,7 +66,10 @@ export default function CategoriesIndex({ categories, filters }: Props) {
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === '') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(specimenCategoriesIndex().url, newFilters, {
             preserveState: true,

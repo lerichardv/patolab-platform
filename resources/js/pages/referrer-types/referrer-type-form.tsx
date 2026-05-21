@@ -1,13 +1,13 @@
 import { useForm } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { 
     store as storeType, 
     update as updateType 
 } from '@/actions/App/Http/Controllers/ReferrerTypeController';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 
 interface ReferrerType {
     id: number;

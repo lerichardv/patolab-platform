@@ -1,8 +1,5 @@
-import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import HeadingSheet from '@/components/heading-sheet';
+import { format, add, isPast, isToday } from 'date-fns';
+import { es } from 'date-fns/locale';
 import {
     Microscope,
     User,
@@ -20,8 +17,11 @@ import {
     FileImage,
     Coins
 } from 'lucide-react';
-import { format, add, isPast, isToday } from 'date-fns';
-import { es } from 'date-fns/locale';
+import HeadingSheet from '@/components/heading-sheet';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 
 interface Props {
     specimen: any | null;
@@ -32,7 +32,9 @@ interface Props {
 }
 
 export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEditClick, preventCloseOnOutsideClick }: Props) {
-    if (!specimen) return null;
+    if (!specimen) {
+return null;
+}
 
     const invoice = specimen.invoice_relation;
     const credit = invoice?.credit_relation;
@@ -42,7 +44,10 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
         : 'N/A';
 
     const getEstimatedDate = () => {
-        if (!specimen.category || !specimen.category.unit || !specimen.category.quantity || !specimen.created_at) return null;
+        if (!specimen.category || !specimen.category.unit || !specimen.category.quantity || !specimen.created_at) {
+return null;
+}
+
         const createdAt = new Date(specimen.created_at);
         const unitMap: Record<string, string> = {
             'minutes': 'minutes',
@@ -51,6 +56,7 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
             'weeks': 'weeks'
         };
         const duration = { [unitMap[specimen.category.unit] || 'days']: specimen.category.quantity };
+
         return add(createdAt, duration);
     };
 
@@ -111,6 +117,7 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
             'transfer': 'Transferencia',
             'credit': 'Crédito'
         };
+
         return labels[type] || type;
     };
 
@@ -120,6 +127,7 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 
     const isImageFile = (path: string) => {
         const ext = getFileExtension(path);
+
         return ext ? ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) : false;
     };
 

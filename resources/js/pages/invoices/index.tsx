@@ -1,5 +1,12 @@
 import { Head, router } from '@inertiajs/react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import debounce from 'lodash/debounce';
+import { Eye, Search, Receipt, CreditCard } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
+import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
+import { Pagination } from '@/components/pagination';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,14 +18,7 @@ import {
     TableHeader,
     TableRow
 } from '@/components/ui/table';
-import { Eye, Search, Receipt, CreditCard } from 'lucide-react';
 import InvoiceViewSheet from './invoice-view-sheet';
-import { Badge } from '@/components/ui/badge';
-import { Pagination } from '@/components/pagination';
-import debounce from 'lodash/debounce';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
 
 interface Invoice {
     id: number;
@@ -70,7 +70,10 @@ export default function InvoicesIndex({ invoices, filters }: Props) {
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === 'all' || value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === 'all' || value === '') {
+delete newFilters[key as keyof typeof filters];
+}
 
         router.get(invoicesIndex().url, newFilters, {
             preserveState: true,
@@ -103,6 +106,7 @@ export default function InvoicesIndex({ invoices, filters }: Props) {
             'transfer': 'Transferencia',
             'credit': 'Crédito'
         };
+
         return labels[type] || type;
     };
 
@@ -153,7 +157,10 @@ export default function InvoicesIndex({ invoices, filters }: Props) {
         }
 
         const credit = invoice.credit_relation;
-        if (!credit) return <span className="text-xs text-muted-foreground italic">N/A</span>;
+
+        if (!credit) {
+return <span className="text-xs text-muted-foreground italic">N/A</span>;
+}
 
         const paid = parseFloat(String(credit.amount_paid || 0));
         const creditAmount = parseFloat(String(credit.credit_amount || 0));

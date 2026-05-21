@@ -1,16 +1,16 @@
-import { useState } from 'react';
 import { useForm } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
-import { Spinner } from '@/components/ui/spinner';
 import { Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { 
     store as storeSpecimenType, 
     update as updateSpecimenType 
 } from '@/actions/App/Http/Controllers/SpecimenTypeController';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '../../components/ui/textarea';
 
 interface Price {
     id?: number;
@@ -41,6 +41,7 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
     const handleAddPrice = () => {
         if (!newPrice || isNaN(Number(newPrice)) || Number(newPrice) < 0) {
             toast.error('Por favor, ingrese un precio válido.');
+
             return;
         }
 

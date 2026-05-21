@@ -1,12 +1,13 @@
 import { useForm } from '@inertiajs/react';
+import type { FormEventHandler} from 'react';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
+import { update as updateCustomer, store as storeCustomer } from '@/actions/App/Http/Controllers/CustomerController';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormEventHandler, useEffect } from 'react';
-import InputError from '@/components/input-error';
-import { toast } from 'sonner';
-import { update as updateCustomer, store as storeCustomer } from '@/actions/App/Http/Controllers/CustomerController';
 
 interface Customer {
     id?: number;

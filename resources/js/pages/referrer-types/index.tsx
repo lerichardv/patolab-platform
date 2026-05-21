@@ -1,17 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { Edit2, Plus, Search, Tag, Trash2 } from 'lucide-react';
-import ReferrerTypeSheet from './referrer-type-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as typesIndex, 
+    destroy as destroyType 
+} from '@/actions/App/Http/Controllers/ReferrerTypeController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -23,12 +18,17 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
-    index as typesIndex, 
-    destroy as destroyType 
-} from '@/actions/App/Http/Controllers/ReferrerTypeController';
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import ReferrerTypeSheet from './referrer-type-sheet';
 
 interface ReferrerType {
     id: number;
@@ -60,7 +60,10 @@ export default function ReferrerTypesIndex({ referrerTypes, filters }: Props) {
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === '') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(typesIndex().url, newFilters, {
             preserveState: true,

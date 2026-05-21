@@ -1,18 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { Edit2, Plus, Search, UserRound, Trash2 } from 'lucide-react';
-import ReferrerSheet from './referrer-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as referrersIndex, 
+    destroy as destroyReferrer 
+} from '@/actions/App/Http/Controllers/ReferrerController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -24,12 +18,18 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-    index as referrersIndex, 
-    destroy as destroyReferrer 
-} from '@/actions/App/Http/Controllers/ReferrerController';
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import ReferrerSheet from './referrer-sheet';
 
 interface ReferrerType {
     id: number;
@@ -74,7 +74,10 @@ export default function ReferrersIndex({ referrers, referrerTypes, filters }: Pr
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === 'all' || value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === 'all' || value === '') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(referrersIndex().url, newFilters, {
             preserveState: true,

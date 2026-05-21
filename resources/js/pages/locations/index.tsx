@@ -1,17 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { Edit2, MapPin, Plus, Search, Trash2 } from 'lucide-react';
-import LocationSheet from './location-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as locationsIndex, 
+    destroy as destroyLocation 
+} from '@/actions/App/Http/Controllers/LocationController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -23,13 +18,18 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
-
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
-    index as locationsIndex, 
-    destroy as destroyLocation 
-} from '@/actions/App/Http/Controllers/LocationController';
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import LocationSheet from './location-sheet';
+
 
 interface Location {
     id: number;
@@ -68,7 +68,10 @@ export default function LocationsIndex({ locations, filters }: Props) {
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === '') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(locationsIndex().url, newFilters, {
             preserveState: true,

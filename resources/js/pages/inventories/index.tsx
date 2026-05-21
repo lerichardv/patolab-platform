@@ -1,19 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { ClipboardList, Edit2, Package, PackageSearch, Plus, Search, Trash2, Warehouse } from 'lucide-react';
-import { Label } from '@/components/ui/label';
-import InventorySheet from '@/pages/inventories/inventory-sheet';
-import AbastecerSheet from '@/pages/inventories/abastecer-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as inventoriesIndex, 
+    destroy as destroyInventory 
+} from '@/actions/App/Http/Controllers/InventoryController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -25,6 +18,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -32,13 +29,16 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
 import { 
-    index as inventoriesIndex, 
-    destroy as destroyInventory 
-} from '@/actions/App/Http/Controllers/InventoryController';
-import { Badge } from '@/components/ui/badge';
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import AbastecerSheet from '@/pages/inventories/abastecer-sheet';
+import InventorySheet from '@/pages/inventories/inventory-sheet';
 
 interface Storage {
     id: number;
@@ -94,7 +94,10 @@ export default function InventoriesIndex({ inventories, storages, products, filt
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === '' || value === 'all') delete newFilters[key as keyof typeof filters];
+
+        if (value === '' || value === 'all') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(inventoriesIndex().url, newFilters, {
             preserveState: true,

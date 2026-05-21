@@ -1,12 +1,12 @@
 import { useForm } from '@inertiajs/react';
+import type { FormEventHandler } from 'react';
+import { toast } from 'sonner';
+import { update as updateInventory, store as storeInventory } from '@/actions/App/Http/Controllers/InventoryController';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormEventHandler } from 'react';
-import InputError from '@/components/input-error';
-import { toast } from 'sonner';
-import { update as updateInventory, store as storeInventory } from '@/actions/App/Http/Controllers/InventoryController';
 
 interface Storage {
     id: number;

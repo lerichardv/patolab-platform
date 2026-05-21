@@ -1,21 +1,11 @@
-import React from 'react';
 import { useForm } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Spinner } from '@/components/ui/spinner';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Check, ChevronsUpDown, Plus, Upload, FileText, X, ExternalLink, AlertCircle, Tag, Microscope } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React from 'react';
 import { toast } from 'sonner';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import CustomerForm from '../customers/customer-form';
-import SequenceForm from '../sequences/sequence-form';
-import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
+import {
+    store as storeSpecimen,
+    update as updateSpecimen
+} from '@/actions/App/Http/Controllers/SpecimenController';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -26,10 +16,20 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-    store as storeSpecimen,
-    update as updateSpecimen
-} from '@/actions/App/Http/Controllers/SpecimenController';
+import { Button } from '@/components/ui/button';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import CustomerForm from '../customers/customer-form';
+import SequenceForm from '../sequences/sequence-form';
+import { Switch } from '@/components/ui/switch';
 
 interface Props {
     specimen: any | null;
@@ -195,10 +195,13 @@ export default function SpecimenForm({
     React.useEffect(() => {
         if (!data.specimen_type) {
             setData('selected_price', '');
+
             return;
         }
+
         const selected = specimenTypes.find(t => t.id.toString() === data.specimen_type);
         const prices = selected?.prices || [];
+
         if (prices.length > 0) {
             const sortedPrices = [...prices].sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount));
             setData('selected_price', sortedPrices[0].amount.toString());
@@ -211,6 +214,7 @@ export default function SpecimenForm({
     const handleAddInsumo = (product: any) => {
         if (data.insumos.some((i: any) => i.id === product.id)) {
             toast.info(`El producto "${product.name}" ya ha sido agregado.`);
+
             return;
         }
 
@@ -236,8 +240,10 @@ export default function SpecimenForm({
         const updated = data.insumos.map((i: any) => {
             if (i.id === id) {
                 const cappedQty = Math.max(1, Math.min(i.total_stock, qty));
+
                 return { ...i, quantity: cappedQty };
             }
+
             return i;
         });
         setData('insumos', updated);
@@ -248,6 +254,7 @@ export default function SpecimenForm({
             if (i.id === id) {
                 return { ...i, price: price };
             }
+
             return i;
         });
         setData('insumos', updated);
@@ -269,7 +276,10 @@ export default function SpecimenForm({
     }, [isDirty, setIsDirty]);
 
     const matchingSequence = React.useMemo(() => {
-        if (specimen || !data.specimen_type || !activeLocationId) return null;
+        if (specimen || !data.specimen_type || !activeLocationId) {
+return null;
+}
+
         return localSequences.find(
             s => s.specimen_type.toString() === data.specimen_type &&
                 s.location_id === activeLocationId &&
@@ -278,10 +288,14 @@ export default function SpecimenForm({
     }, [specimen, data.specimen_type, localSequences, activeLocationId]);
 
     const nextSequencePreview = React.useMemo(() => {
-        if (!matchingSequence) return '';
+        if (!matchingSequence) {
+return '';
+}
+
         const fillWidth = matchingSequence.fill ?? 4;
         const paddedSeq = String(matchingSequence.current_sequence).padStart(fillWidth, '0');
         const paddedMonth = String(matchingSequence.month).padStart(2, '0');
+
         return `${matchingSequence.prefix}${matchingSequence.separator}${paddedSeq}${matchingSequence.separator}${paddedMonth}${matchingSequence.separator}${matchingSequence.year}`;
     }, [matchingSequence]);
 
@@ -290,18 +304,39 @@ export default function SpecimenForm({
         const localErrors: Record<string, string> = {};
 
         // Validar campos de la muestra
-        if (!data.customer) localErrors.customer = 'El paciente es requerido.';
-        if (!data.referrer) localErrors.referrer = 'El médico remitente es requerido.';
+        if (!data.customer) {
+localErrors.customer = 'El paciente es requerido.';
+}
+
+        if (!data.referrer) {
+localErrors.referrer = 'El médico remitente es requerido.';
+}
+
         if (!data.specimen_type) {
             localErrors.specimen_type = 'El tipo de muestra es requerido.';
         } else if (!specimen && !matchingSequence) {
             localErrors.specimen_type = 'No existe una secuencia de numeración activa configurada para este tipo de muestra.';
         }
-        if (!data.specimen_type_examination) localErrors.specimen_type_examination = 'El examen a realizar es requerido.';
-        if (!data.specimen_category) localErrors.specimen_category = 'La categoría de tiempo es requerida.';
-        if (!data.priority_id) localErrors.priority_id = 'La prioridad es requerida.';
-        if (!data.anatomic_site.trim()) localErrors.anatomic_site = 'El sitio anatómico es requerido.';
-        if (!data.status) localErrors.status = 'El estado es requerido.';
+
+        if (!data.specimen_type_examination) {
+localErrors.specimen_type_examination = 'El examen a realizar es requerido.';
+}
+
+        if (!data.specimen_category) {
+localErrors.specimen_category = 'La categoría de tiempo es requerida.';
+}
+
+        if (!data.priority_id) {
+localErrors.priority_id = 'La prioridad es requerida.';
+}
+
+        if (!data.anatomic_site.trim()) {
+localErrors.anatomic_site = 'El sitio anatómico es requerido.';
+}
+
+        if (!data.status) {
+localErrors.status = 'El estado es requerido.';
+}
 
         // El archivo de orden médica es requerido al crear
         if (!data.medical_order_file) {
@@ -321,8 +356,10 @@ export default function SpecimenForm({
                     <span className="text-xs text-muted-foreground">Por favor, complete todos los campos obligatorios del Paso 1 antes de continuar.</span>
                 </div>
             );
+
             return false;
         }
+
         return true;
     };
 
@@ -351,6 +388,7 @@ export default function SpecimenForm({
             } else if (parseFloat(data.custom_amount) < 0) {
                 localErrors.custom_amount = 'El importe personalizado debe ser mayor o igual a 0.';
             }
+
             if (!data.custom_amount_reason || !data.custom_amount_reason.trim()) {
                 localErrors.custom_amount_reason = 'El concepto/razón del importe adicional es requerido.';
             }
@@ -365,18 +403,21 @@ export default function SpecimenForm({
                 localErrors.initial_payment_amount = 'El monto de pago inicial es requerido.';
             } else {
                 const amt = parseFloat(data.initial_payment_amount);
+
                 if (isNaN(amt) || amt <= 0) {
                     localErrors.initial_payment_amount = 'El monto de pago inicial debe ser mayor a cero.';
                 } else if (amt > totalVal) {
                     localErrors.initial_payment_amount = `El monto de pago inicial no puede superar el total de la factura (L. ${totalVal.toFixed(2)}).`;
                 }
             }
+
             if (!data.initial_payment_type) {
                 localErrors.initial_payment_type = 'El tipo de pago inicial es requerido.';
             }
         }
 
         const needsProof = data.payment_type !== 'credit' || (data.payment_type === 'credit' && data.has_initial_payment);
+
         if (needsProof && !data.proof_of_payment) {
             localErrors.proof_of_payment = 'El comprobante de pago es requerido.';
         }
@@ -394,8 +435,10 @@ export default function SpecimenForm({
                     <span className="text-xs text-muted-foreground">Por favor, complete todos los campos obligatorios del Paso 3 antes de continuar.</span>
                 </div>
             );
+
             return false;
         }
+
         return true;
     };
 
@@ -405,18 +448,21 @@ export default function SpecimenForm({
         // Si es edición, se guarda directamente sin confirmación de facturación
         if (specimen) {
             submitForm();
+
             return;
         }
 
         // Si es creación y estamos en el paso 1, avanzar al paso 2
         if (currentStep === 1) {
             handleNextStep();
+
             return;
         }
 
         // Si es creación y estamos en el paso 2, avanzar al paso 3
         if (currentStep === 2) {
             handleNextStep();
+
             return;
         }
 
@@ -457,7 +503,10 @@ export default function SpecimenForm({
 
     // Maximum prices (regular prices)
     const maxSpecimenPriceVal = React.useMemo(() => {
-        if (availablePrices.length === 0) return 0;
+        if (availablePrices.length === 0) {
+return 0;
+}
+
         return Math.max(...availablePrices.map((p: any) => parseFloat(p.amount) || 0));
     }, [availablePrices]);
 
@@ -466,6 +515,7 @@ export default function SpecimenForm({
             const maxPrice = insumo.prices && insumo.prices.length > 0
                 ? parseFloat(insumo.prices[0].amount)
                 : (parseFloat(insumo.sale_price) || insumo.price || 0);
+
             return sum + (maxPrice * insumo.quantity);
         }, 0);
     }, [data.insumos]);
@@ -473,6 +523,7 @@ export default function SpecimenForm({
     // Discounts
     const specimenDiscountVal = React.useMemo(() => {
         const selected = parseFloat(data.selected_price) || 0;
+
         return Math.max(0, maxSpecimenPriceVal - selected);
     }, [maxSpecimenPriceVal, data.selected_price]);
 
@@ -482,6 +533,7 @@ export default function SpecimenForm({
                 ? parseFloat(insumo.prices[0].amount)
                 : (parseFloat(insumo.sale_price) || insumo.price || 0);
             const discountPerUnit = Math.max(0, maxPrice - insumo.price);
+
             return sum + (discountPerUnit * insumo.quantity);
         }, 0);
     }, [data.insumos]);
@@ -491,6 +543,7 @@ export default function SpecimenForm({
     React.useEffect(() => {
         const extra = data.custom_amount_enabled ? (parseFloat(data.custom_amount) || 0) : 0;
         const amountToSet = maxSpecimenPriceVal + extra + insumosDiscountVal;
+
         if (data.amount !== amountToSet.toString()) {
             setData('amount', amountToSet.toString());
         }
@@ -1119,6 +1172,7 @@ export default function SpecimenForm({
                                                                 value={parseFloat(insumo.price || 0).toString()}
                                                                 onValueChange={(val) => {
                                                                     const parsed = parseFloat(val);
+
                                                                     if (!isNaN(parsed)) {
                                                                         handleUpdateInsumoPrice(insumo.id, parsed);
                                                                     }
@@ -1131,6 +1185,7 @@ export default function SpecimenForm({
                                                                     {insumo.prices && insumo.prices.length > 0 ? (
                                                                         insumo.prices.map((p: any, idx: number) => {
                                                                             const priceStr = parseFloat(p.amount || 0).toString();
+
                                                                             return (
                                                                                 <SelectItem key={idx} value={priceStr} className="font-mono text-xs">
                                                                                     L. {parseFloat(p.amount || 0).toFixed(2)}
@@ -1330,10 +1385,12 @@ export default function SpecimenForm({
                                                 onValueChange={(value) => {
                                                     setData(data => {
                                                         const updated = { ...data, payment_type: value };
+
                                                         if (value === 'credit') {
                                                             updated.proof_of_payment = null;
                                                             updated.has_initial_payment = false;
                                                         }
+
                                                         return updated;
                                                     });
                                                 }}

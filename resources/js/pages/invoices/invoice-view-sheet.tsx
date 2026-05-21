@@ -1,8 +1,5 @@
-import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import HeadingSheet from '@/components/heading-sheet';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import {
     Microscope,
     User,
@@ -20,8 +17,11 @@ import {
     Coins,
     Hash
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import HeadingSheet from '@/components/heading-sheet';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 
 interface Props {
     invoice: any | null;
@@ -30,7 +30,9 @@ interface Props {
 }
 
 export default function InvoiceViewSheet({ invoice, open, onOpenChange }: Props) {
-    if (!invoice) return null;
+    if (!invoice) {
+return null;
+}
 
     const specimen = invoice.specimen;
     const credit = invoice.credit_relation;
@@ -46,6 +48,7 @@ export default function InvoiceViewSheet({ invoice, open, onOpenChange }: Props)
             'transfer': 'Transferencia',
             'credit': 'Crédito'
         };
+
         return labels[type] || type;
     };
 
@@ -55,6 +58,7 @@ export default function InvoiceViewSheet({ invoice, open, onOpenChange }: Props)
 
     const isImageFile = (path: string) => {
         const ext = getFileExtension(path);
+
         return ext ? ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) : false;
     };
 

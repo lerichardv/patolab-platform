@@ -1,10 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-    Sheet,
-    SheetContent,
-} from '@/components/ui/sheet';
 import HeadingSheet from '@/components/heading-sheet';
-import SpecimenForm from './specimen-form';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -15,6 +10,11 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Sheet,
+    SheetContent,
+} from '@/components/ui/sheet';
+import SpecimenForm from './specimen-form';
 
 interface Props {
     specimen: any | null;
@@ -55,10 +55,12 @@ export default function SpecimenSheet({
             if (open && !specimen && isFormDirty) {
                 e.preventDefault();
                 e.returnValue = '';
+
                 return '';
             }
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
+
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
@@ -68,9 +70,11 @@ export default function SpecimenSheet({
         if (!newOpen) {
             if (!specimen && isFormDirty) {
                 setShowCloseConfirm(true);
+
                 return;
             }
         }
+
         onOpenChange(newOpen);
     };
 

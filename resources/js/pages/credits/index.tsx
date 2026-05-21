@@ -1,5 +1,19 @@
 import { Head, router, usePage } from '@inertiajs/react';
+import { format } from 'date-fns';
+import debounce from 'lodash/debounce';
+import { FileText, Search, CreditCard, ExternalLink, Printer, History } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
+import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
+import { Pagination } from '@/components/pagination';
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogFooter,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,21 +25,7 @@ import {
     TableHeader, 
     TableRow 
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Pagination } from '@/components/pagination';
-import { FileText, Search, CreditCard, ExternalLink, Printer, History } from 'lucide-react';
 import CreditSheet from './credit-sheet';
-import debounce from 'lodash/debounce';
-import { format } from 'date-fns';
-import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
-import {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogDescription,
-    AlertDialogFooter,
-} from '@/components/ui/alert-dialog';
 
 interface Customer {
     id: number;
@@ -94,7 +94,10 @@ export default function CreditsIndex({ credits, filters }: Props) {
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === 'all' || value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === 'all' || value === '') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(creditsIndex().url, newFilters, {
             preserveState: true,
@@ -127,9 +130,11 @@ export default function CreditsIndex({ credits, filters }: Props) {
         if (remaining === 0) {
             return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Pagado</Badge>;
         }
+
         if (paid > 0) {
             return <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">Pago Parcial</Badge>;
         }
+
         return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">Pendiente</Badge>;
     };
 

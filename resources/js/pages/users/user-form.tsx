@@ -1,11 +1,12 @@
 import { useForm } from '@inertiajs/react';
+import type { FormEventHandler} from 'react';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
+import { update as updateUser, store as storeUser } from '@/actions/App/Http/Controllers/UserController';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FormEventHandler, useEffect } from 'react';
-import InputError from '@/components/input-error';
-import { toast } from 'sonner';
-import { update as updateUser, store as storeUser } from '@/actions/App/Http/Controllers/UserController';
 
 interface User {
     id?: number;

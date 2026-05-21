@@ -1,5 +1,9 @@
 import { useForm } from '@inertiajs/react';
-import { FormEventHandler, useEffect } from 'react';
+import type { FormEventHandler} from 'react';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
+import { store as storeSequence, update as updateSequence } from '@/actions/App/Http/Controllers/SequenceController';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,9 +14,6 @@ import {
     SelectTrigger, 
     SelectValue 
 } from '@/components/ui/select';
-import InputError from '@/components/input-error';
-import { toast } from 'sonner';
-import { store as storeSequence, update as updateSequence } from '@/actions/App/Http/Controllers/SequenceController';
 
 interface Location {
     id: number;
@@ -123,6 +124,7 @@ export default function SequenceForm({ sequence, locations, specimenTypes, seque
         const year = String(data.year);
         const prefix = data.prefix || '...';
         const separator = data.separator || '';
+
         return `${prefix}${separator}${seq}${separator}${month}${separator}${year}`;
     };
 
@@ -167,6 +169,7 @@ export default function SequenceForm({ sequence, locations, specimenTypes, seque
                         <SelectContent>
                             {specimenTypes.map((type) => {
                                 const exists = hasSequence(type.id);
+
                                 return (
                                     <SelectItem 
                                         key={type.id} 

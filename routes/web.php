@@ -10,7 +10,59 @@ Route::inertia('/', 'welcome', [
 ])->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
+    Route::get('dashboard', function () {
+        $specimensCount = \App\Models\Specimen::where('active', true)->count();
+        $moneyMadeToday = \App\Models\Invoice::whereDate('created_at', \Carbon\Carbon::today())->sum('total');
+        $customersCount = \App\Models\Customer::where('active', true)->count();
+
+        $startOfWeek = \Carbon\Carbon::now()->startOfWeek();
+        $endOfWeek = \Carbon\Carbon::now()->endOfWeek();
+
+        $specimensThisWeekCount = \App\Models\Specimen::where('active', true)
+            ->whereBetween('created_at', [$startOfWeek, $endOfWeek])
+            ->count();
+
+        // Get specimens created this week, grouped by date
+        $specimensThisWeek = \App\Models\Specimen::where('active', true)
+            ->whereBetween('created_at', [$startOfWeek, $endOfWeek])
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+            ->groupBy('date')
+            ->pluck('count', 'date');
+
+        // Get invoices created this week, grouped by date
+        $invoicesThisWeek = \App\Models\Invoice::whereBetween('created_at', [$startOfWeek, $endOfWeek])
+            ->selectRaw('DATE(created_at) as date, SUM(total) as total')
+            ->groupBy('date')
+            ->pluck('total', 'date');
+
+        // Build a complete list of 7 days (Monday to Sunday)
+        $weeklyData = [];
+        $daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+        for ($i = 0; $i < 7; $i++) {
+            $dateStr = $startOfWeek->copy()->addDays($i)->toDateString();
+            $weeklyData[] = [
+                'day' => $daysOfWeek[$i],
+                'date' => $dateStr,
+                'count' => (int)($specimensThisWeek[$dateStr] ?? 0),
+                'earnings' => (float)($invoicesThisWeek[$dateStr] ?? 0),
+            ];
+        }
+
+        $todaySpecimens = \App\Models\Specimen::where('active', true)
+            ->whereDate('created_at', \Carbon\Carbon::today())
+            ->with(['customerRelation', 'type', 'examination', 'priority', 'invoiceRelation'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return inertia('dashboard', [
+            'specimensCount' => $specimensCount,
+            'specimensThisWeekCount' => $specimensThisWeekCount,
+            'moneyMadeToday' => (float)$moneyMadeToday,
+            'customersCount' => $customersCount,
+            'specimensWeeklyData' => $weeklyData,
+            'todaySpecimens' => $todaySpecimens,
+        ]);
+    })->name('dashboard');
     Route::inertia('test-page', 'test-page')->name('test-page');
     Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
     Route::resource('customers', CustomerController::class);

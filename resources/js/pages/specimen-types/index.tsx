@@ -1,19 +1,13 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { Edit2, Microscope, Plus, Search, Trash2 } from 'lucide-react';
-import SpecimenTypeSheet from './specimen-type-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as specimenTypesIndex, 
+    destroy as destroySpecimenType 
+} from '@/actions/App/Http/Controllers/SpecimenTypeController';
 import { Pagination } from '@/components/pagination';
-import { Badge } from '@/components/ui/badge';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -24,12 +18,18 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
-    index as specimenTypesIndex, 
-    destroy as destroySpecimenType 
-} from '@/actions/App/Http/Controllers/SpecimenTypeController';
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import SpecimenTypeSheet from './specimen-type-sheet';
 
 interface Price {
     id?: number;
@@ -72,7 +72,10 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === '') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(specimenTypesIndex().url, newFilters, {
             preserveState: true,

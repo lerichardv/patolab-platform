@@ -1,19 +1,10 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import { differenceInDays, parseISO, format } from 'date-fns';
+import debounce from 'lodash/debounce';
 import { Edit2, Plus, Search, Trash2, Receipt, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
-import CaiRangeSheet from './cai-range-sheet';
-import { Badge } from '@/components/ui/badge';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { index as caiRangesIndex, destroy as destroyCaiRange } from '@/actions/App/Http/Controllers/CaiRangeController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -25,10 +16,19 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
-import { index as caiRangesIndex, destroy as destroyCaiRange } from '@/actions/App/Http/Controllers/CaiRangeController';
-import { differenceInDays, parseISO, format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import CaiRangeSheet from './cai-range-sheet';
 
 interface Location {
     id: number;
@@ -85,7 +85,10 @@ export default function CaiRangesIndex({ caiRanges, locations, filters }: Props)
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === 'all' || value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === 'all' || value === '') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(caiRangesIndex().url, newFilters, {
             preserveState: true,

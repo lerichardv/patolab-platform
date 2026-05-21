@@ -1,15 +1,15 @@
 import { useForm } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '../../components/ui/textarea';
-import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { 
     store as storeReferrer, 
     update as updateReferrer 
 } from '@/actions/App/Http/Controllers/ReferrerController';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '../../components/ui/textarea';
 
 interface ReferrerType {
     id: number;

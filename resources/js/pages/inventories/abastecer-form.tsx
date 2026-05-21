@@ -1,12 +1,12 @@
 import { useForm } from '@inertiajs/react';
+import type { FormEventHandler } from 'react';
+import { toast } from 'sonner';
+import { abastecer as abastecerAction } from '@/actions/App/Http/Controllers/InventoryController';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormEventHandler } from 'react';
-import InputError from '@/components/input-error';
-import { toast } from 'sonner';
-import { abastecer as abastecerAction } from '@/actions/App/Http/Controllers/InventoryController';
 
 interface Inventory {
     id: number;
@@ -29,7 +29,9 @@ export default function AbastecerForm({ inventories, onSuccess }: Props) {
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        if (!data.inventory_id) return;
+        if (!data.inventory_id) {
+return;
+}
 
         post(abastecerAction(Number(data.inventory_id)).url, {
             onSuccess: () => {

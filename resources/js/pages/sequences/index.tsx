@@ -1,17 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { Edit2, Hash, Plus, Search, Trash2 } from 'lucide-react';
-import SequenceSheet from './sequence-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import {
+    index as sequencesIndex,
+    destroy as destroySequence
+} from '@/actions/App/Http/Controllers/SequenceController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -23,12 +18,17 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
-    index as sequencesIndex,
-    destroy as destroySequence
-} from '@/actions/App/Http/Controllers/SequenceController';
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
+} from '@/components/ui/table';
+import SequenceSheet from './sequence-sheet';
 
 interface Location {
     id: number;
@@ -85,7 +85,10 @@ export default function SequencesIndex({ sequences, locations, specimenTypes, al
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === '') {
+delete newFilters[key as keyof typeof filters];
+}
 
         router.get(sequencesIndex().url, newFilters, {
             preserveState: true,
@@ -137,6 +140,7 @@ export default function SequencesIndex({ sequences, locations, specimenTypes, al
         const seq = String(sequence.current_sequence).padStart(fill, '0');
         const month = String(sequence.month).padStart(2, '0');
         const year = String(sequence.year); // Full 4-digit year
+
         return `${sequence.prefix}${sequence.separator}${seq}${sequence.separator}${month}${sequence.separator}${year}`;
     };
 

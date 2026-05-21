@@ -1,18 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { Edit2, FlaskConical, Plus, Search, Trash2 } from 'lucide-react';
-import SpecimenTypeExaminationSheet from './specimen-type-examination-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as examinationsIndex, 
+    destroy as destroyExamination 
+} from '@/actions/App/Http/Controllers/SpecimenTypeExaminationController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -24,12 +18,18 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-    index as examinationsIndex, 
-    destroy as destroyExamination 
-} from '@/actions/App/Http/Controllers/SpecimenTypeExaminationController';
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import SpecimenTypeExaminationSheet from './specimen-type-examination-sheet';
 
 interface SpecimenType {
     id: number;
@@ -75,7 +75,10 @@ export default function SpecimenTypeExaminationsIndex({ examinations, specimenTy
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === 'all' || value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === 'all' || value === '') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(examinationsIndex().url, newFilters, {
             preserveState: true,

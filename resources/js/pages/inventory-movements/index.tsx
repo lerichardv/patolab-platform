@@ -1,6 +1,20 @@
 import { Head, router } from '@inertiajs/react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import debounce from 'lodash/debounce';
+import { History, Search, User, ArrowUpCircle, ArrowDownCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
+import { index as inventoryMovementsIndex } from '@/actions/App/Http/Controllers/InventoryMovementController';
+import { Pagination } from '@/components/pagination';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { 
     Table, 
     TableBody, 
@@ -9,20 +23,6 @@ import {
     TableHeader, 
     TableRow 
 } from '@/components/ui/table';
-import { History, Search, User, ArrowUpCircle, ArrowDownCircle, RefreshCw, Trash2 } from 'lucide-react';
-import { Pagination } from '@/components/pagination';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import debounce from 'lodash/debounce';
-import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { index as inventoryMovementsIndex } from '@/actions/App/Http/Controllers/InventoryMovementController';
 
 interface Movement {
     id: number;
@@ -63,7 +63,10 @@ export default function InventoryMovementsIndex({ movements, filters }: Props) {
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === '' || value === 'all') delete newFilters[key as keyof typeof filters];
+
+        if (value === '' || value === 'all') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(inventoryMovementsIndex().url, newFilters, {
             preserveState: true,

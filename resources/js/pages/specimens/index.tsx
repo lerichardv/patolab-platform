@@ -1,17 +1,16 @@
-import { Head, router, usePage } from '@inertiajs/react';
-import { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { formatDistanceToNow, add, isPast, isToday, format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { Plus, Microscope, Edit2, Trash2, Tag, CalendarClock, FileText, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import type {
+    DropResult
+} from '@hello-pangea/dnd';
 import {
     DragDropContext,
     Droppable,
-    Draggable,
-    DropResult
+    Draggable
 } from '@hello-pangea/dnd';
-import SpecimenSheet from './specimen-sheet';
-import SpecimenViewSheet from './specimen-view-sheet';
+import { Head, router, usePage } from '@inertiajs/react';
+import { formatDistanceToNow, add, isPast, isToday, format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Plus, Microscope, Edit2, Trash2, Tag, CalendarClock, FileText, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import {
     updateOrder as updateSpecimenOrder,
@@ -27,6 +26,9 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import SpecimenSheet from './specimen-sheet';
+import SpecimenViewSheet from './specimen-view-sheet';
 
 interface Specimen {
     id: number;
@@ -68,7 +70,9 @@ interface Props {
 
 
 const getDueDateInfo = (specimen: Specimen) => {
-    if (!specimen.category || !specimen.category.unit || !specimen.category.quantity) return null;
+    if (!specimen.category || !specimen.category.unit || !specimen.category.quantity) {
+return null;
+}
 
     const createdAt = new Date(specimen.created_at);
     const unitMap: Record<string, string> = {
@@ -137,19 +141,25 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
     const findSpecimenById = (id: number): Specimen | null => {
         for (const p of priorities) {
             const found = p.specimens.find(s => s.id === id);
-            if (found) return found;
+
+            if (found) {
+return found;
+}
         }
+
         return null;
     };
 
     useEffect(() => {
         if (flash.new_invoice_url) {
             setInvoiceUrl(flash.new_invoice_url);
+
             if (flash.new_payment_invoice_url) {
                 setPaymentInvoiceUrl(flash.new_payment_invoice_url);
             } else {
                 setPaymentInvoiceUrl(null);
             }
+
             setActivePdf('invoice');
             setShowInvoiceModal(true);
         }
@@ -159,6 +169,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
         if (flash.new_specimen_id) {
             const specId = parseInt(flash.new_specimen_id);
             const found = findSpecimenById(specId);
+
             if (found) {
                 setIsSheetOpen(false);
                 setSelectedSpecimen(null);
@@ -169,10 +180,52 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
         }
     }, [flash.new_specimen_id, priorities]);
 
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const specimenParam = urlParams.get('specimen');
+        const action = urlParams.get('action');
+
+        if (specimenParam && action === 'view' && priorities.length > 0) {
+            let found: Specimen | null = null;
+            for (const p of priorities) {
+                const spec = p.specimens.find((s) => {
+                    // Match by sequence_code (case insensitive)
+                    if (s.sequence_code?.toLowerCase() === specimenParam.toLowerCase()) {
+                        return true;
+                    }
+                    // Fallback to match by numeric id
+                    const parsedId = parseInt(specimenParam);
+                    if (!isNaN(parsedId) && s.id === parsedId) {
+                        return true;
+                    }
+                    return false;
+                });
+                if (spec) {
+                    found = spec;
+                    break;
+                }
+            }
+
+            if (found) {
+                setIsSheetOpen(false);
+                setSelectedSpecimen(null);
+                setSelectedSpecimenForView(found);
+                setIsViewSheetOpen(true);
+
+                // Clean the query parameters from URL to avoid re-triggering on fresh re-renders/navs
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, '', newUrl);
+            }
+        }
+    }, [priorities]);
+
     const onDragEnd = (result: DropResult) => {
         const { source, destination } = result;
 
-        if (!destination) return;
+        if (!destination) {
+return;
+}
+
         if (
             source.droppableId === destination.droppableId &&
             source.index === destination.index
@@ -276,6 +329,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 
     const updateScrollState = () => {
         const el = scrollContainerRef.current;
+
         if (el) {
             setCanScrollLeft(el.scrollLeft > 5);
             setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 5);
@@ -285,6 +339,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
     useEffect(() => {
         updateScrollState();
         window.addEventListener('resize', updateScrollState);
+
         return () => window.removeEventListener('resize', updateScrollState);
     }, [priorities]);
 
@@ -294,7 +349,11 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
         const el = scrollContainerRef.current;
-        if (!el) return;
+
+        if (!el) {
+return;
+}
+
         const rect = el.getBoundingClientRect();
 
         const relativeY = e.clientY - rect.top;
@@ -314,6 +373,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
     const scrollLeftFn = (e: React.MouseEvent) => {
         e.stopPropagation();
         const el = scrollContainerRef.current;
+
         if (el) {
             el.scrollBy({ left: -350, behavior: 'smooth' });
         }
@@ -322,6 +382,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
     const scrollRightFn = (e: React.MouseEvent) => {
         e.stopPropagation();
         const el = scrollContainerRef.current;
+
         if (el) {
             el.scrollBy({ left: 350, behavior: 'smooth' });
         }
@@ -477,7 +538,11 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
                                                                         </div>
                                                                         {(() => {
                                                                             const dueInfo = getDueDateInfo(specimen);
-                                                                            if (!dueInfo) return null;
+
+                                                                            if (!dueInfo) {
+return null;
+}
+
                                                                             return (
                                                                                 <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                                                                                     <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border bg-primary/10 text-primary border-primary/20 w-fit">
@@ -573,6 +638,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
             {/* DIÁLOGO DE IMPRESIÓN/VISTA PREVIA DE FACTURA */}
             <AlertDialog open={showInvoiceModal} onOpenChange={(open) => {
                 setShowInvoiceModal(open);
+
                 if (!open) {
                     setInvoiceUrl(null);
                     setPaymentInvoiceUrl(null);
@@ -638,6 +704,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
                         <Button
                             onClick={() => {
                                 const url = activePdf === 'invoice' ? invoiceUrl : paymentInvoiceUrl;
+
                                 if (url) {
                                     window.open(url, '_blank');
                                 }

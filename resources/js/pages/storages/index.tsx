@@ -1,17 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { Edit2, Plus, Search, Trash2, Warehouse } from 'lucide-react';
-import StorageSheet from './storage-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as storagesIndex, 
+    destroy as destroyStorage 
+} from '@/actions/App/Http/Controllers/StorageController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -23,12 +18,17 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
-    index as storagesIndex, 
-    destroy as destroyStorage 
-} from '@/actions/App/Http/Controllers/StorageController';
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import StorageSheet from './storage-sheet';
 
 interface Storage {
     id: number;
@@ -66,7 +66,10 @@ export default function StoragesIndex({ storages, filters }: Props) {
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === '') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(storagesIndex().url, newFilters, {
             preserveState: true,

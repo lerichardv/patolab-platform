@@ -1,17 +1,12 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { Edit2, Package, Plus, Search, Trash2 } from 'lucide-react';
-import ProductSheet from '@/pages/products/product-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as productsIndex, 
+    destroy as destroyProduct 
+} from '@/actions/App/Http/Controllers/ProductController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -23,13 +18,18 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
-import { 
-    index as productsIndex, 
-    destroy as destroyProduct 
-} from '@/actions/App/Http/Controllers/ProductController';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { 
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import ProductSheet from '@/pages/products/product-sheet';
 
 interface Price {
     id?: number;
@@ -79,7 +79,10 @@ export default function ProductsIndex({ products, filters }: Props) {
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === '' || value === 'all') delete newFilters[key as keyof typeof filters];
+
+        if (value === '' || value === 'all') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(productsIndex().url, newFilters, {
             preserveState: true,

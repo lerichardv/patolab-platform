@@ -1,12 +1,13 @@
 import { useForm } from '@inertiajs/react';
+import type { FormEventHandler} from 'react';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
+import { store as storeCaiRange, update as updateCaiRange } from '@/actions/App/Http/Controllers/CaiRangeController';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormEventHandler, useEffect } from 'react';
-import InputError from '@/components/input-error';
-import { toast } from 'sonner';
-import { store as storeCaiRange, update as updateCaiRange } from '@/actions/App/Http/Controllers/CaiRangeController';
 
 interface Location {
     id: number;
@@ -40,7 +41,10 @@ interface Props {
 
 export default function CaiRangeForm({ caiRange, locations, onSuccess }: Props) {
     const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '';
+        if (!dateStr) {
+return '';
+}
+
         // Extract YYYY-MM-DD from datetime
         return dateStr.split('T')[0];
     };
@@ -80,7 +84,10 @@ export default function CaiRangeForm({ caiRange, locations, onSuccess }: Props) 
             onSuccess: () => {
                 toast.success(caiRange?.id ? 'Rango de facturación actualizado' : 'Rango de facturación creado');
                 onSuccess();
-                if (!caiRange?.id) reset();
+
+                if (!caiRange?.id) {
+reset();
+}
             },
         };
 

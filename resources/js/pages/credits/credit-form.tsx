@@ -1,13 +1,14 @@
 import { useForm } from '@inertiajs/react';
+import { FileText, Upload, X } from 'lucide-react';
+import type { FormEventHandler} from 'react';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
+import { pay as payCredit } from '@/actions/App/Http/Controllers/CreditController';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FormEventHandler, useEffect } from 'react';
-import InputError from '@/components/input-error';
-import { toast } from 'sonner';
-import { FileText, Upload, X } from 'lucide-react';
-import { pay as payCredit } from '@/actions/App/Http/Controllers/CreditController';
 
 interface Customer {
     id: number;
@@ -44,16 +45,19 @@ export default function CreditForm({ credit, onSuccess }: Props) {
 
         if (parseFloat(data.amount_paid) <= 0) {
             toast.error('El monto a pagar debe ser mayor que cero');
+
             return;
         }
 
         if (parseFloat(data.amount_paid) > remainingVal) {
             toast.error('El monto a pagar no puede superar el saldo pendiente');
+
             return;
         }
 
         if (!data.proof_of_payment) {
             toast.error('El comprobante de pago es requerido');
+
             return;
         }
 

@@ -1,17 +1,13 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import { usePage } from '@inertiajs/react';
+import debounce from 'lodash/debounce';
 import { Edit2, Plus, Search, Trash2, Users, FileSpreadsheet } from 'lucide-react';
-import UserSheet from './user-sheet';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as usersIndex, 
+    destroy as destroyUser 
+} from '@/actions/App/Http/Controllers/UserController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -23,13 +19,17 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
-    index as usersIndex, 
-    destroy as destroyUser 
-} from '@/actions/App/Http/Controllers/UserController';
-import { usePage } from '@inertiajs/react';
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import UserSheet from './user-sheet';
 
 interface User {
     id: number;
@@ -104,7 +104,10 @@ export default function UsersIndex({ users, filters }: Props) {
                     setIsDeleteDialogOpen(false);
                 },
                 onError: (errors: any) => {
-                    if (errors.error) toast.error(errors.error);
+                    if (errors.error) {
+toast.error(errors.error);
+}
+
                     setIsDeleteDialogOpen(false);
                 }
             });

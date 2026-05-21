@@ -1,19 +1,13 @@
 import { Head, router } from '@inertiajs/react';
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
-} from '@/components/ui/table';
+import debounce from 'lodash/debounce';
 import { Edit2, FileSpreadsheet, Plus, Search, Trash2, Users } from 'lucide-react';
-import CustomerSheet from './customer-sheet';
-import { Badge } from '@/components/ui/badge';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { 
+    index as customersIndex, 
+    destroy as destroyCustomer, 
+    exportMethod as exportCustomers 
+} from '@/actions/App/Http/Controllers/CustomerController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -25,13 +19,19 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import debounce from 'lodash/debounce';
-import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-    index as customersIndex, 
-    destroy as destroyCustomer, 
-    exportMethod as exportCustomers 
-} from '@/actions/App/Http/Controllers/CustomerController';
+    Table, 
+    TableBody, 
+    TableCell, 
+    TableHead, 
+    TableHeader, 
+    TableRow 
+} from '@/components/ui/table';
+import CustomerSheet from './customer-sheet';
 
 interface Customer {
     id: number;
@@ -80,7 +80,10 @@ export default function CustomersIndex({ customers, filters }: Props) {
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
-        if (value === 'all' || value === '') delete newFilters[key as keyof typeof filters];
+
+        if (value === 'all' || value === '') {
+delete newFilters[key as keyof typeof filters];
+}
         
         router.get(customersIndex().url, newFilters, {
             preserveState: true,
