@@ -40,13 +40,16 @@ interface Props {
     sequence?: Sequence;
     locations: Location[];
     specimenTypes: SpecimenType[];
+    sequences?: any[];
     onSuccess: () => void;
+    defaultLocationId?: number;
+    defaultSpecimenTypeId?: number;
 }
 
-export default function SequenceForm({ sequence, locations, specimenTypes, onSuccess }: Props) {
+export default function SequenceForm({ sequence, locations, specimenTypes, sequences = [], onSuccess, defaultLocationId, defaultSpecimenTypeId }: Props) {
     const { data, setData, post, put, processing, errors, reset } = useForm({
-        location_id: sequence?.location_id || (locations.length > 0 ? locations[0].id : 0),
-        specimen_type: sequence?.specimen_type || (specimenTypes.length > 0 ? specimenTypes[0].id : 0),
+        location_id: sequence?.location_id || defaultLocationId || (locations.length > 0 ? locations[0].id : 0),
+        specimen_type: sequence?.specimen_type || defaultSpecimenTypeId || (specimenTypes.length > 0 ? specimenTypes[0].id : 0),
         prefix: sequence?.prefix || '',
         separator: sequence?.separator || '-',
         fill: sequence?.fill || 4,
@@ -54,6 +57,14 @@ export default function SequenceForm({ sequence, locations, specimenTypes, onSuc
         year: sequence?.year || new Date().getFullYear(),
         current_sequence: sequence?.current_sequence || 1,
     });
+
+    const hasSequence = (specimenTypeId: number) => {
+        return sequences.some(s => 
+            s.location_id === data.location_id && 
+            s.specimen_type === specimenTypeId &&
+            s.id !== sequence?.id
+        );
+    };
 
     useEffect(() => {
         if (sequence) {
@@ -68,15 +79,26 @@ export default function SequenceForm({ sequence, locations, specimenTypes, onSuc
                 current_sequence: sequence.current_sequence,
             });
         } else {
-            reset();
+            setData({
+                location_id: defaultLocationId || (locations.length > 0 ? locations[0].id : 0),
+                specimen_type: defaultSpecimenTypeId || (specimenTypes.length > 0 ? specimenTypes[0].id : 0),
+                prefix: '',
+                separator: '-',
+                fill: 4,
+                month: new Date().getMonth() + 1,
+                year: new Date().getFullYear(),
+                current_sequence: 1,
+            });
         }
-    }, [sequence]);
+    }, [sequence, defaultLocationId, defaultSpecimenTypeId]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        e.stopPropagation();
         
         if (sequence?.id) {
             put(updateSequence(sequence.id).url, {
+                preserveState: true,
                 onSuccess: () => {
                     toast.success('Secuencia actualizada correctamente');
                     onSuccess();
@@ -84,6 +106,7 @@ export default function SequenceForm({ sequence, locations, specimenTypes, onSuc
             });
         } else {
             post(storeSequence().url, {
+                preserveState: true,
                 onSuccess: () => {
                     toast.success('Secuencia creada correctamente');
                     onSuccess();
@@ -142,11 +165,19 @@ export default function SequenceForm({ sequence, locations, specimenTypes, onSuc
                             <SelectValue placeholder="Seleccione tipo" />
                         </SelectTrigger>
                         <SelectContent>
-                            {specimenTypes.map((type) => (
-                                <SelectItem key={type.id} value={type.id.toString()}>
-                                    {type.name}
-                                </SelectItem>
-                            ))}
+                            {specimenTypes.map((type) => {
+                                const exists = hasSequence(type.id);
+                                return (
+                                    <SelectItem 
+                                        key={type.id} 
+                                        value={type.id.toString()}
+                                        disabled={exists}
+                                        className={exists ? "text-muted-foreground opacity-60 font-normal" : ""}
+                                    >
+                                        {type.name} {exists ? ' (Ya configurado)' : ''}
+                                    </SelectItem>
+                                );
+                            })}
                         </SelectContent>
                     </Select>
                     <InputError message={errors.specimen_type} />

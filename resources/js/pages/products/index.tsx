@@ -31,6 +31,11 @@ import {
 } from '@/actions/App/Http/Controllers/ProductController';
 import { Badge } from '@/components/ui/badge';
 
+interface Price {
+    id?: number;
+    amount: number | string;
+}
+
 interface Product {
     id: number;
     code: string;
@@ -42,6 +47,7 @@ interface Product {
     sale_price: number;
     isv: boolean;
     active: boolean;
+    prices?: Price[];
 }
 
 interface Props {
@@ -165,7 +171,7 @@ export default function ProductsIndex({ products, filters }: Props) {
                                 <TableHead>Nombre</TableHead>
                                 <TableHead>Unidad</TableHead>
                                 <TableHead>Precio Compra</TableHead>
-                                <TableHead>Precio Venta</TableHead>
+                                <TableHead>Precios de Venta</TableHead>
                                 <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -197,7 +203,19 @@ export default function ProductsIndex({ products, filters }: Props) {
                                             <span className="text-xs">{getUnitLabel(product.unit)} ({product.unit_value})</span>
                                         </TableCell>
                                         <TableCell>L. {Number(product.purchase_price).toFixed(2)}</TableCell>
-                                        <TableCell>L. {Number(product.sale_price).toFixed(2)}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                                {product.prices && product.prices.length > 0 ? (
+                                                    product.prices.map((price) => (
+                                                        <Badge key={price.id} variant="secondary" className="font-mono">
+                                                            L. {parseFloat(String(price.amount)).toFixed(2)}
+                                                        </Badge>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">Sin precio</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
                                                 <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>

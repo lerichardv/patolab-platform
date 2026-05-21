@@ -12,7 +12,7 @@ class SpecimenController extends Controller
         
         $priorities->load(['specimens' => function($q) {
             $q->where('specimen.active', true)
-              ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation'])
+              ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation'])
               ->leftJoin('priorities_specimens_order', function($join) {
                   $join->on('specimen.id', '=', 'priorities_specimens_order.specimen_id')
                        ->on('specimen.priority_id', '=', 'priorities_specimens_order.priority_id');
@@ -22,13 +22,31 @@ class SpecimenController extends Controller
               ->orderBy('specimen.created_at', 'desc');
         }]);
 
+        $activeCai = \App\Models\CaiRange::where('status', 'active')->first();
+        $activeLocationId = $activeCai ? $activeCai->location_id : null;
+        $sequences = \App\Models\Sequence::where('active', true)->get();
+
+        $products = \App\Models\Product::where('active', true)
+            ->whereHas('inventory', function($q) {
+                $q->where('active', true);
+            })
+            ->withSum(['inventory as total_stock' => function($q) {
+                $q->where('active', true);
+            }], 'quantity')
+            ->with('prices')
+            ->get();
+
         return \Inertia\Inertia::render('specimens/index', [
             'priorities' => $priorities,
             'customers' => \App\Models\Customer::where('active', true)->get(),
-            'specimenTypes' => \App\Models\SpecimenType::where('active', true)->get(),
+            'specimenTypes' => \App\Models\SpecimenType::where('active', true)->with('prices')->get(),
             'examinations' => \App\Models\SpecimenTypeExamination::where('active', true)->get(),
             'categories' => \App\Models\SpecimenCategory::where('active', true)->get(),
             'referrers' => \App\Models\Referrer::where('active', true)->get(),
+            'locations' => \App\Models\Location::where('active', true)->get(),
+            'sequences' => $sequences,
+            'activeLocationId' => $activeLocationId,
+            'products' => $products,
         ]);
     }
 
@@ -45,18 +63,327 @@ class SpecimenController extends Controller
             'clinical_notes' => 'nullable|string',
             'status' => 'required|string',
             'priority_id' => 'required|exists:priorities,id',
+            'medical_order_file' => [
+                'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp,gif',
+                function ($attribute, $value, $fail) {
+                    if ($value instanceof \Illuminate\Http\UploadedFile) {
+                        $mime = $value->getMimeType();
+                        $isImage = str_starts_with($mime, 'image/');
+                        $sizeInKb = $value->getSize() / 1024;
+                        if ($isImage) {
+                            if ($sizeInKb > 10240) {
+                                $fail('El archivo de imagen no debe superar los 10 MB.');
+                            }
+                        } else {
+                            if ($sizeInKb > 30720) {
+                                $fail('El archivo de orden médica no debe superar los 30 MB.');
+                            }
+                        }
+                    }
+                }
+            ],
+            'amount' => 'required|numeric|min:0',
+            'discount' => 'required|numeric|min:0',
+            'payment_type' => 'required|in:cash,credit card,bank transfer,credit',
+            'has_initial_payment' => 'nullable|boolean',
+            'initial_payment_amount' => 'required_if:has_initial_payment,true|nullable|numeric|min:0.01',
+            'initial_payment_type' => 'required_if:has_initial_payment,true|nullable|in:cash,credit card,bank transfer',
+            'custom_amount_enabled' => 'nullable|boolean',
+            'custom_amount' => 'nullable|numeric|min:0',
+            'custom_amount_reason' => 'nullable|string|max:255',
+            'proof_of_payment' => [
+                ($request->input('payment_type') === 'credit' && !$request->boolean('has_initial_payment')) ? 'nullable' : 'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp,gif',
+                function ($attribute, $value, $fail) {
+                    if ($value instanceof \Illuminate\Http\UploadedFile) {
+                        $mime = $value->getMimeType();
+                        $isImage = str_starts_with($mime, 'image/');
+                        $sizeInKb = $value->getSize() / 1024;
+                        if ($isImage) {
+                            if ($sizeInKb > 10240) {
+                                $fail('El archivo de comprobante no debe superar los 10 MB.');
+                            }
+                        } else {
+                            if ($sizeInKb > 30720) {
+                                $fail('El archivo de comprobante no debe superar los 30 MB.');
+                            }
+                        }
+                    }
+                }
+            ],
+            'insumos' => 'nullable|array',
+            'insumos.*.id' => 'required|exists:products,id',
+            'insumos.*.quantity' => 'required|integer|min:1',
+            'insumos.*.price' => 'required|numeric|min:0',
         ]);
 
-        $specimen = \App\Models\Specimen::create($validated);
-        
-        $maxOrder = \App\Models\PrioritySpecimenOrder::where('priority_id', $validated['priority_id'])->max('order') ?? 0;
-        \App\Models\PrioritySpecimenOrder::create([
-            'priority_id' => $validated['priority_id'],
-            'specimen_id' => $specimen->id,
-            'order' => $maxOrder + 1,
-        ]);
+        $specimen = null;
+        $invoice = null;
+        $paymentInvoice = null;
 
-        return redirect()->back();
+        \Illuminate\Support\Facades\DB::transaction(function() use ($request, $validated, &$specimen, &$invoice, &$paymentInvoice) {
+            $caiRange = \App\Models\CaiRange::where('status', 'active')->first();
+            if (!$caiRange) {
+                throw new \Exception('No hay un rango CAI activo configurado en el sistema.');
+            }
+
+            // Get Sequence based on location_id (sucursal) and specimen_type
+            $sequence = \App\Models\Sequence::where('location_id', $caiRange->location_id)
+                ->where('specimen_type', $validated['specimen_type'])
+                ->where('active', true)
+                ->first();
+
+            if (!$sequence) {
+                throw new \Exception('No hay una secuencia de numeración activa configurada para esta sucursal y tipo de muestra.');
+            }
+
+            // Build the sequence code
+            $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
+            $paddedMonth = str_pad($sequence->month, 2, '0', STR_PAD_LEFT);
+            $sequenceCode = $sequence->prefix . $sequence->separator . $paddedSeq . $sequence->separator . $paddedMonth . $sequence->separator . $sequence->year;
+
+            // Increment current sequence
+            $sequence->increment('current_sequence');
+
+            $specimenData = $validated;
+            unset($specimenData['amount'], $specimenData['discount'], $specimenData['payment_type'], $specimenData['proof_of_payment'], $specimenData['insumos'], $specimenData['has_initial_payment'], $specimenData['initial_payment_amount'], $specimenData['initial_payment_type']);
+            
+            if ($request->hasFile('medical_order_file')) {
+                $path = $this->storeUploadedFile($request->file('medical_order_file'), 'medical_orders');
+                $specimenData['medical_order_file'] = $path;
+            }
+            
+            $specimenData['sequence_code'] = $sequenceCode;
+            
+            $specimen = \App\Models\Specimen::create($specimenData);
+
+            if (!empty($validated['insumos'])) {
+                foreach ($validated['insumos'] as $insumo) {
+                    $specimen->products()->attach($insumo['id'], [
+                        'quantity' => $insumo['quantity'],
+                        'price' => $insumo['price']
+                    ]);
+                    
+                    $remaining = (int)$insumo['quantity'];
+                    $inventories = \App\Models\Inventory::where('product', $insumo['id'])
+                        ->where('active', true)
+                        ->where('quantity', '>', 0)
+                        ->orderBy('id', 'asc')
+                        ->get();
+                        
+                    $totalAvailableStock = $inventories->sum('quantity');
+                    
+                    if ($totalAvailableStock < $remaining) {
+                        $product = \App\Models\Product::find($insumo['id']);
+                        throw new \Exception("Stock insuficiente para el insumo: " . ($product ? $product->name : "ID " . $insumo['id']) . ". Solicitado: {$remaining}, Disponible: {$totalAvailableStock}.");
+                    }
+                    
+                    foreach ($inventories as $inv) {
+                        if ($remaining <= 0) {
+                            break;
+                        }
+                        
+                        $before = $inv->quantity;
+                        if ($inv->quantity >= $remaining) {
+                            $inv->quantity -= $remaining;
+                            $inv->save();
+                            
+                            $this->logInventoryMovement($inv, -$remaining, $before, $inv->quantity);
+                            $remaining = 0;
+                        } else {
+                            $subtracted = $inv->quantity;
+                            $remaining -= $subtracted;
+                            $inv->quantity = 0;
+                            $inv->save();
+                            
+                            $this->logInventoryMovement($inv, -$subtracted, $before, 0);
+                        }
+                    }
+                }
+            }
+            
+            $maxOrder = \App\Models\PrioritySpecimenOrder::where('priority_id', $validated['priority_id'])->max('order') ?? 0;
+            \App\Models\PrioritySpecimenOrder::create([
+                'priority_id' => $validated['priority_id'],
+                'specimen_id' => $specimen->id,
+                'order' => $maxOrder + 1,
+            ]);
+
+            $nextNumber = $caiRange->last_used_number + 1;
+            $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+            $fullInvoiceNumber = $caiRange->full_prefix . $invoiceNumber;
+
+            $proofOfPaymentPath = '';
+            if ($request->hasFile('proof_of_payment') && !$request->boolean('has_initial_payment')) {
+                $proofOfPaymentPath = $this->storeUploadedFile($request->file('proof_of_payment'), 'proofs');
+            } elseif ($validated['payment_type'] === 'credit') {
+                $proofOfPaymentPath = 'Crédito';
+            } else {
+                $proofOfPaymentPath = $this->storeUploadedFile($request->file('proof_of_payment'), 'proofs');
+            }
+
+            $insumosTotal = 0.00;
+            if (!empty($validated['insumos'])) {
+                foreach ($validated['insumos'] as $insumo) {
+                    $insumosTotal += (float)$insumo['price'] * (int)$insumo['quantity'];
+                }
+            }
+
+            $amount = (float)$validated['amount'] + $insumosTotal;
+            $discount = (float)$validated['discount'];
+            $subtotal = $amount - $discount;
+
+            if ($request->boolean('has_initial_payment') && (float)$validated['initial_payment_amount'] > $subtotal) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'initial_payment_amount' => ['El monto del pago inicial no puede superar el total de la factura (L. ' . number_format($subtotal, 2) . ').']
+                ]);
+            }
+
+            $creditId = null;
+            $initialPaymentAmount = 0.00;
+            if ($validated['payment_type'] === 'credit') {
+                $initialPaymentAmount = $request->boolean('has_initial_payment') ? (float)$validated['initial_payment_amount'] : 0.00;
+                $credit = \App\Models\Credit::create([
+                    'customer_id' => $specimen->customer,
+                    'credit_amount' => $subtotal,
+                    'amount_paid' => $initialPaymentAmount,
+                    'amount_remaining' => $subtotal - $initialPaymentAmount,
+                ]);
+                $creditId = $credit->id;
+            }
+
+            $isCustomAmount = !empty($validated['custom_amount_enabled']) && (float)($validated['custom_amount'] ?? 0) > 0;
+            $customAmountVal = $isCustomAmount ? (float)$validated['custom_amount'] : 0.00;
+            $customAmountReasonVal = $isCustomAmount ? ($validated['custom_amount_reason'] ?? null) : null;
+
+            $invoice = \App\Models\Invoice::create([
+                'full_invoice_number' => $fullInvoiceNumber,
+                'invoice_number' => $invoiceNumber,
+                'cai_range_id' => $caiRange->id,
+                'customer_id' => $specimen->customer,
+                'specimen_id' => $specimen->id,
+                'payment_type' => $validated['payment_type'],
+                'credit_payment_id' => $creditId,
+                'amount' => $amount,
+                'discount' => $discount,
+                'subtotal' => $subtotal,
+                'exempt_amount' => 0.00,
+                'tax_exempt_amount' => $subtotal,
+                'taxable_amount_15' => 0.00,
+                'taxable_amount_18' => 0.00,
+                'isv_15' => 0.00,
+                'isv_18' => 0.00,
+                'total' => $subtotal,
+                'proof_of_payment' => $proofOfPaymentPath,
+                'invoice_file' => '', 
+                'custom_amount' => $customAmountVal,
+                'custom_amount_reason' => $customAmountReasonVal,
+            ]);
+
+            $caiRange->increment('last_used_number');
+            if ($caiRange->last_used_number >= $caiRange->end_number) {
+                $caiRange->update(['status' => 'exhausted']);
+            }
+
+            if ($validated['payment_type'] === 'credit' && $request->boolean('has_initial_payment')) {
+                $nextNumber2 = $caiRange->last_used_number + 1;
+                $invoiceNumber2 = str_pad($nextNumber2, 8, '0', STR_PAD_LEFT);
+                $fullInvoiceNumber2 = $caiRange->full_prefix . $invoiceNumber2;
+
+                $proofOfPaymentPath2 = '';
+                if ($request->hasFile('proof_of_payment')) {
+                    $proofOfPaymentPath2 = $this->storeUploadedFile($request->file('proof_of_payment'), 'proofs');
+                }
+
+                $paymentInvoice = \App\Models\Invoice::create([
+                    'full_invoice_number' => $fullInvoiceNumber2,
+                    'invoice_number' => $invoiceNumber2,
+                    'cai_range_id' => $caiRange->id,
+                    'customer_id' => $specimen->customer,
+                    'specimen_id' => $specimen->id,
+                    'payment_type' => $validated['initial_payment_type'],
+                    'credit_payment_id' => $creditId,
+                    'amount' => $initialPaymentAmount,
+                    'discount' => 0.00,
+                    'subtotal' => $initialPaymentAmount,
+                    'exempt_amount' => 0.00,
+                    'tax_exempt_amount' => $initialPaymentAmount,
+                    'taxable_amount_15' => 0.00,
+                    'taxable_amount_18' => 0.00,
+                    'isv_15' => 0.00,
+                    'isv_18' => 0.00,
+                    'total' => $initialPaymentAmount,
+                    'proof_of_payment' => $proofOfPaymentPath2,
+                    'invoice_file' => '', 
+                ]);
+
+                $caiRange->increment('last_used_number');
+                if ($caiRange->last_used_number >= $caiRange->end_number) {
+                    $caiRange->update(['status' => 'exhausted']);
+                }
+            }
+
+            $invoice->load(['specimen.products']);
+            $totalWords = $this->numberToSpanishWords($invoice->total);
+            $customer = \App\Models\Customer::findOrFail($specimen->customer);
+            $examination = \App\Models\SpecimenTypeExamination::findOrFail($specimen->specimen_type_examination);
+            $location = \App\Models\Location::findOrFail($caiRange->location_id);
+
+            $htmlContent = view('pdf.invoice', compact('invoice', 'caiRange', 'customer', 'examination', 'location', 'totalWords'))->render();
+
+            $filename = 'invoice_' . $invoice->id . '_' . time() . '.pdf';
+            $pdfPath = 'invoices/' . $filename;
+
+            $pdfContent = \Spatie\Browsershot\Browsershot::html($htmlContent)
+                ->noSandbox()
+                ->margins(10, 10, 10, 10)
+                ->format('A4')
+                ->pdf();
+
+            \Illuminate\Support\Facades\Storage::disk('public')->put($pdfPath, $pdfContent);
+            $invoice->update(['invoice_file' => $pdfPath]);
+
+            if ($paymentInvoice) {
+                $paymentTotalWords = $this->numberToSpanishWords($paymentInvoice->total);
+                $htmlContent2 = view('pdf.credit_payment_invoice', [
+                    'invoice' => $paymentInvoice,
+                    'caiRange' => $caiRange,
+                    'customer' => $customer,
+                    'location' => $location,
+                    'totalWords' => $paymentTotalWords,
+                    'credit' => $credit,
+                    'originalInvoice' => $invoice,
+                ])->render();
+
+                $filename2 = 'credit_invoice_' . $paymentInvoice->id . '_' . time() . '.pdf';
+                $pdfPath2 = 'invoices/' . $filename2;
+
+                $pdfContent2 = \Spatie\Browsershot\Browsershot::html($htmlContent2)
+                    ->noSandbox()
+                    ->margins(10, 10, 10, 10)
+                    ->format('A4')
+                    ->pdf();
+
+                \Illuminate\Support\Facades\Storage::disk('public')->put($pdfPath2, $pdfContent2);
+                $paymentInvoice->update(['invoice_file' => $pdfPath2]);
+            }
+        });
+
+        $responseData = [
+            'success' => 'Muestra y factura creadas con éxito.',
+            'new_specimen_id' => $specimen->id,
+            'new_invoice_id' => $invoice->id,
+            'new_invoice_url' => asset('storage/' . $invoice->invoice_file),
+        ];
+
+        if ($paymentInvoice) {
+            $responseData['new_payment_invoice_url'] = asset('storage/' . $paymentInvoice->invoice_file);
+        }
+
+        return redirect()->back()->with($responseData);
     }
 
     public function update(\Illuminate\Http\Request $request, \App\Models\Specimen $specimen)
@@ -72,7 +399,38 @@ class SpecimenController extends Controller
             'clinical_notes' => 'nullable|string',
             'status' => 'required|string',
             'priority_id' => 'required|exists:priorities,id',
+            'medical_order_file' => [
+                $specimen->medical_order_file ? 'nullable' : 'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp,gif',
+                function ($attribute, $value, $fail) {
+                    if ($value instanceof \Illuminate\Http\UploadedFile) {
+                        $mime = $value->getMimeType();
+                        $isImage = str_starts_with($mime, 'image/');
+                        $sizeInKb = $value->getSize() / 1024;
+                        if ($isImage) {
+                            if ($sizeInKb > 10240) {
+                                $fail('El archivo de imagen no debe superar los 10 MB.');
+                            }
+                        } else {
+                            if ($sizeInKb > 30720) {
+                                $fail('El archivo de orden médica no debe superar los 30 MB.');
+                            }
+                        }
+                    }
+                }
+            ],
         ]);
+
+        if ($request->hasFile('medical_order_file')) {
+            if ($specimen->medical_order_file) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($specimen->medical_order_file);
+            }
+            $path = $this->storeMedicalOrder($request->file('medical_order_file'));
+            $validated['medical_order_file'] = $path;
+        } else {
+            unset($validated['medical_order_file']);
+        }
 
         $oldPriorityId = $specimen->priority_id;
         
@@ -119,5 +477,249 @@ class SpecimenController extends Controller
     {
         $specimen->update(['active' => false]);
         return redirect()->back();
+    }
+
+    /**
+     * Optimiza y almacena una imagen de orden médica como JPG, o almacena un PDF directamente.
+     */
+    protected function storeMedicalOrder(\Illuminate\Http\UploadedFile $file): string
+    {
+        $mime = $file->getMimeType();
+        
+        // Si no es una imagen compatible con GD, la guardamos directamente
+        if (!str_starts_with($mime, 'image/')) {
+            return $file->store('medical_orders', 'public');
+        }
+
+        $gdImage = null;
+        if ($mime === 'image/jpeg' || $mime === 'image/jpg') {
+            $gdImage = @imagecreatefromjpeg($file->getRealPath());
+        } elseif ($mime === 'image/png') {
+            $gdImage = @imagecreatefrompng($file->getRealPath());
+        } elseif ($mime === 'image/gif') {
+            $gdImage = @imagecreatefromgif($file->getRealPath());
+        } elseif ($mime === 'image/webp') {
+            if (function_exists('imagecreatefromwebp')) {
+                $gdImage = @imagecreatefromwebp($file->getRealPath());
+            }
+        }
+
+        // Si falló la carga con GD, la guardamos directamente
+        if (!$gdImage) {
+            return $file->store('medical_orders', 'public');
+        }
+
+        $originalWidth = imagesx($gdImage);
+        $originalHeight = imagesy($gdImage);
+
+        // Límite mínimo de dimensiones (1000px)
+        $minScale = 1.0;
+        if ($originalWidth > 1000 && $originalHeight > 1000) {
+            $minScale = max(1000 / $originalWidth, 1000 / $originalHeight);
+        }
+
+        $quality = 90;
+        $scale = 1.0;
+        $tempPath = tempnam(sys_get_temp_dir(), 'med_order_');
+
+        while (true) {
+            $w = (int)($originalWidth * $scale);
+            $h = (int)($originalHeight * $scale);
+            
+            $tmpImg = imagecreatetruecolor($w, $h);
+            imagefill($tmpImg, 0, 0, imagecolorallocate($tmpImg, 255, 255, 255));
+            imagecopyresampled($tmpImg, $gdImage, 0, 0, 0, 0, $w, $h, $originalWidth, $originalHeight);
+            
+            imagejpeg($tmpImg, $tempPath, $quality);
+            imagedestroy($tmpImg);
+
+            $filesize = filesize($tempPath);
+
+            if ($filesize <= 300 * 1024) {
+                break;
+            }
+
+            if ($scale > $minScale) {
+                $scale = max($minScale, $scale - 0.1);
+                continue;
+            }
+
+            if ($quality > 10) {
+                $quality -= 10;
+                continue;
+            }
+
+            break;
+        }
+
+        imagedestroy($gdImage);
+
+        $filename = \Illuminate\Support\Str::random(40) . '.jpg';
+        \Illuminate\Support\Facades\Storage::disk('public')->putFileAs('medical_orders', new \Illuminate\Http\File($tempPath), $filename);
+        @unlink($tempPath);
+
+        return 'medical_orders/' . $filename;
+    }
+
+    /**
+     * Optimiza y almacena un archivo (imagen o PDF) en un directorio específico de storage/public.
+     */
+    protected function storeUploadedFile(\Illuminate\Http\UploadedFile $file, string $folder): string
+    {
+        $mime = $file->getMimeType();
+        
+        // Si no es una imagen compatible con GD, la guardamos directamente
+        if (!str_starts_with($mime, 'image/')) {
+            return $file->store($folder, 'public');
+        }
+
+        $gdImage = null;
+        if ($mime === 'image/jpeg' || $mime === 'image/jpg') {
+            $gdImage = @imagecreatefromjpeg($file->getRealPath());
+        } elseif ($mime === 'image/png') {
+            $gdImage = @imagecreatefrompng($file->getRealPath());
+        } elseif ($mime === 'image/gif') {
+            $gdImage = @imagecreatefromgif($file->getRealPath());
+        } elseif ($mime === 'image/webp') {
+            if (function_exists('imagecreatefromwebp')) {
+                $gdImage = @imagecreatefromwebp($file->getRealPath());
+            }
+        }
+
+        // Si falló la carga con GD, la guardamos directamente
+        if (!$gdImage) {
+            return $file->store($folder, 'public');
+        }
+
+        $originalWidth = imagesx($gdImage);
+        $originalHeight = imagesy($gdImage);
+
+        // Límite mínimo de dimensiones (1000px)
+        $minScale = 1.0;
+        if ($originalWidth > 1000 && $originalHeight > 1000) {
+            $minScale = max(1000 / $originalWidth, 1000 / $originalHeight);
+        }
+
+        $quality = 90;
+        $scale = 1.0;
+        $tempPath = tempnam(sys_get_temp_dir(), 'img_opt_');
+
+        while (true) {
+            $w = (int)($originalWidth * $scale);
+            $h = (int)($originalHeight * $scale);
+            
+            $tmpImg = imagecreatetruecolor($w, $h);
+            imagefill($tmpImg, 0, 0, imagecolorallocate($tmpImg, 255, 255, 255));
+            imagecopyresampled($tmpImg, $gdImage, 0, 0, 0, 0, $w, $h, $originalWidth, $originalHeight);
+            
+            imagejpeg($tmpImg, $tempPath, $quality);
+            imagedestroy($tmpImg);
+
+            $filesize = filesize($tempPath);
+
+            if ($filesize <= 300 * 1024) {
+                break;
+            }
+
+            if ($scale > $minScale) {
+                $scale = max($minScale, $scale - 0.1);
+                continue;
+            }
+
+            if ($quality > 10) {
+                $quality -= 10;
+                continue;
+            }
+
+            break;
+        }
+
+        imagedestroy($gdImage);
+
+        $filename = \Illuminate\Support\Str::random(40) . '.jpg';
+        \Illuminate\Support\Facades\Storage::disk('public')->putFileAs($folder, new \Illuminate\Http\File($tempPath), $filename);
+        @unlink($tempPath);
+
+        return $folder . '/' . $filename;
+    }
+
+    /**
+     * Convierte un valor numérico a su representación en palabras en español con centavos.
+     */
+    protected function numberToSpanishWords(float $number): string
+    {
+        $amount = number_format($number, 2, '.', '');
+        $parts = explode('.', $amount);
+        $integerPart = (int)$parts[0];
+        $decimalPart = $parts[1];
+
+        if ($integerPart === 0) {
+            $integerWords = 'CERO';
+        } else {
+            $integerWords = $this->numberToSpanishWordsHelper($integerPart);
+        }
+
+        return $integerWords . ' CON ' . $decimalPart . '/100';
+    }
+
+    protected function numberToSpanishWordsHelper(int $number): string
+    {
+        $units = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+        $tens = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+        $teens = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+        $twenties = ['VEINTE', 'VEINTIUNO', 'VEINTIDOS', 'VEINTITRES', 'VEINTICUATRO', 'VEINTICINCO', 'VEINTISEIS', 'VEINTISIETE', 'VEINTIOCHO', 'VEINTINUEVE'];
+        $hundreds = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+
+        if ($number < 10) {
+            return $units[$number];
+        }
+        if ($number < 20) {
+            return $teens[$number - 10];
+        }
+        if ($number < 30) {
+            return $twenties[$number - 20];
+        }
+        if ($number < 100) {
+            $ten = (int)($number / 10);
+            $unit = $number % 10;
+            return $tens[$ten] . ($unit > 0 ? ' Y ' . $units[$unit] : '');
+        }
+        if ($number < 1000) {
+            if ($number === 100) return 'CIEN';
+            $hundred = (int)($number / 100);
+            $remainder = $number % 100;
+            return $hundreds[$hundred] . ($remainder > 0 ? ' ' . $this->numberToSpanishWordsHelper($remainder) : '');
+        }
+        if ($number < 1000000) {
+            $thousands = (int)($number / 1000);
+            $remainder = $number % 1000;
+            $prefix = $thousands === 1 ? 'MIL' : $this->numberToSpanishWordsHelper($thousands) . ' MIL';
+            return $prefix . ($remainder > 0 ? ' ' . $this->numberToSpanishWordsHelper($remainder) : '');
+        }
+        if ($number < 1000000000) {
+            $millions = (int)($number / 1000000);
+            $remainder = $number % 1000000;
+            $prefix = $millions === 1 ? 'UN MILLON' : $this->numberToSpanishWordsHelper($millions) . ' MILLONES';
+            return $prefix . ($remainder > 0 ? ' ' . $this->numberToSpanishWordsHelper($remainder) : '');
+        }
+        return '';
+    }
+
+    /**
+     * Registra un movimiento de inventario cuando se descuentan insumos de una muestra.
+     */
+    private function logInventoryMovement(\App\Models\Inventory $inventory, $quantityAdded, $before, $after)
+    {
+        \App\Models\InventoryMovement::create([
+            'inventory_name' => $inventory->productRelation->name,
+            'inventory' => $inventory->id,
+            'storage_name' => $inventory->storageRelation->name,
+            'storage' => $inventory->storage,
+            'quantity_added' => $quantityAdded,
+            'quantity_before_update' => $before,
+            'quantity_after_update' => $after,
+            'movement' => 'removed',
+            'user_id' => \Illuminate\Support\Facades\Auth::id() ?? 1,
+        ]);
     }
 }

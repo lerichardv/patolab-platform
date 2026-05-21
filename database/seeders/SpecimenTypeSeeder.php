@@ -65,6 +65,25 @@ class SpecimenTypeSeeder extends Seeder
                 ]
             );
 
+            // Seed 1 to 4 prices (first is biggest, subsequent are cheaper)
+            $type->prices()->delete();
+            $numPrices = rand(1, 4);
+            $basePrice = rand(500, 2000);
+            $previousPrice = $basePrice;
+
+            for ($i = 0; $i < $numPrices; $i++) {
+                if ($i === 0) {
+                    $amount = $basePrice;
+                } else {
+                    $discountPercent = rand(10, 25);
+                    $amount = $previousPrice * (1 - $discountPercent / 100);
+                }
+
+                $amount = round($amount, 2);
+                $type->prices()->create(['amount' => $amount]);
+                $previousPrice = $amount;
+            }
+
             $exams = $types[$typeName] ?? [];
             
             if (empty($exams)) {

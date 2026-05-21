@@ -17,6 +17,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('users', UserController::class);
     Route::post('specimens/update-order', [\App\Http\Controllers\SpecimenController::class, 'updateOrder'])->name('specimens.update-order');
     Route::resource('specimens', \App\Http\Controllers\SpecimenController::class);
+    Route::resource('invoices', \App\Http\Controllers\InvoiceController::class)->only(['index']);
+    Route::resource('credits', \App\Http\Controllers\CreditController::class)->only(['index']);
+    Route::post('credits/{credit}/pay', [\App\Http\Controllers\CreditController::class, 'pay'])->name('credits.pay');
     Route::resource('specimen-categories', \App\Http\Controllers\SpecimenCategoryController::class);
     Route::resource('specimen-types', \App\Http\Controllers\SpecimenTypeController::class);
     Route::resource('specimen-type-examinations', \App\Http\Controllers\SpecimenTypeExaminationController::class);

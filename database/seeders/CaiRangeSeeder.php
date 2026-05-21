@@ -13,7 +13,9 @@ class CaiRangeSeeder extends Seeder
      */
     public function run(): void
     {
+        \Illuminate\Support\Facades\Schema::disableForeignKeyConstraints();
         CaiRange::truncate();
+        \Illuminate\Support\Facades\Schema::enableForeignKeyConstraints();
         
         $locations = Location::all();
         

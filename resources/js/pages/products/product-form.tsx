@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +8,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { FormEventHandler } from 'react';
 import InputError from '@/components/input-error';
+import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { update as updateProduct, store as storeProduct } from '@/actions/App/Http/Controllers/ProductController';
+
+interface Price {
+    id?: number;
+    amount: number | string;
+}
 
 interface Product {
     id?: number;
@@ -20,6 +27,7 @@ interface Product {
     purchase_price: number;
     sale_price: number;
     isv: boolean;
+    prices?: Price[];
 }
 
 interface Props {
@@ -34,9 +42,40 @@ export default function ProductForm({ product, onSuccess }: Props) {
         unit: product?.unit || 'unit',
         unit_value: product?.unit_value || 0,
         purchase_price: product?.purchase_price || 0,
-        sale_price: product?.sale_price || 0,
         isv: product?.isv || false,
+        prices: product?.prices || [] as Price[],
     });
+
+    const [newPrice, setNewPrice] = useState<string>('');
+
+    const handleAddPrice = () => {
+        if (!newPrice || isNaN(Number(newPrice)) || Number(newPrice) < 0) {
+            toast.error('Por favor, ingrese un precio válido.');
+            return;
+        }
+
+        const priceAmount = parseFloat(newPrice).toFixed(2);
+        
+        setData('prices', [
+            ...data.prices,
+            { amount: priceAmount }
+        ]);
+        setNewPrice('');
+    };
+
+    const handlePriceChange = (index: number, value: string) => {
+        const updatedPrices = [...data.prices];
+        updatedPrices[index] = {
+            ...updatedPrices[index],
+            amount: value
+        };
+        setData('prices', updatedPrices);
+    };
+
+    const handleRemovePrice = (index: number) => {
+        const updatedPrices = data.prices.filter((_, i) => i !== index);
+        setData('prices', updatedPrices);
+    };
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -126,27 +165,77 @@ export default function ProductForm({ product, onSuccess }: Props) {
                     <InputError message={errors.purchase_price} />
                 </div>
 
-                <div className="space-y-2">
-                    <Label htmlFor="sale_price">Precio de Venta (L.) *</Label>
-                    <Input
-                        id="sale_price"
-                        type="number"
-                        step="0.01"
-                        value={data.sale_price}
-                        onChange={(e) => setData('sale_price', Number(e.target.value))}
+                <div className="flex items-center space-x-2 py-8">
+                    <Switch
+                        id="isv"
+                        checked={data.isv}
+                        onCheckedChange={(checked) => setData('isv', checked)}
                     />
-                    <InputError message={errors.sale_price} />
+                    <Label htmlFor="isv">ISV</Label>
+                    <InputError message={errors.isv} />
                 </div>
             </div>
 
-            <div className="flex items-center space-x-2 py-2">
-                <Switch
-                    id="isv"
-                    checked={data.isv}
-                    onCheckedChange={(checked) => setData('isv', checked)}
-                />
-                <Label htmlFor="isv">ISV</Label>
-                <InputError message={errors.isv} />
+            <div className="grid gap-3 pt-2">
+                <Label>Precios de Venta (L.)</Label>
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">L.</span>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={newPrice}
+                            onChange={(e) => setNewPrice(e.target.value)}
+                            className="pl-7"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddPrice();
+                                }
+                            }}
+                        />
+                    </div>
+                    <Button type="button" variant="outline" onClick={handleAddPrice}>
+                        <Plus className="h-4 w-4 mr-1" /> Agregar
+                    </Button>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto border rounded-md p-2 flex flex-col gap-2">
+                    {data.prices.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">No se han agregado precios aún.</p>
+                    ) : (
+                        data.prices.map((price, idx) => (
+                            <div key={idx} className="flex items-center justify-between gap-3">
+                                <div className="relative flex-1">
+                                    <span className="absolute left-3 top-2 text-sm text-muted-foreground font-mono">L.</span>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={price.amount}
+                                        onChange={(e) => handlePriceChange(idx, e.target.value)}
+                                        className="pl-7 h-8 font-mono"
+                                    />
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive/90"
+                                    onClick={() => handleRemovePrice(idx)}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))
+                    )}
+                </div>
+                {errors.prices && <p className="text-sm text-destructive">{errors.prices}</p>}
+                {Object.keys(errors).some(key => key.startsWith('prices.')) && (
+                    <p className="text-sm text-destructive">Por favor, revise que todos los precios sean válidos.</p>
+                )}
             </div>
 
             <div className="flex justify-end pt-4">

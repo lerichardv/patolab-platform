@@ -28,6 +28,8 @@ import { index as productsIndex } from '@/actions/App/Http/Controllers/ProductCo
 import { index as storagesIndex } from '@/actions/App/Http/Controllers/StorageController';
 import { index as inventoryMovementsIndex } from '@/actions/App/Http/Controllers/InventoryMovementController';
 import { index as caiRangesIndex } from '@/actions/App/Http/Controllers/CaiRangeController';
+import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
+import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
 import { Beaker, BookOpen, Contact, FolderGit2, LayoutGrid, Users, ShieldCheck, FlaskConical, Microscope, UserRound, Tag, MapPin, Hash, Warehouse, PackageSearch, Package, ClipboardList, History, Receipt } from 'lucide-react';
 import type { NavItem } from '@/types';
 
@@ -136,7 +138,11 @@ const adminNavItems: NavItem[] = [
                     },
                     {
                         title: 'Facturas',
-                        href: '#',
+                        href: invoicesIndex(),
+                    },
+                    {
+                        title: 'Créditos',
+                        href: creditsIndex(),
                     },
                 ],
             },

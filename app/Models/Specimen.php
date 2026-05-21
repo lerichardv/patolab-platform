@@ -30,6 +30,7 @@ class Specimen extends Model
     ];
 
     protected $fillable = [
+        'sequence_code',
         'customer',
         'specimen_type',
         'specimen_type_examination',
@@ -39,6 +40,7 @@ class Specimen extends Model
         'diagnosis',
         'clinical_notes',
         'status',
+        'medical_order_file',
 		'priority_id',
         'active',
     ];
@@ -83,10 +85,15 @@ class Specimen extends Model
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class, 'specimen_products', 'specimen', 'product')
+            ->withPivot(['quantity', 'price'])
             ->withTimestamps();
     }
 	public function priority(): BelongsTo
     {
         return $this->belongsTo(Priority::class, 'priority_id');
+    }
+    public function invoiceRelation(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Invoice::class, 'specimen_id');
     }
 }

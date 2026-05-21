@@ -2,13 +2,13 @@ import { Head, router } from '@inertiajs/react';
 import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow
 } from '@/components/ui/table';
 import { Edit2, Hash, Plus, Search, Trash2 } from 'lucide-react';
 import SequenceSheet from './sequence-sheet';
@@ -25,9 +25,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import debounce from 'lodash/debounce';
 import { toast } from 'sonner';
-import { 
-    index as sequencesIndex, 
-    destroy as destroySequence 
+import {
+    index as sequencesIndex,
+    destroy as destroySequence
 } from '@/actions/App/Http/Controllers/SequenceController';
 
 interface Location {
@@ -70,12 +70,13 @@ interface Props {
     };
     locations: Location[];
     specimenTypes: SpecimenType[];
+    allSequences: any[];
     filters: {
         search?: string;
     };
 }
 
-export default function SequencesIndex({ sequences, locations, specimenTypes, filters }: Props) {
+export default function SequencesIndex({ sequences, locations, specimenTypes, allSequences = [], filters }: Props) {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedSequence, setSelectedSequence] = useState<any | null>(null);
@@ -85,7 +86,7 @@ export default function SequencesIndex({ sequences, locations, specimenTypes, fi
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
         if (value === '') delete newFilters[key as keyof typeof filters];
-        
+
         router.get(sequencesIndex().url, newFilters, {
             preserveState: true,
             replace: true,
@@ -173,6 +174,7 @@ export default function SequencesIndex({ sequences, locations, specimenTypes, fi
                             <TableRow>
                                 <TableHead>Sucursal / Tipo</TableHead>
                                 <TableHead>Prefijo</TableHead>
+                                <TableHead>Siguiente secuencia</TableHead>
                                 <TableHead>Formato / Preview</TableHead>
                                 <TableHead>Mes / Año</TableHead>
                                 <TableHead className="text-right">Acciones</TableHead>
@@ -195,6 +197,11 @@ export default function SequencesIndex({ sequences, locations, specimenTypes, fi
                                         <TableCell>
                                             <div className="bg-primary/10 px-2 py-1 rounded inline-flex items-center font-mono text-xs font-bold text-primary">
                                                 {sequence.prefix}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="bg-muted px-2.5 py-1 rounded inline-flex items-center font-mono text-xs font-bold text-muted-foreground border">
+                                                {sequence.current_sequence}
                                             </div>
                                         </TableCell>
                                         <TableCell>
@@ -226,7 +233,7 @@ export default function SequencesIndex({ sequences, locations, specimenTypes, fi
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
+                                    <TableCell colSpan={6} className="h-24 text-center">
                                         No se encontraron resultados.
                                     </TableCell>
                                 </TableRow>
@@ -235,13 +242,13 @@ export default function SequencesIndex({ sequences, locations, specimenTypes, fi
                     </Table>
                 </div>
 
-                <Pagination 
-                    links={sequences.links} 
+                <Pagination
+                    links={sequences.links}
                     meta={{
                         from: sequences.from,
                         to: sequences.to,
                         total: sequences.total
-                    }} 
+                    }}
                 />
             </div>
 
@@ -249,6 +256,7 @@ export default function SequencesIndex({ sequences, locations, specimenTypes, fi
                 sequence={selectedSequence}
                 locations={locations}
                 specimenTypes={specimenTypes}
+                allSequences={allSequences}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
             />
@@ -258,7 +266,7 @@ export default function SequencesIndex({ sequences, locations, specimenTypes, fi
                     <AlertDialogHeader>
                         <AlertDialogTitle>¿Está completamente seguro?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción desactivará la secuencia para <strong>{sequenceToDelete?.location?.name}</strong> ({sequenceToDelete?.prefix}). 
+                            Esta acción desactivará la secuencia para <strong>{sequenceToDelete?.location?.name}</strong> ({sequenceToDelete?.prefix}).
                             Ya no se utilizará para generar nuevos correlativos de muestras.
                         </AlertDialogDescription>
                     </AlertDialogHeader>

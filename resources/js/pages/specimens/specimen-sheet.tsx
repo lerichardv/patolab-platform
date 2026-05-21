@@ -1,9 +1,20 @@
+import { useState, useEffect } from 'react';
 import {
     Sheet,
     SheetContent,
 } from '@/components/ui/sheet';
 import HeadingSheet from '@/components/heading-sheet';
 import SpecimenForm from './specimen-form';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Props {
     specimen: any | null;
@@ -15,39 +26,106 @@ interface Props {
     categories: any[];
     referrers: any[];
     priorities: any[];
+    locations: any[];
+    sequences: any[];
+    activeLocationId: number | null;
+    products: any[];
 }
 
-export default function SpecimenSheet({ 
-    specimen, 
-    open, 
-    onOpenChange, 
-    customers, 
-    specimenTypes, 
-    examinations, 
-    categories, 
-    referrers, 
-    priorities 
+export default function SpecimenSheet({
+    specimen,
+    open,
+    onOpenChange,
+    customers,
+    specimenTypes,
+    examinations,
+    categories,
+    referrers,
+    priorities,
+    locations,
+    sequences,
+    activeLocationId,
+    products
 }: Props) {
+    const [isFormDirty, setIsFormDirty] = useState(false);
+    const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (open && !specimen && isFormDirty) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [open, specimen, isFormDirty]);
+
+    const handleOpenChange = (newOpen: boolean) => {
+        if (!newOpen) {
+            if (!specimen && isFormDirty) {
+                setShowCloseConfirm(true);
+                return;
+            }
+        }
+        onOpenChange(newOpen);
+    };
+
     return (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="sm:max-w-[800px] overflow-y-auto">
-                <HeadingSheet 
-                    title={specimen ? 'Editar Muestra' : 'Nueva Muestra'}
-                    description={specimen 
-                        ? 'Realice cambios en la información de la muestra aquí.' 
-                        : 'Complete el formulario para registrar una nueva muestra en el sistema.'}
-                />
-                <SpecimenForm 
-                    specimen={specimen} 
-                    onSuccess={() => onOpenChange(false)} 
-                    customers={customers}
-                    specimenTypes={specimenTypes}
-                    examinations={examinations}
-                    categories={categories}
-                    referrers={referrers}
-                    priorities={priorities}
-                />
-            </SheetContent>
-        </Sheet>
+        <>
+            <Sheet open={open} onOpenChange={handleOpenChange}>
+                <SheetContent className="w-full sm:max-w-[90vw] md:max-w-[1000px] lg:max-w-[1100px] overflow-y-auto">
+                    <HeadingSheet
+                        title={specimen ? 'Editar Muestra' : 'Nueva Muestra'}
+                        description={specimen
+                            ? 'Realice cambios en la información de la muestra aquí.'
+                            : 'Complete el formulario para registrar una nueva muestra en el sistema.'}
+                    />
+                    <SpecimenForm
+                        specimen={specimen}
+                        onSuccess={() => onOpenChange(false)}
+                        setIsDirty={setIsFormDirty}
+                        customers={customers}
+                        specimenTypes={specimenTypes}
+                        examinations={examinations}
+                        categories={categories}
+                        referrers={referrers}
+                        priorities={priorities}
+                        locations={locations}
+                        sequences={sequences}
+                        activeLocationId={activeLocationId}
+                        products={products}
+                    />
+                </SheetContent>
+            </Sheet>
+
+            <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+                <AlertDialogContent className="max-w-[450px]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás seguro de salir?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Todos los datos ingresados en la nueva muestra se perderán permanentemente.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setShowCloseConfirm(false)}>
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setShowCloseConfirm(false);
+                                onOpenChange(false);
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-white"
+                        >
+                            Sí, salir
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }

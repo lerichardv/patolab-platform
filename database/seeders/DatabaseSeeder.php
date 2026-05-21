@@ -20,6 +20,12 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
 
+        User::factory()->create([
+            'name' => 'Ricardo Valladares',
+            'email' => 'ricardo.valladares.triminio@gmail.com',
+            'password' => bcrypt('12345678'),
+        ]);
+
         $this->call([
             SpecimenTypeSeeder::class,
             ReferrerSeeder::class,
@@ -28,6 +34,10 @@ class DatabaseSeeder extends Seeder
             StorageSeeder::class,
             ProductSeeder::class,
             CaiRangeSeeder::class,
+            PrioritySeeder::class,
+            SpecimenCategorySeeder::class,
+            CustomerSeeder::class,
+            SpecimenSeeder::class,
         ]);
     }
 }

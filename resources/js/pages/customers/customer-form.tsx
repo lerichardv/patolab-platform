@@ -45,6 +45,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        e.stopPropagation();
 
         if (customer?.id) {
             put(updateCustomer(customer.id).url, {

@@ -137,7 +137,7 @@ export default function CustomersIndex({ customers, filters }: Props) {
                         <p className="text-muted-foreground">Administre su base de datos de clientes y empresas.</p>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => window.open(exportCustomers(filters).url, '_blank')} className="h-10 px-5 text-sm w-full md:w-auto">
+                        <Button variant="outline" onClick={() => window.open(exportCustomers({ query: filters }).url, '_blank')} className="h-10 px-5 text-sm w-full md:w-auto">
                             <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar
                         </Button>
                         <Button onClick={handleCreate} className="h-10 px-5 text-sm w-full md:w-auto">

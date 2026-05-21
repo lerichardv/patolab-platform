@@ -19,7 +19,7 @@ class SequenceSeeder extends Seeder
         Sequence::truncate();
 
         $location = Location::first();
-        $specimenTypes = SpecimenType::limit(3)->get();
+        $specimenTypes = SpecimenType::all();
 
         if ($location && $specimenTypes->count() > 0) {
             foreach ($specimenTypes as $type) {

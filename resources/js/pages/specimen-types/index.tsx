@@ -13,6 +13,7 @@ import {
 import { Edit2, Microscope, Plus, Search, Trash2 } from 'lucide-react';
 import SpecimenTypeSheet from './specimen-type-sheet';
 import { Pagination } from '@/components/pagination';
+import { Badge } from '@/components/ui/badge';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -30,11 +31,17 @@ import {
     destroy as destroySpecimenType 
 } from '@/actions/App/Http/Controllers/SpecimenTypeController';
 
+interface Price {
+    id?: number;
+    amount: number | string;
+}
+
 interface SpecimenType {
     id: number;
     name: string;
     description: string | null;
     created_at: string;
+    prices?: Price[];
 }
 
 interface Props {
@@ -149,6 +156,7 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                             <TableRow>
                                 <TableHead>Nombre</TableHead>
                                 <TableHead>Descripción</TableHead>
+                                <TableHead>Precios</TableHead>
                                 <TableHead>Fecha Creación</TableHead>
                                 <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
@@ -160,6 +168,19 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                                         <TableCell className="font-medium">{type.name}</TableCell>
                                         <TableCell className="max-w-md truncate text-muted-foreground">
                                             {type.description || 'Sin descripción'}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-wrap gap-1 max-w-xs">
+                                                {type.prices && type.prices.length > 0 ? (
+                                                    type.prices.map((price) => (
+                                                        <Badge key={price.id} variant="secondary" className="font-mono">
+                                                            L. {parseFloat(String(price.amount)).toFixed(2)}
+                                                        </Badge>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">Sin precio</span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
                                             {new Date(type.created_at).toLocaleDateString('es-ES', {
@@ -182,7 +203,7 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="h-24 text-center">
+                                    <TableCell colSpan={5} className="h-24 text-center">
                                         No se encontraron resultados.
                                     </TableCell>
                                 </TableRow>

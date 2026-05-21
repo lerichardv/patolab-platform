@@ -13,8 +13,8 @@ import {
 interface Category {
     id: number;
     name: string;
-    unit: string;
-    quantity: number;
+    unit: string | null;
+    quantity: number | null;
 }
 
 interface Props {

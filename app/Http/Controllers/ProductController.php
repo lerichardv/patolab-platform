@@ -12,7 +12,7 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::query()->where('active', true);
+        $query = Product::query()->with('prices')->where('active', true);
 
         if ($request->has('search')) {
             $search = $request->get('search');
@@ -43,8 +43,9 @@ class ProductController extends Controller
             'unit' => 'required|in:percentage,miligrams,unit',
             'unit_value' => 'required|numeric',
             'purchase_price' => 'required|numeric',
-            'sale_price' => 'required|numeric',
             'isv' => 'required|boolean',
+            'prices' => 'nullable|array',
+            'prices.*.amount' => 'required|numeric|min:0',
         ]);
 
         $validated['code'] = Str::upper(Str::random(8));
@@ -54,7 +55,24 @@ class ProductController extends Controller
             $validated['code'] = Str::upper(Str::random(8));
         }
 
-        Product::create($validated);
+        $product = Product::create([
+            'code' => $validated['code'],
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? '',
+            'unit' => $validated['unit'],
+            'unit_value' => $validated['unit_value'],
+            'purchase_price' => $validated['purchase_price'],
+            'sale_price' => 0,
+            'isv' => $validated['isv'],
+        ]);
+
+        if (!empty($validated['prices'])) {
+            foreach ($validated['prices'] as $priceData) {
+                $product->prices()->create([
+                    'amount' => $priceData['amount'],
+                ]);
+            }
+        }
 
         return redirect()->back();
     }
@@ -67,11 +85,39 @@ class ProductController extends Controller
             'unit' => 'required|in:percentage,miligrams,unit',
             'unit_value' => 'required|numeric',
             'purchase_price' => 'required|numeric',
-            'sale_price' => 'required|numeric',
             'isv' => 'required|boolean',
+            'prices' => 'nullable|array',
+            'prices.*.id' => 'nullable|integer',
+            'prices.*.amount' => 'required|numeric|min:0',
         ]);
 
-        $product->update($validated);
+        $product->update([
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? '',
+            'unit' => $validated['unit'],
+            'unit_value' => $validated['unit_value'],
+            'purchase_price' => $validated['purchase_price'],
+            'isv' => $validated['isv'],
+        ]);
+
+        $priceIdsToKeep = [];
+
+        if (isset($validated['prices'])) {
+            foreach ($validated['prices'] as $priceData) {
+                if (isset($priceData['id'])) {
+                    $price = $product->prices()->find($priceData['id']);
+                    if ($price) {
+                        $price->update(['amount' => $priceData['amount']]);
+                        $priceIdsToKeep[] = $price->id;
+                    }
+                } else {
+                    $price = $product->prices()->create(['amount' => $priceData['amount']]);
+                    $priceIdsToKeep[] = $price->id;
+                }
+            }
+        }
+
+        $product->prices()->whereNotIn('id', $priceIdsToKeep)->delete();
 
         return redirect()->back();
     }

@@ -28,11 +28,12 @@ interface Props {
     sequence?: Sequence | null;
     locations: Location[];
     specimenTypes: SpecimenType[];
+    allSequences?: any[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
-export default function SequenceSheet({ sequence, locations, specimenTypes, open, onOpenChange }: Props) {
+export default function SequenceSheet({ sequence, locations, specimenTypes, allSequences = [], open, onOpenChange }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="w-full sm:max-w-[540px] overflow-y-auto">
@@ -47,6 +48,7 @@ export default function SequenceSheet({ sequence, locations, specimenTypes, open
                     sequence={sequence || undefined}
                     locations={locations}
                     specimenTypes={specimenTypes}
+                    sequences={allSequences}
                     onSuccess={() => onOpenChange(false)} 
                 />
             </SheetContent>

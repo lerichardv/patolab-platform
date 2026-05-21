@@ -3,6 +3,11 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import HeadingSheet from '@/components/heading-sheet';
 import ProductForm from '@/pages/products/product-form';
 
+interface Price {
+    id?: number;
+    amount: number | string;
+}
+
 interface Product {
     id?: number;
     code: string;
@@ -13,6 +18,7 @@ interface Product {
     purchase_price: number;
     sale_price: number;
     isv: boolean;
+    prices?: Price[];
 }
 
 interface Props {

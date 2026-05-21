@@ -97,11 +97,36 @@ class ProductSeeder extends Seeder
         ];
 
         foreach ($products as $productData) {
-            Product::create(array_merge($productData, [
+            $product = Product::create([
+                'name' => $productData['name'],
+                'description' => $productData['description'],
+                'unit' => $productData['unit'],
+                'unit_value' => $productData['unit_value'],
+                'purchase_price' => $productData['purchase_price'],
+                'sale_price' => 0,
                 'code' => Str::upper(Str::random(8)),
                 'isv' => true,
                 'active' => true,
-            ]));
+            ]);
+
+            // Seed 1 to 4 prices (first is biggest, subsequent are cheaper)
+            $product->prices()->delete();
+            $numPrices = rand(1, 4);
+            $basePrice = $productData['sale_price'];
+            $previousPrice = $basePrice;
+
+            for ($i = 0; $i < $numPrices; $i++) {
+                if ($i === 0) {
+                    $amount = $basePrice;
+                } else {
+                    $discountPercent = rand(10, 25);
+                    $amount = $previousPrice * (1 - $discountPercent / 100);
+                }
+
+                $amount = round($amount, 2);
+                $product->prices()->create(['amount' => $amount]);
+                $previousPrice = $amount;
+            }
         }
     }
 }
