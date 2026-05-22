@@ -49,6 +49,13 @@ COPY . .
 # --- FIX 2: Run the autoload discovery now that artisan exists ---
 RUN composer dump-autoload --no-dev --optimize
 
+# --- NEW: Prevent Laravel from crashing during build if it looks for a DB ---
+ENV DB_CONNECTION=sqlite
+ENV DB_DATABASE=:memory:
+
+# --- NEW: Force the raw PHP error to print clearly in your Railway logs ---
+RUN php artisan wayfinder:generate --with-form
+
 # Build frontend
 RUN npm run build
 
