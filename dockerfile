@@ -66,6 +66,8 @@ RUN npm run build
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV NODE_PATH=/usr/lib/node_modules
 ENV PATH=$PATH:/usr/bin:/usr/local/bin
+ENV XDG_CONFIG_HOME=/tmp/.chromium
+ENV XDG_CACHE_HOME=/tmp/.chromium
 
 # --- Configure Nginx and Supervisor Inline ---
 RUN echo 'server {\n\
