@@ -120,6 +120,6 @@ EXPOSE 8080
 # Supervisor manages both Nginx and PHP-FPM processes simultaneously
 CMD ["sh", "-c", "\
 	php artisan storage:link --force || true && \
-	chmod -R 755 /app/storage && \
-	chown -R www-data:www-data /app/storage && \
+	chmod -R 755 /app/storage /app/public && \
+	chown -R www-data:www-data /app/storage /app/public && \
 	/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]
