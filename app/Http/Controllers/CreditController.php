@@ -169,6 +169,11 @@ class CreditController extends Controller
 
             $pdfContent = Browsershot::html($htmlContent)
                 ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
+                ->addChromiumArguments([
+                    'disable-crash-reporter', 
+                    'disable-dev-shm-usage',
+                    'no-sandbox'
+                ])
                 ->noSandbox()
                 ->margins(10, 10, 10, 10)
                 ->format('A4')

@@ -339,6 +339,11 @@ class SpecimenController extends Controller
 
             $pdfContent = \Spatie\Browsershot\Browsershot::html($htmlContent)
                 ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
+                ->addChromiumArguments([
+                    'disable-crash-reporter', 
+                    'disable-dev-shm-usage',
+                    'no-sandbox'
+                ])
                 ->noSandbox()
                 ->margins(10, 10, 10, 10)
                 ->format('A4')
@@ -364,6 +369,11 @@ class SpecimenController extends Controller
 
                 $pdfContent2 = \Spatie\Browsershot\Browsershot::html($htmlContent2)
                     ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
+                    ->addChromiumArguments([
+                        'disable-crash-reporter', 
+                        'disable-dev-shm-usage',
+                        'no-sandbox'
+                    ])
                     ->noSandbox()
                     ->margins(10, 10, 10, 10)
                     ->format('A4')
