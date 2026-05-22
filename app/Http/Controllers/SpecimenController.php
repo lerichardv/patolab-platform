@@ -338,6 +338,7 @@ class SpecimenController extends Controller
             $pdfPath = 'invoices/' . $filename;
 
             $pdfContent = \Spatie\Browsershot\Browsershot::html($htmlContent)
+                ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
                 ->noSandbox()
                 ->margins(10, 10, 10, 10)
                 ->format('A4')
@@ -362,6 +363,7 @@ class SpecimenController extends Controller
                 $pdfPath2 = 'invoices/' . $filename2;
 
                 $pdfContent2 = \Spatie\Browsershot\Browsershot::html($htmlContent2)
+                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
                     ->noSandbox()
                     ->margins(10, 10, 10, 10)
                     ->format('A4')

@@ -168,6 +168,7 @@ class CreditController extends Controller
             $pdfPath = 'invoices/' . $filename;
 
             $pdfContent = Browsershot::html($htmlContent)
+                ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
                 ->noSandbox()
                 ->margins(10, 10, 10, 10)
                 ->format('A4')

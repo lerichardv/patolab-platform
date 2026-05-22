@@ -64,6 +64,8 @@ RUN npm run build
 
 # Set up Puppeteer environment variable
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV NODE_PATH=/usr/lib/node_modules
+ENV PATH=$PATH:/usr/bin:/usr/local/bin
 
 # --- Configure Nginx and Supervisor Inline ---
 RUN echo 'server {\n\
