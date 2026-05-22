@@ -33,6 +33,9 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
+# Allow plugins to run cleanly as root inside Docker
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
 # Copy composer files first for caching
 COPY composer.json composer.lock ./
 
@@ -46,14 +49,24 @@ RUN npm ci
 # Copy app
 COPY . .
 
-# --- FIX 2: Run the autoload discovery now that artisan exists ---
+# --- NEW FIX: Re-create missing Laravel storage directories ---
+RUN mkdir -p \
+	storage/framework/cache/data \
+	storage/framework/sessions \
+	storage/framework/views \
+	storage/framework/testing \
+	storage/logs \
+	bootstrap/cache && \
+	chmod -R 775 storage bootstrap/cache
+
+# --- Run the autoload discovery now that artisan exists ---
 RUN composer dump-autoload --no-dev --optimize
 
-# --- NEW: Prevent Laravel from crashing during build if it looks for a DB ---
+# Prevent Laravel from crashing during build if it looks for a DB
 ENV DB_CONNECTION=sqlite
 ENV DB_DATABASE=:memory:
 
-# --- NEW: Force the raw PHP error to print clearly in your Railway logs ---
+# This should now execute perfectly!
 RUN php artisan wayfinder:generate --with-form
 
 # Build frontend
