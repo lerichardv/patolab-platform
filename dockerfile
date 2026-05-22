@@ -49,7 +49,7 @@ RUN mkdir -p \
 	storage/logs \
 	bootstrap/cache && \
 	chmod -R 775 storage bootstrap/cache && \
-	chown -R www-data:www-data /app
+	chown -R www-data:www-data storage bootstrap/cache
 
 # Run the autoload discovery now that artisan exists
 RUN composer dump-autoload --no-dev --optimize
