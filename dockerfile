@@ -79,4 +79,5 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8080}"]
+# Force the port to be evaluated cleanly by the shell before passing it to artisan
+CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=$((${PORT:-8080}))"]
