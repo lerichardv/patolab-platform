@@ -36,7 +36,7 @@ WORKDIR /app
 # Copy composer files first for caching
 COPY composer.json composer.lock ./
 
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
 # Copy package files
 COPY package.json package-lock.json ./
@@ -45,6 +45,9 @@ RUN npm ci
 
 # Copy app
 COPY . .
+
+# --- FIX 2: Run the autoload discovery now that artisan exists ---
+RUN composer dump-autoload --no-dev --optimize
 
 # Build frontend
 RUN npm run build
