@@ -49,7 +49,7 @@ RUN mkdir -p \
 	storage/logs \
 	bootstrap/cache && \
 	chmod -R 775 storage bootstrap/cache && \
-	chown -R www-data:www-data storage bootstrap/cache
+	chown -R www-data:www-data storage bootstrap/cache 
 
 # Run the autoload discovery now that artisan exists
 RUN composer dump-autoload --no-dev --optimize
@@ -59,6 +59,7 @@ ENV DB_CONNECTION=sqlite
 ENV DB_DATABASE=:memory:
 
 # Run Wayfinder translation mapping and compile React assets
+RUN php artisan storage:link --force || true
 RUN php artisan wayfinder:generate --with-form
 RUN npm run build
 
@@ -69,7 +70,12 @@ ENV PATH=$PATH:/usr/bin:/usr/local/bin
 ENV XDG_CONFIG_HOME=/tmp/.chromium
 ENV XDG_CACHE_HOME=/tmp/.chromium
 
-# --- Configure Nginx and Supervisor Inline ---
+# --- Force PHP-FPM to listen on TCP 127.0.0.1:9000 ---
+RUN echo '[www]\n\
+	listen = 127.0.0.1:9000\n\
+	listen.allowed_clients = 127.0.0.1\n' > /usr/local/etc/php-fpm.d/zz-docker.conf
+
+# --- Configure Nginx Inline ---
 RUN echo 'server {\n\
 	listen 8080;\n\
 	listen [::]:8080;\n\
@@ -77,21 +83,34 @@ RUN echo 'server {\n\
 	root /app/public;\n\
 	index index.php;\n\
 	charset utf-8;\n\
+	client_max_body_size 100M;\n\
+	\n\
 	location / {\n\
-	try_files $uri $uri/ /index.php?$query_string;\n\
+		try_files $uri $uri/ /index.php?$query_string;\n\
 	}\n\
+	\n\
 	location = /favicon.ico { access_log off; log_not_found off; }\n\
 	location = /robots.txt  { access_log off; log_not_found off; }\n\
+	\n\
 	error_page 404 /index.php;\n\
-	location ~ \.php$ {\n\
-	fastcgi_pass 127.0.0.1:9000;\n\
-	fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;\n\
-	include fastcgi_params;\n\
+	\n\
+	location ~ \\.php$ {\n\
+		fastcgi_pass 127.0.0.1:9000;\n\
+		fastcgi_index index.php;\n\
+		fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;\n\
+		include fastcgi_params;\n\
+		fastcgi_buffering on;\n\
+		fastcgi_buffer_size 16k;\n\
+		fastcgi_buffers 16 16k;\n\
+		fastcgi_connect_timeout 60s;\n\
+		fastcgi_send_timeout 60s;\n\
+		fastcgi_read_timeout 60s;\n\
 	}\n\
-	location ~ /\.(?!well-known).* {\n\
-	deny all;\n\
+	\n\
+	location ~ /\\.(?!well-known).* {\n\
+		deny all;\n\
 	}\n\
-	}' > /etc/nginx/sites-available/default
+}' > /etc/nginx/sites-available/default
 
 RUN echo '[supervisord]\n\
 	nodaemon=true\n\
@@ -119,7 +138,6 @@ EXPOSE 8080
 
 # Supervisor manages both Nginx and PHP-FPM processes simultaneously
 CMD ["sh", "-c", "\
-	php artisan storage:link --force || true && \
 	chmod -R 755 /app/storage /app/public && \
 	chown -R www-data:www-data /app/storage /app/public && \
 	/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]
