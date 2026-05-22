@@ -61,6 +61,7 @@ ENV DB_DATABASE=:memory:
 # Run Wayfinder translation mapping and compile React assets
 RUN php artisan storage:link --force || true
 RUN php artisan wayfinder:generate --with-form
+RUN php artisan migrate --force
 RUN npm run build
 
 # Set up Puppeteer environment variable
@@ -70,12 +71,7 @@ ENV PATH=$PATH:/usr/bin:/usr/local/bin
 ENV XDG_CONFIG_HOME=/tmp/.chromium
 ENV XDG_CACHE_HOME=/tmp/.chromium
 
-# --- Force PHP-FPM to listen on TCP 127.0.0.1:9000 ---
-RUN echo '[www]\n\
-	listen = 127.0.0.1:9000\n\
-	listen.allowed_clients = 127.0.0.1\n' > /usr/local/etc/php-fpm.d/zz-docker.conf
-
-# --- Configure Nginx Inline ---
+# --- Configure Nginx and Supervisor Inline ---
 RUN echo 'server {\n\
 	listen 8080;\n\
 	listen [::]:8080;\n\
@@ -86,7 +82,7 @@ RUN echo 'server {\n\
 	client_max_body_size 100M;\n\
 	\n\
 	location / {\n\
-		try_files $uri $uri/ /index.php?$query_string;\n\
+	try_files $uri $uri/ /index.php?$query_string;\n\
 	}\n\
 	\n\
 	location = /favicon.ico { access_log off; log_not_found off; }\n\
@@ -95,22 +91,22 @@ RUN echo 'server {\n\
 	error_page 404 /index.php;\n\
 	\n\
 	location ~ \\.php$ {\n\
-		fastcgi_pass 127.0.0.1:9000;\n\
-		fastcgi_index index.php;\n\
-		fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;\n\
-		include fastcgi_params;\n\
-		fastcgi_buffering on;\n\
-		fastcgi_buffer_size 16k;\n\
-		fastcgi_buffers 16 16k;\n\
-		fastcgi_connect_timeout 60s;\n\
-		fastcgi_send_timeout 60s;\n\
-		fastcgi_read_timeout 60s;\n\
+	fastcgi_pass 127.0.0.1:9000;\n\
+	fastcgi_index index.php;\n\
+	fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;\n\
+	include fastcgi_params;\n\
+	fastcgi_buffering on;\n\
+	fastcgi_buffer_size 16k;\n\
+	fastcgi_buffers 16 16k;\n\
+	fastcgi_connect_timeout 60s;\n\
+	fastcgi_send_timeout 60s;\n\
+	fastcgi_read_timeout 60s;\n\
 	}\n\
 	\n\
 	location ~ /\\.(?!well-known).* {\n\
-		deny all;\n\
+	deny all;\n\
 	}\n\
-}' > /etc/nginx/sites-available/default
+	}' > /etc/nginx/sites-available/default
 
 RUN echo '[supervisord]\n\
 	nodaemon=true\n\
