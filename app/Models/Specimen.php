@@ -43,6 +43,7 @@ class Specimen extends Model
         'medical_order_file',
 		'priority_id',
         'active',
+        'access_token',
     ];
 
     protected $casts = [
@@ -78,6 +79,29 @@ class Specimen extends Model
         return $this->belongsTo(SpecimenCategory::class, 'specimen_category');
     }
 
+    public function getExpectedFinalizationDateAttribute(): ?\Carbon\Carbon
+    {
+        if (!$this->category || !$this->category->unit || !$this->category->quantity || !$this->created_at) {
+            return null;
+        }
+
+        $createdAt = \Carbon\Carbon::parse($this->created_at);
+        $unit = $this->category->unit;
+        $quantity = $this->category->quantity;
+
+        switch ($unit) {
+            case 'minutes':
+                return $createdAt->addMinutes($quantity);
+            case 'hours':
+                return $createdAt->addHours($quantity);
+            case 'weeks':
+                return $createdAt->addWeeks($quantity);
+            case 'days':
+            default:
+                return $createdAt->addDays($quantity);
+        }
+    }
+
     public function referrerRelation(): BelongsTo
     {
         return $this->belongsTo(Referrer::class, 'referrer');
@@ -92,6 +116,16 @@ class Specimen extends Model
     {
         return $this->belongsTo(Priority::class, 'priority_id');
     }
+
+    /**
+     * Obtiene los usuarios asignados a la muestra.
+     */
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'specimen_user', 'specimen_id', 'user_id')
+            ->withTimestamps();
+    }
+
     public function invoiceRelation(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(Invoice::class, 'specimen_id');

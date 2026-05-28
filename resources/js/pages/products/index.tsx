@@ -29,6 +29,12 @@ import {
     TableHeader, 
     TableRow 
 } from '@/components/ui/table';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import ProductSheet from '@/pages/products/product-sheet';
 
 interface Price {
@@ -139,7 +145,7 @@ delete newFilters[key as keyof typeof filters];
     };
 
     return (
-        <>
+        <TooltipProvider>
             <Head title="Gestión de Productos" />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -172,6 +178,7 @@ delete newFilters[key as keyof typeof filters];
                             <TableRow>
                                 <TableHead>Código</TableHead>
                                 <TableHead>Nombre</TableHead>
+                                <TableHead>Descripción</TableHead>
                                 <TableHead>Unidad</TableHead>
                                 <TableHead>Precio Compra</TableHead>
                                 <TableHead>Precios de Venta</TableHead>
@@ -201,6 +208,20 @@ delete newFilters[key as keyof typeof filters];
                                                     )}
                                                 </div>
                                             </div>
+                                        </TableCell>
+                                        <TableCell className="text-sm text-muted-foreground max-w-[250px]">
+                                            {product.description ? (
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span className="cursor-help block truncate">{product.description}</span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-[300px] break-words">
+                                                        {product.description}
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            ) : (
+                                                '—'
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-xs">{getUnitLabel(product.unit)} ({product.unit_value})</span>
@@ -233,7 +254,7 @@ delete newFilters[key as keyof typeof filters];
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
+                                    <TableCell colSpan={7} className="h-24 text-center">
                                         No se encontraron productos.
                                     </TableCell>
                                 </TableRow>
@@ -275,6 +296,6 @@ delete newFilters[key as keyof typeof filters];
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </>
+        </TooltipProvider>
     );
 }

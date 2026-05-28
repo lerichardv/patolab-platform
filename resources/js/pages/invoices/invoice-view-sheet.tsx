@@ -44,8 +44,11 @@ return null;
     const getPaymentTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
             'cash': 'Efectivo',
-            'card': 'Tarjeta',
-            'transfer': 'Transferencia',
+            'card': 'Tarjeta de Crédito',
+            'credit card': 'Tarjeta de Crédito',
+            'transfer': 'Transferencia Bancaria',
+            'bank transfer': 'Transferencia Bancaria',
+            'check': 'Cheque',
             'credit': 'Crédito'
         };
 

@@ -12,7 +12,7 @@ class SpecimenController extends Controller
         
         $priorities->load(['specimens' => function($q) {
             $q->where('specimen.active', true)
-              ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation'])
+              ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'users'])
               ->leftJoin('priorities_specimens_order', function($join) {
                   $join->on('specimen.id', '=', 'priorities_specimens_order.specimen_id')
                        ->on('specimen.priority_id', '=', 'priorities_specimens_order.priority_id');
@@ -36,6 +36,12 @@ class SpecimenController extends Controller
             ->with('prices')
             ->get();
 
+        $pathologistRoleId = \App\Models\Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
+        $pathologists = [];
+        if ($pathologistRoleId) {
+            $pathologists = \App\Models\User::where('active', true)->where('role_id', $pathologistRoleId)->get();
+        }
+
         return \Inertia\Inertia::render('specimens/index', [
             'priorities' => $priorities,
             'customers' => \App\Models\Customer::where('active', true)->get(),
@@ -43,10 +49,13 @@ class SpecimenController extends Controller
             'examinations' => \App\Models\SpecimenTypeExamination::where('active', true)->get(),
             'categories' => \App\Models\SpecimenCategory::where('active', true)->get(),
             'referrers' => \App\Models\Referrer::where('active', true)->get(),
+            'referrerTypes' => \App\Models\ReferrerType::where('active', true)->get(),
             'locations' => \App\Models\Location::where('active', true)->get(),
             'sequences' => $sequences,
             'activeLocationId' => $activeLocationId,
             'products' => $products,
+            'settings' => \App\Models\Setting::all()->pluck('setting_value', 'setting_key'),
+            'pathologists' => $pathologists,
         ]);
     }
 
@@ -58,13 +67,13 @@ class SpecimenController extends Controller
             'specimen_type_examination' => 'required|exists:specimen_type_examination,id',
             'specimen_category' => 'required|exists:specimen_category,id',
             'referrer' => 'required|exists:referrers,id',
-            'anatomic_site' => 'required|string|max:255',
+            'anatomic_site' => 'nullable|string|max:255',
             'diagnosis' => 'nullable|string',
             'clinical_notes' => 'nullable|string',
             'status' => 'required|string',
             'priority_id' => 'required|exists:priorities,id',
             'medical_order_file' => [
-                'required',
+                'nullable',
                 'file',
                 'mimes:pdf,jpg,jpeg,png,webp,gif',
                 function ($attribute, $value, $fail) {
@@ -86,15 +95,21 @@ class SpecimenController extends Controller
             ],
             'amount' => 'required|numeric|min:0',
             'discount' => 'required|numeric|min:0',
-            'payment_type' => 'required|in:cash,credit card,bank transfer,credit',
+            'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
             'has_initial_payment' => 'nullable|boolean',
             'initial_payment_amount' => 'required_if:has_initial_payment,true|nullable|numeric|min:0.01',
-            'initial_payment_type' => 'required_if:has_initial_payment,true|nullable|in:cash,credit card,bank transfer',
+            'initial_payment_type' => 'required_if:has_initial_payment,true|nullable|in:cash,credit card,bank transfer,check',
             'custom_amount_enabled' => 'nullable|boolean',
             'custom_amount' => 'nullable|numeric|min:0',
             'custom_amount_reason' => 'nullable|string|max:255',
+            'age_discount_type' => 'nullable|string|in:third,fourth',
+            'age_discount_amount' => 'nullable|numeric|min:0',
             'proof_of_payment' => [
-                ($request->input('payment_type') === 'credit' && !$request->boolean('has_initial_payment')) ? 'nullable' : 'required',
+                (
+                    $request->input('payment_type') === 'cash' ||
+                    ($request->input('payment_type') === 'credit' && !$request->boolean('has_initial_payment')) ||
+                    ($request->input('payment_type') === 'credit' && $request->boolean('has_initial_payment') && $request->input('initial_payment_type') === 'cash')
+                ) ? 'nullable' : 'required',
                 'file',
                 'mimes:pdf,jpg,jpeg,png,webp,gif',
                 function ($attribute, $value, $fail) {
@@ -157,6 +172,7 @@ class SpecimenController extends Controller
             }
             
             $specimenData['sequence_code'] = $sequenceCode;
+            $specimenData['access_token'] = \Illuminate\Support\Str::random(32);
             
             $specimen = \App\Models\Specimen::create($specimenData);
 
@@ -216,13 +232,21 @@ class SpecimenController extends Controller
             $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
             $fullInvoiceNumber = $caiRange->full_prefix . $invoiceNumber;
 
-            $proofOfPaymentPath = '';
-            if ($request->hasFile('proof_of_payment') && !$request->boolean('has_initial_payment')) {
+            $proofOfPaymentPath = null;
+            if ($validated['payment_type'] === 'credit') {
+                if ($request->boolean('has_initial_payment')) {
+                    if (in_array($request->input('initial_payment_type'), ['credit card', 'bank transfer', 'check']) && $request->hasFile('proof_of_payment')) {
+                        $proofOfPaymentPath = $this->storeUploadedFile($request->file('proof_of_payment'), 'proofs');
+                    } else {
+                        $proofOfPaymentPath = null;
+                    }
+                } else {
+                    $proofOfPaymentPath = null;
+                }
+            } elseif ($request->hasFile('proof_of_payment')) {
                 $proofOfPaymentPath = $this->storeUploadedFile($request->file('proof_of_payment'), 'proofs');
-            } elseif ($validated['payment_type'] === 'credit') {
-                $proofOfPaymentPath = 'Crédito';
             } else {
-                $proofOfPaymentPath = $this->storeUploadedFile($request->file('proof_of_payment'), 'proofs');
+                $proofOfPaymentPath = 'Efectivo';
             }
 
             $insumosTotal = 0.00;
@@ -232,7 +256,7 @@ class SpecimenController extends Controller
                 }
             }
 
-            $amount = (float)$validated['amount'] + $insumosTotal;
+            $amount = (float)$validated['amount'];
             $discount = (float)$validated['discount'];
             $subtotal = $amount - $discount;
 
@@ -259,6 +283,8 @@ class SpecimenController extends Controller
             $customAmountVal = $isCustomAmount ? (float)$validated['custom_amount'] : 0.00;
             $customAmountReasonVal = $isCustomAmount ? ($validated['custom_amount_reason'] ?? null) : null;
 
+            $totalPaid = in_array($validated['payment_type'], ['cash', 'credit card', 'bank transfer', 'check']) ? $subtotal : $initialPaymentAmount;
+
             $invoice = \App\Models\Invoice::create([
                 'full_invoice_number' => $fullInvoiceNumber,
                 'invoice_number' => $invoiceNumber,
@@ -277,10 +303,13 @@ class SpecimenController extends Controller
                 'isv_15' => 0.00,
                 'isv_18' => 0.00,
                 'total' => $subtotal,
+                'total_paid' => $totalPaid,
                 'proof_of_payment' => $proofOfPaymentPath,
                 'invoice_file' => '', 
                 'custom_amount' => $customAmountVal,
                 'custom_amount_reason' => $customAmountReasonVal,
+                'age_discount_type' => $validated['age_discount_type'] ?? null,
+                'age_discount_amount' => (float)($validated['age_discount_amount'] ?? 0.00),
             ]);
 
             $caiRange->increment('last_used_number');
@@ -288,45 +317,7 @@ class SpecimenController extends Controller
                 $caiRange->update(['status' => 'exhausted']);
             }
 
-            if ($validated['payment_type'] === 'credit' && $request->boolean('has_initial_payment')) {
-                $nextNumber2 = $caiRange->last_used_number + 1;
-                $invoiceNumber2 = str_pad($nextNumber2, 8, '0', STR_PAD_LEFT);
-                $fullInvoiceNumber2 = $caiRange->full_prefix . $invoiceNumber2;
-
-                $proofOfPaymentPath2 = '';
-                if ($request->hasFile('proof_of_payment')) {
-                    $proofOfPaymentPath2 = $this->storeUploadedFile($request->file('proof_of_payment'), 'proofs');
-                }
-
-                $paymentInvoice = \App\Models\Invoice::create([
-                    'full_invoice_number' => $fullInvoiceNumber2,
-                    'invoice_number' => $invoiceNumber2,
-                    'cai_range_id' => $caiRange->id,
-                    'customer_id' => $specimen->customer,
-                    'specimen_id' => $specimen->id,
-                    'payment_type' => $validated['initial_payment_type'],
-                    'credit_payment_id' => $creditId,
-                    'amount' => $initialPaymentAmount,
-                    'discount' => 0.00,
-                    'subtotal' => $initialPaymentAmount,
-                    'exempt_amount' => 0.00,
-                    'tax_exempt_amount' => $initialPaymentAmount,
-                    'taxable_amount_15' => 0.00,
-                    'taxable_amount_18' => 0.00,
-                    'isv_15' => 0.00,
-                    'isv_18' => 0.00,
-                    'total' => $initialPaymentAmount,
-                    'proof_of_payment' => $proofOfPaymentPath2,
-                    'invoice_file' => '', 
-                ]);
-
-                $caiRange->increment('last_used_number');
-                if ($caiRange->last_used_number >= $caiRange->end_number) {
-                    $caiRange->update(['status' => 'exhausted']);
-                }
-            }
-
-            $invoice->load(['specimen.products']);
+            $invoice->load(['specimen.products', 'creditRelation']);
             $totalWords = $this->numberToSpanishWords($invoice->total);
             $customer = \App\Models\Customer::findOrFail($specimen->customer);
             $examination = \App\Models\SpecimenTypeExamination::findOrFail($specimen->specimen_type_examination);
@@ -351,37 +342,6 @@ class SpecimenController extends Controller
 
             \Illuminate\Support\Facades\Storage::disk('public')->put($pdfPath, $pdfContent);
             $invoice->update(['invoice_file' => $pdfPath]);
-
-            if ($paymentInvoice) {
-                $paymentTotalWords = $this->numberToSpanishWords($paymentInvoice->total);
-                $htmlContent2 = view('pdf.credit_payment_invoice', [
-                    'invoice' => $paymentInvoice,
-                    'caiRange' => $caiRange,
-                    'customer' => $customer,
-                    'location' => $location,
-                    'totalWords' => $paymentTotalWords,
-                    'credit' => $credit,
-                    'originalInvoice' => $invoice,
-                ])->render();
-
-                $filename2 = 'credit_invoice_' . $paymentInvoice->id . '_' . time() . '.pdf';
-                $pdfPath2 = 'invoices/' . $filename2;
-
-                $pdfContent2 = \Spatie\Browsershot\Browsershot::html($htmlContent2)
-                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
-                    ->addChromiumArguments([
-                        'disable-crash-reporter', 
-                        'disable-dev-shm-usage',
-                        'no-sandbox'
-                    ])
-                    ->noSandbox()
-                    ->margins(10, 10, 10, 10)
-                    ->format('A4')
-                    ->pdf();
-
-                \Illuminate\Support\Facades\Storage::disk('public')->put($pdfPath2, $pdfContent2);
-                $paymentInvoice->update(['invoice_file' => $pdfPath2]);
-            }
         });
 
         $responseData = [
@@ -406,13 +366,13 @@ class SpecimenController extends Controller
             'specimen_type_examination' => 'required|exists:specimen_type_examination,id',
             'specimen_category' => 'required|exists:specimen_category,id',
             'referrer' => 'required|exists:referrers,id',
-            'anatomic_site' => 'required|string|max:255',
+            'anatomic_site' => 'nullable|string|max:255',
             'diagnosis' => 'nullable|string',
             'clinical_notes' => 'nullable|string',
             'status' => 'required|string',
             'priority_id' => 'required|exists:priorities,id',
             'medical_order_file' => [
-                $specimen->medical_order_file ? 'nullable' : 'required',
+                'nullable',
                 'file',
                 'mimes:pdf,jpg,jpeg,png,webp,gif',
                 function ($attribute, $value, $fail) {
@@ -734,4 +694,98 @@ class SpecimenController extends Controller
             'user_id' => \Illuminate\Support\Facades\Auth::id() ?? 1,
         ]);
     }
+
+    public function assignUser(\Illuminate\Http\Request $request, \App\Models\Specimen $specimen)
+    {
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+        ]);
+
+        if (!$specimen->users()->where('user_id', $validated['user_id'])->exists()) {
+            $specimen->users()->attach($validated['user_id']);
+        }
+
+        return redirect()->back()->with('success', 'Patólogo asignado con éxito.');
+    }
+
+    public function unassignUser(\Illuminate\Http\Request $request, \App\Models\Specimen $specimen)
+    {
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+        ]);
+
+        $specimen->users()->detach($validated['user_id']);
+
+        return redirect()->back()->with('success', 'Patólogo desasignado con éxito.');
+    }
+
+    public function bulkAction(\Illuminate\Http\Request $request)
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'integer|exists:specimen,id',
+            'action' => 'required|string|in:change_status,change_priority,assign_pathologist,unassign_pathologist,delete',
+            'value' => 'nullable',
+        ]);
+
+        $ids = $validated['ids'];
+        $action = $validated['action'];
+        $value = $validated['value'] ?? null;
+
+        \Illuminate\Support\Facades\DB::transaction(function() use ($ids, $action, $value) {
+            if ($action === 'change_status') {
+                \App\Models\Specimen::whereIn('id', $ids)->update(['status' => $value]);
+            } elseif ($action === 'change_priority') {
+                \App\Models\Specimen::whereIn('id', $ids)->update(['priority_id' => $value]);
+                
+                foreach ($ids as $id) {
+                    $maxOrder = \App\Models\PrioritySpecimenOrder::where('priority_id', $value)->max('order') ?? 0;
+                    \App\Models\PrioritySpecimenOrder::updateOrCreate(
+                        ['priority_id' => $value, 'specimen_id' => $id],
+                        ['order' => $maxOrder + 1]
+                    );
+                }
+            } elseif ($action === 'assign_pathologist') {
+                foreach ($ids as $id) {
+                    $specimen = \App\Models\Specimen::find($id);
+                    if ($specimen && !$specimen->users()->where('user_id', $value)->exists()) {
+                        $specimen->users()->attach($value);
+                    }
+                }
+            } elseif ($action === 'unassign_pathologist') {
+                foreach ($ids as $id) {
+                    $specimen = \App\Models\Specimen::find($id);
+                    if ($specimen) {
+                        $specimen->users()->detach($value);
+                    }
+                }
+            } elseif ($action === 'delete') {
+                \App\Models\Specimen::whereIn('id', $ids)->update(['active' => false]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Acción en bulk realizada con éxito.');
+    }
+
+    public function showPublic(\Illuminate\Http\Request $request, $specimen_code)
+    {
+        $token = $request->query('token');
+        if (!$token) {
+            $token = $request->input('token');
+        }
+
+        $specimen = \App\Models\Specimen::where('sequence_code', $specimen_code)
+            ->where('active', true)
+            ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation'])
+            ->firstOrFail();
+
+        if ($specimen->access_token !== $token) {
+            abort(403, 'Acceso no autorizado o token inválido.');
+        }
+
+        return \Inertia\Inertia::render('specimens/public-progress', [
+            'specimen' => $specimen
+        ]);
+    }
 }
+

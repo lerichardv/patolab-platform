@@ -1,7 +1,7 @@
 import { useForm } from '@inertiajs/react';
 import { FileText, Upload, X } from 'lucide-react';
 import type { FormEventHandler} from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { pay as payCredit } from '@/actions/App/Http/Controllers/CreditController';
 import InputError from '@/components/input-error';
@@ -9,6 +9,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Spinner } from '@/components/ui/spinner';
 
 interface Customer {
     id: number;
@@ -33,6 +44,8 @@ interface Props {
 export default function CreditForm({ credit, onSuccess }: Props) {
     const remainingVal = parseFloat(String(credit.amount_remaining));
 
+    const [showConfirm, setShowConfirm] = useState(false);
+
     const { data, setData, post, processing, errors, reset } = useForm({
         amount_paid: remainingVal.toFixed(2),
         payment_type: 'cash',
@@ -55,14 +68,17 @@ export default function CreditForm({ credit, onSuccess }: Props) {
             return;
         }
 
-        if (!data.proof_of_payment) {
+        if (data.payment_type !== 'cash' && !data.proof_of_payment) {
             toast.error('El comprobante de pago es requerido');
 
             return;
         }
 
-        // We use standard POST request because we are uploading files.
-        // Inertia.post handles FormData automatically when files are present in the form data.
+        setShowConfirm(true);
+    };
+
+    const confirmSubmit = () => {
+        setShowConfirm(false);
         post(payCredit(credit.id).url, {
             onSuccess: () => {
                 toast.success('Pago de crédito registrado con éxito');
@@ -129,13 +145,14 @@ export default function CreditForm({ credit, onSuccess }: Props) {
                             <SelectItem value="cash">Efectivo</SelectItem>
                             <SelectItem value="credit card">Tarjeta de Crédito</SelectItem>
                             <SelectItem value="bank transfer">Transferencia Bancaria</SelectItem>
+                            <SelectItem value="check">Cheque</SelectItem>
                         </SelectContent>
                     </Select>
                     <InputError message={errors.payment_type} />
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="proof_of_payment">Comprobante de Pago (PDF o Imagen) *</Label>
+                    <Label htmlFor="proof_of_payment">Comprobante de Pago (PDF o Imagen) {data.payment_type !== 'cash' && '*'}</Label>
 
                     {data.proof_of_payment && (
                         <div className="flex items-center justify-between p-3 rounded-lg border bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/20">
@@ -198,9 +215,57 @@ export default function CreditForm({ credit, onSuccess }: Props) {
 
             <div className="flex justify-end pt-4 border-t">
                 <Button type="submit" disabled={processing} className="w-full sm:w-auto">
+                    {processing && <Spinner className="mr-2" />}
                     {processing ? 'Registrando...' : 'Registrar Pago'}
                 </Button>
             </div>
+
+            <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+                <AlertDialogContent className="max-w-[450px]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmación de Abono</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Revise detalladamente los importes antes de registrar este abono al crédito.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    <div className="grid gap-3 py-3 text-sm">
+                        <div className="flex justify-between border-b pb-2">
+                            <span className="font-medium text-muted-foreground">Cliente:</span>
+                            <span className="font-semibold text-foreground">{credit.customer?.name}</span>
+                        </div>
+                        <div className="flex justify-between border-b pb-2">
+                            <span className="font-medium text-muted-foreground">Tipo de Pago:</span>
+                            <span className="font-semibold text-foreground">
+                                {data.payment_type === 'cash' ? 'Efectivo' :
+                                 data.payment_type === 'credit card' ? 'Tarjeta de Crédito' :
+                                 data.payment_type === 'bank transfer' ? 'Transferencia Bancaria' :
+                                 data.payment_type === 'check' ? 'Cheque' : data.payment_type}
+                            </span>
+                        </div>
+                        <div className="flex justify-between border-b pb-2">
+                            <span className="font-medium text-muted-foreground">Monto de Abono:</span>
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">L. {parseFloat(data.amount_paid || '0').toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between border-b pb-2">
+                            <span className="font-medium text-muted-foreground">Saldo Pendiente Anterior:</span>
+                            <span className="font-semibold text-foreground">L. {remainingVal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-base border-b pb-2">
+                            <span className="text-primary">Nuevo Saldo Pendiente:</span>
+                            <span className="text-destructive">L. {Math.max(0, remainingVal - (parseFloat(data.amount_paid) || 0)).toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmSubmit} disabled={processing}>
+                            {processing && <Spinner className="mr-2" />}
+                            {processing ? 'Registrando...' : 'Confirmar Pago'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </form>
     );
 }

@@ -25,6 +25,7 @@ interface Props {
     examinations: any[];
     categories: any[];
     referrers: any[];
+    referrerTypes: any[];
     priorities: any[];
     locations: any[];
     sequences: any[];
@@ -41,6 +42,7 @@ export default function SpecimenSheet({
     examinations,
     categories,
     referrers,
+    referrerTypes,
     priorities,
     locations,
     sequences,
@@ -97,6 +99,7 @@ export default function SpecimenSheet({
                         examinations={examinations}
                         categories={categories}
                         referrers={referrers}
+                        referrerTypes={referrerTypes}
                         priorities={priorities}
                         locations={locations}
                         sequences={sequences}

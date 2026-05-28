@@ -27,14 +27,22 @@ class CreditController extends Controller
             'invoices.caiRange'
         ]);
 
-        // Filter by search query (Customer name or Customer ID/RTN)
+        // Filter by search query (Customer name, Customer ID/RTN, or Credit ID)
         if ($request->has('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
-                $q->whereHas('customer', function ($cq) use ($search) {
-                    $cq->where('name', 'like', "%{$search}%")
-                       ->orWhere('id_number', 'like', "%{$search}%");
-                });
+                if (is_numeric($search)) {
+                    $q->where('id', $search)
+                      ->orWhereHas('customer', function ($cq) use ($search) {
+                          $cq->where('name', 'like', "%{$search}%")
+                             ->orWhere('id_number', 'like', "%{$search}%");
+                      });
+                } else {
+                    $q->whereHas('customer', function ($cq) use ($search) {
+                        $cq->where('name', 'like', "%{$search}%")
+                           ->orWhere('id_number', 'like', "%{$search}%");
+                    });
+                }
             });
         }
 
@@ -72,9 +80,9 @@ class CreditController extends Controller
                     }
                 }
             ],
-            'payment_type' => 'required|in:cash,credit card,bank transfer',
+            'payment_type' => 'required|in:cash,credit card,bank transfer,check',
             'proof_of_payment' => [
-                'required',
+                $request->input('payment_type') === 'cash' ? 'nullable' : 'required',
                 'file',
                 function ($attribute, $value, $fail) {
                     if ($value instanceof \Illuminate\Http\UploadedFile) {
@@ -123,7 +131,7 @@ class CreditController extends Controller
 
             $amountPaid = (float)$validated['amount_paid'];
 
-            // Create payment invoice
+             // Create payment invoice
             $invoice = Invoice::create([
                 'full_invoice_number' => $fullInvoiceNumber,
                 'invoice_number' => $invoiceNumber,
@@ -142,6 +150,7 @@ class CreditController extends Controller
                 'isv_15' => 0.00,
                 'isv_18' => 0.00,
                 'total' => $amountPaid,
+                'total_paid' => $amountPaid,
                 'proof_of_payment' => $proofOfPaymentPath,
                 'invoice_file' => '', 
             ]);
@@ -149,6 +158,12 @@ class CreditController extends Controller
             // Update credit values
             $credit->increment('amount_paid', $amountPaid);
             $credit->decrement('amount_remaining', $amountPaid);
+            $credit->refresh();
+
+            // Update original invoice total_paid
+            $originalInvoice->update([
+                'total_paid' => $credit->amount_paid
+            ]);
 
             // Increment CAI Range
             $caiRange->increment('last_used_number');

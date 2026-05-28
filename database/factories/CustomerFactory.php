@@ -26,8 +26,14 @@ class CustomerFactory extends Factory
             'age' => $type === 'cliente' ? $this->faker->numberBetween(18, 80) : null,
             'phone' => $this->faker->numerify('####-####'),
             'gender' => $this->faker->randomElement(['Hombre', 'Mujer', 'Otro']),
-            'state' => $this->faker->randomElement(['Francisco Morazán', 'Cortés', 'Atlántida', 'Choluteca']),
-            'city' => $this->faker->city(),
+            'state' => function () {
+                return \App\Models\Department::inRandomOrder()->first()?->id ?? 1;
+            },
+            'city' => function (array $attributes) {
+                return \App\Models\Municipality::where('department_id', $attributes['state'])->inRandomOrder()->first()?->id 
+                    ?? \App\Models\Municipality::inRandomOrder()->first()?->id 
+                    ?? 1;
+            },
             'secondary_phone' => $this->faker->optional()->numerify('####-####'),
             'address' => $this->faker->address(),
             'email' => $this->faker->safeEmail(),

@@ -1,8 +1,8 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import debounce from 'lodash/debounce';
-import { FileText, Search, CreditCard, ExternalLink, Printer, History } from 'lucide-react';
-import { useState, useCallback, useEffect } from 'react';
+import { FileText, Search, CreditCard, ExternalLink, Printer, History, Eye } from 'lucide-react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
 import { Pagination } from '@/components/pagination';
 import {
@@ -35,6 +35,11 @@ interface Customer {
     email?: string;
 }
 
+interface Specimen {
+    id: number;
+    sequence_code?: string;
+}
+
 interface Invoice {
     id: number;
     full_invoice_number: string;
@@ -42,6 +47,7 @@ interface Invoice {
     total: string | number;
     invoice_file: string;
     created_at: string;
+    specimen?: Specimen;
 }
 
 interface Credit {
@@ -83,6 +89,36 @@ export default function CreditsIndex({ credits, filters }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [showLeftShadow, setShowLeftShadow] = useState(false);
+    const [showRightShadow, setShowRightShadow] = useState(false);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const scrollContainer = container.querySelector('.relative.w-full.overflow-auto') || container;
+
+        const handleScroll = () => {
+            const scrollLeft = scrollContainer.scrollLeft;
+            const scrollWidth = scrollContainer.scrollWidth;
+            const clientWidth = scrollContainer.clientWidth;
+
+            setShowLeftShadow(scrollLeft > 2);
+            setShowRightShadow(scrollLeft < scrollWidth - clientWidth - 2);
+        };
+
+        handleScroll();
+
+        scrollContainer.addEventListener('scroll', handleScroll);
+        window.addEventListener('resize', handleScroll);
+
+        return () => {
+            scrollContainer.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('resize', handleScroll);
+        };
+    }, [credits.data]);
 
     // Watch flash for new invoice generation
     useEffect(() => {
@@ -172,18 +208,20 @@ delete newFilters[key as keyof typeof filters];
                     </Select>
                 </div>
 
-                <div className="rounded-md border bg-card">
+                <div ref={containerRef} className="rounded-md border bg-card">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Cliente</TableHead>
-                                <TableHead>Monto Crédito</TableHead>
-                                <TableHead>Monto Pagado</TableHead>
-                                <TableHead>Saldo Pendiente</TableHead>
-                                <TableHead>Fecha Creación</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead>Facturas Asoc.</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
+                                <TableHead className={`min-w-[100px] sticky left-0 z-10 bg-card border-r border-border w-[100px] after:absolute after:right-[-8px] after:top-0 after:bottom-0 after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent dark:after:from-black/[0.2] pointer-events-none after:transition-opacity after:duration-200 ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}>ID</TableHead>
+                                <TableHead className="min-w-[180px] pl-5">Cliente</TableHead>
+                                <TableHead className="min-w-[140px]">Muestra</TableHead>
+                                <TableHead className="min-w-[140px]">Monto Crédito</TableHead>
+                                <TableHead className="min-w-[140px]">Monto Pagado</TableHead>
+                                <TableHead className="min-w-[140px]">Saldo Pendiente</TableHead>
+                                <TableHead className="min-w-[150px]">Fecha Creación</TableHead>
+                                <TableHead className="min-w-[130px]">Estado</TableHead>
+                                <TableHead className="min-w-[180px]">Facturas Asoc.</TableHead>
+                                <TableHead className={`text-right sticky right-0 z-10 bg-card border-l border-border min-w-[100px] w-[100px] before:absolute before:left-[-8px] before:top-0 before:bottom-0 before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] dark:before:to-black/[0.2] before:transition-opacity before:duration-200 ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}>Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -192,31 +230,57 @@ delete newFilters[key as keyof typeof filters];
                                     const originalInvoice = credit.invoices?.find(inv => inv.payment_type === 'credit');
                                     const paymentInvoices = credit.invoices?.filter(inv => inv.payment_type !== 'credit') || [];
                                     const remainingVal = parseFloat(String(credit.amount_remaining));
+                                    const isPaid = remainingVal === 0;
+                                    const rowBgClass = isPaid ? 'bg-emerald-500/5 dark:bg-emerald-500/5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10' : '';
+                                    const stickyBgClass = isPaid ? 'bg-[#f6fdf9] dark:bg-[#07180e] group-hover:bg-[#ebf8f0] dark:group-hover:bg-[#0b2416]' : 'bg-card group-hover:bg-muted/50';
 
                                     return (
-                                        <TableRow key={credit.id}>
-                                            <TableCell>
+                                        <TableRow key={credit.id} className={`group ${rowBgClass}`}>
+                                            <TableCell className={`min-w-[100px] sticky left-0 z-10 ${stickyBgClass} transition-colors border-r border-border w-[100px] after:absolute after:right-[-8px] after:top-0 after:bottom-0 after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent dark:after:from-black/[0.2] pointer-events-none after:transition-opacity after:duration-200 ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}>
+                                                <span className="font-mono text-xs font-semibold">#{credit.id}</span>
+                                            </TableCell>
+                                            <TableCell className="min-w-[180px] pl-5">
                                                 <div className="flex flex-col">
                                                     <span className="font-medium text-foreground">{credit.customer?.name}</span>
                                                     <span className="text-xs text-muted-foreground">{credit.customer?.id_number}</span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="font-mono font-semibold">
+                                            <TableCell className="min-w-[140px]">
+                                                {originalInvoice?.specimen ? (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="font-mono text-[10px] font-bold text-primary bg-primary/5 border border-primary/20 px-1.5 py-0.5 rounded">
+                                                            {originalInvoice.specimen.sequence_code || `#${originalInvoice.specimen.id}`}
+                                                        </span>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-5 w-5 hover:bg-muted"
+                                                            onClick={() => router.get('/specimens', { specimen: originalInvoice.specimen?.sequence_code || String(originalInvoice.specimen?.id), action: 'view' })}
+                                                            title="Ver Muestra"
+                                                        >
+                                                            <Eye className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground italic">N/A</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="min-w-[140px] font-mono font-semibold">
                                                 L. {parseFloat(String(credit.credit_amount)).toFixed(2)}
                                             </TableCell>
-                                            <TableCell className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                                            <TableCell className="min-w-[140px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
                                                 L. {parseFloat(String(credit.amount_paid)).toFixed(2)}
                                             </TableCell>
-                                            <TableCell className="font-mono text-destructive font-semibold">
+                                            <TableCell className={`min-w-[140px] font-mono font-semibold ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
                                                 L. {remainingVal.toFixed(2)}
                                             </TableCell>
-                                            <TableCell className="text-xs text-muted-foreground">
+                                            <TableCell className="min-w-[150px] text-xs text-muted-foreground">
                                                 {format(new Date(credit.created_at), 'dd/MM/yyyy h:mm a')}
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="min-w-[130px]">
                                                 {getStatusBadge(credit)}
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="min-w-[180px]">
                                                 <div className="flex flex-col gap-1 text-[11px]">
                                                     {originalInvoice && (
                                                         <a 
@@ -248,7 +312,7 @@ delete newFilters[key as keyof typeof filters];
                                                     )}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="text-right">
+                                            <TableCell className={`text-right sticky right-0 z-10 ${stickyBgClass} transition-colors border-l border-border min-w-[100px] w-[100px] before:absolute before:left-[-8px] before:top-0 before:bottom-0 before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] dark:before:to-black/[0.2] before:transition-opacity before:duration-200 ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}>
                                                 <div className="flex justify-end gap-2">
                                                     {remainingVal > 0 && (
                                                         <Button 
@@ -267,7 +331,7 @@ delete newFilters[key as keyof typeof filters];
                                 })
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
+                                    <TableCell colSpan={10} className="h-24 text-center">
                                         No se encontraron créditos de clientes.
                                     </TableCell>
                                 </TableRow>

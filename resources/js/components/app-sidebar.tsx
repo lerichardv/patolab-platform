@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Beaker, BookOpen, Contact, FolderGit2, LayoutGrid, Users, ShieldCheck, FlaskConical, Microscope, UserRound, Tag, MapPin, Hash, Warehouse, PackageSearch, Package, ClipboardList, History, Receipt } from 'lucide-react';
+import { Beaker, BookOpen, Contact, FolderGit2, LayoutGrid, Users, ShieldCheck, FlaskConical, Microscope, UserRound, Tag, MapPin, Hash, Warehouse, PackageSearch, Package, ClipboardList, History, Receipt, Settings } from 'lucide-react';
 import { index as caiRangesIndex } from '@/actions/App/Http/Controllers/CaiRangeController';
 import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
 import { index as customersIndex } from '@/actions/App/Http/Controllers/CustomerController';
@@ -8,19 +8,22 @@ import { index as locationsIndex } from '@/actions/App/Http/Controllers/Location
 import { index as referrersIndex } from '@/actions/App/Http/Controllers/ReferrerController';
 import { index as specimenCategoriesIndex } from '@/actions/App/Http/Controllers/SpecimenCategoryController';
 import { index as specimensIndex } from '@/actions/App/Http/Controllers/SpecimenController';
+import { index as myAssignmentsIndex } from '@/actions/App/Http/Controllers/MyAssignmentController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
+import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
+import { index as settingsSystemIndex } from '@/actions/App/Http/Controllers/SettingController';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
-    Sidebar,
-    SidebarContent,
-    SidebarFooter,
-    SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
+	Sidebar,
+	SidebarContent,
+	SidebarFooter,
+	SidebarHeader,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard, testPage } from '@/routes';
 import { index as specimenTypesIndex } from '@/actions/App/Http/Controllers/SpecimenTypeController';
@@ -34,154 +37,169 @@ import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceCo
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
-    {
-        title: 'Resumen',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Muestras',
-        href: specimensIndex(),
-        icon: Microscope,
-    },
+	{
+		title: 'Resumen',
+		href: dashboard(),
+		icon: LayoutGrid,
+	},
+	{
+		title: 'Muestras',
+		href: specimensIndex(),
+		icon: Microscope,
+	},
+	{
+		title: 'Mis Asignaciones',
+		href: myAssignmentsIndex(),
+		icon: ClipboardList,
+	},
 ];
 
 const adminNavItems: NavItem[] = [
-    {
-        title: 'Inventario',
-        href: '#',
-        icon: PackageSearch,
-        items: [
-            {
-                title: 'Gestionar Inventario',
-                href: inventoriesIndex(),
-                icon: ClipboardList,
-            },
-            {
-                title: 'Productos',
-                href: productsIndex(),
-                icon: Package,
-            },
-            {
-                title: 'Almacenes',
-                href: storagesIndex(),
-                icon: Warehouse,
-            },
-            {
-                title: 'Historial de Movimientos',
-                href: inventoryMovementsIndex(),
-                icon: History,
-            },
-        ],
-    },
-    {
-        title: 'Administración',
-        href: '#',
-        icon: ShieldCheck,
-        items: [
+	{
+		title: 'Inventario',
+		href: '#',
+		icon: PackageSearch,
+		items: [
+			{
+				title: 'Gestionar Inventario',
+				href: inventoriesIndex(),
+				icon: ClipboardList,
+			},
+			{
+				title: 'Productos',
+				href: productsIndex(),
+				icon: Package,
+			},
+			{
+				title: 'Almacenes',
+				href: storagesIndex(),
+				icon: Warehouse,
+			},
+			{
+				title: 'Historial de Movimientos',
+				href: inventoryMovementsIndex(),
+				icon: History,
+			},
+		],
+	},
+	{
+		title: 'Administración',
+		href: '#',
+		icon: ShieldCheck,
+		items: [
 			{
 				title: 'Clientes',
 				href: customersIndex(),
 				icon: Contact,
 			},
-            {
-                title: 'Muestras',
-                href: '#',
-                icon: Microscope,
-                items: [
-                    {
-                        title: 'Tipos de Muestras',
-                        href: specimenTypesIndex(),
-                    },
-                    {
-                        title: 'Tipos de análisis',
-                        href: specimenTypeExaminationsIndex(),
-                    },
-                    {
-                        title: 'Categorías',
-                        href: specimenCategoriesIndex(),
-                    },
-                    {
-                        title: 'Secuencias',
-                        href: sequencesIndex(),
-                    },
-                ],
-            },
-            {
-                title: 'Remitentes',
-                href: '#',
-                icon: UserRound,
-                items: [
-                    {
-                        title: 'Gestionar Remitentes',
-                        href: referrersIndex(),
-                    },
-                    {
-                        title: 'Tipos de Remitentes',
-                        href: referrerTypesIndex(),
-                    },
-                ],
-            },
-            {
-                title: 'Sucursales',
-                href: locationsIndex(),
-                icon: MapPin,
-            },
-            {
-                title: 'Facturación',
-                href: '#',
-                icon: Receipt,
-                items: [
-                    {
-                        title: 'Rangos de Facturación',
-                        href: caiRangesIndex(),
-                    },
-                    {
-                        title: 'Facturas',
-                        href: invoicesIndex(),
-                    },
-                    {
-                        title: 'Créditos',
-                        href: creditsIndex(),
-                    },
-                ],
-            },
-            {
-                title: 'Usuarios del sistema',
-                href: usersIndex(),
-                icon: Users,
-            },
-        ],
-    },
+			{
+				title: 'Muestras',
+				href: '#',
+				icon: Microscope,
+				items: [
+					{
+						title: 'Tipos de Muestras',
+						href: specimenTypesIndex(),
+					},
+					{
+						title: 'Tipos de análisis',
+						href: specimenTypeExaminationsIndex(),
+					},
+					{
+						title: 'Categorías',
+						href: specimenCategoriesIndex(),
+					},
+					{
+						title: 'Secuencias',
+						href: sequencesIndex(),
+					},
+				],
+			},
+			{
+				title: 'Remitentes',
+				href: '#',
+				icon: UserRound,
+				items: [
+					{
+						title: 'Gestionar Remitentes',
+						href: referrersIndex(),
+					},
+					{
+						title: 'Tipos de Remitentes',
+						href: referrerTypesIndex(),
+					},
+				],
+			},
+			{
+				title: 'Sucursales',
+				href: locationsIndex(),
+				icon: MapPin,
+			},
+			{
+				title: 'Facturación',
+				href: '#',
+				icon: Receipt,
+				items: [
+					{
+						title: 'Rangos de Facturación',
+						href: caiRangesIndex(),
+					},
+					{
+						title: 'Facturas',
+						href: invoicesIndex(),
+					},
+					{
+						title: 'Créditos',
+						href: creditsIndex(),
+					},
+				],
+			},
+			{
+				title: 'Usuarios del sistema',
+				href: usersIndex(),
+				icon: Users,
+			},
+			{
+				title: 'Roles y Permisos',
+				href: rolesIndex(),
+				icon: ShieldCheck,
+			},
+			{
+				title: 'Ajustes del Sistema',
+				href: settingsSystemIndex(),
+				icon: Settings,
+			},
+		],
+	},
 ];
 
 const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
-    return (
-        <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
-                                <AppLogo />
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarHeader>
+	return (
+		<Sidebar collapsible="icon" variant="inset">
+			<SidebarHeader>
+				<SidebarMenu>
+					<SidebarMenuItem>
+						<SidebarMenuButton size="lg" asChild>
+							<Link href={dashboard()} prefetch>
+								<AppLogo />
+							</Link>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				</SidebarMenu>
+			</SidebarHeader>
 
-            <SidebarContent>
-                <NavMain items={mainNavItems} label="Operaciones" />
-                <NavMain items={adminNavItems} label="Gestión" />
-            </SidebarContent>
+			<SidebarContent>
+				<NavMain items={mainNavItems} label="Operaciones" />
+				<NavMain items={adminNavItems} label="Gestión" />
+			</SidebarContent>
 
-            <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
-                <NavUser />
-            </SidebarFooter>
-        </Sidebar>
-    );
+			<SidebarFooter>
+				<NavFooter items={footerNavItems} className="mt-auto" />
+				<NavUser />
+			</SidebarFooter>
+		</Sidebar>
+	);
 }

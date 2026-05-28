@@ -194,8 +194,8 @@ test('storing a specimen with automatic discount calculation for specimen price 
     $proofOfPaymentFile = UploadedFile::fake()->create('payment_proof.pdf', 50, 'application/pdf');
 
     // Frontend would submit:
-    // data.amount = maxSpecimenPrice (500) + customAmount (0) + insumosDiscount ( (30 - 15) * 2 = 30 ) = 530
-    // data.discount = specimenDiscount (500 - 400 = 100) + insumosDiscount (30) = 130
+    // data.amount = maxSpecimenPrice (500) + customAmount (0) = 500
+    // data.discount = specimenDiscount (500 - 400 = 100) = 100
     // data.insumos = [[id, price = 15, quantity = 2]]
     $response = $this->post(route('specimens.store'), [
         'customer' => $this->customer->id,
@@ -209,8 +209,8 @@ test('storing a specimen with automatic discount calculation for specimen price 
         'status' => 'received',
         'priority_id' => $this->priority->id,
         'medical_order_file' => $medicalOrderFile,
-        'amount' => 530.00,
-        'discount' => 130.00,
+        'amount' => 500.00,
+        'discount' => 100.00,
         'payment_type' => 'cash',
         'proof_of_payment' => $proofOfPaymentFile,
         'insumos' => [
@@ -244,17 +244,17 @@ test('storing a specimen with automatic discount calculation for specimen price 
 
     // Verify Invoice was created
     // Expected math:
-    // Amount: (float)amount_submitted (530) + insumos_total (15 * 2 = 30) = 560
-    // Discount: 130
-    // Subtotal: 560 - 130 = 430
+    // Amount: (float)amount_submitted (500.00) = 500.00
+    // Discount: 100.00
+    // Subtotal: 500.00 - 100.00 = 400.00
     $this->assertDatabaseHas('invoices', [
         'customer_id' => $this->customer->id,
         'specimen_id' => $specimen->id,
-        'amount' => '560.00',
-        'discount' => '130.00',
-        'subtotal' => '430.00',
-        'total' => '430.00',
-        'tax_exempt_amount' => '430.00',
+        'amount' => '500.00',
+        'discount' => '100.00',
+        'subtotal' => '400.00',
+        'total' => '400.00',
+        'tax_exempt_amount' => '400.00',
     ]);
 });
 

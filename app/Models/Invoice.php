@@ -33,7 +33,10 @@ class Invoice extends Model
         'proof_of_payment',
         'invoice_file',
         'custom_amount',
-        'custom_amount_reason'
+        'custom_amount_reason',
+        'total_paid',
+        'age_discount_type',
+        'age_discount_amount',
     ];
 
     protected $casts = [
@@ -48,6 +51,8 @@ class Invoice extends Model
         'isv_18' => 'decimal:2',
         'total' => 'decimal:2',
         'custom_amount' => 'decimal:2',
+        'total_paid' => 'decimal:2',
+        'age_discount_amount' => 'decimal:2',
     ];
 
     public function caiRange(): BelongsTo

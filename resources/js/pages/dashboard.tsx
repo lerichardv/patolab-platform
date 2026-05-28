@@ -663,6 +663,8 @@ function TodaySpecimensList({
                 return 'Tarjeta';
             case 'bank transfer':
                 return 'Transferencia';
+            case 'check':
+                return 'Cheque';
             case 'credit':
                 return 'Crédito';
             default:

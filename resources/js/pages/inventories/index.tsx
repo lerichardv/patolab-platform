@@ -1,12 +1,13 @@
 import { Head, router } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
-import { ClipboardList, Edit2, Package, PackageSearch, Plus, Search, Trash2, Warehouse } from 'lucide-react';
+import { ClipboardList, Edit2, Eye, Package, PackageSearch, Plus, Search, Trash2, Warehouse } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { 
     index as inventoriesIndex, 
     destroy as destroyInventory 
 } from '@/actions/App/Http/Controllers/InventoryController';
+import { index as productsIndex } from '@/actions/App/Http/Controllers/ProductController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -77,13 +78,14 @@ interface Props {
     };
     storages: Storage[];
     products: Product[];
+    existingInventories: { storage: number; product: number }[];
     filters: {
         search?: string;
         storage?: string;
     };
 }
 
-export default function InventoriesIndex({ inventories, storages, products, filters }: Props) {
+export default function InventoriesIndex({ inventories, storages, products, existingInventories, filters }: Props) {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isAbastecerOpen, setIsAbastecerOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -217,7 +219,18 @@ delete newFilters[key as keyof typeof filters];
                                                     <Package className="h-4 w-4 text-primary" />
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span>{item.product_relation.name}</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span>{item.product_relation.name}</span>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-5 w-5 text-muted-foreground hover:text-primary"
+                                                            onClick={() => router.get(productsIndex({ query: { search: item.product_relation.name } }).url)}
+                                                            title="Ver producto"
+                                                        >
+                                                            <Eye className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </div>
                                                     <span className="text-[10px] font-mono text-muted-foreground uppercase">
                                                         {item.product_relation.code}
                                                     </span>
@@ -272,6 +285,7 @@ delete newFilters[key as keyof typeof filters];
                 inventory={selectedInventory}
                 storages={storages}
                 products={products}
+                existingInventories={existingInventories}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
             />

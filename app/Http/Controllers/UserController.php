@@ -11,7 +11,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::query()->where('active', true);
+        $query = User::query()->where('active', true)->with('role');
 
         if ($request->has('search')) {
             $search = $request->get('search');
@@ -22,9 +22,11 @@ class UserController extends Controller
         }
 
         $users = $query->latest()->paginate(10)->withQueryString();
+        $roles = \App\Models\Role::orderBy('name')->get();
 
         return Inertia::render('users/index', [
             'users' => $users,
+            'roles' => $roles,
             'filters' => $request->only(['search']),
         ]);
     }
@@ -35,12 +37,14 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
+            'role_id' => 'nullable|exists:roles,id',
         ]);
 
         User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
+            'role_id' => $validated['role_id'] ?? null,
             'active' => true,
         ]);
 
@@ -58,11 +62,13 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
             'password' => 'nullable|string|min:8|confirmed',
+            'role_id' => 'nullable|exists:roles,id',
         ]);
 
         $data = [
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'role_id' => $validated['role_id'] ?? null,
         ];
 
         if (!empty($validated['password'])) {

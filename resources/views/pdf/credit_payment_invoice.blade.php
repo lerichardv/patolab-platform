@@ -16,8 +16,8 @@
             font-family: 'Outfit', sans-serif;
             font-size: 11px;
             color: #333333;
-            line-height: 1.4;
-            padding: 20px;
+            line-height: 1.3;
+            padding: 10px;
             background-color: #ffffff;
         }
 
@@ -25,32 +25,33 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
 
         .logo-section {
-            width: 25%;
+            width: 68%;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: flex-start;
         }
 
         .logo-img {
-            max-width: 150px;
+            max-width: 240px;
             height: auto;
         }
 
         .info-section {
-            width: 45%;
-            text-align: center;
-            padding: 0 10px;
+            width: 100%;
+            text-align: left;
+            padding: 0;
+            margin-top: 4px;
         }
 
         .company-name {
-            font-size: 18px;
+            font-size: 11px;
             font-weight: 700;
             color: #1e3a8a;
-            margin-bottom: 6px;
+            margin-bottom: 2px;
         }
 
         .company-details {
@@ -90,7 +91,7 @@
         }
 
         .cliente-section {
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
 
         .section-header {
@@ -99,16 +100,16 @@
             font-size: 12px;
             font-weight: 700;
             text-align: center;
-            padding: 5px;
+            padding: 3px;
             border-radius: 4px;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
 
         .cliente-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            padding: 8px 12px;
+            gap: 6px;
+            padding: 5px 10px;
             border: 1px solid #e5e7eb;
             border-radius: 6px;
             background-color: #f9fafb;
@@ -129,7 +130,7 @@
         }
 
         .table-section {
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
 
         table {
@@ -143,12 +144,12 @@
             color: #ffffff;
             font-weight: 600;
             text-align: left;
-            padding: 8px;
+            padding: 5px;
             font-size: 10px;
         }
 
         td {
-            padding: 8px;
+            padding: 5px;
             border-bottom: 1px solid #e5e7eb;
         }
 
@@ -160,7 +161,7 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-top: 15px;
+            margin-top: 8px;
         }
 
         .totals-left {
@@ -168,7 +169,7 @@
             font-size: 10px;
             font-weight: 600;
             color: #1f2937;
-            padding-top: 10px;
+            padding-top: 5px;
         }
 
         .totals-right {
@@ -179,7 +180,7 @@
             display: flex;
             justify-content: space-between;
             font-size: 9.5px;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
             color: #4b5563;
         }
 
@@ -188,12 +189,12 @@
             font-weight: 700;
             color: #000000;
             border-top: 1px solid #374151;
-            padding-top: 6px;
-            margin-top: 6px;
+            padding-top: 4px;
+            margin-top: 4px;
         }
 
         .footer-section {
-            margin-top: 40px;
+            margin-top: 15px;
             font-size: 9px;
             color: #6b7280;
             position: relative;
@@ -201,22 +202,22 @@
 
         .exigela-text {
             font-weight: 600;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .correlatives {
-            margin-bottom: 15px;
+            margin-bottom: 8px;
         }
 
         .correlative-item {
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         .stamp-container {
             display: flex;
             justify-content: center;
-            gap: 40px;
-            margin-top: 25px;
+            gap: 15px;
+            margin-top: 15px;
             align-items: center;
         }
 
@@ -230,6 +231,12 @@
             transform: rotate(-5deg);
             letter-spacing: 2px;
             opacity: 0.85;
+        }
+
+        .round-seal {
+            width: 110px;
+            height: auto;
+            opacity: 0.8;
         }
 
         .original-copia {
@@ -273,8 +280,8 @@
         }
 
         .credit-info-box {
-            margin-top: 15px;
-            padding: 10px;
+            margin-top: 8px;
+            padding: 6px;
             border: 1px dashed #3b82f6;
             border-radius: 6px;
             background-color: #f0f7ff;
@@ -284,7 +291,7 @@
         .credit-info-title {
             font-weight: 700;
             color: #1e3a8a;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
             text-transform: uppercase;
         }
 
@@ -299,18 +306,18 @@
 
     <div class="header-container">
         <div class="logo-section">
-            @if(file_exists(public_path('images/patolab-isotipo.png')))
-                <img class="logo-img" src="{{ public_path('images/patolab-isotipo.png') }}" alt="Logo PatoLab">
+            @if(file_exists(public_path('images/patolab-logo-horizontal.png')))
+                <img class="logo-img" src="{{ public_path('images/patolab-logo-horizontal.png') }}" alt="Logo PatoLab">
             @else
                 <div style="font-size: 20px; font-weight: 800; color: #1e3a8a;">PatoLab</div>
             @endif
-        </div>
-        <div class="info-section">
-            <div class="company-name">Castro Urbina Y Asociados S. De R.I.</div>
-            <div class="company-details">
-                Barrio los Andes: 7, 12-13 Calle Avenida, Sector N.O., Casa NO.: 105, Departamento: Cortes, Municipio: San Pedro Sula<br>
-                Teléfono: 25106502 | Celular: 94428529<br>
-                Correo: info@patolab.org
+            <div class="info-section">
+                <div class="company-name">Castro Urbina Y Asociados S. De R.L.</div>
+                <div class="company-details">
+                    Barrio los Andes: 7, 12-13 Calle Avenida, Sector N.O., Casa NO.: 105, Departamento: Cortes, Municipio: San Pedro Sula<br>
+                    Teléfono: 25106502 | Celular: 94428529<br>
+                    Correo: info@patolab.org
+                </div>
             </div>
         </div>
         <div class="factura-box">
@@ -349,7 +356,7 @@
                 </div>
                 <div class="factura-row">
                     <span>Factura:</span>
-                    <span style="text-transform: capitalize;">Contado</span>
+                    <span style="text-transform: capitalize;">{{ $invoice->payment_type === 'check' ? 'Cheque' : 'Contado' }}</span>
                 </div>
             </div>
         </div>
@@ -368,13 +375,17 @@
                 <div style="grid-column: span 2; display: flex; flex-direction: column; align-items: flex-start;">
                     <span class="specimen-title">Código de Muestra</span>
                     <span class="specimen-code-badge">{{ $originalInvoice->specimen->sequence_code }}</span>
-                </div>
-                <div style="text-align: right; align-self: center; display: flex; flex-direction: column; align-items: flex-end;">
-                    <span class="specimen-value">
+                    <span style="font-size: 10px; color: #4b5563; margin-top: 2px;">
                         {{ $originalInvoice->specimen->type->name }}
                         @if($originalInvoice->specimen->examination)
-                            | {{ $originalInvoice->specimen->examination->name }}
+                            - {{ $originalInvoice->specimen->examination->name }}
                         @endif
+                    </span>
+                </div>
+                <div style="text-align: right; align-self: center; display: flex; flex-direction: column; align-items: flex-end;">
+                    <span class="specimen-title">Fecha Estimada de Finalización</span>
+                    <span class="specimen-value" style="font-size: 13px; font-weight: 800; color: #1e3a8a;">
+                        {{ $originalInvoice->specimen->expected_finalization_date ? $originalInvoice->specimen->expected_finalization_date->format('d/m/Y h:i a') : 'N/A' }}
                     </span>
                 </div>
                 <div style="grid-column: span 3; border-top: 1px solid #bfdbfe; margin: 4px 0;"></div>
@@ -386,10 +397,7 @@
             <div class="cliente-item">
                 <strong>ID/RTN:</strong> {{ $customer->id_number }}
             </div>
-            <div class="cliente-item">
-                <strong>Expediente:</strong> {{ $customer->id }}
-            </div>
-            <div class="cliente-item">
+            <div class="cliente-item" style="grid-column: span 2;">
                 <strong>Teléfono:</strong> {{ $customer->phone ?? '0' }}
             </div>
         </div>
@@ -418,6 +426,11 @@
                             @endif
                             Factura de Crédito Original: <strong>{{ $originalInvoice->full_invoice_number }}</strong>
                         </div>
+                        @if($originalInvoice && $originalInvoice->age_discount_type)
+                            <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
+                                * Factura original con Descuento de {{ $originalInvoice->age_discount_type === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }} (- L. {{ number_format($originalInvoice->age_discount_amount, 2) }})
+                            </div>
+                        @endif
                     </td>
                     <td>1</td>
                     <td class="text-right">L. {{ number_format($invoice->amount, 2) }}</td>
@@ -433,7 +446,7 @@
             {{ $totalWords }}
 
             <div class="credit-info-box">
-                <div class="credit-info-title">Estado de la Cuenta de Crédito</div>
+                <div class="credit-info-title">Estado de Cuenta de Crédito</div>
                 <div class="credit-info-row">
                     <span>Monto de Crédito Original:</span>
                     <strong>L. {{ number_format($credit->credit_amount, 2) }}</strong>
@@ -505,6 +518,10 @@
         </div>
 
         <div class="stamp-container">
+            @if(file_exists(public_path('images/sello.png')))
+                <img class="round-seal" src="{{ public_path('images/sello.png') }}" alt="Sello PatoLab">
+            @endif
+
             <div class="pagado-stamp">PAGADO</div>
         </div>
 

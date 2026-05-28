@@ -11,7 +11,7 @@ class CustomerController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Customer::query()->where('active', true);
+        $query = Customer::with(['department', 'municipality'])->where('active', true);
 
         if ($request->has('search')) {
             $search = $request->get('search');
@@ -31,11 +31,23 @@ class CustomerController extends Controller
         }
 
         if ($request->has('state') && $request->get('state') !== '') {
-            $query->where('state', $request->get('state'));
+            $state = $request->get('state');
+            $query->where(function ($q) use ($state) {
+                $q->where('state', $state)
+                    ->orWhereHas('department', function ($q) use ($state) {
+                        $q->where('name', 'like', "%{$state}%");
+                    });
+            });
         }
 
         if ($request->has('city') && $request->get('city') !== '') {
-            $query->where('city', $request->get('city'));
+            $city = $request->get('city');
+            $query->where(function ($q) use ($city) {
+                $q->where('city', $city)
+                    ->orWhereHas('municipality', function ($q) use ($city) {
+                        $q->where('name', 'like', "%{$city}%");
+                    });
+            });
         }
 
         $customers = $query->latest()->paginate(10)->withQueryString();
@@ -55,8 +67,8 @@ class CustomerController extends Controller
             'age' => 'required_if:type,cliente|nullable|integer',
             'phone' => 'required|string',
             'gender' => 'required|string',
-            'state' => 'required|string',
-            'city' => 'required|string',
+            'state' => 'required|exists:departments,id',
+            'city' => 'required|exists:municipalities,id',
             'secondary_phone' => 'nullable|string',
             'address' => 'nullable|string',
             'email' => 'nullable|email',
@@ -76,8 +88,8 @@ class CustomerController extends Controller
             'age' => 'required_if:type,cliente|nullable|integer',
             'phone' => 'required|string',
             'gender' => 'required|string',
-            'state' => 'required|string',
-            'city' => 'required|string',
+            'state' => 'required|exists:departments,id',
+            'city' => 'required|exists:municipalities,id',
             'secondary_phone' => 'nullable|string',
             'address' => 'nullable|string',
             'email' => 'nullable|email',
@@ -97,7 +109,7 @@ class CustomerController extends Controller
 
     public function export(Request $request)
     {
-        $query = Customer::query()->where('active', true);
+        $query = Customer::with(['department', 'municipality'])->where('active', true);
 
         if ($request->has('search')) {
             $search = $request->get('search');
@@ -117,11 +129,23 @@ class CustomerController extends Controller
         }
 
         if ($request->has('state') && $request->get('state') !== '') {
-            $query->where('state', $request->get('state'));
+            $state = $request->get('state');
+            $query->where(function ($q) use ($state) {
+                $q->where('state', $state)
+                    ->orWhereHas('department', function ($q) use ($state) {
+                        $q->where('name', 'like', "%{$state}%");
+                    });
+            });
         }
 
         if ($request->has('city') && $request->get('city') !== '') {
-            $query->where('city', $request->get('city'));
+            $city = $request->get('city');
+            $query->where(function ($q) use ($city) {
+                $q->where('city', $city)
+                    ->orWhereHas('municipality', function ($q) use ($city) {
+                        $q->where('name', 'like', "%{$city}%");
+                    });
+            });
         }
 
         $customers = $query->latest()->get();
@@ -146,8 +170,8 @@ class CustomerController extends Controller
                     $customer->age,
                     $customer->gender,
                     $customer->phone,
-                    $customer->state,
-                    $customer->city,
+                    $customer->department?->name ?? $customer->state,
+                    $customer->municipality?->name ?? $customer->city,
                     $customer->email,
                 ]);
             }

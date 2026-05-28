@@ -6,6 +6,7 @@ use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Storage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
@@ -34,6 +35,7 @@ class InventoryController extends Controller
             'inventories' => $inventories,
             'storages' => Storage::where('active', true)->get(),
             'products' => Product::where('active', true)->get(),
+            'existingInventories' => Inventory::where('active', true)->get(['storage', 'product']),
             'filters' => $request->only(['search', 'storage']),
         ]);
     }
@@ -42,29 +44,48 @@ class InventoryController extends Controller
     {
         $validated = $request->validate([
             'storage' => 'required|exists:storage,id',
-            'product' => 'required|exists:products,id',
-            'quantity' => 'required|numeric|min:0',
+            'items' => 'required|array|min:1',
+            'items.*.product' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0',
         ]);
 
-        $existing = Inventory::where('storage', $validated['storage'])
-            ->where('product', $validated['product'])
-            ->first();
+        DB::beginTransaction();
 
-        if ($existing) {
-            $before = $existing->quantity;
-            $existing->update([
-                'quantity' => $existing->quantity + $validated['quantity'],
-                'active' => true,
-            ]);
-            $inventory = $existing;
-            $movementType = 'updated';
-        } else {
-            $before = 0;
-            $inventory = Inventory::create($validated);
-            $movementType = 'added';
+        try {
+            foreach ($validated['items'] as $item) {
+                $productId = $item['product'];
+                $quantity = $item['quantity'];
+
+                $existing = Inventory::where('storage', $validated['storage'])
+                    ->where('product', $productId)
+                    ->first();
+
+                if ($existing) {
+                    $before = $existing->quantity;
+                    $existing->update([
+                        'quantity' => $existing->quantity + $quantity,
+                        'active' => true,
+                    ]);
+                    $inventory = $existing;
+                    $movementType = 'updated';
+                } else {
+                    $before = 0;
+                    $inventory = Inventory::create([
+                        'storage' => $validated['storage'],
+                        'product' => $productId,
+                        'quantity' => $quantity,
+                    ]);
+                    $movementType = 'added';
+                }
+
+                $this->logMovement($inventory, $quantity, $before, $inventory->quantity, $movementType);
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
         }
-
-        $this->logMovement($inventory, $validated['quantity'], $before, $inventory->quantity, $movementType);
 
         return redirect()->back();
     }
@@ -85,16 +106,30 @@ class InventoryController extends Controller
         return redirect()->back();
     }
 
-    public function abastecer(Request $request, Inventory $inventory)
+    public function abastecer(Request $request)
     {
         $validated = $request->validate([
-            'quantity' => 'required|numeric|min:0.01',
+            'items' => 'required|array|min:1',
+            'items.*.inventory_id' => 'required|exists:inventory,id',
+            'items.*.quantity' => 'required|numeric|not_in:0',
         ]);
 
-        $before = $inventory->quantity;
-        $inventory->increment('quantity', $validated['quantity']);
+        DB::beginTransaction();
 
-        $this->logMovement($inventory, $validated['quantity'], $before, $inventory->quantity, 'added');
+        try {
+            foreach ($validated['items'] as $item) {
+                $inventory = Inventory::findOrFail($item['inventory_id']);
+                $before = $inventory->quantity;
+                $inventory->increment('quantity', $item['quantity']);
+
+                $this->logMovement($inventory, $item['quantity'], $before, $inventory->quantity, 'added');
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
 
         return redirect()->back();
     }

@@ -1,5 +1,5 @@
 import { useForm } from '@inertiajs/react';
-import type { FormEventHandler} from 'react';
+import type { FormEventHandler } from 'react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { update as updateUser, store as storeUser } from '@/actions/App/Http/Controllers/UserController';
@@ -7,24 +7,34 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 interface User {
     id?: number;
     name: string;
     email: string;
+    role_id?: number;
     password?: string;
     password_confirmation?: string;
 }
 
 interface UserFormProps {
     user?: User;
+    roles: Array<{ id: number; name: string; slug: string }>;
     onSuccess: () => void;
 }
 
-export default function UserForm({ user, onSuccess }: UserFormProps) {
+export default function UserForm({ user, roles, onSuccess }: UserFormProps) {
     const { data, setData, post, put, processing, errors, reset } = useForm({
         name: user?.name || '',
         email: user?.email || '',
+        role_id: user?.role_id?.toString() || '',
         password: '',
         password_confirmation: '',
     });
@@ -34,6 +44,7 @@ export default function UserForm({ user, onSuccess }: UserFormProps) {
             setData({
                 name: user.name,
                 email: user.email,
+                role_id: user.role_id?.toString() || '',
                 password: '',
                 password_confirmation: '',
             });
@@ -87,6 +98,26 @@ export default function UserForm({ user, onSuccess }: UserFormProps) {
                     placeholder="juan.perez@ejemplo.com"
                 />
                 <InputError message={errors.email} />
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="role_id">Rol del Usuario</Label>
+                <Select
+                    value={data.role_id}
+                    onValueChange={(value) => setData('role_id', value)}
+                >
+                    <SelectTrigger id="role_id">
+                        <SelectValue placeholder="Seleccione un rol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {roles.map((role) => (
+                            <SelectItem key={role.id} value={role.id.toString()}>
+                                {role.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <InputError message={errors.role_id} />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

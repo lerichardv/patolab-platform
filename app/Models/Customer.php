@@ -25,4 +25,14 @@ class Customer extends Model
         'email',
         'active',
     ];
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class, 'state');
+    }
+
+    public function municipality()
+    {
+        return $this->belongsTo(Municipality::class, 'city');
+    }
 }

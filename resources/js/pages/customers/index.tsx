@@ -46,6 +46,14 @@ interface Customer {
     city: string;
     address: string;
     email: string;
+    department?: {
+        id: number;
+        name: string;
+    };
+    municipality?: {
+        id: number;
+        name: string;
+    };
 }
 
 interface Props {
@@ -222,10 +230,10 @@ delete newFilters[key as keyof typeof filters];
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex flex-col text-xs">
-                                                <span>{customer.city}</span>
-                                                <span className="text-muted-foreground">{customer.state}</span>
-                                            </div>
+                                             <div className="flex flex-col text-xs">
+                                                 <span>{customer.municipality?.name || customer.city}</span>
+                                                 <span className="text-muted-foreground">{customer.department?.name || customer.state}</span>
+                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
