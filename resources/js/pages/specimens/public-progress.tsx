@@ -81,6 +81,8 @@ export default function PublicProgress({ specimen }: Props) {
 		? isToday(estimatedDate) && !isCompleted
 		: false;
 
+	// Determine active step index
+	const currentStepIndex = STATUS_STEPS.findIndex(step => step.key === specimen.status);
 	const isCancelled = specimen.status === 'cancelled';
 
 	return (
@@ -195,145 +197,48 @@ export default function PublicProgress({ specimen }: Props) {
 									<Clock className="w-4 h-4 text-primary" /> Línea de Tiempo del Progreso
 								</h3>
 
-								{(() => {
-									const STATUS_ORDER = [
-										'received',
-										'macroscopic_review',
-										'processing',
-										'microscopic_review',
-										'finalized',
-										'delivered'
-									];
-									const currentIdx = STATUS_ORDER.indexOf(specimen.status);
+								<div className="relative pl-6 md:pl-8 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-border/60">
+									{STATUS_STEPS.map((step, idx) => {
+										const isPastStep = idx < currentStepIndex;
+										const isCurrentStep = idx === currentStepIndex;
 
-									const steps = [
-										{
-											number: '1',
-											label: 'Recibido',
-											desc: 'Muestra ingresada en el sistema.',
-											isCompleted: currentIdx > 0,
-											isActive: currentIdx === 0,
-										},
-										{
-											number: '2',
-											label: 'Procesamiento',
-											desc: 'Procesamiento y análisis en laboratorio.',
-											isCompleted: currentIdx > 3,
-											isActive: currentIdx >= 1 && currentIdx <= 3,
-											substeps: [
-												{
-													letter: 'a',
-													label: 'Macroscopía',
-													desc: 'Análisis físico y macroscópico de la muestra.',
-													isCompleted: currentIdx > 1,
-													isActive: currentIdx === 1,
-												},
-												{
-													letter: 'b',
-													label: 'Microscopía',
-													desc: 'Análisis microscópico y patológico.',
-													isCompleted: currentIdx > 3,
-													isActive: currentIdx === 2 || currentIdx === 3,
-												}
-											]
-										},
-										{
-											number: '3',
-											label: 'Informe Finalizado',
-											desc: 'Diagnóstico concluido y reporte firmado.',
-											isCompleted: currentIdx > 4,
-											isActive: currentIdx === 4,
-										},
-										{
-											number: '4',
-											label: 'Entregado',
-											desc: 'El reporte físico o digital fue entregado al paciente.',
-											isCompleted: currentIdx === 5,
-											isActive: currentIdx === 5,
-										}
-									];
+										return (
+											<div key={step.key} className="relative group">
+												{/* Step Node Icon/Indicator */}
+												<div className={`absolute -left-[27px] md:-left-[31px] top-1 w-6 h-6 rounded-full flex items-center justify-center z-10 transition-all duration-300 border ${isPastStep
+														? 'bg-emerald-500 border-emerald-600 text-white shadow-md'
+														: isCurrentStep
+															? 'bg-blue-600 border-blue-700 text-white ring-4 ring-blue-500/20 shadow-md scale-110'
+															: 'bg-background border-border text-muted-foreground'
+													}`}>
+													{isPastStep ? (
+														<CheckCircle2 className="w-4 h-4 stroke-[3]" />
+													) : isCurrentStep ? (
+														<Loader2 className="w-3.5 h-3.5 animate-spin" />
+													) : (
+														<span className="text-[10px] font-bold">{idx + 1}</span>
+													)}
+												</div>
 
-									return (
-										<div className="relative space-y-8 before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-[2px] before:bg-border/60">
-											{steps.map((step) => {
-												return (
-													<div key={step.number} className="relative group">
-														{/* Step Node Icon/Indicator */}
-														<div className={`absolute left-0 top-1 w-8 h-8 rounded-full flex items-center justify-center z-10 transition-all duration-300 border ${
-															step.isCompleted
-																? 'bg-emerald-500 border-emerald-600 text-white shadow-md'
-																: step.isActive
-																	? 'bg-blue-600 border-blue-700 text-white ring-4 ring-blue-500/20 shadow-md scale-110'
-																	: 'bg-background border-border text-muted-foreground'
-														}`}>
-															{step.isCompleted ? (
-																<CheckCircle2 className="w-4.5 h-4.5 stroke-[3]" />
-															) : step.isActive && !step.substeps ? (
-																<Loader2 className="w-4 h-4 animate-spin" />
-															) : (
-																<span className="text-xs font-bold">{step.number}</span>
-															)}
-														</div>
-
-														{/* Step Content */}
-														<div className={`pl-10 md:pl-12 transition-all duration-200 ${
-															step.isActive ? 'opacity-100 translate-x-1' : step.isCompleted ? 'opacity-85' : 'opacity-50'
-														}`}>
-															<h4 className="text-sm font-bold flex items-center gap-2">
-																{step.label}
-																{step.isActive && (
-																	<span className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider rounded border border-blue-500/20">
-																		Etapa Actual
-																	</span>
-																)}
-															</h4>
-															<p className="text-xs text-muted-foreground mt-1">
-																{step.desc}
-															</p>
-
-															{/* Sub-steps */}
-															{step.substeps && (
-																<div className="mt-4 ml-1 pl-4 border-l border-border/60 space-y-4">
-																	{step.substeps.map((substep) => (
-																		<div key={substep.letter} className="relative flex items-start gap-3">
-																			{/* Substep Indicator */}
-																			<div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border transition-all duration-300 shrink-0 ${
-																				substep.isCompleted
-																					? 'bg-emerald-500 border-emerald-600 text-white shadow-sm'
-																					: substep.isActive
-																						? 'bg-blue-600 border-blue-700 text-white ring-2 ring-blue-500/20'
-																						: 'bg-background border-border text-muted-foreground'
-																			}`}>
-																				{substep.isCompleted ? (
-																					<CheckCircle2 className="w-3.5 h-3.5 stroke-[3]" />
-																				) : substep.isActive ? (
-																					<Loader2 className="w-3 h-3 animate-spin" />
-																				) : (
-																					substep.letter
-																				)}
-																			</div>
-																			<div className={substep.isActive ? 'opacity-100' : substep.isCompleted ? 'opacity-85' : 'opacity-50'}>
-																				<h5 className="text-sm font-semibold flex items-center gap-2">
-																					{substep.label}
-																					{substep.isActive && (
-																						<span className="text-[9px] px-1.5 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider rounded border border-blue-500/20">
-																							Activo
-																						</span>
-																					)}
-																				</h5>
-																				<p className="text-xs text-muted-foreground mt-0.5">{substep.desc}</p>
-																			</div>
-																		</div>
-																	))}
-																</div>
-															)}
-														</div>
-													</div>
-												);
-											})}
-										</div>
-									);
-								})()}
+												{/* Step Content */}
+												<div className={`transition-all duration-200 ${isCurrentStep ? 'opacity-100 translate-x-1' : isPastStep ? 'opacity-80' : 'opacity-50'
+													}`}>
+													<h4 className="text-sm font-bold flex items-center gap-2">
+														{step.label}
+														{isCurrentStep && (
+															<span className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wider rounded border border-blue-500/20">
+																Etapa Actual
+															</span>
+														)}
+													</h4>
+													<p className="text-xs text-muted-foreground mt-1">
+														{step.desc}
+													</p>
+												</div>
+											</div>
+										);
+									})}
+								</div>
 							</div>
 						)}
 					</CardContent>
