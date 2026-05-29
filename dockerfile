@@ -61,7 +61,6 @@ ENV DB_DATABASE=:memory:
 # Run Wayfinder translation mapping and compile React assets
 RUN php artisan storage:link --force || true
 RUN php artisan wayfinder:generate --with-form
-RUN php artisan migrate --force
 RUN npm run build
 
 # Set up Puppeteer environment variable
