@@ -13,11 +13,11 @@ class SpecimenController extends Controller
         $priorities->load(['specimens' => function($q) {
             $q->where('specimen.active', true)
               ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank'])
-              ->leftJoin('priorities_specimens_order', function($join) {
-                  $join->on('specimen.id', '=', 'priorities_specimens_order.specimen_id')
-                       ->on('specimen.priority_id', '=', 'priorities_specimens_order.priority_id');
+              ->leftJoin(\DB::raw('(SELECT specimen_id, priority_id, MIN(`order`) as board_order FROM priorities_specimens_order GROUP BY specimen_id, priority_id) as pso'), function($join) {
+                  $join->on('specimen.id', '=', 'pso.specimen_id')
+                       ->on('specimen.priority_id', '=', 'pso.priority_id');
               })
-              ->select('specimen.*', 'priorities_specimens_order.order as board_order')
+              ->select('specimen.*', 'pso.board_order')
               ->orderBy('board_order', 'asc')
               ->orderBy('specimen.created_at', 'desc');
         }]);
@@ -453,6 +453,10 @@ class SpecimenController extends Controller
         $specimen->update($validated);
 
         if ($oldPriorityId != $validated['priority_id']) {
+            \App\Models\PrioritySpecimenOrder::where('specimen_id', $specimen->id)
+                ->where('priority_id', '!=', $validated['priority_id'])
+                ->delete();
+
             $maxOrder = \App\Models\PrioritySpecimenOrder::where('priority_id', $validated['priority_id'])->max('order') ?? 0;
             \App\Models\PrioritySpecimenOrder::updateOrCreate(
                 ['priority_id' => $validated['priority_id'], 'specimen_id' => $specimen->id],
@@ -478,6 +482,10 @@ class SpecimenController extends Controller
                 if ($specimen && $specimen->priority_id != $item['priority_id']) {
                     $specimen->update(['priority_id' => $item['priority_id']]);
                 }
+
+                \App\Models\PrioritySpecimenOrder::where('specimen_id', $item['id'])
+                    ->where('priority_id', '!=', $item['priority_id'])
+                    ->delete();
 
                 \App\Models\PrioritySpecimenOrder::updateOrCreate(
                     ['priority_id' => $item['priority_id'], 'specimen_id' => $item['id']],
@@ -783,6 +791,10 @@ class SpecimenController extends Controller
                 \App\Models\Specimen::whereIn('id', $ids)->update(['priority_id' => $value]);
                 
                 foreach ($ids as $id) {
+                    \App\Models\PrioritySpecimenOrder::where('specimen_id', $id)
+                        ->where('priority_id', '!=', $value)
+                        ->delete();
+
                     $maxOrder = \App\Models\PrioritySpecimenOrder::where('priority_id', $value)->max('order') ?? 0;
                     \App\Models\PrioritySpecimenOrder::updateOrCreate(
                         ['priority_id' => $value, 'specimen_id' => $id],

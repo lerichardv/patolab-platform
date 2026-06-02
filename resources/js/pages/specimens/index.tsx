@@ -157,12 +157,29 @@ const ALL_STATUSES = [
 	{ value: 'cancelled', label: 'Cancelada' },
 ];
 
+const deduplicateSpecimens = (prioritiesList: Priority[]): Priority[] => {
+	const seenIds = new Set<number>();
+	return prioritiesList.map(priority => {
+		const uniqueSpecimens = (priority.specimens || []).filter(specimen => {
+			if (seenIds.has(specimen.id)) {
+				return false;
+			}
+			seenIds.add(specimen.id);
+			return true;
+		});
+		return {
+			...priority,
+			specimens: uniqueSpecimens
+		};
+	});
+};
+
 export default function SpecimensIndex({ priorities: initialPriorities, customers, specimenTypes, examinations, categories, referrers, referrerTypes, locations, sequences, activeLocationId, products, pathologists, banks }: Props) {
 	const { props } = usePage() as any;
 	const flash = props.flash || {};
 	const isMobile = useIsMobile();
 
-	const [priorities, setPriorities] = useState<Priority[]>(initialPriorities);
+	const [priorities, setPriorities] = useState<Priority[]>(() => deduplicateSpecimens(initialPriorities));
 	const [isSheetOpen, setIsSheetOpen] = useState(false);
 	const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
 	const [selectedSpecimen, setSelectedSpecimen] = useState<Specimen | null>(null);
@@ -270,7 +287,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 	};
 
 	useEffect(() => {
-		setPriorities(initialPriorities);
+		setPriorities(deduplicateSpecimens(initialPriorities));
 	}, [initialPriorities]);
 
 	const findSpecimenById = (id: number): Specimen | null => {
@@ -534,7 +551,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 			preserveState: true,
 			onError: () => {
 				toast.error('Error al actualizar el orden');
-				setPriorities(initialPriorities); // Revert on error
+				setPriorities(deduplicateSpecimens(initialPriorities)); // Revert on error
 			}
 		});
 	};
