@@ -18,7 +18,8 @@ import {
 	FileImage,
 	Coins,
 	Copy,
-	Check
+	Check,
+	Layers
 } from 'lucide-react';
 import HeadingSheet from '@/components/heading-sheet';
 import { Badge } from '@/components/ui/badge';
@@ -32,9 +33,10 @@ interface Props {
 	onOpenChange: (open: boolean) => void;
 	onEditClick: () => void;
 	preventCloseOnOutsideClick?: boolean;
+	onEditInvoiceClick?: (invoice: any) => void;
 }
 
-export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEditClick, preventCloseOnOutsideClick }: Props) {
+export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEditClick, preventCloseOnOutsideClick, onEditInvoiceClick }: Props) {
 	if (!specimen) {
 		return null;
 	}
@@ -49,7 +51,7 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 		setTimeout(() => setCopied(false), 2000);
 	};
 
-	const invoice = specimen.invoice_relation;
+	const invoice = (specimen.is_group && specimen.group && specimen.group.invoice) ? specimen.group.invoice : specimen.invoice_relation;
 	const credit = invoice?.credit_relation;
 
 	const formattedDate = specimen.created_at
@@ -126,11 +128,31 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 		const labels: Record<string, string> = {
 			'cash': 'Efectivo',
 			'card': 'Tarjeta',
+			'credit card': 'Tarjeta de Crédito',
 			'transfer': 'Transferencia',
+			'bank transfer': 'Transferencia Bancaria',
+			'check': 'Cheque',
 			'credit': 'Crédito'
 		};
 
 		return labels[type] || type;
+	};
+
+	const formatPaymentDate = (dateStr: string | null | undefined) => {
+		if (!dateStr) return '';
+		try {
+			// Extract date part YYYY-MM-DD
+			const datePart = dateStr.split(/[ T]/)[0];
+			const parts = datePart.split('-');
+			if (parts.length !== 3) return dateStr;
+			const [year, month, day] = parts.map(Number);
+			if (isNaN(year) || isNaN(month) || isNaN(day)) return dateStr;
+			// Create date in local timezone
+			const date = new Date(year, month - 1, day);
+			return format(date, "dd 'de' MMMM, yyyy", { locale: es });
+		} catch (e) {
+			return dateStr;
+		}
 	};
 
 	const getFileExtension = (path: string) => {
@@ -172,7 +194,19 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 								description={`Registrada el ${formattedDate}`}
 							/>
 						</div>
-						<div className="flex gap-2">
+						<div className="flex justify-center sm:justify-start gap-2 w-full sm:w-auto">
+							{invoice && onEditInvoiceClick && (
+								<Button
+									onClick={() => {
+										onOpenChange(false);
+										onEditInvoiceClick(invoice);
+									}}
+									variant="outline"
+									className="flex items-center gap-2"
+								>
+									<CreditCard className="w-4 h-4" /> Editar Factura
+								</Button>
+							)}
 							<Button onClick={onEditClick} className="flex items-center gap-2">
 								<Edit className="w-4 h-4" /> Editar Muestra
 							</Button>
@@ -196,6 +230,14 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 												<Tag className="w-3.5 h-3.5" /> Código de Secuencia (Muestra)
 											</span>
 											<p className="text-sm font-mono font-bold text-primary">{specimen.sequence_code}</p>
+										</div>
+									)}
+									{specimen.group && (
+										<div className="space-y-1 sm:col-span-2 bg-purple-500/5 dark:bg-purple-500/10 p-2.5 rounded-md border border-purple-500/25 border-dashed animate-in fade-in-50 duration-200">
+											<span className="text-xs text-purple-600 dark:text-purple-300 flex items-center gap-1 font-semibold">
+												<Layers className="w-3.5 h-3.5 text-purple-500" /> Grupo de Muestras
+											</span>
+											<p className="text-sm font-bold text-purple-700 dark:text-purple-200">{specimen.group.name}</p>
 										</div>
 									)}
 									{specimen.access_token && (
@@ -340,6 +382,9 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 								</div>
 							</div>
 
+
+
+
 							{/* Medical Order File */}
 							{specimen.medical_order_file && (
 								<div className="rounded-lg border bg-card text-card-foreground p-5 shadow-sm space-y-4">
@@ -394,6 +439,44 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 
 						{/* Right Column: Invoice & Credit Info */}
 						<div className="space-y-6">
+							{/* Assigned Pathologists */}
+							<div className="rounded-lg border bg-card text-card-foreground p-5 shadow-sm space-y-4">
+								<h3 className="text-lg font-semibold flex items-center gap-2 text-primary">
+									<User className="w-5 h-5" /> Patólogos Asignados
+								</h3>
+								<Separator />
+								{specimen.users && specimen.users.length > 0 ? (
+									<div className="border border-border/85 rounded-lg overflow-hidden bg-muted/5">
+										<table className="w-full border-collapse text-left text-sm">
+											<thead>
+												<tr className="bg-muted/50 border-b text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+													<th className="p-3">Nombre</th>
+													<th className="p-3">Correo Electrónico</th>
+												</tr>
+											</thead>
+											<tbody className="divide-y divide-border/60">
+												{specimen.users.map((user: any) => (
+													<tr key={user.id} className="hover:bg-muted/20 transition-colors">
+														<td className="p-3 font-medium text-foreground">
+															{user.name}
+														</td>
+														<td className="p-3 text-muted-foreground">
+															{user.email}
+														</td>
+													</tr>
+												))}
+											</tbody>
+										</table>
+									</div>
+								) : (
+									<div className="text-center py-6 px-4 space-y-2 border border-dashed rounded-lg bg-muted/10">
+										<p className="text-xs text-muted-foreground">
+											No hay patólogos asignados a esta muestra.
+										</p>
+									</div>
+								)}
+							</div>
+
 							{invoice ? (
 								<>
 									<div className="rounded-lg border bg-card text-card-foreground p-5 shadow-sm space-y-4">
@@ -424,6 +507,92 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 													<p className="font-semibold text-muted-foreground">Datos del Rango CAI:</p>
 													<p><span className="font-medium">CAI:</span> {invoice.cai_range.cai}</p>
 													<p><span className="font-medium">Rango:</span> {invoice.cai_range.from_number} al {invoice.cai_range.to_number}</p>
+												</div>
+											)}
+
+											{/* Detalles de Método de Pago */}
+											{((invoice.payment_type !== 'credit') || (invoice.payment_type === 'credit' && parseFloat(invoice.total_paid) > 0)) && (
+												<div className="bg-muted/20 border border-border rounded-lg p-4 space-y-2.5">
+													<h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+														Detalles del Pago {invoice.payment_type === 'credit' && '(Pago Inicial)'}
+													</h4>
+
+													{invoice.payment_method_date && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Fecha de Pago:</span>
+															<span className="font-medium">
+																{formatPaymentDate(invoice.payment_method_date)}
+															</span>
+														</div>
+													)}
+
+													{/* Cash */}
+													{invoice.cash_value !== null && parseFloat(invoice.cash_value) > 0 && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Efectivo Recibido:</span>
+															<span className="font-medium text-foreground">L. {parseFloat(invoice.cash_value).toFixed(2)}</span>
+														</div>
+													)}
+
+													{/* Check */}
+													{invoice.check_number && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Número de Cheque:</span>
+															<span className="font-mono font-medium text-foreground">{invoice.check_number}</span>
+														</div>
+													)}
+													{invoice.check_value !== null && parseFloat(invoice.check_value) > 0 && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Monto del Cheque:</span>
+															<span className="font-medium text-foreground">L. {parseFloat(invoice.check_value).toFixed(2)}</span>
+														</div>
+													)}
+
+													{/* Credit Card */}
+													{invoice.card_last_4 && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Tarjeta (Últimos 4):</span>
+															<span className="font-mono font-medium text-foreground">**** **** **** {invoice.card_last_4}</span>
+														</div>
+													)}
+													{invoice.card_expiration && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Vencimiento Tarjeta:</span>
+															<span className="font-medium text-foreground">{invoice.card_expiration}</span>
+														</div>
+													)}
+													{invoice.card_authorization_code && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Aut. Tarjeta:</span>
+															<span className="font-mono font-medium text-foreground">{invoice.card_authorization_code}</span>
+														</div>
+													)}
+													{invoice.card_value_charged !== null && parseFloat(invoice.card_value_charged) > 0 && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Monto Cobrado (Tarjeta):</span>
+															<span className="font-medium text-foreground">L. {parseFloat(invoice.card_value_charged).toFixed(2)}</span>
+														</div>
+													)}
+
+													{/* Bank Transfer */}
+													{invoice.transfer_bank && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Banco Transferencia:</span>
+															<span className="font-medium text-foreground">{invoice.transfer_bank.name}</span>
+														</div>
+													)}
+													{invoice.transfer_authorization_code && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Referencia/Autorización:</span>
+															<span className="font-mono font-medium text-foreground">{invoice.transfer_authorization_code}</span>
+														</div>
+													)}
+													{invoice.transfer_value !== null && parseFloat(invoice.transfer_value) > 0 && (
+														<div className="flex justify-between text-sm">
+															<span className="text-muted-foreground">Monto Transferido:</span>
+															<span className="font-medium text-foreground">L. {parseFloat(invoice.transfer_value).toFixed(2)}</span>
+														</div>
+													)}
 												</div>
 											)}
 
@@ -517,7 +686,7 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 
 									{/* Proof of Payment File */}
 									{invoice.proof_of_payment && (
-										<div className="rounded-lg border bg-card text-card-foreground p-5 shadow-sm space-y-4">
+										<div className="rounded-lg border bg-card text-card-foreground p-5 shadow-sm space-y-4 mb-10">
 											<h3 className="text-lg font-semibold flex items-center gap-2 text-primary">
 												<FileText className="w-5 h-5" /> Comprobante de Pago
 											</h3>

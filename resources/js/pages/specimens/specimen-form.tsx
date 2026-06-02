@@ -1,5 +1,5 @@
 import { useForm, usePage } from '@inertiajs/react';
-import { Check, ChevronsUpDown, Plus, Upload, FileText, X, ExternalLink, AlertCircle, Tag, Microscope } from 'lucide-react';
+import { Check, ChevronsUpDown, Plus, Upload, FileText, X, ExternalLink, AlertCircle, Tag, Microscope, Wallet, CreditCard, Landmark, Receipt, Calendar } from 'lucide-react';
 import React from 'react';
 import { toast } from 'sonner';
 import {
@@ -30,6 +30,9 @@ import { cn } from '@/lib/utils';
 import CustomerForm from '../customers/customer-form';
 import ReferrerForm from '../referrers/referrer-form';
 import SequenceForm from '../sequences/sequence-form';
+import SpecimenTypeForm from '../specimen-types/specimen-type-form';
+import SpecimenTypeExaminationSheet from '../specimen-type-examinations/specimen-type-examination-sheet';
+import CategorySheet from '../specimen-categories/category-sheet';
 import { Switch } from '@/components/ui/switch';
 import HeadingSheet from '@/components/heading-sheet';
 
@@ -48,6 +51,7 @@ interface Props {
 	sequences: any[];
 	activeLocationId: number | null;
 	products?: any[];
+	banks?: any[];
 }
 
 function FormCombobox({
@@ -58,7 +62,7 @@ function FormCombobox({
 	emptyMessage = 'No se encontraron resultados.',
 	disabled = false
 }: {
-	options: { label: string; value: string; color?: string }[];
+	options: { label: string; value: string; color?: string; disabled?: boolean }[];
 	value: string;
 	onChange: (value: string) => void;
 	placeholder: string;
@@ -99,7 +103,9 @@ function FormCombobox({
 								<CommandItem
 									key={option.value}
 									value={option.label}
+									disabled={option.disabled}
 									onSelect={() => {
+										if (option.disabled) return;
 										onChange(option.value);
 										setOpen(false);
 									}}
@@ -113,7 +119,7 @@ function FormCombobox({
 									{option.color && (
 										<div className="mr-2 w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: option.color }} />
 									)}
-									<span className="truncate">{option.label}</span>
+									<span className={cn("truncate", option.disabled && "text-muted-foreground opacity-50")}>{option.label}</span>
 								</CommandItem>
 							))}
 						</CommandGroup>
@@ -138,14 +144,226 @@ export default function SpecimenForm({
 	locations = [],
 	sequences = [],
 	activeLocationId = null,
-	products = []
+	products = [],
+	banks = []
 }: Props) {
 	const [isCustomerSheetOpen, setIsCustomerSheetOpen] = React.useState(false);
 	const [isReferrerSheetOpen, setIsReferrerSheetOpen] = React.useState(false);
 	const [isSequenceSheetOpen, setIsSequenceSheetOpen] = React.useState(false);
+	const [isSpecimenTypeSheetOpen, setIsSpecimenTypeSheetOpen] = React.useState(false);
+	const [isExaminationSheetOpen, setIsExaminationSheetOpen] = React.useState(false);
+	const [isCategorySheetOpen, setIsCategorySheetOpen] = React.useState(false);
+	const prevSpecimenTypesRef = React.useRef<any[]>(specimenTypes);
+	const prevExaminationsRef = React.useRef<any[]>(examinations);
+	const prevCategoriesRef = React.useRef<any[]>(categories);
+
+	React.useEffect(() => {
+		if (specimenTypes.length > prevSpecimenTypesRef.current.length) {
+			const newTypes = specimenTypes.filter(
+				t => !prevSpecimenTypesRef.current.some(prev => prev.id === t.id)
+			);
+			if (newTypes.length > 0) {
+				setData('specimen_type', newTypes[0].id.toString());
+				toast.success(`Tipo de muestra "${newTypes[0].name}" seleccionado automáticamente`);
+			}
+		}
+		prevSpecimenTypesRef.current = specimenTypes;
+	}, [specimenTypes]);
+
+	React.useEffect(() => {
+		if (examinations.length > prevExaminationsRef.current.length) {
+			const newExams = examinations.filter(
+				e => !prevExaminationsRef.current.some(prev => prev.id === e.id)
+			);
+			if (newExams.length > 0) {
+				setData('specimen_type_examination', newExams[0].id.toString());
+				toast.success(`Análisis "${newExams[0].name}" seleccionado automáticamente`);
+			}
+		}
+		prevExaminationsRef.current = examinations;
+	}, [examinations]);
+
+	React.useEffect(() => {
+		if (categories.length > prevCategoriesRef.current.length) {
+			const newCats = categories.filter(
+				c => !prevCategoriesRef.current.some(prev => prev.id === c.id)
+			);
+			if (newCats.length > 0) {
+				setData('specimen_category', newCats[0].id.toString());
+				toast.success(`Categoría "${newCats[0].name}" seleccionada automáticamente`);
+			}
+		}
+		prevCategoriesRef.current = categories;
+	}, [categories]);
+
 	const [localSequences, setLocalSequences] = React.useState<any[]>(sequences);
 	const [showConfirm, setShowConfirm] = React.useState(false);
 	const [isFacturating, setIsFacturating] = React.useState(false);
+	const [isPaymentSheetOpen, setIsPaymentSheetOpen] = React.useState(false);
+	const [localPayment, setLocalPayment] = React.useState({
+		payment_type: '',
+		payment_method_date: new Date().toISOString().split('T')[0],
+		cash_value: '',
+		check_number: '',
+		check_value: '',
+		card_last_4: '',
+		card_value_charged: '',
+		card_expiration: '',
+		card_authorization_code: '',
+		transfer_bank_id: '',
+		transfer_value: '',
+		transfer_authorization_code: '',
+		has_initial_payment: false,
+		initial_payment_amount: '',
+		initial_payment_type: 'cash',
+	});
+	const [localPaymentErrors, setLocalPaymentErrors] = React.useState<Record<string, string>>({});
+
+	React.useEffect(() => {
+		if (isPaymentSheetOpen) {
+			setLocalPayment({
+				payment_type: data.payment_type || '',
+				payment_method_date: data.payment_method_date || new Date().toISOString().split('T')[0],
+				cash_value: data.cash_value || '',
+				check_number: data.check_number || '',
+				check_value: data.check_value || '',
+				card_last_4: data.card_last_4 || '',
+				card_value_charged: data.card_value_charged || '',
+				card_expiration: data.card_expiration || '',
+				card_authorization_code: data.card_authorization_code || '',
+				transfer_bank_id: data.transfer_bank_id || '',
+				transfer_value: data.transfer_value || '',
+				transfer_authorization_code: data.transfer_authorization_code || '',
+				has_initial_payment: data.has_initial_payment || false,
+				initial_payment_amount: data.initial_payment_amount || '',
+				initial_payment_type: data.initial_payment_type || 'cash',
+			});
+			setLocalPaymentErrors({});
+		}
+	}, [isPaymentSheetOpen]);
+
+	const handleSavePaymentDetails = () => {
+		const errors: Record<string, string> = {};
+
+		if (!localPayment.payment_type) {
+			errors.payment_type = 'El tipo de pago es requerido.';
+		}
+
+		if (localPayment.payment_type !== 'credit' && !localPayment.payment_method_date) {
+			errors.payment_method_date = 'La fecha de pago es requerida.';
+		}
+
+		if (localPayment.payment_type === 'cash') {
+			if (!localPayment.cash_value || parseFloat(localPayment.cash_value) <= 0) {
+				errors.cash_value = 'El valor recibido es requerido y debe ser mayor que 0.';
+			}
+		}
+
+		if (localPayment.payment_type === 'check') {
+			if (!localPayment.check_number) {
+				errors.check_number = 'El número de cheque es requerido.';
+			}
+			if (!localPayment.check_value || parseFloat(localPayment.check_value) <= 0) {
+				errors.check_value = 'El valor del cheque es requerido y debe ser mayor que 0.';
+			}
+		}
+
+		if (localPayment.payment_type === 'credit card') {
+			if (!localPayment.card_last_4 || localPayment.card_last_4.length !== 4) {
+				errors.card_last_4 = 'Se requieren los últimos 4 dígitos.';
+			}
+			if (!localPayment.card_expiration) {
+				errors.card_expiration = 'El vencimiento de la tarjeta es requerido.';
+			} else if (!/^(0[1-9]|1[0-2])\/\d{2}(\d{2})?$/.test(localPayment.card_expiration)) {
+				errors.card_expiration = 'El vencimiento debe tener un formato como 12/26 o 12/2026.';
+			}
+			if (!localPayment.card_authorization_code) {
+				errors.card_authorization_code = 'El código de autorización es requerido.';
+			}
+			if (!localPayment.card_value_charged || parseFloat(localPayment.card_value_charged) <= 0) {
+				errors.card_value_charged = 'El valor cobrado es requerido y debe ser mayor que 0.';
+			}
+		}
+
+		if (localPayment.payment_type === 'bank transfer') {
+			if (!localPayment.transfer_bank_id || localPayment.transfer_bank_id === 'none') {
+				errors.transfer_bank_id = 'El banco es requerido.';
+			}
+			if (!localPayment.transfer_authorization_code) {
+				errors.transfer_authorization_code = 'El código de autorización/referencia es requerido.';
+			}
+			if (!localPayment.transfer_value || parseFloat(localPayment.transfer_value) <= 0) {
+				errors.transfer_value = 'El valor transferido es requerido y debe ser mayor que 0.';
+			}
+		}
+
+		if (localPayment.payment_type === 'credit' && localPayment.has_initial_payment) {
+			if (!localPayment.initial_payment_amount || parseFloat(localPayment.initial_payment_amount) <= 0) {
+				errors.initial_payment_amount = 'El monto de pago inicial es requerido y debe ser mayor que 0.';
+			} else if (parseFloat(localPayment.initial_payment_amount) > totalVal) {
+				errors.initial_payment_amount = `El pago inicial no puede superar el total (L. ${totalVal.toFixed(2)}).`;
+			}
+			if (!localPayment.initial_payment_type) {
+				errors.initial_payment_type = 'El tipo de pago inicial es requerido.';
+			}
+
+			if (localPayment.initial_payment_type === 'check' && !localPayment.check_number) {
+				errors.check_number = 'El número de cheque es requerido.';
+			}
+
+			if (localPayment.initial_payment_type === 'credit card') {
+				if (!localPayment.card_last_4 || localPayment.card_last_4.length !== 4) {
+					errors.card_last_4 = 'Se requieren los últimos 4 dígitos.';
+				}
+				if (!localPayment.card_expiration) {
+					errors.card_expiration = 'El vencimiento de la tarjeta es requerido.';
+				} else if (!/^(0[1-9]|1[0-2])\/\d{2}(\d{2})?$/.test(localPayment.card_expiration)) {
+					errors.card_expiration = 'El vencimiento debe tener un formato como 12/26 o 12/2026.';
+				}
+				if (!localPayment.card_authorization_code) {
+					errors.card_authorization_code = 'El código de autorización es requerido.';
+				}
+			}
+
+			if (localPayment.initial_payment_type === 'bank transfer') {
+				if (!localPayment.transfer_bank_id || localPayment.transfer_bank_id === 'none') {
+					errors.transfer_bank_id = 'El banco es requerido.';
+				}
+				if (!localPayment.transfer_authorization_code) {
+					errors.transfer_authorization_code = 'El código de autorización/referencia es requerido.';
+				}
+			}
+		}
+
+		if (Object.keys(errors).length > 0) {
+			setLocalPaymentErrors(errors);
+			toast.error('Por favor complete los campos obligatorios del método de pago.');
+			return;
+		}
+
+		// Apply to data
+		setData(d => ({
+			...d,
+			payment_type: localPayment.payment_type,
+			payment_method_date: localPayment.payment_method_date,
+			cash_value: localPayment.cash_value,
+			check_number: localPayment.check_number,
+			check_value: localPayment.check_value,
+			card_last_4: localPayment.card_last_4,
+			card_value_charged: localPayment.card_value_charged,
+			card_expiration: localPayment.card_expiration,
+			card_authorization_code: localPayment.card_authorization_code,
+			transfer_bank_id: localPayment.transfer_bank_id,
+			transfer_value: localPayment.transfer_value,
+			transfer_authorization_code: localPayment.transfer_authorization_code,
+			has_initial_payment: localPayment.has_initial_payment,
+			initial_payment_amount: localPayment.initial_payment_amount,
+			initial_payment_type: localPayment.initial_payment_type,
+		}));
+
+		setIsPaymentSheetOpen(false);
+	};
+
 	const [currentStep, setCurrentStep] = React.useState(1);
 	const [searchQuery, setSearchQuery] = React.useState('');
 	const formRef = React.useRef<HTMLFormElement>(null);
@@ -186,11 +404,24 @@ export default function SpecimenForm({
 		additional_discount: '0',
 		age_discount_type: null as string | null,
 		age_discount_amount: '0',
-		payment_type: 'cash',
+		payment_type: '',
 		proof_of_payment: null as File | null,
 		has_initial_payment: false,
 		initial_payment_amount: '',
 		initial_payment_type: 'cash',
+
+		// Detailed payment fields (creation only)
+		payment_method_date: new Date().toISOString().split('T')[0],
+		cash_value: '',
+		check_number: '',
+		check_value: '',
+		card_last_4: '',
+		card_value_charged: '',
+		card_expiration: '',
+		card_authorization_code: '',
+		transfer_bank_id: '',
+		transfer_value: '',
+		transfer_authorization_code: '',
 
 		// Insumos field (creation only)
 		agregar_insumos: false,
@@ -230,12 +461,18 @@ export default function SpecimenForm({
 		}
 	}, [data.specimen_type, specimenTypes]);
 
+	const sortedSpecimenTypes = React.useMemo(() => {
+		return [...specimenTypes].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+	}, [specimenTypes]);
+
 	const filteredExaminations = React.useMemo(() => {
 		if (!data.specimen_type) {
 			return [];
 		}
 
-		return examinations.filter(e => e.specimen_type?.toString() === data.specimen_type);
+		return examinations
+			.filter(e => e.specimen_type?.toString() === data.specimen_type)
+			.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
 	}, [examinations, data.specimen_type]);
 
 	React.useEffect(() => {
@@ -404,6 +641,10 @@ export default function SpecimenForm({
 		const localErrors: Record<string, string> = {};
 
 		// Validar campos de facturación (creación)
+		if (!data.payment_type) {
+			localErrors.payment_type = 'El método de pago es requerido.';
+		}
+
 		if (!data.amount) {
 			localErrors.amount = 'El importe es requerido.';
 		} else if (parseFloat(data.amount) < 0) {
@@ -614,6 +855,91 @@ export default function SpecimenForm({
 	const subtotalVal = Math.max(0, maxSpecimenPriceVal + customAmountVal - (autoDiscountTotal + additionalDiscountVal));
 	const totalVal = subtotalVal; // taxes are 0
 
+	// Auto-fill detailed payment fields based on totalVal and selections
+	React.useEffect(() => {
+		if (!isPaymentSheetOpen) return;
+		const type = localPayment.payment_type;
+		if (type === 'cash') {
+			setLocalPayment(prev => ({
+				...prev,
+				cash_value: totalVal.toString(),
+				check_value: '', check_number: '',
+				card_value_charged: '', card_last_4: '', card_expiration: '', card_authorization_code: '',
+				transfer_value: '', transfer_bank_id: '', transfer_authorization_code: ''
+			}));
+		} else if (type === 'check') {
+			setLocalPayment(prev => ({
+				...prev,
+				check_value: totalVal.toString(),
+				cash_value: '',
+				card_value_charged: '', card_last_4: '', card_expiration: '', card_authorization_code: '',
+				transfer_value: '', transfer_bank_id: '', transfer_authorization_code: ''
+			}));
+		} else if (type === 'credit card') {
+			setLocalPayment(prev => ({
+				...prev,
+				card_value_charged: totalVal.toString(),
+				cash_value: '',
+				check_value: '', check_number: '',
+				transfer_value: '', transfer_bank_id: '', transfer_authorization_code: ''
+			}));
+		} else if (type === 'bank transfer') {
+			setLocalPayment(prev => ({
+				...prev,
+				transfer_value: totalVal.toString(),
+				cash_value: '',
+				check_value: '', check_number: '',
+				card_value_charged: '', card_last_4: '', card_expiration: '', card_authorization_code: ''
+			}));
+		} else if (type === 'credit') {
+			if (localPayment.has_initial_payment) {
+				const initialAmt = localPayment.initial_payment_amount || '0';
+				if (localPayment.initial_payment_type === 'cash') {
+					setLocalPayment(prev => ({
+						...prev,
+						cash_value: initialAmt,
+						check_value: '', check_number: '',
+						card_value_charged: '', card_last_4: '', card_expiration: '', card_authorization_code: '',
+						transfer_value: '', transfer_bank_id: '', transfer_authorization_code: ''
+					}));
+				} else if (localPayment.initial_payment_type === 'check') {
+					setLocalPayment(prev => ({
+						...prev,
+						check_value: initialAmt,
+						cash_value: '',
+						card_value_charged: '', card_last_4: '', card_expiration: '', card_authorization_code: '',
+						transfer_value: '', transfer_bank_id: '', transfer_authorization_code: ''
+					}));
+				} else if (localPayment.initial_payment_type === 'credit card') {
+					setLocalPayment(prev => ({
+						...prev,
+						card_value_charged: initialAmt,
+						cash_value: '',
+						check_value: '', check_number: '',
+						transfer_value: '', transfer_bank_id: '', transfer_authorization_code: ''
+					}));
+				} else if (localPayment.initial_payment_type === 'bank transfer') {
+					setLocalPayment(prev => ({
+						...prev,
+						transfer_value: initialAmt,
+						cash_value: '',
+						check_value: '', check_number: '',
+						card_value_charged: '', card_last_4: '', card_expiration: '', card_authorization_code: ''
+					}));
+				}
+			} else {
+				// reset all details
+				setLocalPayment(prev => ({
+					...prev,
+					cash_value: '',
+					check_value: '', check_number: '',
+					card_value_charged: '', card_last_4: '', card_expiration: '', card_authorization_code: '',
+					transfer_value: '', transfer_bank_id: '', transfer_authorization_code: ''
+				}));
+			}
+		}
+	}, [totalVal, localPayment.payment_type, localPayment.has_initial_payment, localPayment.initial_payment_amount, localPayment.initial_payment_type, isPaymentSheetOpen]);
+
 	const selectedCustomer = React.useMemo(() => {
 		return customers.find(c => c.id.toString() === data.customer);
 	}, [data.customer, customers]);
@@ -632,8 +958,190 @@ export default function SpecimenForm({
 			case 'bank transfer': return 'Transferencia Bancaria';
 			case 'check': return 'Cheque';
 			case 'credit': return 'Al Crédito';
-			default: return type;
+			default: return type || 'Sin seleccionar';
 		}
+	};
+
+	const formatCardExpiration = (value: string) => {
+		const cleaned = value.replace(/\D/g, '');
+		if (cleaned.length === 0) return '';
+		let month = cleaned.slice(0, 2);
+		let year = cleaned.slice(2, 6);
+		if (month.length === 1 && month !== '0' && month !== '1') {
+			month = '0' + month;
+		} else if (month.length === 2) {
+			const mVal = parseInt(month);
+			if (mVal < 1) month = '01';
+			if (mVal > 12) month = '12';
+		}
+		if (cleaned.length > 2) {
+			return `${month}/${year}`;
+		}
+		return month;
+	};
+
+	const renderPaymentResume = () => {
+		const label = getPaymentTypeLabel(data.payment_type);
+		return (
+			<div className="flex flex-col gap-1.5 text-xs text-muted-foreground mt-2 border-t pt-3">
+				<div className="flex justify-between items-center">
+					<span>Método de Pago:</span>
+					<span className="font-bold text-foreground capitalize flex items-center gap-1">
+						{data.payment_type === 'cash' && <Wallet className="w-3.5 h-3.5 text-primary" />}
+						{data.payment_type === 'credit card' && <CreditCard className="w-3.5 h-3.5 text-primary" />}
+						{data.payment_type === 'bank transfer' && <Landmark className="w-3.5 h-3.5 text-primary" />}
+						{data.payment_type === 'check' && <Receipt className="w-3.5 h-3.5 text-primary" />}
+						{label}
+					</span>
+				</div>
+				{data.payment_method_date && (
+					<div className="flex justify-between">
+						<span>Fecha:</span>
+						<span className="font-mono text-foreground">{data.payment_method_date}</span>
+					</div>
+				)}
+				{data.payment_type === 'cash' && data.cash_value && (
+					<div className="flex justify-between">
+						<span>Monto Efectivo:</span>
+						<span className="font-semibold text-foreground font-mono">L. {parseFloat(data.cash_value).toFixed(2)}</span>
+					</div>
+				)}
+				{data.payment_type === 'check' && (
+					<>
+						{data.check_number && (
+							<div className="flex justify-between">
+								<span>Número de Cheque:</span>
+								<span className="font-semibold text-foreground font-mono">{data.check_number}</span>
+							</div>
+						)}
+						{data.check_value && (
+							<div className="flex justify-between">
+								<span>Monto Cheque:</span>
+								<span className="font-semibold text-foreground font-mono">L. {parseFloat(data.check_value).toFixed(2)}</span>
+							</div>
+						)}
+					</>
+				)}
+				{data.payment_type === 'credit card' && (
+					<>
+						{data.card_last_4 && (
+							<div className="flex justify-between">
+								<span>Tarjeta (Últimos 4):</span>
+								<span className="font-semibold text-foreground font-mono">**** {data.card_last_4}</span>
+							</div>
+						)}
+						{data.card_expiration && (
+							<div className="flex justify-between">
+								<span>Expira:</span>
+								<span className="font-semibold text-foreground font-mono">{data.card_expiration}</span>
+							</div>
+						)}
+						{data.card_authorization_code && (
+							<div className="flex justify-between">
+								<span>Código Autorización:</span>
+								<span className="font-semibold text-foreground font-mono">{data.card_authorization_code}</span>
+							</div>
+						)}
+						{data.card_value_charged && (
+							<div className="flex justify-between">
+								<span>Monto Cobrado:</span>
+								<span className="font-semibold text-foreground font-mono">L. {parseFloat(data.card_value_charged).toFixed(2)}</span>
+							</div>
+						)}
+					</>
+				)}
+				{data.payment_type === 'bank transfer' && (
+					<>
+						{data.transfer_bank_id && (
+							<div className="flex justify-between">
+								<span>Banco:</span>
+								<span className="font-semibold text-foreground">
+									{banks.find(b => b.id.toString() === data.transfer_bank_id.toString())?.name || 'Banco Seleccionado'}
+								</span>
+							</div>
+						)}
+						{data.transfer_authorization_code && (
+							<div className="flex justify-between">
+								<span>Código Transferencia:</span>
+								<span className="font-semibold text-foreground font-mono">{data.transfer_authorization_code}</span>
+							</div>
+						)}
+						{data.transfer_value && (
+							<div className="flex justify-between">
+								<span>Monto Transferido:</span>
+								<span className="font-semibold text-foreground font-mono">L. {parseFloat(data.transfer_value).toFixed(2)}</span>
+							</div>
+						)}
+					</>
+				)}
+				{data.payment_type === 'credit' && (
+					<>
+						<div className="flex justify-between">
+							<span>Pago Inicial:</span>
+							<span className="font-semibold text-foreground">{data.has_initial_payment ? 'Sí' : 'No'}</span>
+						</div>
+						{data.has_initial_payment && (
+							<>
+								<div className="flex justify-between">
+									<span>Monto Inicial:</span>
+									<span className="font-semibold text-foreground font-mono">L. {parseFloat(data.initial_payment_amount || '0').toFixed(2)}</span>
+								</div>
+								<div className="flex justify-between">
+									<span>Tipo de Pago Inicial:</span>
+									<span className="font-semibold text-foreground capitalize">{getPaymentTypeLabel(data.initial_payment_type)}</span>
+								</div>
+								{data.initial_payment_type === 'check' && data.check_number && (
+									<div className="flex justify-between">
+										<span>Nº Cheque:</span>
+										<span className="font-semibold text-foreground font-mono">{data.check_number}</span>
+									</div>
+								)}
+								{data.initial_payment_type === 'credit card' && (
+									<>
+										{data.card_last_4 && (
+											<div className="flex justify-between">
+												<span>Tarjeta:</span>
+												<span className="font-semibold text-foreground font-mono">**** {data.card_last_4}</span>
+											</div>
+										)}
+										{data.card_authorization_code && (
+											<div className="flex justify-between">
+												<span>Código Aut.:</span>
+												<span className="font-semibold text-foreground font-mono">{data.card_authorization_code}</span>
+											</div>
+										)}
+									</>
+								)}
+								{data.initial_payment_type === 'bank transfer' && (
+									<>
+										{data.transfer_bank_id && (
+											<div className="flex justify-between">
+												<span>Banco:</span>
+												<span className="font-semibold text-foreground">
+													{banks.find(b => b.id.toString() === data.transfer_bank_id.toString())?.name || 'Banco Seleccionado'}
+												</span>
+											</div>
+										)}
+										{data.transfer_authorization_code && (
+											<div className="flex justify-between">
+												<span>Referencia:</span>
+												<span className="font-semibold text-foreground font-mono">{data.transfer_authorization_code}</span>
+											</div>
+										)}
+									</>
+								)}
+							</>
+						)}
+					</>
+				)}
+				{data.proof_of_payment && (
+					<div className="flex items-center justify-between p-2 mt-2 rounded border bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/20 text-emerald-600">
+						<span className="font-semibold">Comprobante:</span>
+						<span className="font-mono text-[10px] truncate max-w-[150px]">{data.proof_of_payment.name}</span>
+					</div>
+				)}
+			</div>
+		);
 	};
 
 	return (
@@ -653,7 +1161,7 @@ export default function SpecimenForm({
 			<form ref={formRef} onSubmit={handlePreSubmit} className="flex flex-col gap-6 py-4 px-5 pt-0">
 				<div className="mb-2 bg-muted/40 p-4 rounded-lg border border-border/60 flex flex-col gap-4">
 					{!specimen && (
-						<div className="flex items-center justify-center flex-wrap gap-4 pb-4 border-b border-border/40">
+						<div className="flex items-center justify-center flex-nowrap gap-2 sm:gap-4 pb-4 border-b border-border/40 w-full max-w-lg mx-auto">
 							{/* Paso 1 */}
 							<button
 								type="button"
@@ -663,7 +1171,7 @@ export default function SpecimenForm({
 									}
 								}}
 								className={cn(
-									"flex items-center gap-3 group text-left cursor-pointer focus:outline-none",
+									"flex items-center gap-2 sm:gap-3 group text-left cursor-pointer focus:outline-none",
 									currentStep > 1 && "hover:opacity-80"
 								)}
 							>
@@ -683,7 +1191,7 @@ export default function SpecimenForm({
 										Paso 1
 									</span>
 									<span className={cn(
-										"text-[11px] font-medium mt-0.5 leading-none transition-colors",
+										"hidden sm:block text-[11px] font-medium mt-1 leading-none transition-colors",
 										currentStep === 1 ? "text-primary font-semibold" : "text-muted-foreground group-hover:text-foreground"
 									)}>
 										Datos de la Muestra
@@ -691,7 +1199,7 @@ export default function SpecimenForm({
 								</div>
 							</button>
 
-							<div className="h-[2px] w-12 bg-muted-foreground/20 rounded-full overflow-hidden shrink-0">
+							<div className="h-[2px] w-8 sm:w-12 bg-muted-foreground/20 rounded-full overflow-hidden shrink-0">
 								<div className={cn(
 									"h-full bg-primary transition-all duration-300 ease-out",
 									currentStep > 1 ? "w-full" : "w-0"
@@ -707,7 +1215,7 @@ export default function SpecimenForm({
 									}
 								}}
 								className={cn(
-									"flex items-center gap-3 group text-left cursor-pointer focus:outline-none",
+									"flex items-center gap-2 sm:gap-3 group text-left cursor-pointer focus:outline-none",
 									currentStep !== 2 && "hover:opacity-80"
 								)}
 							>
@@ -727,7 +1235,7 @@ export default function SpecimenForm({
 										Paso 2
 									</span>
 									<span className={cn(
-										"text-[11px] font-medium mt-0.5 leading-none transition-colors",
+										"hidden sm:block text-[11px] font-medium mt-1 leading-none transition-colors",
 										currentStep === 2 ? "text-primary font-semibold" : "text-muted-foreground group-hover:text-foreground"
 									)}>
 										Facturación
@@ -833,19 +1341,43 @@ export default function SpecimenForm({
 
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
 							<div className="grid gap-2">
-								<Label htmlFor="specimen_type">Tipo de Muestra</Label>
+								<div className="flex items-center justify-between">
+									<Label htmlFor="specimen_type">Tipo de Muestra</Label>
+									<button
+										type="button"
+										onClick={() => setIsSpecimenTypeSheetOpen(true)}
+										className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
+									>
+										<Plus className="w-3 h-3" /> Nuevo
+									</button>
+								</div>
 								<FormCombobox
 									placeholder="Seleccionar tipo"
 									value={data.specimen_type}
 									onChange={(v) => setData('specimen_type', v)}
-									options={specimenTypes.map(t => ({ label: t.name, value: t.id.toString() }))}
+									options={sortedSpecimenTypes.map(t => ({ label: t.name, value: t.id.toString() }))}
 								/>
 
 								{errors.specimen_type && <p className="text-sm text-destructive">{errors.specimen_type}</p>}
 							</div>
 
 							<div className="grid gap-2">
-								<Label htmlFor="specimen_type_examination">Examen a Realizar</Label>
+								<div className="flex items-center justify-between">
+									<Label htmlFor="specimen_type_examination">Examen a Realizar</Label>
+									<button
+										type="button"
+										onClick={() => setIsExaminationSheetOpen(true)}
+										disabled={!data.specimen_type}
+										className={cn(
+											"text-xs font-medium flex items-center gap-1 transition-colors",
+											data.specimen_type
+												? "text-primary hover:underline cursor-pointer"
+												: "text-muted-foreground/50 cursor-not-allowed"
+										)}
+									>
+										<Plus className="w-3 h-3" /> Nuevo
+									</button>
+								</div>
 								<FormCombobox
 									placeholder={data.specimen_type ? "Seleccionar examen" : "Seleccione un tipo de muestra primero"}
 									value={data.specimen_type_examination}
@@ -900,7 +1432,16 @@ export default function SpecimenForm({
 
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
 							<div className="grid gap-2">
-								<Label htmlFor="specimen_category">Categoría (Tiempo)</Label>
+								<div className="flex items-center justify-between">
+									<Label htmlFor="specimen_category">Categoría (Tiempo)</Label>
+									<button
+										type="button"
+										onClick={() => setIsCategorySheetOpen(true)}
+										className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
+									>
+										<Plus className="w-3 h-3" /> Nuevo
+									</button>
+								</div>
 								<FormCombobox
 									placeholder="Seleccionar categoría"
 									value={data.specimen_category}
@@ -942,12 +1483,12 @@ export default function SpecimenForm({
 									onChange={(v) => setData('status', v)}
 									options={[
 										{ label: 'Recibida', value: 'received', color: '#3b82f6' },
-										{ label: 'Revisión Macroscópica', value: 'macroscopic_review', color: '#8b5cf6' },
-										{ label: 'En Proceso', value: 'processing', color: '#f59e0b' },
-										{ label: 'Revisión Microscópica', value: 'microscopic_review', color: '#d946ef' },
-										{ label: 'Finalizada', value: 'finalized', color: '#10b981' },
-										{ label: 'Entregada', value: 'delivered', color: '#64748b' },
-										{ label: 'Cancelada', value: 'cancelled', color: '#ef4444' },
+										{ label: 'Revisión Macroscópica', value: 'macroscopic_review', color: '#8b5cf6', disabled: data.status !== 'macroscopic_review' },
+										{ label: 'En Proceso', value: 'processing', color: '#f59e0b', disabled: data.status !== 'processing' },
+										{ label: 'Revisión Microscópica', value: 'microscopic_review', color: '#d946ef', disabled: data.status !== 'microscopic_review' },
+										{ label: 'Finalizada', value: 'finalized', color: '#10b981', disabled: data.status !== 'finalized' },
+										{ label: 'Entregada', value: 'delivered', color: '#64748b', disabled: data.status !== 'delivered' },
+										{ label: 'Cancelada', value: 'cancelled', color: '#ef4444', disabled: data.status !== 'cancelled' },
 									]}
 								/>
 								{errors.status && <p className="text-sm text-destructive">{errors.status}</p>}
@@ -1017,6 +1558,11 @@ export default function SpecimenForm({
 										accept=".pdf,image/*"
 										onChange={(e) => {
 											const file = e.target.files?.[0] || null;
+											if (file && file.size > 50 * 1024 * 1024) {
+												toast.error("El archivo de Orden Médica no debe exceder los 50MB.");
+												e.target.value = '';
+												return;
+											}
 											setData('medical_order_file', file);
 										}}
 									/>
@@ -1031,7 +1577,7 @@ export default function SpecimenForm({
 											{specimen?.medical_order_file ? 'Reemplazar archivo de Orden Médica' : 'Subir Orden Médica'}
 										</span>
 										<span className="text-[10px] text-muted-foreground mt-1">
-											PDF hasta 30MB, imágenes hasta 10MB
+											PDF o imágenes hasta 50MB
 										</span>
 									</label>
 								</div>
@@ -1547,116 +2093,39 @@ export default function SpecimenForm({
 										</div>
 									</div>
 
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-										<div className="grid gap-2">
-											<Label htmlFor="payment_type">Tipo de Pago <span className="text-destructive">*</span></Label>
-											<Select
-												value={data.payment_type}
-												onValueChange={(value) => {
-													setData(data => {
-														const updated = { ...data, payment_type: value };
+									{/* Detalle y Tipo de Pago Wrapper */}
+									<div className="flex flex-col gap-3 p-4 bg-muted/30 border rounded-lg">
 
-														if (value === 'credit') {
-															updated.proof_of_payment = null;
-															updated.has_initial_payment = false;
-														}
+										<div className="flex flex-col gap-2">
+											<div className="flex items-center justify-between">
+												<div>
+													<span className="text-xs font-semibold">Método de pago:</span>
+													<span className="ml-2 px-2.5 py-0.5 rounded-full text-[11px] bg-primary/10 text-primary font-bold capitalize">
+														{getPaymentTypeLabel(data.payment_type)}
+													</span>
+												</div>
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													onClick={() => setIsPaymentSheetOpen(true)}
+													className="font-semibold h-8"
+												>
+													{data.payment_type ? 'Cambiar método de Pago' : 'Seleccionar método de pago'}
+												</Button>
+											</div>
 
-														return updated;
-													});
-												}}
-											>
-												<SelectTrigger className="w-full">
-													<SelectValue placeholder="Seleccione el tipo de pago" />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="cash">Efectivo</SelectItem>
-													<SelectItem value="credit card">Tarjeta de Crédito</SelectItem>
-													<SelectItem value="bank transfer">Transferencia Bancaria</SelectItem>
-													<SelectItem value="check">Cheque</SelectItem>
-													<SelectItem value="credit">Al Crédito</SelectItem>
-												</SelectContent>
-											</Select>
-											{errors.payment_type && <p className="text-sm text-destructive">{errors.payment_type}</p>}
+											{data.payment_type ? renderPaymentResume() : (
+												<div className="text-[11px] text-muted-foreground mt-2 border-t pt-2.5 italic">
+													Por favor, configure los detalles del pago.
+												</div>
+											)}
+											{errors.payment_type && <p className="text-sm text-destructive mt-1">{errors.payment_type}</p>}
 										</div>
 									</div>
 
-									{data.payment_type === 'credit' && (
-										<div className="flex flex-col gap-3 p-4 bg-muted/30 border rounded-lg mt-2">
-											<div className="flex items-center justify-between">
-												<div className="flex flex-col gap-0.5">
-													<Label htmlFor="has-initial-payment" className="text-xs font-semibold cursor-pointer">
-														Con pago inicial
-													</Label>
-													<span className="text-[10px] text-muted-foreground">
-														Active esta opción si el cliente realiza un abono o pago inicial al momento del registro.
-													</span>
-												</div>
-												<Switch
-													id="has-initial-payment"
-													checked={data.has_initial_payment}
-													onCheckedChange={(checked) => {
-														setData(d => ({
-															...d,
-															has_initial_payment: checked,
-															proof_of_payment: checked ? d.proof_of_payment : null,
-															initial_payment_amount: checked ? d.initial_payment_amount : '',
-															initial_payment_type: checked ? d.initial_payment_type : 'cash'
-														}));
-													}}
-												/>
-											</div>
-
-											{data.has_initial_payment && (
-												<div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-2">
-													<div className="grid gap-2">
-														<Label htmlFor="initial_payment_amount">
-															Monto de Pago Inicial (L.) <span className="text-destructive">*</span>
-														</Label>
-														<Input
-															id="initial_payment_amount"
-															type="number"
-															step="0.01"
-															min="0.01"
-															max={totalVal}
-															value={data.initial_payment_amount}
-															onChange={(e) => setData('initial_payment_amount', e.target.value)}
-															placeholder="0.00"
-															required
-														/>
-														{errors.initial_payment_amount && (
-															<p className="text-sm text-destructive">{errors.initial_payment_amount}</p>
-														)}
-													</div>
-
-													<div className="grid gap-2">
-														<Label htmlFor="initial_payment_type">
-															Tipo de Pago Inicial <span className="text-destructive">*</span>
-														</Label>
-														<Select
-															value={data.initial_payment_type}
-															onValueChange={(value) => setData('initial_payment_type', value)}
-														>
-															<SelectTrigger className="w-full">
-																<SelectValue placeholder="Seleccione el tipo de pago" />
-															</SelectTrigger>
-															<SelectContent>
-																<SelectItem value="cash">Efectivo</SelectItem>
-																<SelectItem value="credit card">Tarjeta de Crédito</SelectItem>
-																<SelectItem value="bank transfer">Transferencia Bancaria</SelectItem>
-																<SelectItem value="check">Cheque</SelectItem>
-															</SelectContent>
-														</Select>
-														{errors.initial_payment_type && (
-															<p className="text-sm text-destructive">{errors.initial_payment_type}</p>
-														)}
-													</div>
-												</div>
-											)}
-										</div>
-									)}
-
 									{/* Comprobante de Pago */}
-									{(data.payment_type !== 'credit' || (data.payment_type === 'credit' && data.has_initial_payment)) ? (
+									{((data.payment_type !== 'cash' && data.payment_type !== 'credit') || (data.payment_type === 'credit' && data.has_initial_payment && data.initial_payment_type !== 'cash')) && (
 										<div className="grid gap-2">
 											<Label htmlFor="proof_of_payment">
 												Comprobante de Pago (PDF o Imagen) {isProofRequired && <span className="text-destructive">*</span>}
@@ -1698,6 +2167,11 @@ export default function SpecimenForm({
 														accept=".pdf,image/*"
 														onChange={(e) => {
 															const file = e.target.files?.[0] || null;
+															if (file && file.size > 50 * 1024 * 1024) {
+																toast.error("El archivo de Comprobante no debe exceder los 50MB.");
+																e.target.value = '';
+																return;
+															}
 															setData('proof_of_payment', file);
 														}}
 													/>
@@ -1712,21 +2186,12 @@ export default function SpecimenForm({
 															Subir Comprobante
 														</span>
 														<span className="text-[10px] text-muted-foreground mt-1">
-															PDF hasta 30MB, imágenes hasta 10MB
+															PDF o imágenes hasta 50MB
 														</span>
 													</label>
 												</div>
 											)}
 											{errors.proof_of_payment && <p className="text-sm text-destructive">{errors.proof_of_payment}</p>}
-										</div>
-									) : (
-										<div className="flex flex-col justify-center p-4 bg-muted/30 border border-dashed rounded-lg">
-											<span className="text-xs font-medium text-muted-foreground">
-												Pago al Crédito seleccionado
-											</span>
-											<span className="text-[10px] text-muted-foreground mt-0.5">
-												No se requiere comprobante de pago físico en este momento. Se registrará la deuda en el saldo de crédito del cliente.
-											</span>
 										</div>
 									)}
 
@@ -1913,6 +2378,440 @@ export default function SpecimenForm({
 				</div>
 			</form>
 
+			<Sheet open={isPaymentSheetOpen} onOpenChange={setIsPaymentSheetOpen}>
+				<SheetContent side="right" className="w-full max-w-[450px] sm:max-w-[650px] overflow-y-auto">
+					<HeadingSheet
+						title="Método de Pago"
+						description="Configure el método de pago e ingrese la información fiscal requerida para facturar."
+					/>
+					<div className="mt-6 flex flex-col gap-6 px-5">
+						{/* Payment type selector */}
+						<div className="grid gap-2">
+							<Label htmlFor="sheet_payment_type">Tipo de Pago <span className="text-destructive">*</span></Label>
+							<Select
+								value={localPayment.payment_type}
+								onValueChange={(value) => {
+									setLocalPayment(prev => {
+										const updated = { ...prev, payment_type: value };
+										if (value === 'credit') {
+											updated.has_initial_payment = false;
+										}
+										return updated;
+									});
+								}}
+							>
+								<SelectTrigger id="sheet_payment_type" className="w-full">
+									<SelectValue placeholder="Seleccione el tipo de pago" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="cash">Efectivo</SelectItem>
+									<SelectItem value="credit card">Tarjeta de Crédito</SelectItem>
+									<SelectItem value="bank transfer">Transferencia Bancaria</SelectItem>
+									<SelectItem value="check">Cheque</SelectItem>
+									<SelectItem value="credit">Al Crédito</SelectItem>
+								</SelectContent>
+							</Select>
+							{localPaymentErrors.payment_type && <p className="text-xs text-destructive">{localPaymentErrors.payment_type}</p>}
+						</div>
+
+						{/* Payment Method Date */}
+						{localPayment.payment_type !== 'credit' && localPayment.payment_type !== '' && (
+							<div className="grid gap-2">
+								<Label htmlFor="payment_method_date">Fecha de Pago <span className="text-destructive">*</span></Label>
+								<Input
+									id="payment_method_date"
+									type="date"
+									value={localPayment.payment_method_date}
+									onChange={(e) => setLocalPayment(prev => ({ ...prev, payment_method_date: e.target.value }))}
+									required
+								/>
+								{localPaymentErrors.payment_method_date && <p className="text-xs text-destructive">{localPaymentErrors.payment_method_date}</p>}
+							</div>
+						)}
+
+						{/* Cash Fields */}
+						{localPayment.payment_type === 'cash' && (
+							<div className="grid gap-2 p-4 bg-muted/40 border rounded-lg">
+								<Label htmlFor="cash_value">Valor Recibido (L.) <span className="text-destructive">*</span></Label>
+								<Input
+									id="cash_value"
+									type="number"
+									step="0.01"
+									value={localPayment.cash_value}
+									onChange={(e) => setLocalPayment(prev => ({ ...prev, cash_value: e.target.value }))}
+									placeholder="0.00"
+									className="font-mono"
+									required
+								/>
+								{localPaymentErrors.cash_value && <p className="text-xs text-destructive">{localPaymentErrors.cash_value}</p>}
+							</div>
+						)}
+
+						{/* Check Fields */}
+						{localPayment.payment_type === 'check' && (
+							<div className="grid gap-4 p-4 bg-muted/40 border rounded-lg">
+								<div className="grid gap-2">
+									<Label htmlFor="check_number">Número de Cheque <span className="text-destructive">*</span></Label>
+									<Input
+										id="check_number"
+										type="text"
+										value={localPayment.check_number}
+										onChange={(e) => setLocalPayment(prev => ({ ...prev, check_number: e.target.value }))}
+										placeholder="Ej. 123456"
+										required
+									/>
+									{localPaymentErrors.check_number && <p className="text-xs text-destructive">{localPaymentErrors.check_number}</p>}
+								</div>
+								<div className="grid gap-2">
+									<Label htmlFor="check_value">Valor del Cheque (L.) <span className="text-destructive">*</span></Label>
+									<Input
+										id="check_value"
+										type="number"
+										step="0.01"
+										value={localPayment.check_value}
+										onChange={(e) => setLocalPayment(prev => ({ ...prev, check_value: e.target.value }))}
+										placeholder="0.00"
+										className="font-mono"
+										required
+									/>
+									{localPaymentErrors.check_value && <p className="text-xs text-destructive">{localPaymentErrors.check_value}</p>}
+								</div>
+							</div>
+						)}
+
+						{/* Credit Card Fields */}
+						{localPayment.payment_type === 'credit card' && (
+							<div className="grid gap-4 p-4 bg-muted/40 border rounded-lg">
+								<div className="grid grid-cols-2 gap-4">
+									<div className="grid gap-2">
+										<Label htmlFor="card_last_4">Últimos 4 Dígitos <span className="text-destructive">*</span></Label>
+										<Input
+											id="card_last_4"
+											type="text"
+											maxLength={4}
+											value={localPayment.card_last_4}
+											onChange={(e) => setLocalPayment(prev => ({ ...prev, card_last_4: e.target.value.replace(/\D/g, '') }))}
+											placeholder="1234"
+											required
+										/>
+										{localPaymentErrors.card_last_4 && <p className="text-xs text-destructive">{localPaymentErrors.card_last_4}</p>}
+									</div>
+									<div className="grid gap-2">
+										<Label htmlFor="card_expiration">Vencimiento <span className="text-destructive">*</span></Label>
+										<Input
+											id="card_expiration"
+											type="text"
+											placeholder="MM/AA o MM/AAAA"
+											maxLength={7}
+											value={localPayment.card_expiration}
+											onChange={(e) => setLocalPayment(prev => ({ ...prev, card_expiration: formatCardExpiration(e.target.value) }))}
+											required
+										/>
+										{localPaymentErrors.card_expiration && <p className="text-xs text-destructive">{localPaymentErrors.card_expiration}</p>}
+									</div>
+								</div>
+								<div className="grid gap-2">
+									<Label htmlFor="card_authorization_code">Código de Autorización <span className="text-destructive">*</span></Label>
+									<Input
+										id="card_authorization_code"
+										type="text"
+										value={localPayment.card_authorization_code}
+										onChange={(e) => setLocalPayment(prev => ({ ...prev, card_authorization_code: e.target.value }))}
+										placeholder="Ej. 987654"
+										required
+									/>
+									{localPaymentErrors.card_authorization_code && <p className="text-xs text-destructive">{localPaymentErrors.card_authorization_code}</p>}
+								</div>
+								<div className="grid gap-2">
+									<Label htmlFor="card_value_charged">Monto Cargado (L.) <span className="text-destructive">*</span></Label>
+									<Input
+										id="card_value_charged"
+										type="number"
+										step="0.01"
+										value={localPayment.card_value_charged}
+										onChange={(e) => setLocalPayment(prev => ({ ...prev, card_value_charged: e.target.value }))}
+										placeholder="0.00"
+										className="font-mono"
+										required
+									/>
+									{localPaymentErrors.card_value_charged && <p className="text-xs text-destructive">{localPaymentErrors.card_value_charged}</p>}
+								</div>
+							</div>
+						)}
+
+						{/* Bank Transfer Fields */}
+						{localPayment.payment_type === 'bank transfer' && (
+							<div className="grid gap-4 p-4 bg-muted/40 border rounded-lg">
+								<div className="grid gap-2">
+									<Label htmlFor="transfer_bank_id">Banco <span className="text-destructive">*</span></Label>
+									<Select
+										value={localPayment.transfer_bank_id}
+										onValueChange={(val) => setLocalPayment(prev => ({ ...prev, transfer_bank_id: val }))}
+									>
+										<SelectTrigger id="transfer_bank_id" className="w-full">
+											<SelectValue placeholder="Seleccione un Banco" />
+										</SelectTrigger>
+										<SelectContent>
+											{banks && banks.length > 0 ? (
+												banks.map((bank: any) => (
+													<SelectItem key={bank.id} value={bank.id.toString()}>
+														{bank.name}
+													</SelectItem>
+												))
+											) : (
+												<SelectItem value="none" disabled>No hay bancos registrados</SelectItem>
+											)}
+										</SelectContent>
+									</Select>
+									{localPaymentErrors.transfer_bank_id && <p className="text-xs text-destructive">{localPaymentErrors.transfer_bank_id}</p>}
+								</div>
+								<div className="grid gap-2">
+									<Label htmlFor="transfer_authorization_code">Código de Autorización / Referencia <span className="text-destructive">*</span></Label>
+									<Input
+										id="transfer_authorization_code"
+										type="text"
+										value={localPayment.transfer_authorization_code}
+										onChange={(e) => setLocalPayment(prev => ({ ...prev, transfer_authorization_code: e.target.value }))}
+										placeholder="Ej. 11223344"
+										required
+									/>
+									{localPaymentErrors.transfer_authorization_code && <p className="text-xs text-destructive">{localPaymentErrors.transfer_authorization_code}</p>}
+								</div>
+								<div className="grid gap-2">
+									<Label htmlFor="transfer_value">Monto Transferido (L.) <span className="text-destructive">*</span></Label>
+									<Input
+										id="transfer_value"
+										type="number"
+										step="0.01"
+										value={localPayment.transfer_value}
+										onChange={(e) => setLocalPayment(prev => ({ ...prev, transfer_value: e.target.value }))}
+										placeholder="0.00"
+										className="font-mono"
+										required
+									/>
+									{localPaymentErrors.transfer_value && <p className="text-xs text-destructive">{localPaymentErrors.transfer_value}</p>}
+								</div>
+							</div>
+						)}
+
+						{/* Credit Options */}
+						{localPayment.payment_type === 'credit' && (
+							<div className="flex flex-col gap-4 p-4 bg-muted/30 border rounded-lg">
+								<div className="flex items-center justify-between">
+									<div className="flex flex-col gap-0.5">
+										<Label htmlFor="sheet-has-initial-payment" className="text-xs font-semibold cursor-pointer">
+											Con pago inicial
+										</Label>
+										<span className="text-[10px] text-muted-foreground">
+											Active esta opción si el cliente realiza un abono o pago inicial al momento del registro.
+										</span>
+									</div>
+									<Switch
+										id="sheet-has-initial-payment"
+										checked={localPayment.has_initial_payment}
+										onCheckedChange={(checked) => {
+											setLocalPayment(prev => ({
+												...prev,
+												has_initial_payment: checked,
+												initial_payment_amount: checked ? prev.initial_payment_amount : '',
+												initial_payment_type: checked ? prev.initial_payment_type : 'cash'
+											}));
+										}}
+									/>
+								</div>
+
+								{localPayment.has_initial_payment && (
+									<div className="flex flex-col gap-4 border-t pt-4 mt-2">
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+											<div className="grid gap-2">
+												<Label htmlFor="sheet_initial_payment_amount">
+													Monto de Pago Inicial (L.) <span className="text-destructive">*</span>
+												</Label>
+												<Input
+													id="sheet_initial_payment_amount"
+													type="number"
+													step="0.01"
+													min="0.01"
+													max={totalVal}
+													value={localPayment.initial_payment_amount}
+													onChange={(e) => setLocalPayment(prev => ({ ...prev, initial_payment_amount: e.target.value }))}
+													placeholder="0.00"
+													required
+												/>
+												{localPaymentErrors.initial_payment_amount && (
+													<p className="text-xs text-destructive">{localPaymentErrors.initial_payment_amount}</p>
+												)}
+											</div>
+
+											<div className="grid gap-2">
+												<Label htmlFor="sheet_initial_payment_type">
+													Tipo de Pago Inicial <span className="text-destructive">*</span>
+												</Label>
+												<Select
+													value={localPayment.initial_payment_type}
+													onValueChange={(value) => setLocalPayment(prev => ({ ...prev, initial_payment_type: value }))}
+												>
+													<SelectTrigger id="sheet_initial_payment_type" className="w-full">
+														<SelectValue placeholder="Seleccione el tipo de pago" />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value="cash">Efectivo</SelectItem>
+														<SelectItem value="credit card">Tarjeta de Crédito</SelectItem>
+														<SelectItem value="bank transfer">Transferencia Bancaria</SelectItem>
+														<SelectItem value="check">Cheque</SelectItem>
+													</SelectContent>
+												</Select>
+												{localPaymentErrors.initial_payment_type && (
+													<p className="text-xs text-destructive">{localPaymentErrors.initial_payment_type}</p>
+												)}
+											</div>
+										</div>
+
+										{/* Date field for credit initial payment */}
+										<div className="grid gap-2">
+											<Label htmlFor="sheet_payment_method_date">Fecha del Abono Inicial <span className="text-destructive">*</span></Label>
+											<Input
+												id="sheet_payment_method_date"
+												type="date"
+												value={localPayment.payment_method_date}
+												onChange={(e) => setLocalPayment(prev => ({ ...prev, payment_method_date: e.target.value }))}
+												required
+											/>
+										</div>
+
+										{/* Nested conditional fields for initial payment details if it matches check, card, or transfer */}
+										{localPayment.initial_payment_type === 'check' && (
+											<div className="grid gap-4 p-3 bg-muted/50 border rounded">
+												<div className="grid gap-1">
+													<Label htmlFor="sheet_check_number" className="text-xs">Número de Cheque <span className="text-destructive">*</span></Label>
+													<Input
+														id="sheet_check_number"
+														type="text"
+														value={localPayment.check_number}
+														onChange={(e) => setLocalPayment(prev => ({ ...prev, check_number: e.target.value }))}
+														placeholder="Ej. 123456"
+														className="h-8 text-xs"
+														required
+													/>
+													{localPaymentErrors.check_number && <p className="text-[10px] text-destructive">{localPaymentErrors.check_number}</p>}
+												</div>
+											</div>
+										)}
+
+										{localPayment.initial_payment_type === 'credit card' && (
+											<div className="grid gap-3 p-3 bg-muted/50 border rounded">
+												<div className="grid grid-cols-2 gap-2">
+													<div className="grid gap-1">
+														<Label htmlFor="sheet_card_last_4" className="text-xs">Últimos 4 Dígitos <span className="text-destructive">*</span></Label>
+														<Input
+															id="sheet_card_last_4"
+															type="text"
+															maxLength={4}
+															value={localPayment.card_last_4}
+															onChange={(e) => setLocalPayment(prev => ({ ...prev, card_last_4: e.target.value.replace(/\D/g, '') }))}
+															placeholder="1234"
+															className="h-8 text-xs"
+															required
+														/>
+														{localPaymentErrors.card_last_4 && <p className="text-[10px] text-destructive">{localPaymentErrors.card_last_4}</p>}
+													</div>
+													<div className="grid gap-1">
+														<Label htmlFor="sheet_card_expiration" className="text-xs">Vencimiento <span className="text-destructive">*</span></Label>
+														<Input
+															id="sheet_card_expiration"
+															type="text"
+															placeholder="MM/AA o MM/AAAA"
+															maxLength={7}
+															value={localPayment.card_expiration}
+															onChange={(e) => setLocalPayment(prev => ({ ...prev, card_expiration: formatCardExpiration(e.target.value) }))}
+															className="h-8 text-xs"
+															required
+														/>
+														{localPaymentErrors.card_expiration && <p className="text-[10px] text-destructive">{localPaymentErrors.card_expiration}</p>}
+													</div>
+												</div>
+												<div className="grid gap-1">
+													<Label htmlFor="sheet_card_authorization_code" className="text-xs">Código de Autorización <span className="text-destructive">*</span></Label>
+													<Input
+														id="sheet_card_authorization_code"
+														type="text"
+														value={localPayment.card_authorization_code}
+														onChange={(e) => setLocalPayment(prev => ({ ...prev, card_authorization_code: e.target.value }))}
+														placeholder="Ej. 987654"
+														className="h-8 text-xs"
+														required
+													/>
+													{localPaymentErrors.card_authorization_code && <p className="text-[10px] text-destructive">{localPaymentErrors.card_authorization_code}</p>}
+												</div>
+											</div>
+										)}
+
+										{localPayment.initial_payment_type === 'bank transfer' && (
+											<div className="grid gap-3 p-3 bg-muted/50 border rounded">
+												<div className="grid gap-1">
+													<Label htmlFor="sheet_transfer_bank_id" className="text-xs">Banco <span className="text-destructive">*</span></Label>
+													<Select
+														value={localPayment.transfer_bank_id}
+														onValueChange={(val) => setLocalPayment(prev => ({ ...prev, transfer_bank_id: val }))}
+													>
+														<SelectTrigger id="sheet_transfer_bank_id" className="h-8 text-xs w-full">
+															<SelectValue placeholder="Seleccione un Banco" />
+														</SelectTrigger>
+														<SelectContent>
+															{banks && banks.length > 0 ? (
+																banks.map((bank: any) => (
+																	<SelectItem key={bank.id} value={bank.id.toString()} className="text-xs">
+																		{bank.name}
+																	</SelectItem>
+																))
+															) : (
+																<SelectItem value="none" disabled>No hay bancos registrados</SelectItem>
+															)}
+														</SelectContent>
+													</Select>
+													{localPaymentErrors.transfer_bank_id && <p className="text-[10px] text-destructive">{localPaymentErrors.transfer_bank_id}</p>}
+												</div>
+												<div className="grid gap-1">
+													<Label htmlFor="sheet_transfer_authorization_code" className="text-xs">Código de Autorización / Referencia <span className="text-destructive">*</span></Label>
+													<Input
+														id="sheet_transfer_authorization_code"
+														type="text"
+														value={localPayment.transfer_authorization_code}
+														onChange={(e) => setLocalPayment(prev => ({ ...prev, transfer_authorization_code: e.target.value }))}
+														placeholder="Ej. 11223344"
+														className="h-8 text-xs"
+														required
+													/>
+													{localPaymentErrors.transfer_authorization_code && <p className="text-[10px] text-destructive">{localPaymentErrors.transfer_authorization_code}</p>}
+												</div>
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+						)}
+
+						<div className="flex gap-3 mt-4">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setIsPaymentSheetOpen(false)}
+								className="flex-1 font-semibold"
+							>
+								Cancelar
+							</Button>
+							<Button
+								type="button"
+								onClick={handleSavePaymentDetails}
+								className="flex-1 font-semibold"
+							>
+								Guardar Detalles
+							</Button>
+						</div>
+					</div>
+				</SheetContent>
+			</Sheet>
+
 			<Sheet open={isCustomerSheetOpen} onOpenChange={setIsCustomerSheetOpen}>
 				<SheetContent side="right" className="w-full max-w-[450px] sm:max-w-[650px] overflow-y-auto">
 					<HeadingSheet
@@ -1962,6 +2861,35 @@ export default function SpecimenForm({
 					</div>
 				</SheetContent>
 			</Sheet>
+
+			<Sheet open={isSpecimenTypeSheetOpen} onOpenChange={setIsSpecimenTypeSheetOpen}>
+				<SheetContent side="right" className="w-full max-w-[450px] sm:max-w-[650px] overflow-y-auto">
+					<HeadingSheet
+						title="Nuevo Tipo de Muestra"
+						description="Complete el formulario para crear un nuevo tipo de muestra."
+					/>
+					<div className="mt-4 -mx-5 px-5">
+						<SpecimenTypeForm
+							specimenType={null}
+							onSuccess={() => setIsSpecimenTypeSheetOpen(false)}
+						/>
+					</div>
+				</SheetContent>
+			</Sheet>
+
+			<SpecimenTypeExaminationSheet
+				examination={null}
+				specimenTypes={specimenTypes}
+				open={isExaminationSheetOpen}
+				onOpenChange={setIsExaminationSheetOpen}
+				defaultSpecimenTypeId={data.specimen_type}
+			/>
+
+			<CategorySheet
+				category={null}
+				open={isCategorySheetOpen}
+				onOpenChange={setIsCategorySheetOpen}
+			/>
 
 			{/* CONFIRMACIÓN DE DIÁLOGO SHADCN (ALERTDIALOG) */}
 			<AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>

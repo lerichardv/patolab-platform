@@ -27,11 +27,12 @@ interface Props {
     examination: Examination | null;
     specimenTypes: SpecimenType[];
     onSuccess: () => void;
+    defaultSpecimenTypeId?: string;
 }
 
-export default function SpecimenTypeExaminationForm({ examination, specimenTypes, onSuccess }: Props) {
+export default function SpecimenTypeExaminationForm({ examination, specimenTypes, onSuccess, defaultSpecimenTypeId }: Props) {
     const { data, setData, post, put, processing, errors } = useForm({
-        specimen_type: examination?.specimen_type.toString() || '',
+        specimen_type: examination?.specimen_type.toString() || defaultSpecimenTypeId || '',
         name: examination?.name || '',
         description: examination?.description || '',
     });

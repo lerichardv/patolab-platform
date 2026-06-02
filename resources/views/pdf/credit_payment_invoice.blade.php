@@ -383,7 +383,7 @@
                     </span>
                 </div>
                 <div style="text-align: right; align-self: center; display: flex; flex-direction: column; align-items: flex-end;">
-                    <span class="specimen-title">Fecha Estimada de Finalización</span>
+                    <span class="specimen-title">Fecha estimada del resultado</span>
                     <span class="specimen-value" style="font-size: 13px; font-weight: 800; color: #1e3a8a;">
                         {{ $originalInvoice->specimen->expected_finalization_date ? $originalInvoice->specimen->expected_finalization_date->format('d/m/Y h:i a') : 'N/A' }}
                     </span>
@@ -397,8 +397,13 @@
             <div class="cliente-item">
                 <strong>ID/RTN:</strong> {{ $customer->id_number }}
             </div>
-            <div class="cliente-item" style="grid-column: span 2;">
+            <div class="cliente-item">
                 <strong>Teléfono:</strong> {{ $customer->phone ?? '0' }}
+            </div>
+            <div class="cliente-item">
+                @if(!empty($customer->email))
+                    <strong>Correo:</strong> {{ $customer->email }}
+                @endif
             </div>
         </div>
     </div>

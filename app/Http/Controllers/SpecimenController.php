@@ -12,7 +12,7 @@ class SpecimenController extends Controller
         
         $priorities->load(['specimens' => function($q) {
             $q->where('specimen.active', true)
-              ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'users'])
+              ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank'])
               ->leftJoin('priorities_specimens_order', function($join) {
                   $join->on('specimen.id', '=', 'priorities_specimens_order.specimen_id')
                        ->on('specimen.priority_id', '=', 'priorities_specimens_order.priority_id');
@@ -56,6 +56,7 @@ class SpecimenController extends Controller
             'products' => $products,
             'settings' => \App\Models\Setting::all()->pluck('setting_value', 'setting_key'),
             'pathologists' => $pathologists,
+            'banks' => \App\Models\Bank::all(),
         ]);
     }
 
@@ -104,6 +105,17 @@ class SpecimenController extends Controller
             'custom_amount_reason' => 'nullable|string|max:255',
             'age_discount_type' => 'nullable|string|in:third,fourth',
             'age_discount_amount' => 'nullable|numeric|min:0',
+            'payment_method_date' => 'nullable|date',
+            'cash_value' => 'nullable|numeric|min:0',
+            'check_number' => 'nullable|string|max:255',
+            'check_value' => 'nullable|numeric|min:0',
+            'card_last_4' => 'nullable|string|max:4',
+            'card_value_charged' => 'nullable|numeric|min:0',
+            'card_expiration' => 'nullable|string|max:10',
+            'card_authorization_code' => 'nullable|string|max:255',
+            'transfer_bank_id' => 'nullable|exists:banks,id',
+            'transfer_value' => 'nullable|numeric|min:0',
+            'transfer_authorization_code' => 'nullable|string|max:255',
             'proof_of_payment' => [
                 (
                     $request->input('payment_type') === 'cash' ||
@@ -164,7 +176,27 @@ class SpecimenController extends Controller
             $sequence->increment('current_sequence');
 
             $specimenData = $validated;
-            unset($specimenData['amount'], $specimenData['discount'], $specimenData['payment_type'], $specimenData['proof_of_payment'], $specimenData['insumos'], $specimenData['has_initial_payment'], $specimenData['initial_payment_amount'], $specimenData['initial_payment_type']);
+            unset(
+                $specimenData['amount'],
+                $specimenData['discount'],
+                $specimenData['payment_type'],
+                $specimenData['proof_of_payment'],
+                $specimenData['insumos'],
+                $specimenData['has_initial_payment'],
+                $specimenData['initial_payment_amount'],
+                $specimenData['initial_payment_type'],
+                $specimenData['payment_method_date'],
+                $specimenData['cash_value'],
+                $specimenData['check_number'],
+                $specimenData['check_value'],
+                $specimenData['card_last_4'],
+                $specimenData['card_value_charged'],
+                $specimenData['card_expiration'],
+                $specimenData['card_authorization_code'],
+                $specimenData['transfer_bank_id'],
+                $specimenData['transfer_value'],
+                $specimenData['transfer_authorization_code']
+            );
             
             if ($request->hasFile('medical_order_file')) {
                 $path = $this->storeUploadedFile($request->file('medical_order_file'), 'medical_orders');
@@ -275,6 +307,7 @@ class SpecimenController extends Controller
                     'credit_amount' => $subtotal,
                     'amount_paid' => $initialPaymentAmount,
                     'amount_remaining' => $subtotal - $initialPaymentAmount,
+                    'specimen_id' => $specimen->id,
                 ]);
                 $creditId = $credit->id;
             }
@@ -310,6 +343,17 @@ class SpecimenController extends Controller
                 'custom_amount_reason' => $customAmountReasonVal,
                 'age_discount_type' => $validated['age_discount_type'] ?? null,
                 'age_discount_amount' => (float)($validated['age_discount_amount'] ?? 0.00),
+                'payment_method_date' => $validated['payment_method_date'] ?? null,
+                'cash_value' => isset($validated['cash_value']) ? (float)$validated['cash_value'] : null,
+                'check_number' => $validated['check_number'] ?? null,
+                'check_value' => isset($validated['check_value']) ? (float)$validated['check_value'] : null,
+                'card_last_4' => $validated['card_last_4'] ?? null,
+                'card_value_charged' => isset($validated['card_value_charged']) ? (float)$validated['card_value_charged'] : null,
+                'card_expiration' => $validated['card_expiration'] ?? null,
+                'card_authorization_code' => $validated['card_authorization_code'] ?? null,
+                'transfer_bank_id' => $validated['transfer_bank_id'] ?? null,
+                'transfer_value' => isset($validated['transfer_value']) ? (float)$validated['transfer_value'] : null,
+                'transfer_authorization_code' => $validated['transfer_authorization_code'] ?? null,
             ]);
 
             $caiRange->increment('last_used_number');
@@ -775,12 +819,19 @@ class SpecimenController extends Controller
         }
 
         $specimen = \App\Models\Specimen::where('sequence_code', $specimen_code)
+            ->where('access_token', $token)
             ->where('active', true)
             ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation'])
-            ->firstOrFail();
+            ->first();
 
-        if ($specimen->access_token !== $token) {
-            abort(403, 'Acceso no autorizado o token inválido.');
+        if (!$specimen) {
+            $exists = \App\Models\Specimen::where('sequence_code', $specimen_code)
+                ->where('active', true)
+                ->exists();
+            if ($exists) {
+                abort(403, 'Acceso no autorizado o token inválido.');
+            }
+            abort(404, 'Muestra no encontrada.');
         }
 
         return \Inertia\Inertia::render('specimens/public-progress', [

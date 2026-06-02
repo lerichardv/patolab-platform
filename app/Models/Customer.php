@@ -35,4 +35,10 @@ class Customer extends Model
     {
         return $this->belongsTo(Municipality::class, 'city');
     }
+
+    public function specimenGroups(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(SpecimenGroup::class, 'specimen_group_customers', 'customer_id', 'specimen_group_id')
+            ->withTimestamps();
+    }
 }

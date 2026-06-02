@@ -32,12 +32,14 @@ trait Auditable
 
         $table = $this->getTable();
         $rowId = $this->getKey();
+        $auditSessionCode = substr(str_replace('-', '', (string) \Illuminate\Support\Str::uuid()), 0, 24);
 
         if ($action === 'create') {
             foreach ($this->getAttributes() as $column => $value) {
                 if ($this->shouldIgnoreColumn($column)) continue;
 
                 AuditLog::create([
+                    'audit_session_code' => $auditSessionCode,
                     'action' => 'create',
                     'table' => $table,
                     'row_id' => $rowId,
@@ -53,6 +55,7 @@ trait Auditable
 
                 $oldValue = $this->getOriginal($column);
                 AuditLog::create([
+                    'audit_session_code' => $auditSessionCode,
                     'action' => 'update',
                     'table' => $table,
                     'row_id' => $rowId,
@@ -80,7 +83,10 @@ trait Auditable
             return;
         }
 
+        $auditSessionCode = substr(str_replace('-', '', (string) \Illuminate\Support\Str::uuid()), 0, 24);
+
         AuditLog::create([
+            'audit_session_code' => $auditSessionCode,
             'action' => 'delete',
             'table' => $this->getTable(),
             'row_id' => $this->getKey(),

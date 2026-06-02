@@ -17,7 +17,7 @@ class MyAssignmentController extends Controller
             ->select('specimen.*')
             ->orderBy('priorities.order', 'asc')
             ->orderBy('specimen.created_at', 'desc')
-            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'users'])
+            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank'])
             ->get();
 
         $priorities = \App\Models\Priority::orderBy('order', 'asc')->get();

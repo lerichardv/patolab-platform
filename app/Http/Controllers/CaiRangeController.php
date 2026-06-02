@@ -12,6 +12,28 @@ class CaiRangeController extends Controller
      */
     public function index(Request $request)
     {
+        // Check and update active CAI ranges that have expired or been exhausted
+        $activeRanges = CaiRange::where('status', 'active')->get();
+        foreach ($activeRanges as $range) {
+            $updated = false;
+            $newStatus = 'active';
+
+            // Check if expired: deadline is past (strictly before today)
+            if ($range->deadline && $range->deadline->lt(today())) {
+                $newStatus = 'expired';
+                $updated = true;
+            }
+            // Check if exhausted: last_used_number >= end_number
+            elseif ($range->last_used_number >= $range->end_number) {
+                $newStatus = 'exhausted';
+                $updated = true;
+            }
+
+            if ($updated) {
+                $range->update(['status' => $newStatus]);
+            }
+        }
+
         $query = CaiRange::with('location');
 
         if ($request->has('search')) {

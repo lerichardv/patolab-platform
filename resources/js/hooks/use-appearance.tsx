@@ -84,7 +84,14 @@ export function initializeTheme(): void {
     applyTheme(currentAppearance);
 
     // Set up system theme change listener
-    mediaQuery()?.addEventListener('change', handleSystemThemeChange);
+    const mq = mediaQuery();
+    if (mq) {
+        if (mq.addEventListener) {
+            mq.addEventListener('change', handleSystemThemeChange);
+        } else if (mq.addListener) {
+            mq.addListener(handleSystemThemeChange);
+        }
+    }
 }
 
 export function useAppearance(): UseAppearanceReturn {

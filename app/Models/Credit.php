@@ -17,17 +17,33 @@ class Credit extends Model
         'credit_amount',
         'amount_paid',
         'amount_remaining',
+        'specimen_id',
+        'is_group',
+        'group_id',
     ];
 
     protected $casts = [
         'credit_amount' => 'decimal:2',
         'amount_paid' => 'decimal:2',
         'amount_remaining' => 'decimal:2',
+        'is_group' => 'boolean',
+        'specimen_id' => 'integer',
+        'group_id' => 'integer',
     ];
 
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id');
+    }
+
+    public function specimen(): BelongsTo
+    {
+        return $this->belongsTo(Specimen::class, 'specimen_id');
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(SpecimenGroup::class, 'group_id');
     }
 
     public function invoices(): \Illuminate\Database\Eloquent\Relations\HasMany

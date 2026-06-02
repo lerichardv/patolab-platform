@@ -14,49 +14,29 @@ import {
     Sheet,
     SheetContent,
 } from '@/components/ui/sheet';
-import SpecimenForm from './specimen-form';
+import InvoiceForm from './invoice-form';
 
 interface Props {
-    specimen: any | null;
+    invoice: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     customers: any[];
-    specimenTypes: any[];
-    examinations: any[];
-    categories: any[];
-    referrers: any[];
-    referrerTypes: any[];
-    priorities: any[];
-    locations: any[];
-    sequences: any[];
-    activeLocationId: number | null;
-    products: any[];
     banks: any[];
 }
 
-export default function SpecimenSheet({
-    specimen,
+export default function InvoiceSheet({
+    invoice,
     open,
     onOpenChange,
     customers,
-    specimenTypes,
-    examinations,
-    categories,
-    referrers,
-    referrerTypes,
-    priorities,
-    locations,
-    sequences,
-    activeLocationId,
-    products,
-    banks
+    banks,
 }: Props) {
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (open && !specimen && isFormDirty) {
+            if (open && isFormDirty) {
                 e.preventDefault();
                 e.returnValue = '';
 
@@ -68,11 +48,11 @@ export default function SpecimenSheet({
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-    }, [open, specimen, isFormDirty]);
+    }, [open, isFormDirty]);
 
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
-            if (!specimen && isFormDirty) {
+            if (isFormDirty) {
                 setShowCloseConfirm(true);
 
                 return;
@@ -87,28 +67,18 @@ export default function SpecimenSheet({
             <Sheet open={open} onOpenChange={handleOpenChange}>
                 <SheetContent className="w-full sm:max-w-[90vw] md:max-w-[1000px] lg:max-w-[1100px] overflow-y-auto">
                     <HeadingSheet
-                        title={specimen ? 'Editar Muestra' : 'Nueva Muestra'}
-                        description={specimen
-                            ? 'Realice cambios en la información de la muestra aquí.'
-                            : 'Complete el formulario para registrar una nueva muestra en el sistema.'}
+                        title="Editar Factura"
+                        description="Realice cambios en la información de la factura aquí. Todos los importes y datos de pago pueden ser ajustados."
                     />
-                    <SpecimenForm
-                        specimen={specimen}
-                        onSuccess={() => onOpenChange(false)}
-                        setIsDirty={setIsFormDirty}
-                        customers={customers}
-                        specimenTypes={specimenTypes}
-                        examinations={examinations}
-                        categories={categories}
-                        referrers={referrers}
-                        referrerTypes={referrerTypes}
-                        priorities={priorities}
-                        locations={locations}
-                        sequences={sequences}
-                        activeLocationId={activeLocationId}
-                        products={products}
-                        banks={banks}
-                    />
+                    {invoice && (
+                        <InvoiceForm
+                            invoice={invoice}
+                            customers={customers}
+                            banks={banks}
+                            onSuccess={() => onOpenChange(false)}
+                            setIsDirty={setIsFormDirty}
+                        />
+                    )}
                 </SheetContent>
             </Sheet>
 
@@ -117,7 +87,7 @@ export default function SpecimenSheet({
                     <AlertDialogHeader>
                         <AlertDialogTitle>¿Estás seguro de salir?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Todos los datos ingresados en la nueva muestra se perderán permanentemente.
+                            Tiene cambios sin guardar en los datos de la factura. Los cambios se perderán permanentemente.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

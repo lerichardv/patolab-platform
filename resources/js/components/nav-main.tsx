@@ -15,17 +15,25 @@ import {
     SidebarMenuSub,
     SidebarMenuSubButton,
     SidebarMenuSubItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
 
 export function NavMain({ items = [], label }: { items: NavItem[]; label?: string }) {
     const { isCurrentUrl, currentUrl } = useCurrentUrl();
+    const { isMobile, setOpenMobile } = useSidebar();
+
+    const handleLinkClick = () => {
+        if (isMobile) {
+            setOpenMobile(false);
+        }
+    };
 
     const isAnyChildActive = (item: NavItem): boolean => {
         if (isCurrentUrl(item.href)) {
-return true;
-}
+            return true;
+        }
 
         if (item.items) {
             return item.items.some((sub) => isAnyChildActive(sub));
@@ -50,7 +58,7 @@ return true;
                                     tooltip={{ children: item.title }}
                                     className="sidebar-marquee-container"
                                 >
-                                    <Link href={item.href} prefetch>
+                                    <Link href={item.href} prefetch onClick={handleLinkClick}>
                                         {item.icon && <item.icon />}
                                         <span className="sidebar-marquee-content truncate">
                                             {item.title}
@@ -89,6 +97,13 @@ function CollapsibleMenuItem({
 }) {
     const isActive = isAnyChildActive(item);
     const [isOpen, setIsOpen] = useState(isActive);
+    const { isMobile, setOpenMobile } = useSidebar();
+
+    const handleLinkClick = () => {
+        if (isMobile) {
+            setOpenMobile(false);
+        }
+    };
 
     useEffect(() => {
         if (isActive) {
@@ -122,7 +137,7 @@ function CollapsibleMenuItem({
                                 return (
                                     <SidebarMenuSubItem key={subItem.title}>
                                         <SidebarMenuSubButton asChild isActive={isCurrentUrl(subItem.href)}>
-                                            <Link href={subItem.href} prefetch className="sidebar-marquee-container">
+                                            <Link href={subItem.href} prefetch className="sidebar-marquee-container" onClick={handleLinkClick}>
                                                 {subItem.icon && <subItem.icon />}
                                                 <span className="sidebar-marquee-content truncate">
                                                     {subItem.title}
@@ -163,6 +178,13 @@ function CollapsibleSubMenuItem({
 }) {
     const isSubActive = isAnyChildActive(subItem);
     const [isOpen, setIsOpen] = useState(isSubActive);
+    const { isMobile, setOpenMobile } = useSidebar();
+
+    const handleLinkClick = () => {
+        if (isMobile) {
+            setOpenMobile(false);
+        }
+    };
 
     useEffect(() => {
         if (isSubActive) {
@@ -192,7 +214,7 @@ function CollapsibleSubMenuItem({
                         {subItem.items?.map((ssItem) => (
                             <SidebarMenuSubItem key={ssItem.title}>
                                 <SidebarMenuSubButton asChild isActive={isCurrentUrl(ssItem.href)}>
-                                    <Link href={ssItem.href} prefetch className="sidebar-marquee-container">
+                                    <Link href={ssItem.href} prefetch className="sidebar-marquee-container" onClick={handleLinkClick}>
                                         <span className="sidebar-marquee-content truncate">
                                             {ssItem.title}
                                         </span>

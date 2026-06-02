@@ -22,9 +22,10 @@ interface Props {
     specimenTypes: SpecimenType[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    defaultSpecimenTypeId?: string;
 }
 
-export default function SpecimenTypeExaminationSheet({ examination, specimenTypes, open, onOpenChange }: Props) {
+export default function SpecimenTypeExaminationSheet({ examination, specimenTypes, open, onOpenChange, defaultSpecimenTypeId }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="sm:max-w-[540px]">
@@ -34,11 +35,14 @@ export default function SpecimenTypeExaminationSheet({ examination, specimenType
                         ? 'Realice cambios en la información del tipo de análisis aquí.' 
                         : 'Complete el formulario para crear un nuevo tipo de análisis asociado a una muestra.'}
                 />
-                <SpecimenTypeExaminationForm 
-                    examination={examination} 
-                    specimenTypes={specimenTypes}
-                    onSuccess={() => onOpenChange(false)} 
-                />
+                {open && (
+                    <SpecimenTypeExaminationForm 
+                        examination={examination} 
+                        specimenTypes={specimenTypes}
+                        onSuccess={() => onOpenChange(false)} 
+                        defaultSpecimenTypeId={defaultSpecimenTypeId}
+                    />
+                )}
             </SheetContent>
         </Sheet>
     );

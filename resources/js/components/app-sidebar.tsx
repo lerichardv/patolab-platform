@@ -24,6 +24,7 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
+	useSidebar,
 } from '@/components/ui/sidebar';
 import { dashboard, testPage } from '@/routes';
 import { index as specimenTypesIndex } from '@/actions/App/Http/Controllers/SpecimenTypeController';
@@ -43,7 +44,12 @@ const mainNavItems: NavItem[] = [
 		icon: LayoutGrid,
 	},
 	{
-		title: 'Muestras',
+		title: 'Facturación',
+		href: invoicesIndex(),
+		icon: Receipt,
+	},
+	{
+		title: 'Tablero de Muestras',
 		href: specimensIndex(),
 		icon: Microscope,
 	},
@@ -136,17 +142,13 @@ const adminNavItems: NavItem[] = [
 				icon: MapPin,
 			},
 			{
-				title: 'Facturación',
+				title: 'Contabilidad',
 				href: '#',
 				icon: Receipt,
 				items: [
 					{
 						title: 'Rangos de Facturación',
 						href: caiRangesIndex(),
-					},
-					{
-						title: 'Facturas',
-						href: invoicesIndex(),
 					},
 					{
 						title: 'Créditos',
@@ -177,13 +179,21 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+	const { isMobile, setOpenMobile } = useSidebar();
+
+	const handleLogoClick = () => {
+		if (isMobile) {
+			setOpenMobile(false);
+		}
+	};
+
 	return (
 		<Sidebar collapsible="icon" variant="inset">
 			<SidebarHeader>
 				<SidebarMenu>
 					<SidebarMenuItem>
 						<SidebarMenuButton size="lg" asChild>
-							<Link href={dashboard()} prefetch>
+							<Link href={dashboard()} prefetch onClick={handleLogoClick}>
 								<AppLogo />
 							</Link>
 						</SidebarMenuButton>

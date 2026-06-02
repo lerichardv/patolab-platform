@@ -96,6 +96,8 @@ class ProductSeeder extends Seeder
             ],
         ];
 
+        $storages = \App\Models\Storage::all();
+
         foreach ($products as $productData) {
             $product = Product::create([
                 'name' => $productData['name'],
@@ -126,6 +128,20 @@ class ProductSeeder extends Seeder
                 $amount = round($amount, 2);
                 $product->prices()->create(['amount' => $amount]);
                 $previousPrice = $amount;
+            }
+
+            // Seed inventory for this product in all storages
+            foreach ($storages as $storage) {
+                \App\Models\Inventory::updateOrCreate(
+                    [
+                        'storage' => $storage->id,
+                        'product' => $product->id,
+                    ],
+                    [
+                        'quantity' => rand(20, 150),
+                        'active' => true,
+                    ]
+                );
             }
         }
     }

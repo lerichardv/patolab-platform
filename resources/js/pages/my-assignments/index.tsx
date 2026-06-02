@@ -3,6 +3,7 @@ import { format, add, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ClipboardList, Eye, Microscope, Calendar, Clock, AlertCircle, Filter, CalendarClock, ChevronDown } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import { DateRangePicker } from '@/components/date-range-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -183,7 +184,7 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 						</div>
 					</div>
 
-					<div className="flex flex-wrap items-center gap-2 justify-end">
+					<div className="flex flex-col md:flex-row items-center gap-2 justify-end">
 						{/* Estado Filter (Combobox Múltiple) */}
 						<Popover>
 							<PopoverTrigger asChild>
@@ -241,118 +242,10 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 						</Popover>
 
 						{/* Rango de Fechas Filter */}
-						<Popover>
-							<PopoverTrigger asChild>
-								<Button variant="outline" className="h-10 gap-2 border bg-card hover:bg-accent/50 transition-colors">
-									<CalendarClock className="h-4 w-4 text-muted-foreground" />
-									<span>
-										{dateRange.from && dateRange.to
-											? `${format(new Date(dateRange.from + 'T00:00:00'), 'dd/MM/yyyy')} - ${format(new Date(dateRange.to + 'T00:00:00'), 'dd/MM/yyyy')}`
-											: 'Cualquier fecha'}
-									</span>
-									<ChevronDown className="h-4 w-4 opacity-50" />
-								</Button>
-							</PopoverTrigger>
-							<PopoverContent className="w-80 p-4" align="end">
-								<div className="space-y-4">
-									<div className="flex flex-col gap-1">
-										<h4 className="font-medium text-sm">Rango de fechas</h4>
-										<p className="text-xs text-muted-foreground">Muestras creadas entre estas fechas.</p>
-									</div>
-									<div className="grid grid-cols-2 gap-2">
-										<div className="space-y-1">
-											<Label htmlFor="date-from" className="text-xs">Desde</Label>
-											<Input
-												id="date-from"
-												type="date"
-												value={dateRange.from}
-												onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
-												className="h-9 text-sm"
-											/>
-										</div>
-										<div className="space-y-1">
-											<Label htmlFor="date-to" className="text-xs">Hasta</Label>
-											<Input
-												id="date-to"
-												type="date"
-												value={dateRange.to}
-												onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
-												className="h-9 text-sm"
-											/>
-										</div>
-									</div>
-									<div className="grid grid-cols-2 gap-1.5 pt-2 border-t text-xs">
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											className="h-7 text-xs font-normal"
-											onClick={() => {
-												const today = new Date();
-												const from = format(today, 'yyyy-MM-dd');
-												const to = format(today, 'yyyy-MM-dd');
-												setDateRange({ from, to });
-											}}
-										>
-											Hoy
-										</Button>
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											className="h-7 text-xs font-normal"
-											onClick={() => {
-												const today = new Date();
-												const from = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-												const to = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-												setDateRange({ from, to });
-											}}
-										>
-											Esta semana
-										</Button>
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											className="h-7 text-xs font-normal"
-											onClick={() => {
-												const today = new Date();
-												const from = format(add(today, { days: -7 }), 'yyyy-MM-dd');
-												const to = format(today, 'yyyy-MM-dd');
-												setDateRange({ from, to });
-											}}
-										>
-											Últimos 7 días
-										</Button>
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											className="h-7 text-xs font-normal"
-											onClick={() => {
-												const today = new Date();
-												const from = format(add(today, { days: -30 }), 'yyyy-MM-dd');
-												const to = format(today, 'yyyy-MM-dd');
-												setDateRange({ from, to });
-											}}
-										>
-											Últimos 30 días
-										</Button>
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											className="col-span-2 h-7 text-xs font-normal text-muted-foreground hover:text-foreground"
-											onClick={() => {
-												setDateRange({ from: '', to: '' });
-											}}
-										>
-											Limpiar filtros de fecha
-										</Button>
-									</div>
-								</div>
-							</PopoverContent>
-						</Popover>
+						<DateRangePicker
+							value={dateRange}
+							onChange={setDateRange}
+						/>
 					</div>
 				</div>
 

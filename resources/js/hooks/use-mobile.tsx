@@ -12,10 +12,18 @@ function mediaQueryListener(callback: (event: MediaQueryListEvent) => void) {
         return () => {};
     }
 
-    mql.addEventListener('change', callback);
+    if (mql.addEventListener) {
+        mql.addEventListener('change', callback);
+    } else if (mql.addListener) {
+        mql.addListener(callback);
+    }
 
     return () => {
-        mql.removeEventListener('change', callback);
+        if (mql.removeEventListener) {
+            mql.removeEventListener('change', callback);
+        } else if (mql.removeListener) {
+            mql.removeListener(callback);
+        }
     };
 }
 

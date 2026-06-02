@@ -389,21 +389,23 @@
 
     <div class="cliente-section">
         <div class="section-header">
-            @if($invoice->specimen && $invoice->specimen->sequence_code)
+            @if($invoice->is_group)
+                Cliente Facturación (Grupo)
+            @elseif($invoice->specimen && $invoice->specimen->sequence_code)
                 Cliente y Muestra
             @else
                 Cliente
             @endif
         </div>
-        <div class="cliente-grid {{ $invoice->specimen && $invoice->specimen->sequence_code ? 'has-specimen' : '' }}">
-            @if($invoice->specimen && $invoice->specimen->sequence_code)
+        <div class="cliente-grid {{ !$invoice->is_group && $invoice->specimen && $invoice->specimen->sequence_code ? 'has-specimen' : '' }}">
+            @if(!$invoice->is_group && $invoice->specimen && $invoice->specimen->sequence_code)
                 <div style="grid-column: span 2; display: flex; flex-direction: column; align-items: flex-start;">
                     <span class="specimen-title">Código de Muestra</span>
                     <span class="specimen-code-badge">{{ $invoice->specimen->sequence_code }}</span>
                     <span style="font-size: 10px; color: #4b5563; margin-top: 2px;">{{ $invoice->specimen->type->name }}</span>
                 </div>
                 <div style="text-align: right; align-self: center; display: flex; flex-direction: column; align-items: flex-end;">
-                    <span class="specimen-title">Fecha Estimada de Finalización</span>
+                    <span class="specimen-title">Fecha estimada del resultado</span>
                     <span class="specimen-value" style="font-size: 13px; font-weight: 800; color: #1e3a8a;">
                         {{ $invoice->specimen->expected_finalization_date ? $invoice->specimen->expected_finalization_date->format('d/m/Y h:i a') : 'N/A' }}
                     </span>
@@ -417,8 +419,13 @@
             <div class="cliente-item">
                 <strong>ID/RTN:</strong> {{ $customer->id_number }}
             </div>
-            <div class="cliente-item" style="grid-column: span 2;">
+            <div class="cliente-item">
                 <strong>Teléfono:</strong> {{ $customer->phone ?? '0' }}
+            </div>
+            <div class="cliente-item">
+                @if(!empty($customer->email))
+                    <strong>Correo:</strong> {{ $customer->email }}
+                @endif
             </div>
         </div>
     </div>
@@ -436,45 +443,106 @@
                 </tr>
             </thead>
             <tbody>
-                @php
-                    $baseExamPrice = (float)$invoice->amount - (float)($invoice->custom_amount ?? 0);
-                    $rowNum = 2;
-                @endphp
-                <tr>
-                    <td>1</td>
-                    <td>
-                        <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">{{ $examination->name }}</div>
-                        <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
-                            Paciente: {{ $customer->name }}
-                            @if($invoice->specimen && $invoice->specimen->sequence_code)
-                                &nbsp;|&nbsp; Muestra: <span style="font-family: monospace; font-weight: bold; color: #1e3a8a; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px;">{{ $invoice->specimen->sequence_code }}</span>
-                            @endif
-                        </div>
-                        @if($invoice->age_discount_type)
-                            <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
-                                * Descuento de {{ $invoice->age_discount_type === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }} aplicado: - L. {{ number_format($invoice->age_discount_amount, 2) }}
+                @if($invoice->is_group)
+                    @php
+                        $specimensList = [];
+                        if (isset($groupSpecimens)) {
+                            $specimensList = $groupSpecimens;
+                        } elseif ($invoice->is_group && $invoice->specimenGroup) {
+                            foreach ($invoice->specimenGroup->specimens as $specimen) {
+                                $price = 0.00;
+                                if ($specimen->type && $specimen->type->prices->isNotEmpty()) {
+                                    $price = (float)$specimen->type->prices->first()->amount;
+                                }
+                                $specimensList[] = [
+                                    'sequence_code' => $specimen->sequence_code,
+                                    'exam_name' => $specimen->examination->name ?? 'Examen',
+                                    'patient_name' => $specimen->customerRelation->name ?? 'Paciente',
+                                    'price' => $price,
+                                    'discount' => 0.00,
+                                    'age_discount_type' => null,
+                                    'age_discount_amount' => 0.00,
+                                ];
+                            }
+                        }
+                        $rowNum = 1;
+                    @endphp
+                    @foreach($specimensList as $spec)
+                        <tr>
+                            <td>{{ $rowNum++ }}</td>
+                            <td>
+                                <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">{{ $spec['exam_name'] }}</div>
+                                <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
+                                    Paciente: {{ $spec['patient_name'] }} &nbsp;|&nbsp; Muestra: <span style="font-family: monospace; font-weight: bold; color: #1e3a8a; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px;">{{ $spec['sequence_code'] }}</span>
+                                </div>
+                                @if(!empty($spec['age_discount_type']))
+                                    <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
+                                        * Descuento de {{ $spec['age_discount_type'] === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }} aplicado: - L. {{ number_format($spec['age_discount_amount'], 2) }}
+                                    </div>
+                                @endif
+                            </td>
+                            <td>1</td>
+                            <td class="text-right">L. {{ number_format($spec['price'], 2) }}</td>
+                            <td class="text-right">L. {{ number_format($spec['discount'], 2) }}</td>
+                            <td class="text-right">L. {{ number_format($spec['price'] - $spec['discount'], 2) }}</td>
+                        </tr>
+                    @endforeach
+                    @if((float)($invoice->custom_amount ?? 0) > 0)
+                    <tr>
+                        <td>{{ $rowNum++ }}</td>
+                        <td>
+                            <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">{{ $invoice->custom_amount_reason ?? 'Cargo Adicional Personalizado' }}</div>
+                            <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
+                                Servicios
                             </div>
-                        @endif
-                    </td>
-                    <td>1</td>
-                    <td class="text-right">L. {{ number_format($baseExamPrice, 2) }}</td>
-                    <td class="text-right">L. {{ number_format($invoice->discount, 2) }}</td>
-                    <td class="text-right">L. {{ number_format($baseExamPrice - (float)$invoice->discount, 2) }}</td>
-                </tr>
-                @if((float)($invoice->custom_amount ?? 0) > 0)
-                <tr>
-                    <td>{{ $rowNum++ }}</td>
-                    <td>
-                        <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">{{ $invoice->custom_amount_reason ?? 'Cargo Adicional Personalizado' }}</div>
-                        <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
-                            Servicios
-                        </div>
-                    </td>
-                    <td>1</td>
-                    <td class="text-right">L. {{ number_format($invoice->custom_amount, 2) }}</td>
-                    <td class="text-right">L. 0.00</td>
-                    <td class="text-right">L. {{ number_format($invoice->custom_amount, 2) }}</td>
-                </tr>
+                        </td>
+                        <td>1</td>
+                        <td class="text-right">L. {{ number_format($invoice->custom_amount, 2) }}</td>
+                        <td class="text-right">L. 0.00</td>
+                        <td class="text-right">L. {{ number_format($invoice->custom_amount, 2) }}</td>
+                    </tr>
+                    @endif
+                @else
+                    @php
+                        $baseExamPrice = (float)$invoice->amount - (float)($invoice->custom_amount ?? 0);
+                        $rowNum = 2;
+                    @endphp
+                    <tr>
+                        <td>1</td>
+                        <td>
+                            <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">{{ $examination->name }}</div>
+                            <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
+                                Paciente: {{ $customer->name }}
+                                @if($invoice->specimen && $invoice->specimen->sequence_code)
+                                    &nbsp;|&nbsp; Muestra: <span style="font-family: monospace; font-weight: bold; color: #1e3a8a; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px;">{{ $invoice->specimen->sequence_code }}</span>
+                                @endif
+                            </div>
+                            @if($invoice->age_discount_type)
+                                <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
+                                    * Descuento de {{ $invoice->age_discount_type === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }} aplicado: - L. {{ number_format($invoice->age_discount_amount, 2) }}
+                                </div>
+                            @endif
+                        </td>
+                        <td>1</td>
+                        <td class="text-right">L. {{ number_format($baseExamPrice, 2) }}</td>
+                        <td class="text-right">L. {{ number_format($invoice->discount, 2) }}</td>
+                        <td class="text-right">L. {{ number_format($baseExamPrice - (float)$invoice->discount, 2) }}</td>
+                    </tr>
+                    @if((float)($invoice->custom_amount ?? 0) > 0)
+                    <tr>
+                        <td>{{ $rowNum++ }}</td>
+                        <td>
+                            <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">{{ $invoice->custom_amount_reason ?? 'Cargo Adicional Personalizado' }}</div>
+                            <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
+                                Servicios
+                            </div>
+                        </td>
+                        <td>1</td>
+                        <td class="text-right">L. {{ number_format($invoice->custom_amount, 2) }}</td>
+                        <td class="text-right">L. 0.00</td>
+                        <td class="text-right">L. {{ number_format($invoice->custom_amount, 2) }}</td>
+                    </tr>
+                    @endif
                 @endif
             </tbody>
         </table>

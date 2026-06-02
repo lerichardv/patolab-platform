@@ -71,6 +71,12 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (newPrice.trim() !== '') {
+            toast.error('Tiene un precio ingresado sin agregar. Por favor, haga clic en el botón "Agregar" para incluirlo en la lista o limpie el campo antes de continuar.');
+
+            return;
+        }
+
         const options = {
             onSuccess: () => {
                 toast.success(specimenType ? 'Tipo de muestra actualizado' : 'Tipo de muestra creado');

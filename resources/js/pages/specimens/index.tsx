@@ -12,6 +12,8 @@ import { es } from 'date-fns/locale';
 import { Plus, Microscope, Edit2, Trash2, Tag, CalendarClock, FileText, ExternalLink, ChevronLeft, ChevronRight, MoreVertical, UserPlus, ChevronDown, Layers, Check, Filter } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
+import { DateRangePicker } from '@/components/date-range-picker';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
 	updateOrder as updateSpecimenOrder,
 	destroy as destroySpecimen
@@ -39,14 +41,19 @@ import {
 	DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 import SpecimenSheet from './specimen-sheet';
+import SpecimenGroupSheet from './specimen-group-sheet';
 import SpecimenViewSheet from './specimen-view-sheet';
 import SpecimenPathologistSheet from './specimen-pathologist-sheet';
 import SpecimenBulkPathologistSheet from './specimen-bulk-pathologist-sheet';
+import InvoiceSheet from '../invoices/invoice-sheet';
 
 interface Specimen {
 	id: number;
@@ -65,6 +72,8 @@ interface Specimen {
 	created_at: string;
 	invoice_relation?: any;
 	users?: any[];
+	group?: any;
+	group_id?: any;
 }
 
 interface Priority {
@@ -87,6 +96,7 @@ interface Props {
 	activeLocationId: number | null;
 	products: any[];
 	pathologists: any[];
+	banks: any[];
 }
 
 
@@ -147,12 +157,14 @@ const ALL_STATUSES = [
 	{ value: 'cancelled', label: 'Cancelada' },
 ];
 
-export default function SpecimensIndex({ priorities: initialPriorities, customers, specimenTypes, examinations, categories, referrers, referrerTypes, locations, sequences, activeLocationId, products, pathologists }: Props) {
+export default function SpecimensIndex({ priorities: initialPriorities, customers, specimenTypes, examinations, categories, referrers, referrerTypes, locations, sequences, activeLocationId, products, pathologists, banks }: Props) {
 	const { props } = usePage() as any;
 	const flash = props.flash || {};
+	const isMobile = useIsMobile();
 
 	const [priorities, setPriorities] = useState<Priority[]>(initialPriorities);
 	const [isSheetOpen, setIsSheetOpen] = useState(false);
+	const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
 	const [selectedSpecimen, setSelectedSpecimen] = useState<Specimen | null>(null);
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 	const [specimenToDelete, setSpecimenToDelete] = useState<Specimen | null>(null);
@@ -173,6 +185,9 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 	const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
 	const [isBulkAssignSheetOpen, setIsBulkAssignSheetOpen] = useState(false);
 
+	const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+	const [isInvoiceSheetOpen, setIsInvoiceSheetOpen] = useState(false);
+
 	const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
 		'received',
 		'macroscopic_review',
@@ -187,6 +202,35 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 		return { from, to };
 	});
 
+	const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
+	const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
+
+	const availableGroups = useMemo(() => {
+		const groupsMap = new Map<string, { id: string; name: string }>();
+		priorities.forEach(priority => {
+			priority.specimens.forEach(specimen => {
+				const matchesStatus = selectedStatuses.includes(specimen.status);
+				const specDateStr = format(new Date(specimen.created_at), 'yyyy-MM-dd');
+				const matchesDate = (!dateRange.from || specDateStr >= dateRange.from) &&
+					(!dateRange.to || specDateStr <= dateRange.to);
+
+				if (matchesStatus && matchesDate && specimen.group) {
+					groupsMap.set(specimen.group.id.toString(), {
+						id: specimen.group.id.toString(),
+						name: specimen.group.name
+					});
+				}
+			});
+		});
+		return Array.from(groupsMap.values());
+	}, [priorities, selectedStatuses, dateRange]);
+
+	useEffect(() => {
+		if (selectedGroupId !== 'all' && !availableGroups.some(g => g.id === selectedGroupId)) {
+			setSelectedGroupId('all');
+		}
+	}, [availableGroups, selectedGroupId]);
+
 	const filteredPriorities = useMemo(() => {
 		return priorities.map(priority => {
 			const filteredSpecimens = priority.specimens.filter(specimen => {
@@ -196,14 +240,17 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 				const matchesDate = (!dateRange.from || specDateStr >= dateRange.from) &&
 					(!dateRange.to || specDateStr <= dateRange.to);
 
-				return matchesStatus && matchesDate;
+				const matchesGroup = selectedGroupId === 'all' ||
+					(specimen.group_id?.toString() === selectedGroupId);
+
+				return matchesStatus && matchesDate && matchesGroup;
 			});
 			return {
 				...priority,
 				specimens: filteredSpecimens
 			};
 		});
-	}, [priorities, selectedStatuses, dateRange]);
+	}, [priorities, selectedStatuses, dateRange, selectedGroupId]);
 
 	const visibleSpecimenIds = useMemo(() => {
 		return filteredPriorities.flatMap(p => p.specimens.map(s => s.id));
@@ -611,7 +658,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 							<h1 className="text-2xl font-bold tracking-tight">Muestras</h1>
 						</div>
 					</div>
-					<div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+					<div className="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto justify-end">
 						{/* Filtro de Estado (Combobox Múltiple) */}
 						<Popover>
 							<PopoverTrigger asChild>
@@ -668,130 +715,103 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 							</PopoverContent>
 						</Popover>
 
-						{/* Filtro de Rango de Fechas */}
-						<Popover>
+						{/* Filtro de Grupo (Combobox con Búsqueda) */}
+						<Popover open={isGroupFilterOpen} onOpenChange={setIsGroupFilterOpen}>
 							<PopoverTrigger asChild>
-								<Button variant="outline" className="h-10 gap-2 border bg-card hover:bg-accent/50 transition-colors">
-									<CalendarClock className="h-4 w-4 text-muted-foreground" />
-									<span>
-										{dateRange.from && dateRange.to
-											? `${format(new Date(dateRange.from + 'T00:00:00'), 'dd/MM/yyyy')} - ${format(new Date(dateRange.to + 'T00:00:00'), 'dd/MM/yyyy')}`
-											: 'Cualquier fecha'}
-									</span>
-									<ChevronDown className="h-4 w-4 opacity-50" />
+								<Button
+									variant="outline"
+									role="combobox"
+									aria-expanded={isGroupFilterOpen}
+									className="h-10 gap-2 border bg-card hover:bg-accent/50 transition-colors justify-between w-full md:w-[200px]"
+								>
+									<div className="flex items-center gap-2 truncate">
+										<Layers className="h-4 w-4 text-muted-foreground shrink-0" />
+										<span className="truncate">
+											{selectedGroupId === 'all'
+												? 'Todos los grupos'
+												: availableGroups.find(g => g.id === selectedGroupId)?.name || 'Grupo seleccionado'}
+										</span>
+									</div>
+									<ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
 								</Button>
 							</PopoverTrigger>
-							<PopoverContent className="w-80 p-4" align="end">
-								<div className="space-y-4">
-									<div className="flex flex-col gap-1">
-										<h4 className="font-medium text-sm">Rango de fechas</h4>
-										<p className="text-xs text-muted-foreground">Muestras creadas entre estas fechas.</p>
-									</div>
-									<div className="grid grid-cols-2 gap-2">
-										<div className="space-y-1">
-											<Label htmlFor="date-from" className="text-xs">Desde</Label>
-											<Input
-												id="date-from"
-												type="date"
-												value={dateRange.from}
-												onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
-												className="h-9 text-sm"
-											/>
-										</div>
-										<div className="space-y-1">
-											<Label htmlFor="date-to" className="text-xs">Hasta</Label>
-											<Input
-												id="date-to"
-												type="date"
-												value={dateRange.to}
-												onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
-												className="h-9 text-sm"
-											/>
-										</div>
-									</div>
-									<div className="grid grid-cols-2 gap-1.5 pt-2 border-t text-xs">
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											className="h-7 text-xs font-normal"
-											onClick={() => {
-												const today = new Date();
-												const from = format(today, 'yyyy-MM-dd');
-												const to = format(today, 'yyyy-MM-dd');
-												setDateRange({ from, to });
-											}}
-										>
-											Hoy
-										</Button>
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											className="h-7 text-xs font-normal"
-											onClick={() => {
-												const today = new Date();
-												const from = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-												const to = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-												setDateRange({ from, to });
-											}}
-										>
-											Esta semana
-										</Button>
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											className="h-7 text-xs font-normal"
-											onClick={() => {
-												const today = new Date();
-												const from = format(add(today, { days: -7 }), 'yyyy-MM-dd');
-												const to = format(today, 'yyyy-MM-dd');
-												setDateRange({ from, to });
-											}}
-										>
-											Últimos 7 días
-										</Button>
-										<Button
-											type="button"
-											variant="outline"
-											size="sm"
-											className="h-7 text-xs font-normal"
-											onClick={() => {
-												const today = new Date();
-												const from = format(add(today, { days: -30 }), 'yyyy-MM-dd');
-												const to = format(today, 'yyyy-MM-dd');
-												setDateRange({ from, to });
-											}}
-										>
-											Últimos 30 días
-										</Button>
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											className="col-span-2 h-7 text-xs font-normal text-muted-foreground hover:text-foreground"
-											onClick={() => {
-												setDateRange({ from: '', to: '' });
-											}}
-										>
-											Limpiar filtros de fecha
-										</Button>
-									</div>
-								</div>
+							<PopoverContent className="w-[200px] p-0" align="end">
+								<Command>
+									<CommandInput placeholder="Buscar grupo..." />
+									<CommandList>
+										<CommandEmpty>No se encontraron grupos.</CommandEmpty>
+										<CommandGroup>
+											<CommandItem
+												value="todos"
+												onSelect={() => {
+													setSelectedGroupId('all');
+													setIsGroupFilterOpen(false);
+												}}
+											>
+												<Check
+													className={cn(
+														"mr-2 h-4 w-4",
+														selectedGroupId === 'all' ? "opacity-100" : "opacity-0"
+													)}
+												/>
+												Todos los grupos
+											</CommandItem>
+											{availableGroups.map((group) => (
+												<CommandItem
+													key={group.id}
+													value={group.name}
+													onSelect={() => {
+														setSelectedGroupId(group.id);
+														setIsGroupFilterOpen(false);
+													}}
+												>
+													<Check
+														className={cn(
+															"mr-2 h-4 w-4",
+															selectedGroupId === group.id ? "opacity-100" : "opacity-0"
+														)}
+													/>
+													{group.name}
+												</CommandItem>
+											))}
+										</CommandGroup>
+									</CommandList>
+								</Command>
 							</PopoverContent>
 						</Popover>
 
-						<Button onClick={handleCreate} className="h-10 px-5 text-sm w-full md:w-auto">
-							<Plus className="mr-2 h-4 w-4" /> Nueva Muestra
-						</Button>
+						{/* Filtro de Rango de Fechas */}
+						<DateRangePicker
+							value={dateRange}
+							onChange={setDateRange}
+						/>
+
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button className="h-10 px-5 text-sm w-full md:w-auto gap-2">
+									<Plus className="h-4 w-4" />
+									<span>Nueva Muestra</span>
+									<ChevronDown className="h-4 w-4 opacity-50" />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" className="w-56">
+								<DropdownMenuItem onClick={handleCreate} className="group cursor-pointer">
+									<Microscope className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-white group-focus:text-white transition-colors" />
+									<span>Muestra Individual</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => setIsGroupSheetOpen(true)} className="group cursor-pointer">
+									<Layers className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-white group-focus:text-white transition-colors" />
+									<span>Grupo de Muestras</span>
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
 				</div>
 
-				<div className='flex gap-2 items-center'>
+				<div className='flex flex-col sm:flex-row sm:items-center gap-2 w-full'>
 
 					{/* Seleccionar control */}
-					<div className="flex items-center gap-2 border rounded-md px-3 h-10 bg-card hover:bg-accent/50 transition-colors cursor-pointer select-none" onClick={() => {
+					<div className="flex items-center justify-between sm:justify-start gap-2 border rounded-md px-3 h-10 bg-card hover:bg-accent/50 transition-colors cursor-pointer select-none w-full sm:w-auto shrink-0" onClick={() => {
 						setIsSelectionMode(prev => {
 							const next = !prev;
 							if (!next) setSelectedIds([]);
@@ -811,10 +831,12 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 						/>
 					</div>
 					{isSelectionMode && (
-						<div className="flex flex-col w-full sm:flex-row sm:items-center justify-between gap-2 select-none bg-gray-50 border border-gray-100 rounded-lg pl-3 pr-1 py-1">
-							<div className="text-sm text-muted-foreground flex items-center gap-2">
+						<div className="flex flex-col w-full sm:flex-row sm:items-center justify-between gap-2 select-none bg-gray-50 dark:bg-muted/10 border border-gray-100 dark:border-border/60 rounded-lg p-2 sm:p-0 sm:pl-3 sm:pr-1 sm:py-1 px-3 w-full">
+							<div className="text-xs sm:text-sm text-muted-foreground flex flex-wrap sm:flex-nowrap items-center gap-2">
 								<span>
-									<span className="font-semibold text-primary">{selectedIds.length}</span> {selectedIds.length === 1 ? 'muestra seleccionada' : 'muestras seleccionadas'}
+									<span className="font-semibold text-primary">{selectedIds.length}</span>{' '}
+									<span className="sm:hidden">{selectedIds.length === 1 ? 'seleccionada' : 'seleccionadas'}</span>
+									<span className="hidden sm:inline">{selectedIds.length === 1 ? 'muestra seleccionada' : 'muestras seleccionadas'}</span>
 								</span>
 								{visibleSpecimenIds.length > 0 && (
 									<>
@@ -823,19 +845,20 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 											type="button"
 											variant="link"
 											onClick={handleSelectAllVisible}
-											className="h-auto p-0 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+											className="h-auto p-0 text-xs sm:text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
 										>
-											{isAllVisibleSelected ? 'Deseleccionar todas' : 'Seleccionar todas'}
+											<span className="sm:hidden">{isAllVisibleSelected ? 'Deseleccionar' : 'Seleccionar todas'}</span>
+											<span className="hidden sm:inline">{isAllVisibleSelected ? 'Deseleccionar todas' : 'Seleccionar todas'}</span>
 										</Button>
 									</>
 								)}
 							</div>
-							<div className="flex items-center gap-2">
+							<div className="flex items-center gap-2 shrink-0">
 								<DropdownMenu>
 									<DropdownMenuTrigger asChild>
 										<Button
 											disabled={selectedIds.length === 0}
-											className="h-8 px-4 text-xs flex items-center gap-2"
+											className="h-8 px-3 sm:px-4 text-xs flex items-center gap-2 w-full sm:w-auto"
 										>
 											<Layers className="h-4 w-4" /> Acciones en Bulk <ChevronDown className="h-4 w-4" />
 										</Button>
@@ -918,7 +941,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 					onMouseLeave={handleMouseLeave}
 				>
 					{/* Left Scroll Button */}
-					{canScrollLeft && isNearLeft && (
+					{!isMobile && canScrollLeft && isNearLeft && (
 						<button
 							type="button"
 							onClick={scrollLeftFn}
@@ -933,7 +956,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 					)}
 
 					{/* Right Scroll Button */}
-					{canScrollRight && isNearRight && (
+					{!isMobile && canScrollRight && isNearRight && (
 						<button
 							type="button"
 							onClick={scrollRightFn}
@@ -995,8 +1018,13 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 																				handleView(specimen);
 																			}
 																		}}
-																		className={`bg-card rounded-md shadow-sm border p-3 flex flex-col gap-2 cursor-pointer hover:border-primary/50 transition-all duration-200 ${snapshot.isDragging ? 'shadow-xl ring-2 ring-primary/20 scale-[1.02] rotate-2 z-50 opacity-90' : ''
-																			} ${selectedIds.includes(specimen.id) ? 'border-primary bg-primary/[0.02] ring-1 ring-primary/30' : ''}`}
+																		className={`rounded-md shadow-sm border p-3 flex flex-col gap-2 cursor-pointer hover:border-primary/50 transition-all duration-200 ${snapshot.isDragging ? 'shadow-xl ring-2 ring-primary/20 scale-[1.02] rotate-2 z-50 opacity-90' : ''
+																			} ${selectedIds.includes(specimen.id)
+																				? 'border-primary bg-primary/[0.02] ring-1 ring-primary/30'
+																				: (specimen.users && specimen.users.length > 0)
+																					? 'border-sky-300/80 dark:border-sky-850 bg-sky-50/50 dark:bg-sky-950/20'
+																					: 'bg-card'
+																			}`}
 																	>
 																		<div className="flex gap-3 items-start">
 																			{isSelectionMode && (
@@ -1010,6 +1038,13 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 																			<div className="flex-1 min-w-0 flex flex-col gap-2">
 																				<div className="flex items-start justify-between">
 																					<div>
+																						{specimen.group?.name && (
+																							<div className="mb-1">
+																								<Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-300 dark:bg-purple-500/20 border-none hover:bg-purple-500/10">
+																									{specimen.group.name}
+																								</Badge>
+																							</div>
+																						)}
 																						<div className="font-medium text-sm">
 																							{specimen.customer_relation?.name}
 																						</div>
@@ -1023,11 +1058,17 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 																						<Button
 																							variant="ghost"
 																							size="icon"
-																							className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+																							className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted relative"
 																							onClick={() => handleAssignClick(specimen)}
 																							title="Asignar Patólogo"
 																						>
 																							<UserPlus className="w-4 h-4" />
+																							<span className={`absolute bottom-0 right-0 flex h-3 w-3 items-center justify-center rounded-full text-[7px] font-extrabold ring-1 ring-background ${(specimen.users?.length || 0) > 0
+																								? 'bg-sky-500 text-white'
+																								: 'bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+																								}`}>
+																								{specimen.users?.length || 0}
+																							</span>
 																						</Button>
 																						<DropdownMenu>
 																							<DropdownMenuTrigger asChild>
@@ -1139,6 +1180,24 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 				sequences={sequences}
 				activeLocationId={activeLocationId}
 				products={products}
+				banks={banks}
+			/>
+
+			<SpecimenGroupSheet
+				open={isGroupSheetOpen}
+				onOpenChange={setIsGroupSheetOpen}
+				customers={customers}
+				specimenTypes={specimenTypes}
+				examinations={examinations}
+				categories={categories}
+				referrers={referrers}
+				referrerTypes={referrerTypes}
+				priorities={initialPriorities}
+				locations={locations}
+				sequences={sequences}
+				activeLocationId={activeLocationId}
+				products={products}
+				banks={banks}
 			/>
 
 			<SpecimenViewSheet
@@ -1147,6 +1206,18 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 				onOpenChange={setIsViewSheetOpen}
 				onEditClick={handleEditFromView}
 				preventCloseOnOutsideClick={showInvoiceModal}
+				onEditInvoiceClick={(invoice) => {
+					setSelectedInvoice(invoice);
+					setIsInvoiceSheetOpen(true);
+				}}
+			/>
+
+			<InvoiceSheet
+				invoice={selectedInvoice}
+				open={isInvoiceSheetOpen}
+				onOpenChange={setIsInvoiceSheetOpen}
+				customers={customers}
+				banks={banks}
 			/>
 
 			<SpecimenPathologistSheet

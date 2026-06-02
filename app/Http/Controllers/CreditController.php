@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Spatie\Browsershot\Browsershot;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class CreditController extends Controller
 {
@@ -24,30 +26,37 @@ class CreditController extends Controller
             'invoices.specimen.category',
             'invoices.specimen.referrerRelation',
             'invoices.specimen.priority',
-            'invoices.caiRange'
+            'invoices.caiRange',
+            'specimen',
+            'group.invoice',
+            'group.specimens.customerRelation',
+            'group.specimens.type',
+            'group.specimens.examination',
+            'group.specimens.category',
+            'group.specimens.referrerRelation',
+            'group.specimens.priority'
         ]);
 
-        // Filter by search query (Customer name, Customer ID/RTN, or Credit ID)
-        if ($request->has('search')) {
+        // Filter by search query (Customer name, Customer ID/RTN, sequence code, or Credit ID)
+        if ($request->filled('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
+                $q->whereHas('customer', function ($cq) use ($search) {
+                    $cq->where('name', 'like', "%{$search}%")
+                       ->orWhere('id_number', 'like', "%{$search}%");
+                })
+                ->orWhereHas('invoices.specimen', function ($sq) use ($search) {
+                    $sq->where('sequence_code', 'like', "%{$search}%");
+                });
+
                 if (is_numeric($search)) {
-                    $q->where('id', $search)
-                      ->orWhereHas('customer', function ($cq) use ($search) {
-                          $cq->where('name', 'like', "%{$search}%")
-                             ->orWhere('id_number', 'like', "%{$search}%");
-                      });
-                } else {
-                    $q->whereHas('customer', function ($cq) use ($search) {
-                        $cq->where('name', 'like', "%{$search}%")
-                           ->orWhere('id_number', 'like', "%{$search}%");
-                    });
+                    $q->orWhere('id', $search);
                 }
             });
         }
 
         // Filter by credit status
-        if ($request->has('status') && $request->get('status') !== 'all') {
+        if ($request->filled('status') && $request->get('status') !== 'all') {
             $status = $request->get('status');
             if ($status === 'paid') {
                 $query->where('amount_remaining', 0);
@@ -59,12 +68,240 @@ class CreditController extends Controller
             }
         }
 
+        // Filter by customer
+        if ($request->filled('customer_id') && $request->get('customer_id') !== 'all') {
+            $query->where('customer_id', $request->get('customer_id'));
+        }
+
+        // Filter by specimen type
+        if ($request->filled('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
+            $query->whereHas('invoices.specimen', function ($sq) use ($request) {
+                $sq->where('specimen_type', $request->get('specimen_type_id'));
+            });
+        }
+
+        // Filter by date range
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->get('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->get('date_to'));
+        }
+
+        // Filter by pending balance (saldo pendiente greater than zero)
+        if ($request->filled('has_pending_balance') && $request->get('has_pending_balance') === 'yes') {
+            $query->where('amount_remaining', '>', 0);
+        }
+
+        // Filter by specimen group
+        if ($request->filled('group_id') && $request->get('group_id') !== 'all') {
+            $query->where('group_id', $request->get('group_id'));
+        }
+
         $credits = $query->latest()->paginate(10)->withQueryString();
+
+        $customers = \App\Models\Customer::where('active', true)->orderBy('name', 'asc')->get();
+        $specimenTypes = \App\Models\SpecimenType::where('active', true)->orderBy('name', 'asc')->get();
 
         return Inertia::render('credits/index', [
             'credits' => $credits,
-            'filters' => $request->only(['search', 'status']),
+            'filters' => $request->only(['search', 'status', 'customer_id', 'specimen_type_id', 'date_from', 'date_to', 'has_pending_balance', 'group_id']),
+            'customers' => $customers,
+            'specimenTypes' => $specimenTypes,
+            'groups' => \App\Models\SpecimenGroup::orderBy('name', 'asc')->get(),
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $query = Credit::with([
+            'customer',
+            'invoices.specimen.type',
+            'invoices.specimen.examination',
+            'invoices.specimen.category',
+            'invoices.specimen.referrerRelation',
+            'invoices.specimen.priority',
+            'invoices.caiRange',
+            'specimen',
+            'group.invoice',
+            'group.specimens.customerRelation',
+            'group.specimens.type',
+            'group.specimens.examination',
+            'group.specimens.category',
+            'group.specimens.referrerRelation',
+            'group.specimens.priority'
+        ]);
+
+        // Filter by search query (Customer name, Customer ID/RTN, sequence code, or Credit ID)
+        if ($request->filled('search')) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('customer', function ($cq) use ($search) {
+                    $cq->where('name', 'like', "%{$search}%")
+                       ->orWhere('id_number', 'like', "%{$search}%");
+                })
+                ->orWhereHas('invoices.specimen', function ($sq) use ($search) {
+                    $sq->where('sequence_code', 'like', "%{$search}%");
+                });
+
+                if (is_numeric($search)) {
+                    $q->orWhere('id', $search);
+                }
+            });
+        }
+
+        // Filter by credit status
+        if ($request->filled('status') && $request->get('status') !== 'all') {
+            $status = $request->get('status');
+            if ($status === 'paid') {
+                $query->where('amount_remaining', 0);
+            } elseif ($status === 'partial') {
+                $query->where('amount_remaining', '>', 0)
+                      ->where('amount_paid', '>', 0);
+            } elseif ($status === 'pending') {
+                $query->where('amount_paid', 0);
+            }
+        }
+
+        // Filter by customer
+        if ($request->filled('customer_id') && $request->get('customer_id') !== 'all') {
+            $query->where('customer_id', $request->get('customer_id'));
+        }
+
+        // Filter by specimen type
+        if ($request->filled('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
+            $query->whereHas('invoices.specimen', function ($sq) use ($request) {
+                $sq->where('specimen_type', $request->get('specimen_type_id'));
+            });
+        }
+
+        // Filter by date range
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->get('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->get('date_to'));
+        }
+
+        // Filter by pending balance (saldo pendiente greater than zero)
+        if ($request->filled('has_pending_balance') && $request->get('has_pending_balance') === 'yes') {
+            $query->where('amount_remaining', '>', 0);
+        }
+
+        $credits = $query->latest()->get();
+
+        $format = $request->get('format', 'csv');
+
+        if ($format === 'xlsx') {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            
+            $headers = [
+                'ID Crédito', 'Cliente', 'RTN/Identidad', 'Muestra', 
+                'Monto Crédito', 'Monto Pagado', 'Saldo Pendiente', 
+                'Fecha Creación', 'Estado'
+            ];
+            
+            foreach ($headers as $colIndex => $headerText) {
+                $sheet->setCellValue([$colIndex + 1, 1], $headerText);
+            }
+            
+            $row = 2;
+            foreach ($credits as $credit) {
+                $originalInvoice = $credit->invoices?->first(function($inv) {
+                    return $inv->payment_type === 'credit';
+                });
+                $specimenCode = $originalInvoice?->specimen?->sequence_code ?? 'N/A';
+                
+                $remaining = (float)$credit->amount_remaining;
+                $paid = (float)$credit->amount_paid;
+                $statusText = 'Pendiente';
+                if ($remaining == 0) {
+                    $statusText = 'Pagado';
+                } elseif ($paid > 0) {
+                    $statusText = 'Pago Parcial';
+                }
+
+                $data = [
+                    '#' . $credit->id,
+                    $credit->customer?->name ?? 'N/A',
+                    $credit->customer?->id_number ?? 'N/A',
+                    $specimenCode,
+                    (float)$credit->credit_amount,
+                    $paid,
+                    $remaining,
+                    $credit->created_at->format('d/m/Y h:i A'),
+                    $statusText
+                ];
+                
+                foreach ($data as $colIndex => $val) {
+                    $sheet->setCellValue([$colIndex + 1, $row], $val);
+                }
+                $row++;
+            }
+            
+            foreach (range(1, count($headers)) as $colIndex) {
+                $sheet->getColumnDimensionByColumn($colIndex)->setAutoSize(true);
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            
+            return response()->streamDownload(function() use ($writer) {
+                $writer->save('php://output');
+            }, 'creditos_patolab.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Cache-Control' => 'max-age=0',
+            ]);
+        }
+
+        // CSV format
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="creditos_patolab.csv"',
+        ];
+
+        $callback = function () use ($credits) {
+            $file = fopen('php://output', 'w');
+            // UTF-8 BOM for Excel
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            fputcsv($file, [
+                'ID Crédito', 'Cliente', 'RTN/Identidad', 'Muestra', 
+                'Monto Crédito', 'Monto Pagado', 'Saldo Pendiente', 
+                'Fecha Creación', 'Estado'
+            ]);
+
+            foreach ($credits as $credit) {
+                $originalInvoice = $credit->invoices?->first(function($inv) {
+                    return $inv->payment_type === 'credit';
+                });
+                $specimenCode = $originalInvoice?->specimen?->sequence_code ?? 'N/A';
+                
+                $remaining = (float)$credit->amount_remaining;
+                $paid = (float)$credit->amount_paid;
+                $statusText = 'Pendiente';
+                if ($remaining == 0) {
+                    $statusText = 'Pagado';
+                } elseif ($paid > 0) {
+                    $statusText = 'Pago Parcial';
+                }
+
+                fputcsv($file, [
+                    '#' . $credit->id,
+                    $credit->customer?->name ?? 'N/A',
+                    $credit->customer?->id_number ?? 'N/A',
+                    $specimenCode,
+                    number_format((float)$credit->credit_amount, 2, '.', ''),
+                    number_format($paid, 2, '.', ''),
+                    number_format($remaining, 2, '.', ''),
+                    $credit->created_at->format('d/m/Y h:i A'),
+                    $statusText
+                ]);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     public function pay(Request $request, Credit $credit)

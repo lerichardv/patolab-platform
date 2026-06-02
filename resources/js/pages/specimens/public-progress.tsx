@@ -28,8 +28,8 @@ interface Props {
 const STATUS_STEPS = [
 	{ key: 'received', label: 'Recibida', desc: 'Muestra ingresada en el sistema.' },
 	{ key: 'macroscopic_review', label: 'Rev. Macroscópica', desc: 'Análisis físico y macroscópico de la muestra.' },
-	{ key: 'processing', label: 'En Proceso', desc: 'Procesamiento en laboratorio.' },
-	{ key: 'microscopic_review', label: 'Rev. Microscópica', desc: 'Análisis microscópico y patológico.' },
+	{ key: 'processing', label: 'En procesamiento', desc: 'Procesamiento en laboratorio.' },
+	{ key: 'microscopic_review', label: 'Rev. Microscópica', desc: 'Análisis microscópico por patólogo.' },
 	{ key: 'finalized', label: 'Finalizada', desc: 'Diagnóstico concluido y reporte firmado.' },
 	{ key: 'delivered', label: 'Entregada', desc: 'El reporte físico o digital fue entregado al paciente.' }
 ];
@@ -136,7 +136,7 @@ export default function PublicProgress({ specimen }: Props) {
 									>
 										{specimen.status === 'received' ? 'Recibida' :
 											specimen.status === 'macroscopic_review' ? 'Rev. Macroscópica' :
-												specimen.status === 'processing' ? 'En Proceso' :
+												specimen.status === 'processing' ? 'En procesamiento' :
 													specimen.status === 'microscopic_review' ? 'Rev. Microscópica' :
 														specimen.status === 'finalized' ? 'Finalizada' :
 															specimen.status === 'delivered' ? 'Entregada' : specimen.status}

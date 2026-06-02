@@ -271,12 +271,12 @@ delete newFilters[key as keyof typeof filters];
                                                         <div className="flex flex-col">
                                                             <span className={`font-mono text-xs font-semibold ${
                                                                 isPercentageWarning && !isExhaustedOrExpired && remaining > 0
-                                                                    ? 'text-destructive' 
+                                                                    ? 'text-orange-500' 
                                                                     : ''
                                                             }`}>{padDocNumber(caiRange.last_used_number)}</span>
                                                             <span className={`text-[10px] ${
                                                                 isPercentageWarning && !isExhaustedOrExpired && remaining > 0
-                                                                    ? 'text-destructive font-semibold' 
+                                                                    ? 'text-orange-500 font-semibold' 
                                                                     : 'text-muted-foreground'
                                                             }`}>
                                                                 {remaining} disponibles
@@ -287,11 +287,11 @@ delete newFilters[key as keyof typeof filters];
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col">
-                                                    <span className={`text-sm font-semibold ${isWarning && !isExhaustedOrExpired ? 'text-destructive' : ''}`}>
+                                                    <span className={`text-sm font-semibold ${isWarning && !isExhaustedOrExpired ? 'text-orange-500' : ''}`}>
                                                         {formattedDate}
                                                     </span>
                                                     {!isExhaustedOrExpired && (
-                                                        <span className={`text-[10px] ${isWarning ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                                                        <span className={`text-[10px] ${isWarning ? 'text-orange-500 font-semibold' : 'text-muted-foreground'}`}>
                                                             {daysRemaining < 0 
                                                                 ? 'Vencido' 
                                                                 : `${daysRemaining} días restantes`}

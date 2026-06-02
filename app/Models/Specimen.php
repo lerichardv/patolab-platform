@@ -44,10 +44,13 @@ class Specimen extends Model
 		'priority_id',
         'active',
         'access_token',
+        'is_group',
+        'group_id',
     ];
 
     protected $casts = [
         'active' => 'boolean',
+        'is_group' => 'boolean',
     ];
 
     protected $appends = [
@@ -129,5 +132,10 @@ class Specimen extends Model
     public function invoiceRelation(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(Invoice::class, 'specimen_id');
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(SpecimenGroup::class, 'group_id');
     }
 }

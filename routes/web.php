@@ -83,8 +83,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimens/{specimen}/assign-user', [\App\Http\Controllers\SpecimenController::class, 'assignUser'])->name('specimens.assign-user');
     Route::post('specimens/{specimen}/unassign-user', [\App\Http\Controllers\SpecimenController::class, 'unassignUser'])->name('specimens.unassign-user');
     Route::get('my-assignments', [\App\Http\Controllers\MyAssignmentController::class, 'index'])->name('my-assignments.index');
+    Route::post('specimen-groups', [\App\Http\Controllers\SpecimenGroupController::class, 'store'])->name('specimen-groups.store');
     Route::resource('specimens', \App\Http\Controllers\SpecimenController::class);
-    Route::resource('invoices', \App\Http\Controllers\InvoiceController::class)->only(['index']);
+    Route::get('invoices/export', [\App\Http\Controllers\InvoiceController::class, 'export'])->name('invoices.export');
+    Route::resource('invoices', \App\Http\Controllers\InvoiceController::class)->only(['index', 'update']);
+    Route::get('credits/export', [\App\Http\Controllers\CreditController::class, 'export'])->name('credits.export');
     Route::resource('credits', \App\Http\Controllers\CreditController::class)->only(['index']);
     Route::post('credits/{credit}/pay', [\App\Http\Controllers\CreditController::class, 'pay'])->name('credits.pay');
     Route::resource('specimen-categories', \App\Http\Controllers\SpecimenCategoryController::class);

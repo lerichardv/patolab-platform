@@ -37,6 +37,19 @@ class Invoice extends Model
         'total_paid',
         'age_discount_type',
         'age_discount_amount',
+        'payment_method_date',
+        'cash_value',
+        'check_number',
+        'check_value',
+        'card_last_4',
+        'card_value_charged',
+        'card_expiration',
+        'card_authorization_code',
+        'transfer_bank_id',
+        'transfer_value',
+        'transfer_authorization_code',
+        'is_group',
+        'group_id',
     ];
 
     protected $casts = [
@@ -53,6 +66,12 @@ class Invoice extends Model
         'custom_amount' => 'decimal:2',
         'total_paid' => 'decimal:2',
         'age_discount_amount' => 'decimal:2',
+        'payment_method_date' => 'date',
+        'cash_value' => 'decimal:2',
+        'check_value' => 'decimal:2',
+        'card_value_charged' => 'decimal:2',
+        'transfer_value' => 'decimal:2',
+        'is_group' => 'boolean',
     ];
 
     public function caiRange(): BelongsTo
@@ -73,5 +92,20 @@ class Invoice extends Model
     public function creditRelation(): BelongsTo
     {
         return $this->belongsTo(Credit::class, 'credit_payment_id');
+    }
+
+    public function transferBank(): BelongsTo
+    {
+        return $this->belongsTo(Bank::class, 'transfer_bank_id');
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(SpecimenGroup::class, 'group_id');
+    }
+
+    public function specimenGroup(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(SpecimenGroup::class, 'invoice_id');
     }
 }
