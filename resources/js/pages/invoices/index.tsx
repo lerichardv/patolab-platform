@@ -654,7 +654,7 @@ export default function InvoicesIndex({ invoices, filters, customers, specimenTy
 							{invoices.data.length > 0 ? (
 								invoices.data.map((invoice) => (
 									<TableRow key={invoice.id} className="group">
-										<TableCell className={`min-w-[150px] md:sticky md:left-0 z-10 bg-card group-hover:bg-muted/50 transition-colors border-r border-border w-[150px] after:hidden md:after:absolute after:right-[-8px] after:top-0 after:bottom-0 after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent dark:after:from-black/[0.2] pointer-events-none after:transition-opacity after:duration-200 ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}>
+										<TableCell className={`min-w-[150px] md:sticky md:left-0 z-10 bg-card group-hover:bg-muted transition-colors border-r border-border w-[150px] after:hidden md:after:absolute after:right-[-8px] after:top-0 after:bottom-0 after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent dark:after:from-black/[0.2] pointer-events-none after:transition-opacity after:duration-200 ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}>
 											<div className="flex flex-col gap-0.5">
 												<span className="font-mono text-sm font-semibold text-foreground">{invoice.full_invoice_number}</span>
 												<div className="flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -793,10 +793,10 @@ export default function InvoicesIndex({ invoices, filters, customers, specimenTy
 										<TableCell className="text-right font-bold text-primary min-w-[120px] pr-6">
 											L. {parseFloat(String(invoice.total)).toFixed(2)}
 										</TableCell>
-										<TableCell className={`text-right font-bold text-emerald-600 dark:text-emerald-400 md:sticky md:right-[80px] z-10 bg-card group-hover:bg-muted/50 transition-colors border-l border-border min-w-[100px] w-[100px] before:hidden md:before:absolute before:left-[-8px] before:top-0 before:bottom-0 before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] dark:before:to-black/[0.2] pointer-events-none before:transition-opacity before:duration-200 ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}>
+										<TableCell className={`text-right font-bold text-emerald-600 dark:text-emerald-400 md:sticky md:right-[80px] z-10 bg-card group-hover:bg-muted transition-colors border-l border-border min-w-[100px] w-[100px] before:hidden md:before:absolute before:left-[-8px] before:top-0 before:bottom-0 before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] dark:before:to-black/[0.2] pointer-events-none before:transition-opacity before:duration-200 ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}>
 											L. {parseFloat(String(invoice.total_paid || 0)).toFixed(2)}
 										</TableCell>
-										<TableCell className="text-right md:sticky md:right-0 z-10 bg-card group-hover:bg-muted/50 transition-colors min-w-[80px] w-[80px]">
+										<TableCell className="text-right md:sticky md:right-0 z-10 bg-card group-hover:bg-muted transition-colors min-w-[80px] w-[80px]">
 											<div className="flex justify-end gap-2">
 												<Button
 													variant="ghost"

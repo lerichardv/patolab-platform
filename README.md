@@ -149,19 +149,27 @@ When deploying the project to a production server or container environment:
    php artisan view:cache
    ```
 
-5. **Run Production Migrations**:
+5. **Directory Permissions**:
+   Always ensure the storage and cache directories have the correct permissions and ownership (e.g. for `www-data` web server user):
+   ```bash
+   chmod -R 775 storage
+   chmod -R 775 bootstrap/cache
+   chown -R www-data:www-data storage bootstrap/cache
+   ```
+
+6. **Run Production Migrations**:
    Run database updates safely:
    ```bash
    php artisan migrate --force
    ```
 
-6. **Queue Worker & Scheduler**:
+7. **Queue Worker & Scheduler**:
    Ensure a worker daemon is running if queue jobs are used, and schedule Laravel's cron task:
    ```bash
    php artisan queue:work --daemon
    ```
 
-7. **Chromium Path (for PDF Invoices)**:
+8. **Chromium Path (for PDF Invoices)**:
    Make sure Chromium is installed on the server. Configure the executable path in `.env` if necessary:
    ```env
    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium

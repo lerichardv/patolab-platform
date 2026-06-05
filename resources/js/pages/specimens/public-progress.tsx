@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { format, add, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -14,11 +14,13 @@ import {
 	ShieldAlert,
 	MapPin,
 	Activity,
-	FileText
+	FileText,
+	ArrowLeft
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import GuestLayout from '@/layouts/guest-layout';
 
 interface Props {
@@ -89,6 +91,21 @@ export default function PublicProgress({ specimen }: Props) {
 		<GuestLayout showLogo={true} title={specimen.sequence_code}>
 			<Head title={`Progreso Muestra ${specimen.sequence_code || ''}`} />
 			<div className="max-w-4xl w-full space-y-6">
+				{specimen.group && (
+					<div className="flex justify-start mb-2">
+						<Button
+							asChild
+							variant="ghost"
+							size="sm"
+							className="gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all group"
+						>
+							<Link href={`/specimen-group/${specimen.group.id}?token=${specimen.group.access_token}`}>
+								<ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" />
+								Ver grupo completo
+							</Link>
+						</Button>
+					</div>
+				)}
 				{/* Status Hero Card */}
 				<Card className="overflow-hidden border-border/50 shadow-xl bg-card/60 backdrop-blur-md">
 					<div
@@ -97,12 +114,12 @@ export default function PublicProgress({ specimen }: Props) {
 							backgroundImage: isCancelled
 								? 'linear-gradient(to right, #ef4444, #f43f5e)'
 								: specimen.status === 'received' ? 'linear-gradient(to right, #3b82f6, #6366f1)'
-								: specimen.status === 'macroscopic_review' ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
-								: specimen.status === 'processing' ? 'linear-gradient(to right, #f59e0b, #eab308)'
-								: specimen.status === 'microscopic_review' ? 'linear-gradient(to right, #d946ef, #ec4899)'
-								: specimen.status === 'finalized' ? 'linear-gradient(to right, #10b981, #14b8a6)'
-								: specimen.status === 'delivered' ? 'linear-gradient(to right, #64748b, #94a3b8)'
-								: 'linear-gradient(to right, #cbd5e1, #e2e8f0)'
+									: specimen.status === 'macroscopic_review' ? 'linear-gradient(to right, #8b5cf6, #a855f7)'
+										: specimen.status === 'processing' ? 'linear-gradient(to right, #f59e0b, #eab308)'
+											: specimen.status === 'microscopic_review' ? 'linear-gradient(to right, #d946ef, #ec4899)'
+												: specimen.status === 'finalized' ? 'linear-gradient(to right, #10b981, #14b8a6)'
+													: specimen.status === 'delivered' ? 'linear-gradient(to right, #64748b, #94a3b8)'
+														: 'linear-gradient(to right, #cbd5e1, #e2e8f0)'
 						}}
 					/>
 					<CardHeader className="pb-4">
@@ -166,10 +183,10 @@ export default function PublicProgress({ specimen }: Props) {
 
 							{formattedEstimatedDate && !isCompleted && (
 								<div className={`space-y-1 col-span-1 sm:col-span-2 p-2 rounded-lg border ${isOverdue
-										? 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-300'
-										: isEstimatedToday
-											? 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'
-											: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+									? 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-300'
+									: isEstimatedToday
+										? 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'
+										: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300'
 									}`}>
 									<span className="text-[10px] uppercase font-bold tracking-wider flex items-center gap-1">
 										<Clock className="w-3 h-3" />
@@ -206,10 +223,10 @@ export default function PublicProgress({ specimen }: Props) {
 											<div key={step.key} className="relative group">
 												{/* Step Node Icon/Indicator */}
 												<div className={`absolute -left-[27px] md:-left-[31px] top-1 w-6 h-6 rounded-full flex items-center justify-center z-10 transition-all duration-300 border ${isPastStep
-														? 'bg-emerald-500 border-emerald-600 text-white shadow-md'
-														: isCurrentStep
-															? 'bg-blue-600 border-blue-700 text-white ring-4 ring-blue-500/20 shadow-md scale-110'
-															: 'bg-background border-border text-muted-foreground'
+													? 'bg-emerald-500 border-emerald-600 text-white shadow-md'
+													: isCurrentStep
+														? 'bg-blue-600 border-blue-700 text-white ring-4 ring-blue-500/20 shadow-md scale-110'
+														: 'bg-background border-border text-muted-foreground'
 													}`}>
 													{isPastStep ? (
 														<CheckCircle2 className="w-4 h-4 stroke-[3]" />

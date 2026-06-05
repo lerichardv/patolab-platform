@@ -143,7 +143,21 @@ class InvoiceController extends Controller
 
         $activeCai = \App\Models\CaiRange::where('status', 'active')->first();
         $activeLocationId = $activeCai ? $activeCai->location_id : null;
-        $sequences = \App\Models\Sequence::where('active', true)->get();
+        $sequences = \App\Models\Sequence::where('active', true)->get()->map(function ($sequence) {
+            $tempSequence = clone $sequence;
+            do {
+                $paddedSeq = str_pad($tempSequence->current_sequence, $tempSequence->fill ?? 4, '0', STR_PAD_LEFT);
+                $paddedMonth = str_pad($tempSequence->month, 2, '0', STR_PAD_LEFT);
+                $sequenceCode = $tempSequence->prefix.$tempSequence->separator.$paddedSeq.$tempSequence->separator.$paddedMonth.$tempSequence->separator.$tempSequence->year;
+
+                $exists = \App\Models\Specimen::where('sequence_code', $sequenceCode)->exists();
+                if ($exists) {
+                    $tempSequence->current_sequence++;
+                }
+            } while ($exists);
+            $sequence->current_sequence = $tempSequence->current_sequence;
+            return $sequence;
+        });
 
         $products = \App\Models\Product::where('active', true)
             ->whereHas('inventory', function($q) {

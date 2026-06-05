@@ -40,6 +40,8 @@ createInertiaApp({
         switch (true) {
             case name === 'welcome':
             case name === 'specimens/public-progress':
+            case name === 'specimens/public-group-progress':
+            case name === 'specimens/report-editor':
             case name.startsWith('errors/'):
                 return null;
             case name.startsWith('auth/'):

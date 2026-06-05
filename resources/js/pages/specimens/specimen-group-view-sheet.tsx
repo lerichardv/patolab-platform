@@ -3,7 +3,8 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import HeadingSheet from '@/components/heading-sheet';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Microscope, CreditCard, ExternalLink, Download, FileText, FileImage } from 'lucide-react';
+import { Microscope, CreditCard, ExternalLink, Download, FileText, FileImage, Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Props {
 	group: any | null;
@@ -17,6 +18,25 @@ export default function SpecimenGroupViewSheet({
 	onOpenChange
 }: Props) {
 	if (!group) return null;
+
+	const [copied, setCopied] = React.useState(false);
+	const [copiedSpecimenId, setCopiedSpecimenId] = React.useState<number | null>(null);
+
+	const copyPublicLink = () => {
+		if (!group.access_token) return;
+		const url = `${window.location.origin}/specimen-group/${group.id}?token=${group.access_token}`;
+		navigator.clipboard.writeText(url);
+		setCopied(true);
+		setTimeout(() => setCopied(false), 2000);
+	};
+
+	const copySpecimenPublicLink = (specimen: any) => {
+		if (!specimen.access_token) return;
+		const url = `${window.location.origin}/specimen/${specimen.sequence_code}?token=${specimen.access_token}`;
+		navigator.clipboard.writeText(url);
+		setCopiedSpecimenId(specimen.id);
+		setTimeout(() => setCopiedSpecimenId(null), 2000);
+	};
 
 	const invoice = group.invoice;
 	const specimens = group.specimens || [];
@@ -61,6 +81,50 @@ export default function SpecimenGroupViewSheet({
 					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-5">
 						{/* Specimens List (Left 2 Columns) */}
 						<div className="lg:col-span-2 space-y-6">
+							{group.access_token && (
+								<div className="rounded-lg border bg-card text-card-foreground p-5 shadow-sm space-y-4 border-dashed border-primary/20 bg-primary/[0.01]">
+									<div className="space-y-1.5 flex flex-col">
+										<span className="text-sm font-semibold text-primary flex items-center gap-1.5 font-sans">
+											<ExternalLink className="w-4 h-4" /> Enlace Público de Progreso del Grupo
+										</span>
+										<p className="text-xs text-muted-foreground">Comparta este enlace con el cliente para que pueda consultar el estado de todas las muestras del grupo.</p>
+										<div className="flex gap-2 w-full mt-1.5">
+											<input
+												type="text"
+												readOnly
+												value={`${window.location.origin}/specimen-group/${group.id}?token=${group.access_token}`}
+												className="flex-1 px-3 py-1.5 text-xs font-mono bg-background border rounded-md select-all outline-none"
+											/>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												onClick={copyPublicLink}
+												className="h-9 flex items-center gap-1.5 shrink-0"
+											>
+												{copied ? (
+													<>
+														<Check className="w-3.5 h-3.5 text-emerald-500" /> Copiado
+													</>
+												) : (
+													<>
+														<Copy className="w-3.5 h-3.5" /> Copiar
+													</>
+												)}
+											</Button>
+											<a
+												href={`/specimen-group/${group.id}?token=${group.access_token}`}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="inline-flex items-center justify-center rounded-md border bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 text-xs font-medium"
+											>
+												Abrir
+											</a>
+										</div>
+									</div>
+								</div>
+							)}
+
 							<div className="rounded-lg border bg-card text-card-foreground p-5 shadow-sm space-y-4">
 								<h3 className="text-lg font-semibold flex items-center gap-2 text-primary">
 									<Microscope className="w-5 h-5" /> Muestras en el Grupo ({specimens.length})
@@ -117,6 +181,48 @@ export default function SpecimenGroupViewSheet({
 													</div>
 												)}
 											</div>
+
+											{/* Specimen public link */}
+											{specimen.access_token && (
+												<div className="mt-3 p-2 bg-background border border-dashed rounded-md flex flex-col gap-1.5 text-xs">
+													<span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+														<ExternalLink className="w-3 h-3 text-primary" /> Enlace Público Individual
+													</span>
+													<div className="flex gap-2 w-full">
+														<input
+															type="text"
+															readOnly
+															value={`${window.location.origin}/specimen/${specimen.sequence_code}?token=${specimen.access_token}`}
+															className="flex-1 px-2.5 py-1 text-[11px] font-mono bg-muted/30 border rounded select-all outline-none"
+														/>
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															onClick={() => copySpecimenPublicLink(specimen)}
+															className="h-7 px-2.5 text-[11px] flex items-center gap-1 shrink-0"
+														>
+															{copiedSpecimenId === specimen.id ? (
+																<>
+																	<Check className="w-3 h-3 text-emerald-500" /> Copiado
+																</>
+															) : (
+																<>
+																	<Copy className="w-3 h-3" /> Copiar
+																</>
+															)}
+														</Button>
+														<a
+															href={`/specimen/${specimen.sequence_code}?token=${specimen.access_token}`}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="h-7 inline-flex items-center justify-center rounded border bg-background hover:bg-accent px-2.5 text-[11px]"
+														>
+															Abrir
+														</a>
+													</div>
+												</div>
+											)}
 
 											{/* Specimen medical order file */}
 											{specimen.medical_order_file && (

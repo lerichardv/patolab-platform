@@ -131,8 +131,8 @@ RUN echo '[supervisord]\n\
 
 EXPOSE 8080
 
-# Supervisor manages both Nginx and PHP-FPM processes simultaneously
 CMD ["sh", "-c", "\
-	chmod -R 755 /app/storage /app/public && \
-	chown -R www-data:www-data /app/storage /app/public && \
+	chmod -R 775 /app/storage /app/bootstrap/cache && \
+	chmod -R 755 /app/public && \
+	chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/public && \
 	/usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]

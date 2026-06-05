@@ -42,6 +42,7 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 	}
 
 	const [copied, setCopied] = useState(false);
+	const [copiedGroup, setCopiedGroup] = useState(false);
 
 	const copyPublicLink = () => {
 		if (!specimen.access_token) return;
@@ -49,6 +50,14 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 		navigator.clipboard.writeText(url);
 		setCopied(true);
 		setTimeout(() => setCopied(false), 2000);
+	};
+
+	const copyGroupPublicLink = () => {
+		if (!specimen.group || !specimen.group.access_token) return;
+		const url = `${window.location.origin}/specimen-group/${specimen.group.id}?token=${specimen.group.access_token}`;
+		navigator.clipboard.writeText(url);
+		setCopiedGroup(true);
+		setTimeout(() => setCopiedGroup(false), 2000);
 	};
 
 	const invoice = (specimen.is_group && specimen.group && specimen.group.invoice) ? specimen.group.invoice : specimen.invoice_relation;
@@ -233,11 +242,52 @@ export default function SpecimenViewSheet({ specimen, open, onOpenChange, onEdit
 										</div>
 									)}
 									{specimen.group && (
-										<div className="space-y-1 sm:col-span-2 bg-purple-500/5 dark:bg-purple-500/10 p-2.5 rounded-md border border-purple-500/25 border-dashed animate-in fade-in-50 duration-200">
+										<div className="space-y-1 sm:col-span-2 bg-purple-500/5 dark:bg-purple-500/10 p-2.5 rounded-md border border-purple-500/25 border-dashed flex flex-col gap-2 animate-in fade-in-50 duration-200">
 											<span className="text-xs text-purple-600 dark:text-purple-300 flex items-center gap-1 font-semibold">
 												<Layers className="w-3.5 h-3.5 text-purple-500" /> Grupo de Muestras
 											</span>
 											<p className="text-sm font-bold text-purple-700 dark:text-purple-200">{specimen.group.name}</p>
+
+											{specimen.group.access_token && (
+												<div className="space-y-1 mt-1 border-t pt-2 flex flex-col gap-1.5">
+													<span className="text-[10px] text-purple-600 dark:text-purple-300 font-semibold flex items-center gap-1">
+														<ExternalLink className="w-3 h-3 text-purple-500" /> Enlace Público del Grupo
+													</span>
+													<div className="flex gap-2 w-full">
+														<input
+															type="text"
+															readOnly
+															value={`${window.location.origin}/specimen-group/${specimen.group.id}?token=${specimen.group.access_token}`}
+															className="flex-1 px-2.5 py-1 text-[11px] font-mono bg-background border border-purple-500/20 rounded select-all outline-none"
+														/>
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															onClick={copyGroupPublicLink}
+															className="h-8 px-2.5 text-[11px] flex items-center gap-1.5 shrink-0 border-purple-500/20 hover:bg-purple-500/10 hover:text-purple-700"
+														>
+															{copiedGroup ? (
+																<>
+																	<Check className="w-3 h-3 text-emerald-500" /> Copiado
+																</>
+															) : (
+																<>
+																	<Copy className="w-3 h-3" /> Copiar
+																</>
+															)}
+														</Button>
+														<a
+															href={`/specimen-group/${specimen.group.id}?token=${specimen.group.access_token}`}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="h-8 inline-flex items-center justify-center rounded border border-purple-500/20 bg-background hover:bg-purple-500/10 hover:text-purple-700 px-2.5 text-xs font-medium"
+														>
+															Abrir
+														</a>
+													</div>
+												</div>
+											)}
 										</div>
 									)}
 									{specimen.access_token && (

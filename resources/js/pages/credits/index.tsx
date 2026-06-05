@@ -518,7 +518,7 @@ export default function CreditsIndex({ credits, filters, customers, specimenType
 									const remainingVal = parseFloat(String(credit.amount_remaining));
 									const isPaid = remainingVal === 0;
 									const rowBgClass = isPaid ? 'bg-emerald-500/5 dark:bg-emerald-500/5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10' : '';
-									const stickyBgClass = isPaid ? 'md:bg-[#f6fdf9] dark:md:bg-[#07180e] group-hover:bg-[#ebf8f0] dark:group-hover:bg-[#0b2416]' : 'md:bg-card group-hover:bg-muted/50';
+									const stickyBgClass = isPaid ? 'md:bg-[#f6fdf9] dark:md:bg-[#07180e] group-hover:bg-[#ebf8f0] dark:group-hover:bg-[#0b2416]' : 'md:bg-card group-hover:bg-muted';
 
 									return (
 										<TableRow key={credit.id} className={`group ${rowBgClass}`}>

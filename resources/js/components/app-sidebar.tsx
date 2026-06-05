@@ -178,7 +178,13 @@ const adminNavItems: NavItem[] = [
 const footerNavItems: NavItem[] = [
 ];
 
-export function AppSidebar() {
+export function AppSidebar({
+	collapsible = 'icon',
+	variant = 'inset',
+}: {
+	collapsible?: 'offcanvas' | 'icon' | 'none';
+	variant?: 'sidebar' | 'floating' | 'inset';
+} = {}) {
 	const { isMobile, setOpenMobile } = useSidebar();
 
 	const handleLogoClick = () => {
@@ -188,7 +194,7 @@ export function AppSidebar() {
 	};
 
 	return (
-		<Sidebar collapsible="icon" variant="inset">
+		<Sidebar collapsible={collapsible} variant={variant}>
 			<SidebarHeader>
 				<SidebarMenu>
 					<SidebarMenuItem>

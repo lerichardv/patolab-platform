@@ -46,6 +46,7 @@ class Specimen extends Model
         'access_token',
         'is_group',
         'group_id',
+        'report_id',
     ];
 
     protected $casts = [
@@ -132,6 +133,11 @@ class Specimen extends Model
     public function invoiceRelation(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(Invoice::class, 'specimen_id');
+    }
+
+    public function report(): BelongsTo
+    {
+        return $this->belongsTo(SpecimenReport::class, 'report_id');
     }
 
     public function group(): BelongsTo

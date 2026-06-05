@@ -1,0 +1,26 @@
+{
+	"name": "editor-collaboration-server",
+	"version": "1.0.0",
+	"type": "module",
+	"main": "server.js",
+	"scripts": {
+		"dev": "nodemon server.js",
+		"start": "node server.js"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"description": "",
+	"dependencies": {
+		"@hocuspocus/extension-webhook": "^4.1.0",
+		"@hocuspocus/provider": "^4.1.0",
+		"@hocuspocus/server": "^4.1.0",
+		"@tiptap/html": "^3.25.0",
+		"crossws": "^0.4.5",
+		"express": "^5.2.1",
+		"yjs": "^13.6.31"
+	},
+	"devDependencies": {
+		"nodemon": "^3.1.14"
+	}
+}

@@ -17,11 +17,27 @@ class SpecimenGroup extends Model
     protected $fillable = [
         'name',
         'invoice_id',
+        'customer_id',
+        'access_token',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($group) {
+            if (empty($group->access_token)) {
+                $group->access_token = \Illuminate\Support\Str::random(32);
+            }
+        });
+    }
 
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class, 'invoice_id');
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'customer_id');
     }
 
     public function specimens(): HasMany

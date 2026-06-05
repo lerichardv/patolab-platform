@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { format, add, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ClipboardList, Eye, Microscope, Calendar, Clock, AlertCircle, Filter, CalendarClock, ChevronDown } from 'lucide-react';
+import { ClipboardList, Eye, Microscope, Calendar, Clock, AlertCircle, Filter, CalendarClock, ChevronDown, FileText } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Badge } from '@/components/ui/badge';
@@ -286,7 +286,7 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 													<TableHead className="min-w-[160px] font-semibold">Análisis</TableHead>
 													<TableHead className="min-w-[120px] font-semibold">Estado</TableHead>
 													<TableHead className="min-w-[140px] font-semibold">Fecha Registro</TableHead>
-													<TableHead className="w-[80px] text-right font-semibold">Detalle</TableHead>
+													<TableHead className="w-[100px] text-right font-semibold">Acciones</TableHead>
 												</TableRow>
 											</TableHeader>
 											<TableBody>
@@ -299,7 +299,7 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 															<TableRow
 																key={specimen.id}
 																className="group hover:bg-muted/30 cursor-pointer transition-colors border-border/40"
-																onClick={() => handleViewSpecimen(specimen)}
+																onClick={() => router.get(`/specimens/${specimen.sequence_code || specimen.id}/report-editor`)}
 															>
 																<TableCell className="font-mono text-xs font-semibold text-primary">
 																	{specimen.sequence_code || `#${specimen.id}`}
@@ -349,7 +349,7 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 																		? format(new Date(specimen.created_at), 'dd/MM/yyyy h:mm a')
 																		: 'N/A'}
 																</TableCell>
-																<TableCell className="text-right">
+																<TableCell className="text-right flex items-center justify-end gap-1">
 																	<Button
 																		variant="ghost"
 																		size="icon"
@@ -361,6 +361,18 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 																		title="Ver detalles"
 																	>
 																		<Eye className="h-4 w-4" />
+																	</Button>
+																	<Button
+																		variant="ghost"
+																		size="icon"
+																		className="h-8 w-8 hover:bg-accent hover:text-accent-foreground text-primary/80 hover:text-primary"
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			router.get(`/specimens/${specimen.sequence_code || specimen.id}/report-editor`);
+																		}}
+																		title="Editor de reporte"
+																	>
+																		<FileText className="h-4 w-4" />
 																	</Button>
 																</TableCell>
 															</TableRow>
