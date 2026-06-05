@@ -36,6 +36,7 @@ import {
 	Undo2,
 	Redo2,
 	Trash2,
+	Info,
 } from 'lucide-react';
 import EditorLayout from '@/layouts/editor-layout';
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { useEditor, EditorContent, type Editor, mergeAttributes } from '@tiptap/react';
+import { ResizableNodeView } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Image } from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
@@ -292,6 +294,7 @@ const editorStyles = `
     line-height: normal;
     display: inline-block;
     height: 1.25em;
+    z-index: 10;
   }
 
   .collaboration-cursor__label {
@@ -335,7 +338,7 @@ const editorStyles = `
     background: rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.8);
     border-radius: 2px;
-    z-index: 10;
+    z-index: 1;
   }
 
   .tiptap [data-resize-handle]:hover {
@@ -488,49 +491,133 @@ const CustomImage = Image.extend({
 		};
 	},
 
-	renderHTML({ HTMLAttributes }) {
-		const isLeft = HTMLAttributes.alignment === 'left';
-		const isRight = HTMLAttributes.alignment === 'right';
+	renderHTML({ node, HTMLAttributes }) {
+		const align = node?.attrs?.alignment || 'center';
+		const isLeft = align === 'left';
+		const isRight = align === 'right';
 		const marginLeft = isLeft ? '0' : 'auto';
 		const marginRight = isRight ? '0' : 'auto';
 
 		const styles = [`display: block`, `margin-left: ${marginLeft}`, `margin-right: ${marginRight}`];
-		if (HTMLAttributes.width) {
-			styles.push(`width: ${HTMLAttributes.width}px`);
+		const width = node?.attrs?.width;
+		const height = node?.attrs?.height;
+		if (width) {
+			styles.push(`width: ${width}px`);
 		}
-		if (HTMLAttributes.height) {
-			styles.push(`height: ${HTMLAttributes.height}px`);
+		if (height) {
+			styles.push(`height: ${height}px`);
 		}
 
 		return [
 			'img',
 			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-				'data-align': HTMLAttributes.alignment || 'center',
-				class: `align-${HTMLAttributes.alignment || 'center'}`,
+				'data-align': align,
+				class: `align-${align}`,
 				style: styles.join('; ') + ';'
 			})
 		];
 	},
 
 	addNodeView() {
-		const parentNodeView = this.parent?.();
-		if (!parentNodeView) return null;
+		if (!this.options.resize || !this.options.resize.enabled || typeof document === 'undefined') {
+			return null;
+		}
 
-		return (props) => {
-			const nodeView = parentNodeView(props);
-			if (!nodeView) {
-				throw new Error('Failed to initialize parent NodeView');
+		const { directions, minWidth, minHeight, alwaysPreserveAspectRatio } = this.options.resize;
+
+		return ({ node, getPos, HTMLAttributes, editor }) => {
+			const el = document.createElement('img');
+			el.draggable = false;
+
+			const mergedAttributes = mergeAttributes(this.options.HTMLAttributes, HTMLAttributes);
+
+			Object.entries(mergedAttributes).forEach(([key, value]) => {
+				if (value != null) {
+					switch (key) {
+						case 'width':
+						case 'height':
+							break;
+						default:
+							el.setAttribute(key, value);
+							break;
+					}
+				}
+			});
+
+			if (mergedAttributes.src !== null) {
+				el.src = mergedAttributes.src;
 			}
 
-			// Override the update method to dynamically apply alignment and sizing changes in the DOM
-			const originalUpdate = nodeView.update;
-			nodeView.update = (node, decorations, innerDecorations) => {
-				const result = originalUpdate ? originalUpdate.call(nodeView, node, decorations, innerDecorations) : true;
-				if (!result) return false;
+			// Create the pill overlay for dimension display
+			const pill = document.createElement('div');
+			pill.style.position = 'absolute';
+			pill.style.bottom = '10px';
+			pill.style.left = '50%';
+			pill.style.transform = 'translateX(-50%)';
+			pill.style.backgroundColor = 'rgba(0, 0, 0, 0.75)';
+			pill.style.color = '#fff';
+			pill.style.fontSize = '10px';
+			pill.style.padding = '2px 8px';
+			pill.style.borderRadius = '9999px';
+			pill.style.pointerEvents = 'none';
+			pill.style.zIndex = '50';
+			pill.style.display = 'none'; // hidden by default
 
-				const el = nodeView.dom.querySelector('img');
-				if (el) {
-					const align = node.attrs.alignment || 'center';
+			let naturalWidth = 0;
+			let naturalHeight = 0;
+
+			const nodeView = new ResizableNodeView({
+				element: el,
+				editor,
+				node,
+				getPos,
+				onResize: (width, height) => {
+					el.style.width = `${width}px`;
+					el.style.height = `${height}px`;
+
+					// Show the dimension overlay
+					pill.style.display = 'block';
+					let percentStr = '';
+					if (naturalWidth > 0) {
+						const pct = Math.round((width / naturalWidth) * 100);
+						percentStr = ` (${pct}%)`;
+					}
+					pill.innerText = `${width}px × ${height}px${percentStr}`;
+				},
+				onCommit: (width, height) => {
+					const pos = getPos();
+					if (pos === undefined) return;
+
+					editor
+						.chain()
+						.setNodeSelection(pos)
+						.updateAttributes(this.name, {
+							width,
+							height,
+						})
+						.run();
+
+					// Hide the pill after resize ends
+					setTimeout(() => {
+						pill.style.display = 'none';
+					}, 1500);
+				},
+				onUpdate: (updatedNode, _decorations, _innerDecorations) => {
+					if (updatedNode.type !== node.type) return false;
+
+					// Sync DOM style when updated collaboratively
+					if (updatedNode.attrs.width) {
+						el.style.width = `${updatedNode.attrs.width}px`;
+					} else {
+						el.style.width = '';
+					}
+					if (updatedNode.attrs.height) {
+						el.style.height = `${updatedNode.attrs.height}px`;
+					} else {
+						el.style.height = '';
+					}
+
+					const align = updatedNode.attrs.alignment || 'center';
 					el.setAttribute('data-align', align);
 					el.className = `align-${align}`;
 
@@ -539,20 +626,29 @@ const CustomImage = Image.extend({
 					el.style.marginLeft = isLeft ? '0' : 'auto';
 					el.style.marginRight = isRight ? '0' : 'auto';
 
-					// Dynamically set style width/height from node attributes
-					if (node.attrs.width) {
-						el.style.width = `${node.attrs.width}px`;
-					} else {
-						el.style.width = '';
-					}
-					if (node.attrs.height) {
-						el.style.height = `${node.attrs.height}px`;
-					} else {
-						el.style.height = '';
-					}
-				}
+					return true;
+				},
+				options: {
+					directions,
+					min: {
+						width: minWidth,
+						height: minHeight,
+					},
+					preserveAspectRatio: alwaysPreserveAspectRatio === true,
+				},
+			});
 
-				return true;
+			const dom = nodeView.dom as HTMLElement;
+			dom.appendChild(pill);
+
+			// when image is loaded, show the node view to get the correct dimensions
+			dom.style.visibility = 'hidden';
+			dom.style.pointerEvents = 'none';
+			el.onload = () => {
+				dom.style.visibility = '';
+				dom.style.pointerEvents = '';
+				naturalWidth = el.naturalWidth;
+				naturalHeight = el.naturalHeight;
 			};
 
 			return nodeView;
@@ -620,6 +716,19 @@ function EditorToolbar({
 	editor: Editor | null;
 	specimenSequenceCode?: string;
 }) {
+	// Force update on editor transactions so button active states update reactively
+	const [, setTick] = useState(0);
+	useEffect(() => {
+		if (!editor) return;
+		const handleUpdate = () => {
+			setTick(tick => tick + 1);
+		};
+		editor.on('transaction', handleUpdate);
+		return () => {
+			editor.off('transaction', handleUpdate);
+		};
+	}, [editor]);
+
 	const handleImageUpload = () => {
 		const input = document.createElement('input');
 		input.type = 'file';
@@ -659,7 +768,7 @@ function EditorToolbar({
 
 	return (
 		<TooltipProvider delayDuration={400}>
-			<div className="flex flex-wrap items-center gap-0.5 p-1.5 bg-muted/40 border-b border-border">
+			<div className="flex flex-wrap items-center gap-0.5 p-1.5 bg-muted/40">
 
 				{/* History */}
 				<ToolbarBtn
@@ -889,8 +998,11 @@ function ReadOnlyEditor({ content }: { content: string }) {
 	}, [content]);
 
 	return (
-		<div className="border rounded-lg bg-muted/10 text-card-foreground shadow-xs overflow-hidden">
-			<EditorContent editor={editor} className="p-4 min-h-[160px] focus:outline-hidden" />
+		<div className="space-y-1">
+			<span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Editor de texto enriquecido</span>
+			<div className="border rounded-lg bg-muted/10 text-card-foreground shadow-xs overflow-hidden">
+				<EditorContent editor={editor} className="p-4 min-h-[160px] focus:outline-hidden" />
+			</div>
 		</div>
 	);
 }
@@ -908,6 +1020,8 @@ function CollaborativeEditorInner({
 	specimenSequenceCode,
 	doc,
 	provider,
+	onFocus,
+	onBlur,
 }: {
 	reportId: number;
 	field: string;
@@ -919,6 +1033,8 @@ function CollaborativeEditorInner({
 	specimenSequenceCode: string;
 	doc: Y.Doc;
 	provider: HocuspocusProvider;
+	onFocus?: (editor: Editor) => void;
+	onBlur?: () => void;
 }) {
 	useEffect(() => {
 		provider.awareness?.setLocalStateField('user', { name: userName, color: cursorColor });
@@ -940,6 +1056,8 @@ function CollaborativeEditorInner({
 			onUsersChange([]);
 		};
 	}, [provider, onUsersChange]);
+
+	const [isFocused, setIsFocused] = useState(false);
 
 	const editor = useEditor({
 		extensions: [
@@ -982,12 +1100,36 @@ function CollaborativeEditorInner({
 		onUpdate({ editor }) {
 			setTimeout(() => { onUpdate(editor.getHTML()); }, 0);
 		},
+		onFocus({ editor }) {
+			setIsFocused(true);
+			onFocus?.(editor);
+		},
+		onBlur() {
+			setIsFocused(false);
+			onBlur?.();
+		},
 	});
 
+	const focusColorClass =
+		field === 'diagnosis' ? 'border-blue-500 ring-1 ring-blue-500/20 shadow-md' :
+			field === 'macroscopy' ? 'border-violet-500 ring-1 ring-violet-500/20 shadow-md' :
+				field === 'microscopy' ? 'border-fuchsia-500 ring-1 ring-fuchsia-500/20 shadow-md' :
+					'border-primary ring-1 ring-primary/20 shadow-md';
+
 	return (
-		<div className="border rounded-lg bg-card text-card-foreground shadow-xs overflow-hidden">
-			<EditorToolbar editor={editor} specimenSequenceCode={specimenSequenceCode} />
-			<EditorContent editor={editor} className="p-4 min-h-[160px] focus:outline-hidden" />
+		<div className="space-y-1">
+			<span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Editor de texto enriquecido</span>
+			<div className={cn(
+				"border rounded-lg bg-card text-card-foreground shadow-xs transition-all duration-200 relative",
+				isFocused ? focusColorClass : "border-border"
+			)}>
+				<EditorContent editor={editor} className="p-4 min-h-[160px] focus:outline-hidden" />
+			</div>
+			<div className="flex justify-end pt-1">
+				<span className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider flex items-center gap-1 bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">
+					<Check className="h-3.5 w-3.5" /> Editable colaborativo
+				</span>
+			</div>
 		</div>
 	);
 }
@@ -1006,6 +1148,8 @@ function CollaborativeEditor(props: {
 	specimenSequenceCode: string;
 	doc: Y.Doc | null;
 	provider: HocuspocusProvider | null;
+	onFocus?: (editor: Editor) => void;
+	onBlur?: () => void;
 }) {
 	const [isMounted, setIsMounted] = useState(false);
 	useEffect(() => { setIsMounted(true); }, []);
@@ -1064,6 +1208,28 @@ function CollaboratorsList({ users }: { users: Collaborator[] }) {
 }
 
 export default function ReportWorkspace({ specimen, report, auth }: Props) {
+	const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
+	const [activeField, setActiveField] = useState<'diagnosis' | 'macroscopy' | 'microscopy' | null>(null);
+	const focusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const handleEditorFocus = (editor: Editor, field: 'diagnosis' | 'macroscopy' | 'microscopy') => {
+		if (focusTimeoutRef.current) {
+			clearTimeout(focusTimeoutRef.current);
+		}
+		setActiveEditor(editor);
+		setActiveField(field);
+	};
+
+	const handleEditorBlur = () => {
+		if (focusTimeoutRef.current) {
+			clearTimeout(focusTimeoutRef.current);
+		}
+		focusTimeoutRef.current = setTimeout(() => {
+			setActiveEditor(null);
+			setActiveField(null);
+		}, 200);
+	};
+
 	const [reportDate, setReportDate] = useState(report?.report_date ? report.report_date.split('T')[0] : new Date().toISOString().split('T')[0]);
 	const [macroscopyHtml, setMacroscopyHtml] = useState(report?.macroscopy_html || '');
 	const [microscopyHtml, setMicroscopyHtml] = useState(report?.microscopy_html || '');
@@ -1701,7 +1867,7 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 				<div className="overflow-auto h-[calc(100vh-64px)] w-screen lg:w-[50vw]">
 
 					{/* Header bar with Back button and Status Badge */}
-					<div className="p-6 flex items-center justify-between border-b sticky top-0 z-10 bg-background/95">
+					<div className="p-6 flex items-center justify-between border-b sticky top-0 z-10 bg-background">
 						<div className="flex items-center gap-3">
 							<Button
 								variant="ghost"
@@ -1730,6 +1896,33 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 							</span>
 						</div>
 					</div>
+
+					{/* Sticky Contextual Formatting Toolbar */}
+					{activeEditor && (
+						<div className="sticky top-[93px] z-10 bg-background/95 transition-all duration-205">
+							<div className="flex items-center justify-strech bg-muted/40 border-b border-border px-6">
+								<div className="w-full overflow-x-auto min-h-[36px] flex justify-between">
+									<EditorToolbar editor={activeEditor} specimenSequenceCode={specimen.sequence_code} />
+								</div>
+
+								{activeField && (
+									<div className='h-[36px] flex items-center'>
+										<div className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border bg-card">
+											<div className={cn(
+												"h-2 w-2 rounded-full",
+												activeField === 'diagnosis' && "bg-blue-500 animate-pulse",
+												activeField === 'macroscopy' && "bg-violet-500 animate-pulse",
+												activeField === 'microscopy' && "bg-fuchsia-500 animate-pulse",
+											)} />
+											<span className="text-muted-foreground text-[9px] uppercase tracking-wider font-bold">
+												{activeField === 'diagnosis' ? 'Diagnóstico' : activeField === 'macroscopy' ? 'Macroscopía' : 'Microscopía'}
+											</span>
+										</div>
+									</div>
+								)}
+							</div>
+						</div>
+					)}
 
 					<div className='p-6 flex flex-col gap-5'>
 
@@ -1787,15 +1980,10 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 
 						{/* Diagnosis Editor Section */}
 						<div className="space-y-3">
-							<div className="flex items-center justify-between">
-								<h3 className="text-sm font-semibold flex items-center gap-2">
+							<div className="flex items-center justify-between pl-3 border-l-4 border-blue-500/80">
+								<h3 className="text-base font-bold tracking-tight text-slate-800 dark:text-slate-200 flex items-center gap-2">
 									<FileText className="h-4 w-4 text-blue-500" /> Diagnóstico Patológico
 								</h3>
-								{isDiagnosisEditable && (
-									<span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-										<Check className="h-3 w-3" /> Editable colaborativo
-									</span>
-								)}
 							</div>
 
 							{isDiagnosisEditable ? (
@@ -1810,6 +1998,8 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 									specimenSequenceCode={specimen.sequence_code}
 									doc={diagnosisDoc}
 									provider={diagnosisProvider}
+									onFocus={(editor) => handleEditorFocus(editor, 'diagnosis')}
+									onBlur={handleEditorBlur}
 								/>
 							) : (
 								<ReadOnlyEditor content={diagnosisHtml} />
@@ -1818,15 +2008,10 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 
 						{/* Macroscopy Editor Section */}
 						<div className="space-y-3">
-							<div className="flex items-center justify-between">
-								<h3 className="text-sm font-semibold flex items-center gap-2">
+							<div className="flex items-center justify-between pl-3 border-l-4 border-violet-500/80">
+								<h3 className="text-base font-bold tracking-tight text-slate-800 dark:text-slate-200 flex items-center gap-2">
 									<Microscope className="h-4 w-4 text-violet-500" /> Descripción Macroscópica
 								</h3>
-								{isMacroscopyEditable && (
-									<span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-										<Check className="h-3 w-3" /> Editable colaborativo
-									</span>
-								)}
 							</div>
 
 							{isMacroscopyEditable ? (
@@ -1841,6 +2026,8 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 									specimenSequenceCode={specimen.sequence_code}
 									doc={macroscopyDoc}
 									provider={macroscopyProvider}
+									onFocus={(editor) => handleEditorFocus(editor, 'macroscopy')}
+									onBlur={handleEditorBlur}
 								/>
 							) : (
 								<ReadOnlyEditor content={macroscopyHtml} />
@@ -1880,15 +2067,10 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 
 						{/* Microscopy Editor Section */}
 						<div className="space-y-3">
-							<div className="flex items-center justify-between">
-								<h3 className="text-sm font-semibold flex items-center gap-2">
+							<div className="flex items-center justify-between pl-3 border-l-4 border-fuchsia-500/80">
+								<h3 className="text-base font-bold tracking-tight text-slate-800 dark:text-slate-200 flex items-center gap-2">
 									<Microscope className="h-4 w-4 text-fuchsia-500" /> Descripción Microscópica
 								</h3>
-								{specimen.status === 'microscopic_review' && (
-									<span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-										<Check className="h-3 w-3" /> Editable colaborativo
-									</span>
-								)}
 							</div>
 
 							{/* Status: before processing - hidden or inactive */}
@@ -1955,6 +2137,8 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 											specimenSequenceCode={specimen.sequence_code}
 											doc={microscopyDoc}
 											provider={microscopyProvider}
+											onFocus={(editor) => handleEditorFocus(editor, 'microscopy')}
+											onBlur={handleEditorBlur}
 										/>
 									) : (
 										<ReadOnlyEditor content={microscopyHtml} />

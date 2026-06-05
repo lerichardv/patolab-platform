@@ -64,25 +64,28 @@ const CustomImage = Image.extend({
 		};
 	},
 
-	renderHTML({ HTMLAttributes }) {
-		const isLeft = HTMLAttributes.alignment === 'left';
-		const isRight = HTMLAttributes.alignment === 'right';
+	renderHTML({ node, HTMLAttributes }) {
+		const align = node?.attrs?.alignment || 'center';
+		const isLeft = align === 'left';
+		const isRight = align === 'right';
 		const marginLeft = isLeft ? '0' : 'auto';
 		const marginRight = isRight ? '0' : 'auto';
 
 		const styles = [`display: block`, `margin-left: ${marginLeft}`, `margin-right: ${marginRight}`];
-		if (HTMLAttributes.width) {
-			styles.push(`width: ${HTMLAttributes.width}px`);
+		const width = node?.attrs?.width;
+		const height = node?.attrs?.height;
+		if (width) {
+			styles.push(`width: ${width}px`);
 		}
-		if (HTMLAttributes.height) {
-			styles.push(`height: ${HTMLAttributes.height}px`);
+		if (height) {
+			styles.push(`height: ${height}px`);
 		}
 
 		return [
 			'img',
 			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-				'data-align': HTMLAttributes.alignment || 'center',
-				class: `align-${HTMLAttributes.alignment || 'center'}`,
+				'data-align': align,
+				class: `align-${align}`,
 				style: styles.join('; ') + ';'
 			})
 		];
