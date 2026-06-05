@@ -279,6 +279,28 @@
             display: block;
         }
 
+        /* ── Image Alignment for PDF ── */
+        .section-content img[style*="text-align: center"],
+        .section-content img.align-center {
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+
+        .section-content img[style*="text-align: right"],
+        .section-content img.align-right {
+            margin-left: auto;
+            margin-right: 0;
+            display: block;
+        }
+
+        .section-content img[style*="text-align: left"],
+        .section-content img.align-left {
+            margin-left: 0;
+            margin-right: auto;
+            display: block;
+        }
+
         /* Prevent heading-only breaks */
         .section-container {
             page-break-inside: avoid;
@@ -316,6 +338,11 @@
             color: #374151;
             margin-top: 10px;
         }
+
+        .page-break {
+            page-break-after: always;
+            break-after: page;
+        }
     </style>
 </head>
 <body>
@@ -341,11 +368,11 @@
     </table>
  
     <!-- Clinical Diagnosis / Main Diagnosis Section -->
-    @if(!empty($specimen->diagnosis))
+    @if(!empty($report->diagnosis_html) || !empty($specimen->diagnosis))
     <div class="section-container">
         <div class="section-header-title">DIAGNÓSTICO</div>
         <div class="section-content">
-            {!! $report->diagnosis_html ?? $specimen->diagnosis !!}
+            {!! !empty($report->diagnosis_html) ? $report->diagnosis_html : $specimen->diagnosis !!}
         </div>
     </div>
     @endif
@@ -360,6 +387,7 @@
  
     <!-- Microscopy Section -->
     @if($specimen->status === 'microscopic_review' || $specimen->status === 'finalized' || $specimen->status === 'delivered')
+    <div class="page-break"></div>
     <div class="section-container">
         <div class="section-header-title">DESCRIPCIÓN MICROSCÓPICA</div>
         <div class="section-content">

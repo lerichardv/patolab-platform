@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { format, add, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ClipboardList, Eye, Microscope, Calendar, Clock, AlertCircle, Filter, CalendarClock, ChevronDown, FileText } from 'lucide-react';
+import { ClipboardList, Eye, Microscope, Calendar, Clock, AlertCircle, Filter, CalendarClock, ChevronDown, FileText, Copy, Check, Search } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Badge } from '@/components/ui/badge';
@@ -106,6 +106,38 @@ const getDueDate = (specimen: Specimen): Date => {
 	return add(createdAt, duration);
 };
 
+function CopyButton({ text }: { text: string }) {
+	const [copied, setCopied] = useState(false);
+
+	const handleCopy = async (e: React.MouseEvent) => {
+		e.stopPropagation();
+		try {
+			await navigator.clipboard.writeText(text);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2000);
+		} catch (err) {
+			console.error('Failed to copy text: ', err);
+		}
+	};
+
+	return (
+		<Button
+			type="button"
+			variant="ghost"
+			size="icon"
+			className="h-6 w-6 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:bg-muted duration-200 text-muted-foreground hover:text-foreground shrink-0"
+			onClick={handleCopy}
+			title="Copiar código"
+		>
+			{copied ? (
+				<Check className="h-3.5 w-3.5 text-green-600 dark:text-green-500" />
+			) : (
+				<Copy className="h-3.5 w-3.5" />
+			)}
+		</Button>
+	);
+}
+
 export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 	const [selectedSpecimen, setSelectedSpecimen] = useState<Specimen | null>(null);
 	const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
@@ -124,9 +156,11 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 		const to = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
 		return { from, to };
 	});
+	const [searchQuery, setSearchQuery] = useState('');
 
 	// Filter specimens client-side
 	const filteredSpecimens = useMemo(() => {
+		const searchLower = searchQuery.trim().toLowerCase();
 		return specimens.filter(specimen => {
 			const matchesStatus = selectedStatuses.includes(specimen.status);
 
@@ -134,9 +168,16 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 			const matchesDate = (!dateRange.from || specDateStr >= dateRange.from) &&
 				(!dateRange.to || specDateStr <= dateRange.to);
 
-			return matchesStatus && matchesDate;
+			const matchesSearch = !searchLower || (
+				(specimen.sequence_code && specimen.sequence_code.toLowerCase().includes(searchLower)) ||
+				(specimen.id.toString().includes(searchLower)) ||
+				(specimen.customer_relation?.name && specimen.customer_relation.name.toLowerCase().includes(searchLower)) ||
+				(specimen.customer_relation?.id_number && specimen.customer_relation.id_number.toLowerCase().includes(searchLower))
+			);
+
+			return matchesStatus && matchesDate && matchesSearch;
 		});
-	}, [specimens, selectedStatuses, dateRange]);
+	}, [specimens, selectedStatuses, dateRange, searchQuery]);
 
 	// Group and sort filtered specimens by priority and due date desc
 	const groupedSpecimens = useMemo(() => {
@@ -184,7 +225,19 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 						</div>
 					</div>
 
-					<div className="flex flex-col md:flex-row items-center gap-2 justify-end">
+					<div className="flex flex-col md:flex-row items-center gap-2 justify-end w-full md:w-auto">
+						{/* Buscador */}
+						<div className="relative w-full md:w-72 shrink-0">
+							<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+							<Input
+								type="text"
+								placeholder="Buscar por código, cliente o RTN..."
+								className="pl-9 h-10 w-full bg-card"
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+							/>
+						</div>
+
 						{/* Estado Filter (Combobox Múltiple) */}
 						<Popover>
 							<PopoverTrigger asChild>
@@ -302,7 +355,10 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 																onClick={() => router.get(`/specimens/${specimen.sequence_code || specimen.id}/report-editor`)}
 															>
 																<TableCell className="font-mono text-xs font-semibold text-primary">
-																	{specimen.sequence_code || `#${specimen.id}`}
+																	<div className="flex items-center gap-1.5 min-h-[24px]">
+																		<span>{specimen.sequence_code || `#${specimen.id}`}</span>
+																		<CopyButton text={specimen.sequence_code || `#${specimen.id}`} />
+																	</div>
 																</TableCell>
 																{/* Visual Day Calendar Tear-off Widget */}
 																<TableCell className="py-2.5">
@@ -336,13 +392,22 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
 																	{specimen.examination?.name || 'N/A'}
 																</TableCell>
 																<TableCell>
-																	<Badge
-																		variant="outline"
-																		className="text-white border-transparent py-0.5 px-2.5 font-semibold text-[11px]"
-																		style={{ backgroundColor: specimen.status_color || '#cbd5e1' }}
-																	>
-																		{statusName}
-																	</Badge>
+																	{(() => {
+																		const color = specimen.status_color || '#cbd5e1';
+																		return (
+																			<Badge
+																				variant="outline"
+																				className="rounded-full px-2.5 py-0.5 font-regular text-xs"
+																				style={{
+																					backgroundColor: `${color}15`,
+																					color: color,
+																					borderColor: `${color}30`
+																				}}
+																			>
+																				{statusName}
+																			</Badge>
+																		);
+																	})()}
 																</TableCell>
 																<TableCell className="text-xs text-muted-foreground">
 																	{specimen.created_at

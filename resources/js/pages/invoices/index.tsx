@@ -739,6 +739,25 @@ export default function InvoicesIndex({ invoices, filters, customers, specimenTy
 															>
 																<Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
 															</Button>
+															<Button
+																variant="ghost"
+																size="icon"
+																className="h-5 w-5 hover:bg-muted"
+																onClick={() => {
+																	const specimenWithInvoice = {
+																		...invoice.specimen,
+																		invoice_relation: {
+																			...invoice,
+																			specimen: undefined
+																		}
+																	};
+																	setSelectedSpecimen(specimenWithInvoice);
+																	setIsSpecimenSheetOpen(true);
+																}}
+																title="Editar Muestra"
+															>
+																<Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+															</Button>
 														</div>
 													)}
 													<span className="text-muted-foreground text-[10px]" title={invoice.specimen.type?.name}>

@@ -9,7 +9,7 @@ import {
 import { Head, router, usePage } from '@inertiajs/react';
 import { formatDistanceToNow, add, isPast, isToday, format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Plus, Microscope, Edit2, Trash2, Tag, CalendarClock, FileText, ExternalLink, ChevronLeft, ChevronRight, MoreVertical, UserPlus, ChevronDown, Layers, Check, Filter } from 'lucide-react';
+import { Plus, Microscope, Edit2, Trash2, Tag, CalendarClock, FileText, ExternalLink, ChevronLeft, ChevronRight, MoreVertical, UserPlus, ChevronDown, Layers, Check, Filter, Search } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { DateRangePicker } from '@/components/date-range-picker';
@@ -221,6 +221,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 
 	const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
 	const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
+	const [searchQuery, setSearchQuery] = useState('');
 
 	const availableGroups = useMemo(() => {
 		const groupsMap = new Map<string, { id: string; name: string }>();
@@ -249,6 +250,7 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 	}, [availableGroups, selectedGroupId]);
 
 	const filteredPriorities = useMemo(() => {
+		const searchLower = searchQuery.trim().toLowerCase();
 		return priorities.map(priority => {
 			const filteredSpecimens = priority.specimens.filter(specimen => {
 				const matchesStatus = selectedStatuses.includes(specimen.status);
@@ -260,14 +262,21 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 				const matchesGroup = selectedGroupId === 'all' ||
 					(specimen.group_id?.toString() === selectedGroupId);
 
-				return matchesStatus && matchesDate && matchesGroup;
+				const matchesSearch = !searchLower || (
+					(specimen.sequence_code && specimen.sequence_code.toLowerCase().includes(searchLower)) ||
+					(specimen.id.toString().includes(searchLower)) ||
+					(specimen.customer_relation?.name && specimen.customer_relation.name.toLowerCase().includes(searchLower)) ||
+					(specimen.customer_relation?.id_number && specimen.customer_relation.id_number.toLowerCase().includes(searchLower))
+				);
+
+				return matchesStatus && matchesDate && matchesGroup && matchesSearch;
 			});
 			return {
 				...priority,
 				specimens: filteredSpecimens
 			};
 		});
-	}, [priorities, selectedStatuses, dateRange, selectedGroupId]);
+	}, [priorities, selectedStatuses, dateRange, selectedGroupId, searchQuery]);
 
 	const visibleSpecimenIds = useMemo(() => {
 		return filteredPriorities.flatMap(p => p.specimens.map(s => s.id));
@@ -826,6 +835,17 @@ export default function SpecimensIndex({ priorities: initialPriorities, customer
 				</div>
 
 				<div className='flex flex-col sm:flex-row sm:items-center gap-2 w-full'>
+					{/* Buscador */}
+					<div className="relative w-full sm:w-72 shrink-0">
+						<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+						<Input
+							type="text"
+							placeholder="Buscar por código, cliente o RTN..."
+							className="pl-9 h-10 w-full bg-card"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+						/>
+					</div>
 
 					{/* Seleccionar control */}
 					<div className="flex items-center justify-between sm:justify-start gap-2 border rounded-md px-3 h-10 bg-card hover:bg-accent/50 transition-colors cursor-pointer select-none w-full sm:w-auto shrink-0" onClick={() => {

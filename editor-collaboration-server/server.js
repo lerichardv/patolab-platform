@@ -5,7 +5,104 @@ import express from 'express';
 import * as Y from 'yjs';
 import { generateJSON, generateHTML } from '@tiptap/html';
 import StarterKit from '@tiptap/starter-kit';
+import { Image } from '@tiptap/extension-image';
+import { TableKit } from '@tiptap/extension-table';
+import TextAlign from '@tiptap/extension-text-align';
 import { TiptapTransformer } from '@hocuspocus/transformer';
+
+import { mergeAttributes } from '@tiptap/core';
+const CustomImage = Image.extend({
+	addAttributes() {
+		return {
+			...this.parent?.(),
+			alignment: {
+				default: 'center',
+				parseHTML: element => {
+					const align = element.getAttribute('data-align');
+					if (align) return align;
+
+					const classes = element.getAttribute('class') || '';
+					if (classes.includes('align-left')) return 'left';
+					if (classes.includes('align-center')) return 'center';
+					if (classes.includes('align-right')) return 'right';
+					if (classes.includes('align-justify')) return 'justify';
+
+					const style = element.getAttribute('style') || '';
+					if (style.includes('margin-left: 0') || style.includes('margin-right: auto')) return 'left';
+					if (style.includes('margin-left: auto') && style.includes('margin-right: auto')) return 'center';
+					if (style.includes('margin-left: auto') && style.includes('margin-right: 0')) return 'right';
+
+					return 'center';
+				},
+				renderHTML: attributes => {
+					const isLeft = attributes.alignment === 'left';
+					const isRight = attributes.alignment === 'right';
+					const marginLeft = isLeft ? '0' : 'auto';
+					const marginRight = isRight ? '0' : 'auto';
+
+					return {
+						'data-align': attributes.alignment,
+						class: `align-${attributes.alignment}`,
+						style: `display: block; margin-left: ${marginLeft}; margin-right: ${marginRight};`
+					};
+				},
+			},
+			width: {
+				default: null,
+				parseHTML: element => {
+					const width = element.getAttribute('width') || element.style.width;
+					return width ? parseInt(width, 10) : null;
+				},
+			},
+			height: {
+				default: null,
+				parseHTML: element => {
+					const height = element.getAttribute('height') || element.style.height;
+					return height ? parseInt(height, 10) : null;
+				},
+			},
+		};
+	},
+
+	renderHTML({ HTMLAttributes }) {
+		const isLeft = HTMLAttributes.alignment === 'left';
+		const isRight = HTMLAttributes.alignment === 'right';
+		const marginLeft = isLeft ? '0' : 'auto';
+		const marginRight = isRight ? '0' : 'auto';
+
+		const styles = [`display: block`, `margin-left: ${marginLeft}`, `margin-right: ${marginRight}`];
+		if (HTMLAttributes.width) {
+			styles.push(`width: ${HTMLAttributes.width}px`);
+		}
+		if (HTMLAttributes.height) {
+			styles.push(`height: ${HTMLAttributes.height}px`);
+		}
+
+		return [
+			'img',
+			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
+				'data-align': HTMLAttributes.alignment || 'center',
+				class: `align-${HTMLAttributes.alignment || 'center'}`,
+				style: styles.join('; ') + ';'
+			})
+		];
+	},
+});
+
+const extensions = [
+	StarterKit.configure({ undoRedo: false }),
+	CustomImage.configure({
+		allowBase64: false,
+		resize: {
+			enabled: true,
+			alwaysPreserveAspectRatio: true,
+		},
+	}),
+	TableKit.configure({
+		table: { resizable: true },
+	}),
+	TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
+];
 
 const webhookUrl = process.env.WEBHOOK_URL || 'http://127.0.0.1:8000/api/collaboration';
 
@@ -44,12 +141,23 @@ const customWebhookExtension = {
 			
 			// 1. First, check if we received a saved binary state during onConnect
 			const savedStateBase64 = data.context?.documentState;
+			let isLoaded = false;
 			if (savedStateBase64) {
 				console.log(`[webhook:onLoadDocument] Restoring document from saved binary state`);
 				const binaryState = Buffer.from(savedStateBase64, 'base64');
 				Y.applyUpdate(data.document, binaryState);
-				return;
+				
+				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status')) {
+					const text = data.document.getText('content').toString();
+					if (text && text.trim() !== '') {
+						isLoaded = true;
+					}
+				} else {
+					isLoaded = true;
+				}
 			}
+
+			if (!isLoaded) {
 
 			// 2. If no binary state exists, fetch the initial HTML/content using the "create" event
 			const response = await fetch(webhookUrl, {
@@ -78,14 +186,15 @@ const customWebhookExtension = {
 					ytext.insert(0, htmlContent);
 				} else {
 					// Parse HTML into ProseMirror JSON using Tiptap
-					const docJson = generateJSON(htmlContent, [StarterKit]);
+					const docJson = generateJSON(htmlContent, extensions);
 					// Convert ProseMirror JSON to Yjs Ydoc update
-					const initialYdoc = TiptapTransformer.toYdoc(docJson, 'content');
+					const initialYdoc = TiptapTransformer.toYdoc(docJson, 'content', extensions);
 					// Merge it into the document
 					data.document.merge(initialYdoc);
 				}
 			} else {
 				console.log(`[webhook:onLoadDocument] Document starts empty`);
+			}
 			}
 		} catch (error) {
 			console.error(`[webhook:onLoadDocument] Error:`, error);
@@ -107,9 +216,11 @@ const customWebhookExtension = {
 					htmlContent = data.document.getText('content').toString();
 				} else {
 					try {
+						const xmlFragment = data.document.getXmlFragment('content');
+						console.log(`[webhook:onChange] xmlFragment content types:`, xmlFragment.toArray().map(item => item?.constructor?.name || typeof item));
 						const json = TiptapTransformer.fromYdoc(data.document, 'content');
 						if (json) {
-							htmlContent = generateHTML(json, [StarterKit]);
+							htmlContent = generateHTML(json, extensions);
 						}
 					} catch (err) {
 						console.warn(`[webhook:onChange] Failed to convert doc to HTML:`, err);

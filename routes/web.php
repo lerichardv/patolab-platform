@@ -114,6 +114,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Specimen Report Editor routes
     Route::get('specimens/{specimen:sequence_code}/report-editor', [ReportEditorController::class, 'show'])->name('specimens.report-editor');
     Route::post('specimens/{specimen:sequence_code}/report-editor', [ReportEditorController::class, 'store'])->name('specimens.report-editor.store');
+    Route::post('specimens/{specimen:sequence_code}/report-editor/save', [ReportEditorController::class, 'save'])->name('specimens.report-editor.save');
     Route::post('specimens/{specimen:sequence_code}/report-editor/update-date', [ReportEditorController::class, 'updateDate'])->name('specimens.report-editor.update-date');
     Route::post('specimens/{specimen:sequence_code}/report-editor/transition-state', [ReportEditorController::class, 'transitionState'])->name('specimens.report-editor.transition-state');
     Route::post('specimens/{specimen:sequence_code}/report-editor/upload-image', [ReportEditorController::class, 'uploadImage'])->name('specimens.report-editor.upload-image');

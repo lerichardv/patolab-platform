@@ -44,7 +44,7 @@ class ReportEditorController extends Controller
                 ]);
             }
             if ($event === 'create') {
-                $specimen = DB::table('specimens')->where('report_id', $reportId)->first();
+                $specimen = DB::table('specimen')->where('report_id', $reportId)->first();
 
                 return response()->json([
                     'content' => $specimen ? $specimen->status : '',
@@ -93,13 +93,24 @@ class ReportEditorController extends Controller
 
         // SCENARIO B: Typing pause threshold reached (Background automatic save process)
         if ($event === 'onChange') {
+            $updateData = [
+                $stateColumn => base64_decode($payload['document']), // Save raw binary vector history
+                'updated_at' => now(),
+            ];
+
+            $htmlValue = $payload['html'] ?? '';
+
+            if ($htmlColumn === 'report_date') {
+                if (!empty($htmlValue) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $htmlValue)) {
+                    $updateData[$htmlColumn] = $htmlValue;
+                }
+            } else {
+                $updateData[$htmlColumn] = $htmlValue;
+            }
+
             DB::table('specimen_reports')
                 ->where('id', $reportId)
-                ->update([
-                    $stateColumn => base64_decode($payload['document']), // Save raw binary vector history
-                    $htmlColumn => $payload['html'] ?? '',              // Save plain indexable HTML string
-                    'updated_at' => now(),
-                ]);
+                ->update($updateData);
 
             return response()->json(['status' => 'success']);
         }
@@ -112,7 +123,21 @@ class ReportEditorController extends Controller
      */
     public function show(Specimen $specimen)
     {
-        $specimen->load(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'report']);
+        $specimen->load([
+            'customerRelation',
+            'type',
+            'examination',
+            'category',
+            'referrerRelation',
+            'report',
+            'users.role',
+            'group.invoice.caiRange',
+            'group.invoice.creditRelation',
+            'group.invoice.transferBank',
+            'invoiceRelation.caiRange',
+            'invoiceRelation.creditRelation',
+            'invoiceRelation.transferBank',
+        ]);
 
         return Inertia::render('specimens/report-editor', [
             'specimen' => $specimen,
@@ -174,6 +199,70 @@ class ReportEditorController extends Controller
     }
 
     /**
+     * Save/Update the entire report content manually.
+     */
+    public function save(Request $request, Specimen $specimen)
+    {
+        $request->validate([
+            'report_date' => 'nullable|string',
+            'macroscopy_html' => 'nullable|string',
+            'microscopy_html' => 'nullable|string',
+            'diagnosis_html' => 'nullable|string',
+            'yjs_macroscopy_state' => 'nullable|string',
+            'yjs_microscopy_state' => 'nullable|string',
+            'yjs_diagnosis_state' => 'nullable|string',
+            'yjs_report_date_state' => 'nullable|string',
+        ]);
+
+        $specimen->load('report');
+        if (! $specimen->report) {
+            return response()->json(['error' => 'No hay reporte asociado a esta muestra.'], 404);
+        }
+
+        $updateData = [];
+
+        if ($request->has('report_date')) {
+            $reportDate = $request->input('report_date');
+            if (!empty($reportDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportDate)) {
+                $updateData['report_date'] = $reportDate;
+            }
+        }
+
+        if ($request->has('macroscopy_html')) {
+            $updateData['macroscopy_html'] = $request->input('macroscopy_html') ?? '';
+        }
+        if ($request->has('microscopy_html')) {
+            $updateData['microscopy_html'] = $request->input('microscopy_html') ?? '';
+        }
+        if ($request->has('diagnosis_html')) {
+            $updateData['diagnosis_html'] = $request->input('diagnosis_html') ?? '';
+        }
+
+        if ($request->filled('yjs_macroscopy_state')) {
+            $updateData['yjs_macroscopy_state'] = base64_decode($request->input('yjs_macroscopy_state'));
+        }
+        if ($request->filled('yjs_microscopy_state')) {
+            $updateData['yjs_microscopy_state'] = base64_decode($request->input('yjs_microscopy_state'));
+        }
+        if ($request->filled('yjs_diagnosis_state')) {
+            $updateData['yjs_diagnosis_state'] = base64_decode($request->input('yjs_diagnosis_state'));
+        }
+        if ($request->filled('yjs_report_date_state')) {
+            $updateData['yjs_report_date_state'] = base64_decode($request->input('yjs_report_date_state'));
+        }
+
+        if (!empty($updateData)) {
+            $specimen->report->update($updateData);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Reporte guardado con éxito.',
+            'report' => $specimen->report,
+        ]);
+    }
+
+    /**
      * Transition the specimen state and update timestamps.
      */
     public function transitionState(Request $request, Specimen $specimen)
@@ -225,16 +314,21 @@ class ReportEditorController extends Controller
         $examination = $specimen->examination;
         $referrer = $specimen->referrerRelation;
 
+        // Convert all local/remote images in editor contents to Base64 data URIs so Browsershot can render them.
+        $report->diagnosis_html = $this->convertImagesToBase64($report->diagnosis_html);
+        $report->macroscopy_html = $this->convertImagesToBase64($report->macroscopy_html);
+        $report->microscopy_html = $this->convertImagesToBase64($report->microscopy_html);
+
         $htmlContent = view('pdf.report.body', compact('specimen', 'report', 'customer', 'examination', 'referrer'))->render();
 
         $pdfContent = Browsershot::html($htmlContent)
-            ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
-            ->addChromiumArguments([
-                'disable-crash-reporter',
-                'disable-dev-shm-usage',
-                'no-sandbox',
-            ])
-            ->noSandbox()
+            // ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
+            // ->addChromiumArguments([
+            //     'disable-crash-reporter',
+            //     'disable-dev-shm-usage',
+            //     'no-sandbox',
+            // ])
+            // ->noSandbox()
             ->paperWidth('216mm')
             ->paperHeight('279mm')
             ->margins(0, 0, 0, 0)
@@ -244,6 +338,83 @@ class ReportEditorController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', 'attachment; filename="reporte_'.$specimen->sequence_code.'.pdf"');
     }
+
+    /**
+     * Convert image src attributes in the given HTML to Base64 inline data URIs.
+     */
+    private function convertImagesToBase64($html)
+    {
+        if (empty($html)) {
+            return $html;
+        }
+
+        return preg_replace_callback('/<img\s+([^>]*\s*)src=["\']([^"\']+)["\']([^>]*)/i', function ($matches) {
+            $beforeSrc = $matches[1];
+            $url = $matches[2];
+            $afterSrc = $matches[3];
+
+            // If it's already base64, don't convert again
+            if (str_starts_with($url, 'data:image/')) {
+                return $matches[0];
+            }
+
+            $base64 = $this->getImageBase64($url);
+            if ($base64) {
+                return '<img ' . $beforeSrc . 'src="' . $base64 . '"' . $afterSrc;
+            }
+
+            return $matches[0];
+        }, $html);
+    }
+
+    /**
+     * Retrieve base64 encoded data URI of an image by local path mapping or URL request.
+     */
+    private function getImageBase64($url)
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        if ($path) {
+            // Check if it's a storage path (e.g. /storage/report-images/...)
+            if (preg_match('/^\/storage\/(.+)$/', $path, $storageMatches)) {
+                $relativePath = $storageMatches[1];
+                $localPath = storage_path('app/public/' . $relativePath);
+                if (file_exists($localPath)) {
+                    $data = file_get_contents($localPath);
+                    $mime = mime_content_type($localPath) ?: 'image/jpeg';
+                    return 'data:' . $mime . ';base64,' . base64_encode($data);
+                }
+            }
+
+            // Fallback: check public directory
+            $publicPath = public_path(ltrim($path, '/'));
+            if (file_exists($publicPath)) {
+                $data = file_get_contents($publicPath);
+                $mime = mime_content_type($publicPath) ?: 'image/jpeg';
+                return 'data:' . $mime . ';base64,' . base64_encode($data);
+            }
+        }
+
+        // External/Remote URL fallback
+        try {
+            $data = file_get_contents($url);
+            if ($data !== false) {
+                $mime = 'image/jpeg';
+                $ext = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
+                if (in_array(strtolower($ext), ['png', 'gif', 'webp', 'svg'])) {
+                    $mime = 'image/' . strtolower($ext);
+                    if (strtolower($ext) === 'svg') {
+                        $mime = 'image/svg+xml';
+                    }
+                }
+                return 'data:' . $mime . ';base64,' . base64_encode($data);
+            }
+        } catch (\Exception $e) {
+            // Ignore/Log
+        }
+
+        return null;
+    }
+
 
     /**
      * Upload and optimize an image for use inside the report editor.
@@ -267,4 +438,3 @@ class ReportEditorController extends Controller
         ]);
     }
 }
-

@@ -2,10 +2,10 @@
 	"name": "editor-collaboration-server",
 	"version": "1.0.0",
 	"type": "module",
-	"main": "server.js",
+	"main": "index.js",
 	"scripts": {
-		"dev": "nodemon server.js",
-		"start": "node server.js"
+		"dev": "nodemon index.js",
+		"start": "node index.js"
 	},
 	"keywords": [],
 	"author": "",
@@ -15,9 +15,20 @@
 		"@hocuspocus/extension-webhook": "^4.1.0",
 		"@hocuspocus/provider": "^4.1.0",
 		"@hocuspocus/server": "^4.1.0",
+		"@hocuspocus/transformer": "^4.1.0",
+		"@tiptap/extension-image": "^3.26.0",
+		"@tiptap/extension-table": "^3.26.0",
+		"@tiptap/extension-table-cell": "^3.26.0",
+		"@tiptap/extension-table-header": "^3.26.0",
+		"@tiptap/extension-table-row": "^3.26.0",
+		"@tiptap/extension-text-align": "^3.26.0",
 		"@tiptap/html": "^3.25.0",
+		"@tiptap/starter-kit": "^3.26.0",
 		"crossws": "^0.4.5",
 		"express": "^5.2.1",
+		"happy-dom": "^20.10.1",
+		"y-prosemirror": "^1.3.7",
+		"y-protocols": "^1.0.7",
 		"yjs": "^13.6.31"
 	},
 	"devDependencies": {
