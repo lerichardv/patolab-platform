@@ -13,7 +13,7 @@
         }
  
         @page {
-            size: 216mm 279mm;
+            size: 215.9mm 279.4mm;
             margin: 45mm 15mm 30mm 15mm;
         }
 

@@ -64,28 +64,25 @@ const CustomImage = Image.extend({
 		};
 	},
 
-	renderHTML({ node, HTMLAttributes }) {
-		const align = node?.attrs?.alignment || 'center';
-		const isLeft = align === 'left';
-		const isRight = align === 'right';
+	renderHTML({ HTMLAttributes }) {
+		const isLeft = HTMLAttributes.alignment === 'left';
+		const isRight = HTMLAttributes.alignment === 'right';
 		const marginLeft = isLeft ? '0' : 'auto';
 		const marginRight = isRight ? '0' : 'auto';
 
 		const styles = [`display: block`, `margin-left: ${marginLeft}`, `margin-right: ${marginRight}`];
-		const width = node?.attrs?.width;
-		const height = node?.attrs?.height;
-		if (width) {
-			styles.push(`width: ${width}px`);
+		if (HTMLAttributes.width) {
+			styles.push(`width: ${HTMLAttributes.width}px`);
 		}
-		if (height) {
-			styles.push(`height: ${height}px`);
+		if (HTMLAttributes.height) {
+			styles.push(`height: ${HTMLAttributes.height}px`);
 		}
 
 		return [
 			'img',
 			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-				'data-align': align,
-				class: `align-${align}`,
+				'data-align': HTMLAttributes.alignment || 'center',
+				class: `align-${HTMLAttributes.alignment || 'center'}`,
 				style: styles.join('; ') + ';'
 			})
 		];
@@ -141,7 +138,7 @@ const customWebhookExtension = {
 	async onLoadDocument(data) {
 		try {
 			console.log(`[webhook:onLoadDocument] Loading document: ${data.documentName}`);
-			
+
 			// 1. First, check if we received a saved binary state during onConnect
 			const savedStateBase64 = data.context?.documentState;
 			let isLoaded = false;
@@ -149,8 +146,8 @@ const customWebhookExtension = {
 				console.log(`[webhook:onLoadDocument] Restoring document from saved binary state`);
 				const binaryState = Buffer.from(savedStateBase64, 'base64');
 				Y.applyUpdate(data.document, binaryState);
-				
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status')) {
+
+				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status')) {
 					const text = data.document.getText('content').toString();
 					if (text && text.trim() !== '') {
 						isLoaded = true;
@@ -162,42 +159,42 @@ const customWebhookExtension = {
 
 			if (!isLoaded) {
 
-			// 2. If no binary state exists, fetch the initial HTML/content using the "create" event
-			const response = await fetch(webhookUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					event: 'create',
-					payload: {
-						documentName: data.documentName,
-						requestParameters: Object.fromEntries(data.requestParameters.entries()),
-					}
-				})
-			});
-			if (!response.ok) {
-				console.error(`[webhook:onLoadDocument] Laravel returned status ${response.status}`);
-				return;
-			}
-			const resData = await response.json();
-			const htmlContent = resData.content;
-			
-			if (htmlContent) {
-				console.log(`[webhook:onLoadDocument] Seeding document with initial content`);
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status')) {
-					// Seed with plain text
-					const ytext = data.document.getText('content');
-					ytext.insert(0, htmlContent);
-				} else {
-					// Parse HTML into ProseMirror JSON using Tiptap
-					const docJson = generateJSON(htmlContent, extensions);
-					// Convert ProseMirror JSON to Yjs Ydoc update
-					const initialYdoc = TiptapTransformer.toYdoc(docJson, 'content', extensions);
-					// Merge it into the document
-					data.document.merge(initialYdoc);
+				// 2. If no binary state exists, fetch the initial HTML/content using the "create" event
+				const response = await fetch(webhookUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						event: 'create',
+						payload: {
+							documentName: data.documentName,
+							requestParameters: Object.fromEntries(data.requestParameters.entries()),
+						}
+					})
+				});
+				if (!response.ok) {
+					console.error(`[webhook:onLoadDocument] Laravel returned status ${response.status}`);
+					return;
 				}
-			} else {
-				console.log(`[webhook:onLoadDocument] Document starts empty`);
-			}
+				const resData = await response.json();
+				const htmlContent = resData.content;
+
+				if (htmlContent) {
+					console.log(`[webhook:onLoadDocument] Seeding document with initial content`);
+					if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status')) {
+						// Seed with plain text
+						const ytext = data.document.getText('content');
+						ytext.insert(0, htmlContent);
+					} else {
+						// Parse HTML into ProseMirror JSON using Tiptap
+						const docJson = generateJSON(htmlContent, extensions);
+						// Convert ProseMirror JSON to Yjs Ydoc update
+						const initialYdoc = TiptapTransformer.toYdoc(docJson, 'content', extensions);
+						// Merge it into the document
+						data.document.merge(initialYdoc);
+					}
+				} else {
+					console.log(`[webhook:onLoadDocument] Document starts empty`);
+				}
 			}
 		} catch (error) {
 			console.error(`[webhook:onLoadDocument] Error:`, error);
@@ -208,14 +205,14 @@ const customWebhookExtension = {
 		const save = async () => {
 			try {
 				console.log(`[webhook:onChange] Saving document: ${data.documentName}`);
-				
+
 				// 1. Get binary state and encode to base64
 				const binaryState = Y.encodeStateAsUpdate(data.document);
 				const base64State = Buffer.from(binaryState).toString('base64');
 
 				// 2. Convert Ydoc to ProseMirror JSON, then to HTML (or extract plain text for date/status)
 				let htmlContent = '';
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status')) {
+				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status')) {
 					htmlContent = data.document.getText('content').toString();
 				} else {
 					try {

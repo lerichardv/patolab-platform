@@ -56,6 +56,24 @@ class ReportEditorController extends Controller
 
             return response()->json(['status' => 'ignored']);
         }
+
+        if ($field === 'save-status') {
+            if ($event === 'onConnect') {
+                return response()->json([
+                    'document' => null,
+                ]);
+            }
+            if ($event === 'create') {
+                return response()->json([
+                    'content' => 'idle',
+                ]);
+            }
+            if ($event === 'onChange') {
+                return response()->json(['status' => 'success']);
+            }
+
+            return response()->json(['status' => 'ignored']);
+        }
         // 3. Map the room string parameters to your exact database schema columns
         $columnMap = [
             'macroscopy' => ['state' => 'yjs_macroscopy_state', 'html' => 'macroscopy_html'],
@@ -329,8 +347,8 @@ class ReportEditorController extends Controller
             //     'no-sandbox',
             // ])
             // ->noSandbox()
-            ->paperWidth('216mm')
-            ->paperHeight('279mm')
+            ->paperWidth('215.9mm')
+            ->paperHeight('279.4mm')
             ->margins(0, 0, 0, 0)
             ->pdf();
 

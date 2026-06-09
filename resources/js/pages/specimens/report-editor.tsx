@@ -1207,6 +1207,94 @@ function CollaboratorsList({ users }: { users: Collaborator[] }) {
 	);
 }
 
+interface MeasuredBlock {
+	id: string;
+	type: 'patient-card' | 'section-header' | 'html' | 'page-break' | 'signature';
+	height: number;
+	title?: string;
+	html?: string;
+	className?: string;
+}
+
+function parseHtmlToBlocks(html: string): string[] {
+	if (!html) return [];
+	if (typeof window === 'undefined') return [html];
+	
+	const div = document.createElement('div');
+	div.innerHTML = html;
+	
+	const blocks: string[] = [];
+	let currentText = '';
+	
+	Array.from(div.childNodes).forEach(node => {
+		if (node.nodeType === Node.ELEMENT_NODE) {
+			if (currentText.trim()) {
+				blocks.push(currentText);
+				currentText = '';
+			}
+			blocks.push((node as Element).outerHTML);
+		} else {
+			currentText += node.textContent || '';
+		}
+	});
+	
+	if (currentText.trim()) {
+		blocks.push(currentText);
+	}
+	
+	return blocks.length > 0 ? blocks : [html];
+}
+
+function PatientMetadataCard({ specimen }: { specimen: Specimen }) {
+	return (
+		<div className="border border-blue-200 bg-blue-50/50 rounded p-3 mb-4 text-[9px] grid grid-cols-2 gap-4 shrink-0">
+			<div className="space-y-1">
+				<p><strong className="text-blue-900 font-semibold">Nombre:</strong> {specimen.customer_relation.name}</p>
+				<p><strong className="text-blue-900 font-semibold">Edad / Sexo:</strong> {specimen.customer_relation.age ?? 'N/A'} años / {specimen.customer_relation.gender}</p>
+				<p><strong className="text-blue-900 font-semibold">Médico Remitente:</strong> {specimen.referrer_relation.name}</p>
+				<p><strong className="text-blue-900 font-semibold">Diagnóstico Clínico:</strong> {specimen.diagnosis || 'N/A'}</p>
+			</div>
+			<div className="space-y-1">
+				<p><strong className="text-blue-900 font-semibold">Hospital/Clínica:</strong> {specimen.referrer_relation.notes || 'HDV'}</p>
+				<p><strong className="text-blue-900 font-semibold">Sitio Preciso de la Muestra:</strong> {specimen.anatomic_site}</p>
+				<p><strong className="text-blue-900 font-semibold">Fecha de la Toma:</strong> {new Date(specimen.created_at).toLocaleDateString('es-HN')}</p>
+				<p><strong className="text-blue-900 font-semibold">Fecha de Recibo:</strong> {new Date(specimen.created_at).toLocaleDateString('es-HN')}</p>
+			</div>
+		</div>
+	);
+}
+
+function SectionHeader({ title }: { title: string }) {
+	return (
+		<div className="text-[9.5px] font-bold text-gray-900 border-b border-gray-100 pb-1 mb-1.5 uppercase shrink-0">
+			{title}
+		</div>
+	);
+}
+
+function SignatureBlock({
+	pathologistName,
+	pathologistTitle,
+	reportDate,
+	isLastPage = false,
+}: {
+	pathologistName: string;
+	pathologistTitle: string;
+	reportDate: string;
+	isLastPage?: boolean;
+}) {
+	return (
+		<div className={cn("pt-6 text-center shrink-0", isLastPage && "mt-auto")}>
+			<div className="w-[180px] border-t border-gray-400 mx-auto mb-1" />
+			<div className="text-[9px] font-bold text-gray-800 uppercase">{pathologistName}</div>
+			<div className="text-[7.5px] text-gray-500 font-medium uppercase tracking-wide">{pathologistTitle}</div>
+			<div className="text-[8px] font-bold text-gray-600 mt-2">
+				FECHA: {reportDate ? new Date(reportDate).toLocaleDateString('es-HN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : new Date().toLocaleDateString('es-HN', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+			</div>
+		</div>
+	);
+}
+
 export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
 	const [activeField, setActiveField] = useState<'diagnosis' | 'macroscopy' | 'microscopy' | null>(null);
@@ -1235,6 +1323,10 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	const [microscopyHtml, setMicroscopyHtml] = useState(report?.microscopy_html || '');
 	const [diagnosisHtml, setDiagnosisHtml] = useState(report?.diagnosis_html || '');
 	const [macroscopyUsers, setMacroscopyUsers] = useState<Collaborator[]>([]);
+
+	// Derived visibility flags — declared early so they can be used in layout hooks below
+	const isMicroscopyVisible = ['microscopic_review', 'finalized', 'delivered'].includes(specimen.status);
+	const isFinished = ['finalized', 'delivered'].includes(specimen.status);
 	const [microscopyUsers, setMicroscopyUsers] = useState<Collaborator[]>([]);
 	const [diagnosisUsers, setDiagnosisUsers] = useState<Collaborator[]>([]);
 
@@ -1246,6 +1338,96 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 
 	const hasMounted = useRef(false);
 	const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const [pages, setPages] = useState<MeasuredBlock[][]>([]);
+	const hiddenContainerRef = useRef<HTMLDivElement>(null);
+	const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
+
+	const calculateLayout = () => {
+		if (!hiddenContainerRef.current) return;
+
+		const children = Array.from(hiddenContainerRef.current.children);
+		const computedPageBlocks: MeasuredBlock[] = [];
+		let headerHeight = 125;
+		let footerHeight = 65;
+
+		children.forEach((child, index) => {
+			const type = child.getAttribute('data-block-type') || 'html';
+			const height = child.getBoundingClientRect().height;
+
+			if (type === 'header-measure') {
+				headerHeight = height;
+			} else if (type === 'footer-measure') {
+				footerHeight = height;
+			} else {
+				const blockType = type as MeasuredBlock['type'];
+				if (blockType === 'patient-card') {
+					computedPageBlocks.push({ id: `patient-card-${index}`, type: blockType, height });
+				} else if (blockType === 'section-header') {
+					const title = child.getAttribute('data-block-title') || '';
+					computedPageBlocks.push({ id: `section-header-${index}`, type: blockType, height, title });
+				} else if (blockType === 'html') {
+					const html = child.innerHTML;
+					const className = child.className || '';
+					computedPageBlocks.push({ id: `html-${index}`, type: blockType, height, html, className });
+				} else if (blockType === 'page-break') {
+					computedPageBlocks.push({ id: `page-break-${index}`, type: blockType, height: 0 });
+				} else if (blockType === 'signature') {
+					computedPageBlocks.push({ id: `signature-${index}`, type: blockType, height });
+				}
+			}
+		});
+
+		const maxContentHeight = 1035 - 96 - headerHeight - footerHeight;
+
+		const computedPages: MeasuredBlock[][] = [];
+		let currentPage: MeasuredBlock[] = [];
+		let currentHeight = 0;
+
+		computedPageBlocks.forEach((block) => {
+			if (block.type === 'page-break') {
+				if (currentPage.length > 0) {
+					computedPages.push(currentPage);
+					currentPage = [];
+					currentHeight = 0;
+				}
+				return;
+			}
+
+			if (currentPage.length > 0 && currentHeight + block.height > maxContentHeight) {
+				computedPages.push(currentPage);
+				currentPage = [block];
+				currentHeight = block.height;
+			} else {
+				currentPage.push(block);
+				currentHeight += block.height;
+			}
+		});
+
+		if (currentPage.length > 0) {
+			computedPages.push(currentPage);
+		}
+
+		setPages(computedPages);
+	};
+
+	useIsomorphicLayoutEffect(() => {
+		calculateLayout();
+	}, [diagnosisHtml, macroscopyHtml, microscopyHtml, reportDate, specimen, isMicroscopyVisible]);
+
+	useEffect(() => {
+		const container = hiddenContainerRef.current;
+		if (!container) return;
+
+		const handleLoad = () => {
+			calculateLayout();
+		};
+
+		container.addEventListener('load', handleLoad, true);
+		return () => {
+			container.removeEventListener('load', handleLoad, true);
+		};
+	}, []);
 
 	// Detect typing activity and trigger autosave feedback
 	useEffect(() => {
@@ -1318,6 +1500,9 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	const [microscopyProvider, setMicroscopyProvider] = useState<HocuspocusProvider | null>(null);
 	const [diagnosisDoc, setDiagnosisDoc] = useState<Y.Doc | null>(null);
 	const [diagnosisProvider, setDiagnosisProvider] = useState<HocuspocusProvider | null>(null);
+	const [saveStatusDoc, setSaveStatusDoc] = useState<Y.Doc | null>(null);
+	const [saveStatusProvider, setSaveStatusProvider] = useState<HocuspocusProvider | null>(null);
+	const [globalSaveState, setGlobalSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
 
 	const reportDateRef = useRef(reportDate);
 
@@ -1326,7 +1511,15 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	}, [reportDate]);
 
 	const handleManualSave = () => {
-		setIsManualSaving(true);
+		if (saveStatusDoc) {
+			const ytext = saveStatusDoc.getText('content');
+			saveStatusDoc.transact(() => {
+				ytext.delete(0, ytext.length);
+				ytext.insert(0, 'saving');
+			});
+		} else {
+			setIsManualSaving(true);
+		}
 		const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '';
 
 		const macroscopyBase64 = macroscopyDoc ? uint8ToBase64(Y.encodeStateAsUpdate(macroscopyDoc)) : null;
@@ -1360,12 +1553,26 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 				return data;
 			})
 			.then(() => {
-				setLastSaved(new Date());
+				if (saveStatusDoc) {
+					const ytext = saveStatusDoc.getText('content');
+					saveStatusDoc.transact(() => {
+						ytext.delete(0, ytext.length);
+						ytext.insert(0, 'saved');
+					});
+					setTimeout(() => {
+						saveStatusDoc.transact(() => {
+							ytext.delete(0, ytext.length);
+							ytext.insert(0, 'idle');
+						});
+					}, 1300);
+				} else {
+					setLastSaved(new Date());
+					setIsSavedRecently(true);
+					setTimeout(() => {
+						setIsSavedRecently(false);
+					}, 1300);
+				}
 				toast.success('Reporte guardado con éxito');
-				setIsSavedRecently(true);
-				setTimeout(() => {
-					setIsSavedRecently(false);
-				}, 1300);
 				router.reload({
 					only: ['report'],
 				});
@@ -1373,6 +1580,13 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 			.catch((err) => {
 				console.error(err);
 				toast.error(err.message || 'Error al guardar el reporte');
+				if (saveStatusDoc) {
+					const ytext = saveStatusDoc.getText('content');
+					saveStatusDoc.transact(() => {
+						ytext.delete(0, ytext.length);
+						ytext.insert(0, 'idle');
+					});
+				}
 			})
 			.finally(() => {
 				setIsManualSaving(false);
@@ -1442,8 +1656,35 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 		setDiagnosisDoc(diagDoc);
 		setDiagnosisProvider(diagProvider);
 
+		// 5. Save Status room
+		const saveDoc = new Y.Doc();
+		const saveProvider = new HocuspocusProvider({
+			url: 'ws://127.0.0.1:1234',
+			name: `report-${report.id}-save-status`,
+			document: saveDoc,
+			token: 'secure-token-or-session-id',
+		});
+
+		setSaveStatusDoc(saveDoc);
+		setSaveStatusProvider(saveProvider);
+
+		const ytextSave = saveDoc.getText('content');
+		const handleSaveYjsChange = () => {
+			const val = ytextSave.toString();
+			if (val === 'saving') {
+				setGlobalSaveState('saving');
+			} else if (val === 'saved') {
+				setGlobalSaveState('saved');
+				setLastSaved(new Date());
+			} else {
+				setGlobalSaveState('idle');
+			}
+		};
+		ytextSave.observe(handleSaveYjsChange);
+
 		return () => {
 			ytext.unobserve(handleYjsChange);
+			ytextSave.unobserve(handleSaveYjsChange);
 			dProvider.destroy();
 			dDoc.destroy();
 			macProvider.destroy();
@@ -1452,6 +1693,8 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 			micDoc.destroy();
 			diagProvider.destroy();
 			diagDoc.destroy();
+			saveProvider.destroy();
+			saveDoc.destroy();
 			setDateDoc(null);
 			setDateProvider(null);
 			setMacroscopyDoc(null);
@@ -1460,6 +1703,8 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 			setMicroscopyProvider(null);
 			setDiagnosisDoc(null);
 			setDiagnosisProvider(null);
+			setSaveStatusDoc(null);
+			setSaveStatusProvider(null);
 		};
 	}, [report?.id]);
 
@@ -1664,14 +1909,15 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	const pathologistName = pathologist ? pathologist.name : 'DRA. ESTEFANY LAGOS';
 	const pathologistTitle = pathologist ? (pathologist.role?.name || 'PATOLOGÍA ONCOLÓGICA') : 'PATOLOGÍA ONCOLÓGICA';
 
-	const isMicroscopyVisible = ['microscopic_review', 'finalized', 'delivered'].includes(specimen.status);
-	const totalPages = isMicroscopyVisible ? 2 : 1;
-	const isFinished = ['finalized', 'delivered'].includes(specimen.status);
+	const totalPages = pages.length > 0 ? pages.length : 1;
 
 	const renderPreviewPage = (pageNum: number) => {
+		const pageBlocks = pages[pageNum - 1] || [];
+		const totalNumPages = pages.length > 0 ? pages.length : 1;
+
 		return (
 			<div
-				className="w-[800px] h-[1035px] bg-white text-slate-800 p-12 border shadow-2xl relative flex flex-col font-sans select-none origin-top-left shrink-0 mb-6 text-left"
+				className="w-[800px] h-[1035px] bg-white text-slate-800 p-12 border shadow-2xl relative flex flex-col font-sans select-none origin-top-left shrink-0 mb-6 text-left overflow-hidden"
 				style={{
 					aspectRatio: '8.5/11'
 				}}
@@ -1706,79 +1952,36 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 				</div>
 
 				{/* Page Content */}
-				<div className="flex-1 flex flex-col overflow-hidden text-left">
-					{pageNum === 1 ? (
-						<>
-							{/* Patient Metadata preview */}
-							<div className="border border-blue-200 bg-blue-50/50 rounded p-3 mb-4 text-[9px] grid grid-cols-2 gap-4 shrink-0">
-								<div className="space-y-1">
-									<p><strong className="text-blue-900 font-semibold">Nombre:</strong> {specimen.customer_relation.name}</p>
-									<p><strong className="text-blue-900 font-semibold">Edad / Sexo:</strong> {specimen.customer_relation.age ?? 'N/A'} años / {specimen.customer_relation.gender}</p>
-									<p><strong className="text-blue-900 font-semibold">Médico Remitente:</strong> {specimen.referrer_relation.name}</p>
-									<p><strong className="text-blue-900 font-semibold">Diagnóstico Clínico:</strong> {specimen.diagnosis || 'N/A'}</p>
-								</div>
-								<div className="space-y-1">
-									<p><strong className="text-blue-900 font-semibold">Hospital/Clínica:</strong> {specimen.referrer_relation.notes || 'HDV'}</p>
-									<p><strong className="text-blue-900 font-semibold">Sitio Preciso de la Muestra:</strong> {specimen.anatomic_site}</p>
-									<p><strong className="text-blue-900 font-semibold">Fecha de la Toma:</strong> {new Date(specimen.created_at).toLocaleDateString('es-HN')}</p>
-									<p><strong className="text-blue-900 font-semibold">Fecha de Recibo:</strong> {new Date(specimen.created_at).toLocaleDateString('es-HN')}</p>
-								</div>
-							</div>
-
-							{/* Diagnosis block */}
-							{(diagnosisHtml || specimen.diagnosis) && (
-								<div className="mb-4 shrink-0">
-									<h4 className="text-[9.5px] font-bold text-gray-900 border-b border-gray-100 pb-1 mb-1.5 uppercase">Diagnóstico</h4>
-									<div
-										className="text-[9.5px] leading-relaxed text-gray-800 preview-content"
-										dangerouslySetInnerHTML={{ __html: diagnosisHtml || specimen.diagnosis || '' }}
-									/>
-								</div>
-							)}
-
-							{/* Macroscopy Preview */}
-							<div className="mb-4 flex-1 overflow-hidden">
-								<h4 className="text-[9.5px] font-bold text-gray-900 border-b border-gray-100 pb-1 mb-1.5 uppercase">Descripción Macroscópica</h4>
-								<div
-									className="text-[9px] leading-relaxed text-gray-800 preview-content overflow-y-auto max-h-full"
-									dangerouslySetInnerHTML={{ __html: macroscopyHtml || '<i>Pendiente de revisión macroscópica.</i>' }}
+				<div className="flex-1 flex flex-col overflow-hidden text-left gap-0">
+					{pageBlocks.map((block) => {
+						if (block.type === 'patient-card') {
+							return <PatientMetadataCard key={block.id} specimen={specimen} />;
+						}
+						if (block.type === 'section-header') {
+							return <SectionHeader key={block.id} title={block.title || ''} />;
+						}
+						if (block.type === 'signature') {
+							return (
+								<SignatureBlock
+									key={block.id}
+									pathologistName={pathologistName}
+									pathologistTitle={pathologistTitle}
+									reportDate={reportDate}
+									isLastPage={true}
 								/>
-							</div>
-
-							{/* Signature on Page 1 if only 1 page total */}
-							{totalPages === 1 && (
-								<div className="mt-auto pt-6 text-center shrink-0">
-									<div className="w-[180px] border-t border-gray-400 mx-auto mb-1" />
-									<div className="text-[9px] font-bold text-gray-800 uppercase">{pathologistName}</div>
-									<div className="text-[7.5px] text-gray-500 font-medium uppercase tracking-wide">{pathologistTitle}</div>
-									<div className="text-[8px] font-bold text-gray-600 mt-2">
-										FECHA: {reportDate ? new Date(reportDate).toLocaleDateString('es-HN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : new Date().toLocaleDateString('es-HN', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-									</div>
-								</div>
-							)}
-						</>
-					) : (
-						<>
-							{/* Microscopy Preview */}
-							<div className="mb-4 flex-1 overflow-hidden">
-								<h4 className="text-[9.5px] font-bold text-gray-900 border-b border-gray-100 pb-1 mb-1.5 uppercase">Descripción Microscópica</h4>
+							);
+						}
+						if (block.type === 'html') {
+							return (
 								<div
-									className="text-[9px] leading-relaxed text-gray-800 preview-content overflow-y-auto max-h-full"
-									dangerouslySetInnerHTML={{ __html: microscopyHtml || '<i>Pendiente de revisión microscópica.</i>' }}
+									key={block.id}
+									className={cn(block.className, "shrink-0")}
+									dangerouslySetInnerHTML={{ __html: block.html || '' }}
 								/>
-							</div>
-
-							{/* Signature always on the last page */}
-							<div className="mt-auto pt-6 text-center shrink-0">
-								<div className="w-[180px] border-t border-gray-400 mx-auto mb-1" />
-								<div className="text-[9px] font-bold text-gray-800 uppercase">{pathologistName}</div>
-								<div className="text-[7.5px] text-gray-500 font-medium uppercase tracking-wide">{pathologistTitle}</div>
-								<div className="text-[8px] font-bold text-gray-600 mt-2">
-									FECHA: {reportDate ? new Date(reportDate).toLocaleDateString('es-HN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : new Date().toLocaleDateString('es-HN', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-								</div>
-							</div>
-						</>
-					)}
+							);
+						}
+						return null;
+					})}
 				</div>
 
 				{/* Footer preview */}
@@ -1801,7 +2004,7 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 					</table>
 
 					<div className="mt-2 text-[7.5px] font-bold text-gray-600">
-						Página {pageNum} de {totalPages}
+						Página {pageNum} de {totalNumPages}
 					</div>
 				</div>
 			</div>
@@ -1835,15 +2038,15 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 					<button
 						data-slot="button"
 						onClick={handleManualSave}
-						disabled={isManualSaving || isSavedRecently || isAutosaving}
+						disabled={globalSaveState === 'saving' || globalSaveState === 'saved' || isSavedRecently || isAutosaving}
 						className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-emerald-600 text-white shadow-xs hover:bg-emerald-600/90 py-2 has-[>svg]:px-3 h-10 px-5 text-sm w-full md:w-auto cursor-pointer"
 					>
-						{isManualSaving ? (
+						{globalSaveState === 'saving' ? (
 							<>
 								<Loader2 className="h-4 w-4 animate-spin mr-1" />
 								Guardando...
 							</>
-						) : isSavedRecently ? (
+						) : (globalSaveState === 'saved' || isSavedRecently) ? (
 							<>
 								<Check className="h-4 w-4 mr-1 text-white" />
 								¡Guardado!
@@ -2276,6 +2479,121 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 					router.visit(`/specimens?specimen=${specimen.sequence_code || specimen.id}&action=edit`);
 				}}
 			/>
+
+			{/* Hidden container for layout measurement */}
+			<div
+				ref={hiddenContainerRef}
+				className="absolute opacity-0 pointer-events-none"
+				style={{
+					width: '704px', // 800 - 96px padding
+					top: '-9999px',
+					left: '-9999px',
+					fontFamily: "'Outfit', 'Helvetica Neue', Arial, sans-serif",
+					fontSize: '10.5px',
+					lineHeight: '1.45',
+					color: '#1f2937',
+				}}
+			>
+				{/* 1. Header (for measurement) */}
+				<div data-block-type="header-measure" className="border-b-2 border-slate-800 pb-3 mb-4">
+					<div className="flex justify-between items-start">
+						<div>
+							<img className="max-h-[52px] w-auto mb-1" src="/images/patolab-logo-horizontal.png" alt="Logo PatoLab" />
+							<span className="text-[8px] italic text-gray-600 block mt-0.5">Calidad Diagnóstica a su Servicio</span>
+						</div>
+						<div className="text-right">
+							<div className="bg-slate-100 border border-slate-300 text-slate-800 font-mono font-bold text-[9.5px] px-2.5 py-1 rounded">
+								Biopsia N° {specimen.sequence_code}
+							</div>
+						</div>
+					</div>
+					<h3 className="text-center text-xs font-bold tracking-wider mt-3 uppercase text-slate-800">Informe de Anatomía Patológica</h3>
+				</div>
+
+				{/* 2. Footer (for measurement) */}
+				<div data-block-type="footer-measure" className="border-t border-slate-800 pt-3 mt-4">
+					<div className="text-center text-[7.5px] font-semibold text-gray-700 mb-1">
+						Este reporte contiene información médica confidencial.
+					</div>
+					<table className="w-full border-none text-[7.5px] text-gray-500 table-fixed">
+						<tbody>
+							<tr className="border-none">
+								<td className="w-1/4 border-none p-0 align-middle text-left">✉ info@PatoLab.org</td>
+							</tr>
+						</tbody>
+					</table>
+					<div className="mt-2 text-[7.5px] font-bold text-gray-600">
+						Página 1 de 1
+					</div>
+				</div>
+
+				{/* 3. Patient Metadata Card */}
+				<div data-block-type="patient-card">
+					<PatientMetadataCard specimen={specimen} />
+				</div>
+
+				{/* 4. Diagnosis Header & Content */}
+				{(diagnosisHtml || specimen.diagnosis) && (
+					<>
+						<div data-block-type="section-header" data-block-title="Diagnóstico">
+							<SectionHeader title="Diagnóstico" />
+						</div>
+						{parseHtmlToBlocks(diagnosisHtml || specimen.diagnosis || '').map((html, idx) => (
+							<div
+								key={`diag-html-${idx}`}
+								data-block-type="html"
+								className="text-[9.5px] leading-relaxed text-gray-800 preview-content"
+								dangerouslySetInnerHTML={{ __html: html }}
+							/>
+						))}
+					</>
+				)}
+
+				{/* 5. Macroscopy Header & Content */}
+				<div data-block-type="section-header" data-block-title="Descripción Macroscópica">
+					<SectionHeader title="Descripción Macroscópica" />
+				</div>
+				{parseHtmlToBlocks(macroscopyHtml || '<i>Pendiente de revisión macroscópica.</i>').map((html, idx) => (
+					<div
+						key={`macro-html-${idx}`}
+						data-block-type="html"
+						className="text-[9px] leading-relaxed text-gray-800 preview-content"
+						dangerouslySetInnerHTML={{ __html: html }}
+					/>
+				))}
+
+				{/* 6. Page Break */}
+				{isMicroscopyVisible && (
+					<div data-block-type="page-break" style={{ height: '0px' }} />
+				)}
+
+				{/* 7. Microscopy Header & Content */}
+				{isMicroscopyVisible && (
+					<>
+						<div data-block-type="section-header" data-block-title="Descripción Microscópica">
+							<SectionHeader title="Descripción Microscópica" />
+						</div>
+						{parseHtmlToBlocks(microscopyHtml || '<i>Pendiente de revisión microscópica.</i>').map((html, idx) => (
+							<div
+								key={`micro-html-${idx}`}
+								data-block-type="html"
+								className="text-[9px] leading-relaxed text-gray-800 preview-content"
+								dangerouslySetInnerHTML={{ __html: html }}
+							/>
+						))}
+					</>
+				)}
+
+				{/* 8. Pathologist Signature Block */}
+				<div data-block-type="signature">
+					<SignatureBlock
+						pathologistName={pathologistName}
+						pathologistTitle={pathologistTitle}
+						reportDate={reportDate}
+						isLastPage={false}
+					/>
+				</div>
+			</div>
 		</EditorLayout>
 	);
 }
