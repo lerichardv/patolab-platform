@@ -3,9 +3,9 @@ import debounce from 'lodash/debounce';
 import { Edit2, FlaskConical, Plus, Search, Trash2 } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { 
-    index as examinationsIndex, 
-    destroy as destroyExamination 
+import {
+    index as examinationsIndex,
+    destroy as destroyExamination,
 } from '@/actions/App/Http/Controllers/SpecimenTypeExaminationController';
 import { Pagination } from '@/components/pagination';
 import {
@@ -20,14 +20,20 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from '@/components/ui/table';
 import SpecimenTypeExaminationSheet from './specimen-type-examination-sheet';
 
@@ -66,20 +72,26 @@ interface Props {
     };
 }
 
-export default function SpecimenTypeExaminationsIndex({ examinations, specimenTypes, filters }: Props) {
+export default function SpecimenTypeExaminationsIndex({
+    examinations,
+    specimenTypes,
+    filters,
+}: Props) {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [selectedExamination, setSelectedExamination] = useState<Examination | null>(null);
-    const [examinationToDelete, setExaminationToDelete] = useState<Examination | null>(null);
+    const [selectedExamination, setSelectedExamination] =
+        useState<Examination | null>(null);
+    const [examinationToDelete, setExaminationToDelete] =
+        useState<Examination | null>(null);
     const [search, setSearch] = useState(filters.search || '');
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
 
         if (value === 'all' || value === '') {
-delete newFilters[key as keyof typeof filters];
-}
-        
+            delete newFilters[key as keyof typeof filters];
+        }
+
         router.get(examinationsIndex().url, newFilters, {
             preserveState: true,
             replace: true,
@@ -90,7 +102,7 @@ delete newFilters[key as keyof typeof filters];
         debounce((value: string) => {
             handleFilterChange('search', value);
         }, 300),
-        [filters]
+        [filters],
     );
 
     useEffect(() => {
@@ -133,12 +145,20 @@ delete newFilters[key as keyof typeof filters];
                     <div>
                         <div className="flex items-center gap-2">
                             <FlaskConical className="h-6 w-6 text-primary" />
-                            <h1 className="text-2xl font-bold tracking-tight">Tipos de Análisis</h1>
+                            <h1 className="text-2xl font-bold tracking-tight">
+                                Tipos de Análisis
+                            </h1>
                         </div>
-                        <p className="text-muted-foreground">Administre los diferentes análisis disponibles por tipo de muestra.</p>
+                        <p className="text-muted-foreground">
+                            Administre los diferentes análisis disponibles por
+                            tipo de muestra.
+                        </p>
                     </div>
                     <div className="flex gap-2">
-                        <Button onClick={handleCreate} className="h-10 px-5 text-sm w-full md:w-auto">
+                        <Button
+                            onClick={handleCreate}
+                            className="h-10 w-full px-5 text-sm md:w-auto"
+                        >
                             <Plus className="mr-2 h-4 w-4" /> Nuevo Análisis
                         </Button>
                     </div>
@@ -146,7 +166,7 @@ delete newFilters[key as keyof typeof filters];
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
                     <div className="relative">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Buscar por nombre..."
                             className="pl-8"
@@ -154,14 +174,24 @@ delete newFilters[key as keyof typeof filters];
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <Select value={filters.specimen_type || 'all'} onValueChange={(v) => handleFilterChange('specimen_type', v)}>
+                    <Select
+                        value={filters.specimen_type || 'all'}
+                        onValueChange={(v) =>
+                            handleFilterChange('specimen_type', v)
+                        }
+                    >
                         <SelectTrigger>
                             <SelectValue placeholder="Tipo de Muestra" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Todos los tipos de muestra</SelectItem>
+                            <SelectItem value="all">
+                                Todos los tipos de muestra
+                            </SelectItem>
                             {specimenTypes.map((type) => (
-                                <SelectItem key={type.id} value={type.id.toString()}>
+                                <SelectItem
+                                    key={type.id}
+                                    value={type.id.toString()}
+                                >
                                     {type.name}
                                 </SelectItem>
                             ))}
@@ -177,7 +207,9 @@ delete newFilters[key as keyof typeof filters];
                                 <TableHead>Análisis</TableHead>
                                 <TableHead>Descripción</TableHead>
                                 <TableHead>Fecha Creación</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
+                                <TableHead className="text-right">
+                                    Acciones
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -186,26 +218,44 @@ delete newFilters[key as keyof typeof filters];
                                     <TableRow key={exam.id}>
                                         <TableCell>
                                             <span className="font-semibold text-primary">
-                                                {exam.type?.name || 'Cargando...'}
+                                                {exam.type?.name ||
+                                                    'Cargando...'}
                                             </span>
                                         </TableCell>
-                                        <TableCell className="font-medium">{exam.name}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {exam.name}
+                                        </TableCell>
                                         <TableCell className="max-w-xs truncate text-muted-foreground">
                                             {exam.description}
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
-                                            {new Date(exam.created_at).toLocaleDateString('es-ES', {
+                                            {new Date(
+                                                exam.created_at,
+                                            ).toLocaleDateString('es-ES', {
                                                 day: '2-digit',
                                                 month: '2-digit',
-                                                year: 'numeric'
+                                                year: 'numeric',
                                             })}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(exam)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        handleEdit(exam)
+                                                    }
+                                                >
                                                     <Edit2 className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteClick(exam)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-destructive"
+                                                    onClick={() =>
+                                                        handleDeleteClick(exam)
+                                                    }
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -214,7 +264,10 @@ delete newFilters[key as keyof typeof filters];
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
+                                    <TableCell
+                                        colSpan={4}
+                                        className="h-24 text-center"
+                                    >
                                         No se encontraron resultados.
                                     </TableCell>
                                 </TableRow>
@@ -223,13 +276,13 @@ delete newFilters[key as keyof typeof filters];
                     </Table>
                 </div>
 
-                <Pagination 
-                    links={examinations.links} 
+                <Pagination
+                    links={examinations.links}
                     meta={{
                         from: examinations.from,
                         to: examinations.to,
-                        total: examinations.total
-                    }} 
+                        total: examinations.total,
+                    }}
                 />
             </div>
 
@@ -240,18 +293,27 @@ delete newFilters[key as keyof typeof filters];
                 onOpenChange={setIsSheetOpen}
             />
 
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>¿Está completamente seguro?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            ¿Está completamente seguro?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción desactivará el tipo de análisis <strong>{examinationToDelete?.name}</strong>. 
-                            Ya no aparecerá en la lista activa.
+                            Esta acción desactivará el tipo de análisis{' '}
+                            <strong>{examinationToDelete?.name}</strong>. Ya no
+                            aparecerá en la lista activa.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-white hover:bg-destructive/90">
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                        >
                             Desactivar
                         </AlertDialogAction>
                     </AlertDialogFooter>

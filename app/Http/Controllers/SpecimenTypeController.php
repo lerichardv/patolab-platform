@@ -42,7 +42,7 @@ class SpecimenTypeController extends Controller
             'description' => $validated['description'] ?? null,
         ]);
 
-        if (!empty($validated['prices'])) {
+        if (! empty($validated['prices'])) {
             foreach ($validated['prices'] as $priceData) {
                 $specimenType->prices()->create([
                     'amount' => $priceData['amount'],

@@ -9,11 +9,8 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-    Sheet,
-    SheetContent,
-} from '@/components/ui/sheet';
+} from '@/components/ui/alert-dialog';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import InvoiceForm from './invoice-form';
 
 interface Props {
@@ -65,7 +62,7 @@ export default function InvoiceSheet({
     return (
         <>
             <Sheet open={open} onOpenChange={handleOpenChange}>
-                <SheetContent className="w-full sm:max-w-[90vw] md:max-w-[1000px] lg:max-w-[1100px] overflow-y-auto">
+                <SheetContent className="w-full overflow-y-auto sm:max-w-[90vw] md:max-w-[1000px] lg:max-w-[1100px]">
                     <HeadingSheet
                         title="Editar Factura"
                         description="Realice cambios en la información de la factura aquí. Todos los importes y datos de pago pueden ser ajustados."
@@ -82,16 +79,24 @@ export default function InvoiceSheet({
                 </SheetContent>
             </Sheet>
 
-            <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+            <AlertDialog
+                open={showCloseConfirm}
+                onOpenChange={setShowCloseConfirm}
+            >
                 <AlertDialogContent className="max-w-[450px]">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>¿Estás seguro de salir?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            ¿Estás seguro de salir?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Tiene cambios sin guardar en los datos de la factura. Los cambios se perderán permanentemente.
+                            Tiene cambios sin guardar en los datos de la
+                            factura. Los cambios se perderán permanentemente.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setShowCloseConfirm(false)}>
+                        <AlertDialogCancel
+                            onClick={() => setShowCloseConfirm(false)}
+                        >
                             Cancelar
                         </AlertDialogCancel>
                         <AlertDialogAction
@@ -99,7 +104,7 @@ export default function InvoiceSheet({
                                 setShowCloseConfirm(false);
                                 onOpenChange(false);
                             }}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-white"
+                            className="bg-destructive text-destructive-foreground text-white hover:bg-destructive/90"
                         >
                             Sí, salir
                         </AlertDialogAction>

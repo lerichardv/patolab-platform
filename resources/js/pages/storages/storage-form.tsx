@@ -1,7 +1,10 @@
 import { useForm } from '@inertiajs/react';
 import type { FormEventHandler } from 'react';
 import { toast } from 'sonner';
-import { update as updateStorage, store as storeStorage } from '@/actions/App/Http/Controllers/StorageController';
+import {
+    update as updateStorage,
+    store as storeStorage,
+} from '@/actions/App/Http/Controllers/StorageController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +53,7 @@ export default function StorageForm({ storage, onSuccess }: Props) {
     };
 
     return (
-        <form onSubmit={submit} className="space-y-4 py-4 px-5">
+        <form onSubmit={submit} className="space-y-4 px-5 py-4">
             <div className="space-y-2">
                 <Label htmlFor="name">Nombre del Almacén *</Label>
                 <Input

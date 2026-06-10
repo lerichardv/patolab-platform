@@ -6,6 +6,7 @@ use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Invoice extends Model
 {
@@ -104,7 +105,7 @@ class Invoice extends Model
         return $this->belongsTo(SpecimenGroup::class, 'group_id');
     }
 
-    public function specimenGroup(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function specimenGroup(): HasOne
     {
         return $this->hasOne(SpecimenGroup::class, 'invoice_id');
     }

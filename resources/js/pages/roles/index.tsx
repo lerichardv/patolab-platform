@@ -8,7 +8,25 @@ import {
     update as updateRole,
     destroy as destroyRole,
 } from '@/actions/App/Http/Controllers/RoleController';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -28,24 +46,11 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface Permission {
     id: number;
@@ -112,7 +117,8 @@ const permissionRows: PermissionRow[] = [
     },
     {
         label: 'Muestras Médicas',
-        description: 'Recepción, análisis, diagnóstico y asignación de patólogos.',
+        description:
+            'Recepción, análisis, diagnóstico y asignación de patólogos.',
         slugs: {
             view: 'specimens.view',
             create: 'specimens.create',
@@ -217,7 +223,8 @@ const permissionRows: PermissionRow[] = [
     },
     {
         label: 'Tipos de Remitente',
-        description: 'Clasificación de orígenes (ej. Hospital, Consulta Privada).',
+        description:
+            'Clasificación de orígenes (ej. Hospital, Consulta Privada).',
         slugs: {
             create: 'referrer_types.create',
             edit: 'referrer_types.edit',
@@ -259,7 +266,12 @@ const permissionRows: PermissionRow[] = [
     },
 ];
 
-export default function RolesIndex({ roles, selectedRoleId, selectedRole, permissions }: Props) {
+export default function RolesIndex({
+    roles,
+    selectedRoleId,
+    selectedRole,
+    permissions,
+}: Props) {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -283,7 +295,7 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
         router.get(
             rolesIndex().url,
             { role_id: value },
-            { preserveState: true }
+            { preserveState: true },
         );
     };
 
@@ -300,7 +312,11 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
 
     const handleRenameRole = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedRole) return;
+
+        if (!selectedRole) {
+            return;
+        }
+
         editForm.put(updateRole(selectedRole.id).url, {
             onSuccess: () => {
                 toast.success('Rol renombrado correctamente');
@@ -310,7 +326,10 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
     };
 
     const handleDeleteRole = () => {
-        if (!selectedRole) return;
+        if (!selectedRole) {
+            return;
+        }
+
         router.delete(destroyRole(selectedRole.id).url, {
             onSuccess: () => {
                 toast.success('Rol eliminado correctamente');
@@ -320,15 +339,20 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                 if (errors.error) {
                     toast.error(errors.error);
                 }
+
                 setIsDeleteOpen(false);
             },
         });
     };
 
     const handleTogglePermission = (permissionId: number) => {
-        if (!selectedRole) return;
+        if (!selectedRole) {
+            return;
+        }
 
-        const isAssigned = selectedRole.permissions.some((p) => p.id === permissionId);
+        const isAssigned = selectedRole.permissions.some(
+            (p) => p.id === permissionId,
+        );
         let newPermissionIds: number[] = [];
 
         if (isAssigned) {
@@ -336,7 +360,10 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                 .filter((p) => p.id !== permissionId)
                 .map((p) => p.id);
         } else {
-            newPermissionIds = [...selectedRole.permissions.map((p) => p.id), permissionId];
+            newPermissionIds = [
+                ...selectedRole.permissions.map((p) => p.id),
+                permissionId,
+            ];
         }
 
         router.put(
@@ -350,19 +377,25 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                 onSuccess: () => {
                     toast.success('Permisos del rol actualizados');
                 },
-            }
+            },
         );
     };
 
     // Helper to find a permission in the database by slug
     const findPermissionBySlug = (slug?: string) => {
-        if (!slug) return null;
+        if (!slug) {
+            return null;
+        }
+
         return permissions.find((p) => p.slug === slug) || null;
     };
 
     // Helper to check if the selected role has a permission
     const hasPermission = (permissionId: number) => {
-        if (!selectedRole) return false;
+        if (!selectedRole) {
+            return false;
+        }
+
         return selectedRole.permissions.some((p) => p.id === permissionId);
     };
 
@@ -372,22 +405,32 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
             <div className="flex h-full flex-1 flex-col gap-6 p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                            <ShieldCheck className="h-6 w-6 text-primary" /> Roles y Permisos
+                        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
+                            <ShieldCheck className="h-6 w-6 text-primary" />{' '}
+                            Roles y Permisos
                         </h1>
                         <p className="text-muted-foreground">
-                            Configure los roles del sistema y asigne los accesos y permisos correspondientes.
+                            Configure los roles del sistema y asigne los accesos
+                            y permisos correspondientes.
                         </p>
                     </div>
-                    <Button onClick={() => setIsCreateOpen(true)} className="h-10 px-5 text-sm w-full md:w-auto">
+                    <Button
+                        onClick={() => setIsCreateOpen(true)}
+                        className="h-10 w-full px-5 text-sm md:w-auto"
+                    >
                         <Plus className="mr-2 h-4 w-4" /> Nuevo Rol
                     </Button>
                 </div>
 
-                <div className="flex flex-col gap-4 bg-card p-4 rounded-lg border">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end justify-between">
-                        <div className="space-y-2 max-w-sm w-full">
-                            <Label htmlFor="role-select" className="text-sm font-semibold">Seleccionar Rol a Gestionar</Label>
+                <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
+                    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+                        <div className="w-full max-w-sm space-y-2">
+                            <Label
+                                htmlFor="role-select"
+                                className="text-sm font-semibold"
+                            >
+                                Seleccionar Rol a Gestionar
+                            </Label>
                             {roles.length > 0 && selectedRoleId && (
                                 <Select
                                     value={selectedRoleId.toString()}
@@ -398,7 +441,10 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                                     </SelectTrigger>
                                     <SelectContent>
                                         {roles.map((role) => (
-                                            <SelectItem key={role.id} value={role.id.toString()}>
+                                            <SelectItem
+                                                key={role.id}
+                                                value={role.id.toString()}
+                                            >
                                                 {role.name}
                                             </SelectItem>
                                         ))}
@@ -408,11 +454,14 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                         </div>
 
                         {selectedRole && (
-                            <div className="flex gap-2 w-full sm:w-auto">
+                            <div className="flex w-full gap-2 sm:w-auto">
                                 <Button
                                     variant="outline"
                                     onClick={() => setIsEditOpen(true)}
-                                    disabled={selectedRole.id === 1 || selectedRole.id === 2}
+                                    disabled={
+                                        selectedRole.id === 1 ||
+                                        selectedRole.id === 2
+                                    }
                                     className="flex-1 sm:flex-none"
                                 >
                                     <Edit2 className="mr-2 h-4 w-4" /> Renombrar
@@ -420,7 +469,10 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                                 <Button
                                     variant="destructive"
                                     onClick={() => setIsDeleteOpen(true)}
-                                    disabled={selectedRole.id === 1 || selectedRole.id === 2}
+                                    disabled={
+                                        selectedRole.id === 1 ||
+                                        selectedRole.id === 2
+                                    }
                                     className="flex-1 sm:flex-none"
                                 >
                                     <Trash2 className="mr-2 h-4 w-4" /> Eliminar
@@ -431,57 +483,107 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                 </div>
 
                 {selectedRole ? (
-                    <div className="rounded-md border bg-card overflow-hidden">
+                    <div className="overflow-hidden rounded-md border bg-card">
                         <Table>
                             <TableHeader className="bg-muted/55">
                                 <TableRow>
-                                    <TableHead className="w-[30%]">Módulo / Sección</TableHead>
-                                    <TableHead className="text-center w-[14%]">Ver</TableHead>
-                                    <TableHead className="text-center w-[14%]">Crear</TableHead>
-                                    <TableHead className="text-center w-[14%]">Editar</TableHead>
-                                    <TableHead className="text-center w-[14%]">Eliminar</TableHead>
-                                    <TableHead className="text-center w-[14%]">Gestionar</TableHead>
+                                    <TableHead className="w-[30%]">
+                                        Módulo / Sección
+                                    </TableHead>
+                                    <TableHead className="w-[14%] text-center">
+                                        Ver
+                                    </TableHead>
+                                    <TableHead className="w-[14%] text-center">
+                                        Crear
+                                    </TableHead>
+                                    <TableHead className="w-[14%] text-center">
+                                        Editar
+                                    </TableHead>
+                                    <TableHead className="w-[14%] text-center">
+                                        Eliminar
+                                    </TableHead>
+                                    <TableHead className="w-[14%] text-center">
+                                        Gestionar
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {permissionRows.map((row) => (
-                                    <TableRow key={row.label} className="hover:bg-muted/20">
-                                        <TableCell className="font-medium py-4">
+                                    <TableRow
+                                        key={row.label}
+                                        className="hover:bg-muted/20"
+                                    >
+                                        <TableCell className="py-4 font-medium">
                                             <div className="flex flex-col">
-                                                <span className="text-sm font-semibold">{row.label}</span>
-                                                <span className="text-xs text-muted-foreground font-normal mt-0.5 leading-relaxed">
+                                                <span className="text-sm font-semibold">
+                                                    {row.label}
+                                                </span>
+                                                <span className="mt-0.5 text-xs leading-relaxed font-normal text-muted-foreground">
                                                     {row.description}
                                                 </span>
                                             </div>
                                         </TableCell>
-                                        {(['view', 'create', 'edit', 'delete', 'manage'] as const).map((action) => {
+                                        {(
+                                            [
+                                                'view',
+                                                'create',
+                                                'edit',
+                                                'delete',
+                                                'manage',
+                                            ] as const
+                                        ).map((action) => {
                                             const permSlug = row.slugs[action];
-                                            const perm = findPermissionBySlug(permSlug);
+                                            const perm =
+                                                findPermissionBySlug(permSlug);
 
                                             return (
-                                                <TableCell key={action} className="text-center py-4">
+                                                <TableCell
+                                                    key={action}
+                                                    className="py-4 text-center"
+                                                >
                                                     {perm ? (
                                                         <div className="flex items-center justify-center">
                                                             <TooltipProvider>
                                                                 <Tooltip>
-                                                                    <TooltipTrigger asChild>
+                                                                    <TooltipTrigger
+                                                                        asChild
+                                                                    >
                                                                         <div>
                                                                             <Switch
-                                                                                checked={hasPermission(perm.id)}
-                                                                                onCheckedChange={() => handleTogglePermission(perm.id)}
-                                                                                disabled={selectedRole.id === 1}
+                                                                                checked={hasPermission(
+                                                                                    perm.id,
+                                                                                )}
+                                                                                onCheckedChange={() =>
+                                                                                    handleTogglePermission(
+                                                                                        perm.id,
+                                                                                    )
+                                                                                }
+                                                                                disabled={
+                                                                                    selectedRole.id ===
+                                                                                    1
+                                                                                }
                                                                             />
                                                                         </div>
                                                                     </TooltipTrigger>
                                                                     <TooltipContent>
-                                                                        <p className="text-xs">{perm.name}</p>
-                                                                        <p className="text-[10px] text-muted-foreground font-mono">{perm.slug}</p>
+                                                                        <p className="text-xs">
+                                                                            {
+                                                                                perm.name
+                                                                            }
+                                                                        </p>
+                                                                        <p className="font-mono text-[10px] text-muted-foreground">
+                                                                            {
+                                                                                perm.slug
+                                                                            }
+                                                                        </p>
                                                                     </TooltipContent>
                                                                 </Tooltip>
                                                             </TooltipProvider>
                                                         </div>
                                                     ) : (
-                                                        <span className="text-muted-foreground/35 select-none font-light">—</span>
+                                                        <span className="font-light text-muted-foreground/35 select-none">
+                                                            —
+                                                        </span>
                                                     )}
                                                 </TableCell>
                                             );
@@ -491,21 +593,28 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                             </TableBody>
                         </Table>
                         {selectedRole.id === 1 && (
-                            <div className="p-4 bg-muted/30 text-xs text-muted-foreground text-center border-t italic">
-                                El rol de Administrador tiene acceso total a todos los módulos y no se puede modificar.
+                            <div className="border-t bg-muted/30 p-4 text-center text-xs text-muted-foreground italic">
+                                El rol de Administrador tiene acceso total a
+                                todos los módulos y no se puede modificar.
                             </div>
                         )}
                         {selectedRole.id === 2 && (
-                            <div className="p-4 bg-muted/30 text-xs text-muted-foreground text-center border-t italic">
-                                El rol de Patólogo es un rol principal del sistema y no puede ser renombrado ni eliminado.
+                            <div className="border-t bg-muted/30 p-4 text-center text-xs text-muted-foreground italic">
+                                El rol de Patólogo es un rol principal del
+                                sistema y no puede ser renombrado ni eliminado.
                             </div>
                         )}
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center justify-center p-12 border rounded-md bg-card text-center gap-2">
+                    <div className="flex flex-col items-center justify-center gap-2 rounded-md border bg-card p-12 text-center">
                         <ShieldCheck className="h-10 w-10 text-muted-foreground/50" />
-                        <h3 className="font-semibold text-lg">No hay rol seleccionado</h3>
-                        <p className="text-sm text-muted-foreground">Por favor, cree un rol para comenzar a administrar los permisos.</p>
+                        <h3 className="text-lg font-semibold">
+                            No hay rol seleccionado
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                            Por favor, cree un rol para comenzar a administrar
+                            los permisos.
+                        </p>
                     </div>
                 )}
             </div>
@@ -522,16 +631,25 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="new-role-name">Nombre del Rol</Label>
+                                <Label htmlFor="new-role-name">
+                                    Nombre del Rol
+                                </Label>
                                 <Input
                                     id="new-role-name"
                                     value={createForm.data.name}
-                                    onChange={(e) => createForm.setData('name', e.target.value)}
+                                    onChange={(e) =>
+                                        createForm.setData(
+                                            'name',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="Ej. Secretaria"
                                     required
                                 />
                                 {createForm.errors.name && (
-                                    <p className="text-sm text-destructive">{createForm.errors.name}</p>
+                                    <p className="text-sm text-destructive">
+                                        {createForm.errors.name}
+                                    </p>
                                 )}
                             </div>
                         </div>
@@ -543,7 +661,10 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                             >
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={createForm.processing}>
+                            <Button
+                                type="submit"
+                                disabled={createForm.processing}
+                            >
                                 Crear Rol
                             </Button>
                         </DialogFooter>
@@ -563,15 +684,21 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="edit-role-name">Nombre del Rol</Label>
+                                <Label htmlFor="edit-role-name">
+                                    Nombre del Rol
+                                </Label>
                                 <Input
                                     id="edit-role-name"
                                     value={editForm.data.name}
-                                    onChange={(e) => editForm.setData('name', e.target.value)}
+                                    onChange={(e) =>
+                                        editForm.setData('name', e.target.value)
+                                    }
                                     required
                                 />
                                 {editForm.errors.name && (
-                                    <p className="text-sm text-destructive">{editForm.errors.name}</p>
+                                    <p className="text-sm text-destructive">
+                                        {editForm.errors.name}
+                                    </p>
                                 )}
                             </div>
                         </div>
@@ -583,7 +710,10 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
                             >
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={editForm.processing}>
+                            <Button
+                                type="submit"
+                                disabled={editForm.processing}
+                            >
                                 Guardar Cambios
                             </Button>
                         </DialogFooter>
@@ -595,11 +725,14 @@ export default function RolesIndex({ roles, selectedRoleId, selectedRole, permis
             <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>¿Está seguro de que desea eliminar este rol?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            ¿Está seguro de que desea eliminar este rol?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                             Esta acción eliminará de forma permanente el rol{' '}
-                            <strong>{selectedRole?.name}</strong>. No podrá revertir esta acción.
-                            Asegúrese de que no haya usuarios asignados a este rol antes de continuar.
+                            <strong>{selectedRole?.name}</strong>. No podrá
+                            revertir esta acción. Asegúrese de que no haya
+                            usuarios asignados a este rol antes de continuar.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

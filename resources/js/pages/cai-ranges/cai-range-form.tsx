@@ -1,13 +1,22 @@
 import { useForm } from '@inertiajs/react';
-import type { FormEventHandler} from 'react';
+import type { FormEventHandler } from 'react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
-import { store as storeCaiRange, update as updateCaiRange } from '@/actions/App/Http/Controllers/CaiRangeController';
+import {
+    store as storeCaiRange,
+    update as updateCaiRange,
+} from '@/actions/App/Http/Controllers/CaiRangeController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 interface Location {
     id: number;
@@ -39,18 +48,24 @@ interface Props {
     onSuccess: () => void;
 }
 
-export default function CaiRangeForm({ caiRange, locations, onSuccess }: Props) {
+export default function CaiRangeForm({
+    caiRange,
+    locations,
+    onSuccess,
+}: Props) {
     const formatDate = (dateStr?: string) => {
         if (!dateStr) {
-return '';
-}
+            return '';
+        }
 
         // Extract YYYY-MM-DD from datetime
         return dateStr.split('T')[0];
     };
 
     const { data, setData, post, put, processing, errors, reset } = useForm({
-        location_id: caiRange?.location_id ? caiRange.location_id.toString() : '',
+        location_id: caiRange?.location_id
+            ? caiRange.location_id.toString()
+            : '',
         cai: caiRange?.cai || '',
         full_prefix: caiRange?.full_prefix || '',
         emission: caiRange?.emission || '',
@@ -63,17 +78,27 @@ return '';
         status: caiRange?.status || 'active',
         limit_percentage_warning: caiRange?.limit_percentage_warning || '10',
         limit_days_warning: caiRange?.limit_days_warning || '15',
-        warning_notifications_amount: caiRange?.warning_notifications_amount || '3',
+        warning_notifications_amount:
+            caiRange?.warning_notifications_amount || '3',
         warning_notifications_sent: caiRange?.warning_notifications_sent || '0',
     });
 
     // Auto-update full_prefix when prefix parts change
     useEffect(() => {
         if (data.emission || data.establishment || data.document_type) {
-            const emissionPart = data.emission ? data.emission.padStart(3, '0').substring(0, 3) : '000';
-            const establishmentPart = data.establishment ? data.establishment.padStart(3, '0').substring(0, 3) : '000';
-            const docTypePart = data.document_type ? data.document_type.padStart(2, '0').substring(0, 2) : '00';
-            setData('full_prefix', `${emissionPart}-${establishmentPart}-${docTypePart}-`);
+            const emissionPart = data.emission
+                ? data.emission.padStart(3, '0').substring(0, 3)
+                : '000';
+            const establishmentPart = data.establishment
+                ? data.establishment.padStart(3, '0').substring(0, 3)
+                : '000';
+            const docTypePart = data.document_type
+                ? data.document_type.padStart(2, '0').substring(0, 2)
+                : '00';
+            setData(
+                'full_prefix',
+                `${emissionPart}-${establishmentPart}-${docTypePart}-`,
+            );
         }
     }, [data.emission, data.establishment, data.document_type]);
 
@@ -82,12 +107,16 @@ return '';
 
         const submitOptions = {
             onSuccess: () => {
-                toast.success(caiRange?.id ? 'Rango de facturación actualizado' : 'Rango de facturación creado');
+                toast.success(
+                    caiRange?.id
+                        ? 'Rango de facturación actualizado'
+                        : 'Rango de facturación creado',
+                );
                 onSuccess();
 
                 if (!caiRange?.id) {
-reset();
-}
+                    reset();
+                }
             },
         };
 
@@ -99,12 +128,12 @@ reset();
     };
 
     return (
-        <form onSubmit={submit} className="space-y-4 py-4 px-5">
+        <form onSubmit={submit} className="space-y-4 px-5 py-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                     <Label htmlFor="location_id">Sucursal *</Label>
-                    <Select 
-                        value={data.location_id} 
+                    <Select
+                        value={data.location_id}
                         onValueChange={(value) => setData('location_id', value)}
                     >
                         <SelectTrigger className="w-full">
@@ -112,7 +141,10 @@ reset();
                         </SelectTrigger>
                         <SelectContent>
                             {locations.map((loc) => (
-                                <SelectItem key={loc.id} value={loc.id.toString()}>
+                                <SelectItem
+                                    key={loc.id}
+                                    value={loc.id.toString()}
+                                >
                                     {loc.name}
                                 </SelectItem>
                             ))}
@@ -123,9 +155,11 @@ reset();
 
                 <div className="space-y-2">
                     <Label htmlFor="status">Estado *</Label>
-                    <Select 
-                        value={data.status} 
-                        onValueChange={(value: 'active' | 'exhausted' | 'expired') => setData('status', value)}
+                    <Select
+                        value={data.status}
+                        onValueChange={(
+                            value: 'active' | 'exhausted' | 'expired',
+                        ) => setData('status', value)}
                     >
                         <SelectTrigger className="w-full">
                             <SelectValue placeholder="Seleccione el estado" />
@@ -151,12 +185,16 @@ reset();
                 <InputError message={errors.cai} />
             </div>
 
-            <div className="border-b border-muted my-2"></div>
-            <h3 className="text-sm font-semibold text-muted-foreground">Configuración del Prefijo</h3>
+            <div className="my-2 border-b border-muted"></div>
+            <h3 className="text-sm font-semibold text-muted-foreground">
+                Configuración del Prefijo
+            </h3>
 
             <div className="grid grid-cols-3 gap-2">
                 <div className="space-y-1">
-                    <Label htmlFor="emission" className="text-xs">Establecimiento (000) *</Label>
+                    <Label htmlFor="emission" className="text-xs">
+                        Establecimiento (000) *
+                    </Label>
                     <Input
                         id="emission"
                         value={data.emission}
@@ -167,22 +205,30 @@ reset();
                     <InputError message={errors.emission} />
                 </div>
                 <div className="space-y-1">
-                    <Label htmlFor="establishment" className="text-xs">Punto Emisión (001) *</Label>
+                    <Label htmlFor="establishment" className="text-xs">
+                        Punto Emisión (001) *
+                    </Label>
                     <Input
                         id="establishment"
                         value={data.establishment}
-                        onChange={(e) => setData('establishment', e.target.value)}
+                        onChange={(e) =>
+                            setData('establishment', e.target.value)
+                        }
                         placeholder="001"
                         maxLength={3}
                     />
                     <InputError message={errors.establishment} />
                 </div>
                 <div className="space-y-1">
-                    <Label htmlFor="document_type" className="text-xs">Tipo Documento (01) *</Label>
+                    <Label htmlFor="document_type" className="text-xs">
+                        Tipo Documento (01) *
+                    </Label>
                     <Input
                         id="document_type"
                         value={data.document_type}
-                        onChange={(e) => setData('document_type', e.target.value)}
+                        onChange={(e) =>
+                            setData('document_type', e.target.value)
+                        }
                         placeholder="01"
                         maxLength={2}
                     />
@@ -191,18 +237,22 @@ reset();
             </div>
 
             <div className="space-y-2">
-                <Label htmlFor="full_prefix">Prefijo Completo (Generado automáticamente)</Label>
+                <Label htmlFor="full_prefix">
+                    Prefijo Completo (Generado automáticamente)
+                </Label>
                 <Input
                     id="full_prefix"
                     value={data.full_prefix}
                     disabled
-                    className="bg-muted text-muted-foreground font-mono"
+                    className="bg-muted font-mono text-muted-foreground"
                 />
                 <InputError message={errors.full_prefix} />
             </div>
 
-            <div className="border-b border-muted my-2"></div>
-            <h3 className="text-sm font-semibold text-muted-foreground">Rango Numérico y Límites</h3>
+            <div className="my-2 border-b border-muted"></div>
+            <h3 className="text-sm font-semibold text-muted-foreground">
+                Rango Numérico y Límites
+            </h3>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="space-y-2">
@@ -211,7 +261,9 @@ reset();
                         id="start_number"
                         type="number"
                         value={data.start_number}
-                        onChange={(e) => setData('start_number', e.target.value)}
+                        onChange={(e) =>
+                            setData('start_number', e.target.value)
+                        }
                         placeholder="1"
                     />
                     <InputError message={errors.start_number} />
@@ -235,7 +287,9 @@ reset();
                         id="last_used_number"
                         type="number"
                         value={data.last_used_number}
-                        onChange={(e) => setData('last_used_number', e.target.value)}
+                        onChange={(e) =>
+                            setData('last_used_number', e.target.value)
+                        }
                         placeholder="0"
                     />
                     <InputError message={errors.last_used_number} />
@@ -255,17 +309,23 @@ reset();
                 </div>
             </div>
 
-            <div className="border-b border-muted my-2"></div>
-            <h3 className="text-sm font-semibold text-muted-foreground">Alertas y Notificaciones</h3>
+            <div className="my-2 border-b border-muted"></div>
+            <h3 className="text-sm font-semibold text-muted-foreground">
+                Alertas y Notificaciones
+            </h3>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                    <Label htmlFor="limit_percentage_warning">Alerta por porcentaje (%)</Label>
+                    <Label htmlFor="limit_percentage_warning">
+                        Alerta por porcentaje (%)
+                    </Label>
                     <Input
                         id="limit_percentage_warning"
                         type="number"
                         value={data.limit_percentage_warning}
-                        onChange={(e) => setData('limit_percentage_warning', e.target.value)}
+                        onChange={(e) =>
+                            setData('limit_percentage_warning', e.target.value)
+                        }
                         placeholder="10"
                         min="0"
                         max="100"
@@ -274,12 +334,16 @@ reset();
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="limit_days_warning">Alerta por días restantes</Label>
+                    <Label htmlFor="limit_days_warning">
+                        Alerta por días restantes
+                    </Label>
                     <Input
                         id="limit_days_warning"
                         type="number"
                         value={data.limit_days_warning}
-                        onChange={(e) => setData('limit_days_warning', e.target.value)}
+                        onChange={(e) =>
+                            setData('limit_days_warning', e.target.value)
+                        }
                         placeholder="15"
                         min="0"
                     />
@@ -289,12 +353,19 @@ reset();
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                    <Label htmlFor="warning_notifications_amount">Cantidad Notificaciones a Enviar</Label>
+                    <Label htmlFor="warning_notifications_amount">
+                        Cantidad Notificaciones a Enviar
+                    </Label>
                     <Input
                         id="warning_notifications_amount"
                         type="number"
                         value={data.warning_notifications_amount}
-                        onChange={(e) => setData('warning_notifications_amount', e.target.value)}
+                        onChange={(e) =>
+                            setData(
+                                'warning_notifications_amount',
+                                e.target.value,
+                            )
+                        }
                         placeholder="3"
                         min="0"
                     />
@@ -302,19 +373,21 @@ reset();
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="warning_notifications_sent">Notificaciones Enviadas</Label>
+                    <Label htmlFor="warning_notifications_sent">
+                        Notificaciones Enviadas
+                    </Label>
                     <Input
                         id="warning_notifications_sent"
                         type="number"
                         value={data.warning_notifications_sent}
                         disabled
-                        className="bg-muted text-muted-foreground cursor-not-allowed"
+                        className="cursor-not-allowed bg-muted text-muted-foreground"
                     />
                     <InputError message={errors.warning_notifications_sent} />
                 </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t">
+            <div className="flex justify-end border-t pt-4">
                 <Button type="submit" disabled={processing}>
                     {caiRange?.id ? 'Actualizar Rango' : 'Guardar Rango'}
                 </Button>

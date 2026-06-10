@@ -51,6 +51,7 @@ class ReferrerTypeController extends Controller
     public function destroy(ReferrerType $referrerType)
     {
         $referrerType->update(['active' => false]);
+
         return redirect()->back();
     }
 }

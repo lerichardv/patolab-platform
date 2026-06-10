@@ -26,14 +26,18 @@ interface Props {
 export default function CustomerSheet({ customer, open, onOpenChange }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-[540px] overflow-y-auto">
-                <HeadingSheet 
+            <SheetContent className="w-full overflow-y-auto sm:max-w-[540px]">
+                <HeadingSheet
                     title={customer ? 'Editar Cliente' : 'Nuevo Cliente'}
-                    description={customer ? 'Actualice la información del cliente aquí.' : 'Complete los campos para registrar un nuevo cliente.'}
+                    description={
+                        customer
+                            ? 'Actualice la información del cliente aquí.'
+                            : 'Complete los campos para registrar un nuevo cliente.'
+                    }
                 />
-                <CustomerForm 
-                    customer={customer || undefined} 
-                    onSuccess={() => onOpenChange(false)} 
+                <CustomerForm
+                    customer={customer || undefined}
+                    onSuccess={() => onOpenChange(false)}
                 />
             </SheetContent>
         </Sheet>

@@ -27,7 +27,7 @@ class SequenceSeeder extends Seeder
                 // Slug helps but we want just the letters, so we use transliterate
                 $cleanName = Str::ascii($type->name);
                 $prefix = strtoupper(substr(preg_replace('/[^a-zA-Z0-9]/', '', $cleanName), 0, 3));
-                
+
                 Sequence::create([
                     'location_id' => $location->id,
                     'specimen_type' => $type->id,

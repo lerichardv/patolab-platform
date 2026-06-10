@@ -20,7 +20,13 @@ import {
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
 
-export function NavMain({ items = [], label }: { items: NavItem[]; label?: string }) {
+export function NavMain({
+    items = [],
+    label,
+}: {
+    items: NavItem[];
+    label?: string;
+}) {
     const { isCurrentUrl, currentUrl } = useCurrentUrl();
     const { isMobile, setOpenMobile } = useSidebar();
 
@@ -58,7 +64,11 @@ export function NavMain({ items = [], label }: { items: NavItem[]; label?: strin
                                     tooltip={{ children: item.title }}
                                     className="sidebar-marquee-container"
                                 >
-                                    <Link href={item.href} prefetch onClick={handleLinkClick}>
+                                    <Link
+                                        href={item.href}
+                                        prefetch
+                                        onClick={handleLinkClick}
+                                    >
                                         {item.icon && <item.icon />}
                                         <span className="sidebar-marquee-content truncate">
                                             {item.title}
@@ -120,7 +130,10 @@ function CollapsibleMenuItem({
         >
             <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip={item.title} className="sidebar-marquee-container">
+                    <SidebarMenuButton
+                        tooltip={item.title}
+                        className="sidebar-marquee-container"
+                    >
                         {item.icon && <item.icon />}
                         <span className="sidebar-marquee-content truncate">
                             {item.title}
@@ -129,16 +142,29 @@ function CollapsibleMenuItem({
                     </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                    <SidebarMenuSub className="mr-0 pr-0 border-l">
+                    <SidebarMenuSub className="mr-0 border-l pr-0">
                         {item.items?.map((subItem) => {
-                            const hasSubSubItems = subItem.items && subItem.items.length > 0;
+                            const hasSubSubItems =
+                                subItem.items && subItem.items.length > 0;
 
                             if (!hasSubSubItems) {
                                 return (
                                     <SidebarMenuSubItem key={subItem.title}>
-                                        <SidebarMenuSubButton asChild isActive={isCurrentUrl(subItem.href)}>
-                                            <Link href={subItem.href} prefetch className="sidebar-marquee-container" onClick={handleLinkClick}>
-                                                {subItem.icon && <subItem.icon />}
+                                        <SidebarMenuSubButton
+                                            asChild
+                                            isActive={isCurrentUrl(
+                                                subItem.href,
+                                            )}
+                                        >
+                                            <Link
+                                                href={subItem.href}
+                                                prefetch
+                                                className="sidebar-marquee-container"
+                                                onClick={handleLinkClick}
+                                            >
+                                                {subItem.icon && (
+                                                    <subItem.icon />
+                                                )}
                                                 <span className="sidebar-marquee-content truncate">
                                                     {subItem.title}
                                                 </span>
@@ -210,11 +236,19 @@ function CollapsibleSubMenuItem({
                     </SidebarMenuSubButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                    <SidebarMenuSub className="mr-0 pr-0 border-l">
+                    <SidebarMenuSub className="mr-0 border-l pr-0">
                         {subItem.items?.map((ssItem) => (
                             <SidebarMenuSubItem key={ssItem.title}>
-                                <SidebarMenuSubButton asChild isActive={isCurrentUrl(ssItem.href)}>
-                                    <Link href={ssItem.href} prefetch className="sidebar-marquee-container" onClick={handleLinkClick}>
+                                <SidebarMenuSubButton
+                                    asChild
+                                    isActive={isCurrentUrl(ssItem.href)}
+                                >
+                                    <Link
+                                        href={ssItem.href}
+                                        prefetch
+                                        className="sidebar-marquee-container"
+                                        onClick={handleLinkClick}
+                                    >
                                         <span className="sidebar-marquee-content truncate">
                                             {ssItem.title}
                                         </span>

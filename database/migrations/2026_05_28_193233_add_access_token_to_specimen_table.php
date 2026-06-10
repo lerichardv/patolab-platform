@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -13,11 +14,11 @@ return new class extends Migration
         });
 
         // Populate existing specimens with a random token
-        $specimens = \DB::table('specimen')->get();
+        $specimens = DB::table('specimen')->get();
         foreach ($specimens as $specimen) {
-            \DB::table('specimen')
+            DB::table('specimen')
                 ->where('id', $specimen->id)
-                ->update(['access_token' => \Illuminate\Support\Str::random(32)]);
+                ->update(['access_token' => Str::random(32)]);
         }
     }
 

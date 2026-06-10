@@ -33,18 +33,31 @@ interface Props {
     onOpenChange: (open: boolean) => void;
 }
 
-export default function CaiRangeSheet({ caiRange, locations, open, onOpenChange }: Props) {
+export default function CaiRangeSheet({
+    caiRange,
+    locations,
+    open,
+    onOpenChange,
+}: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-[600px] overflow-y-auto">
-                <HeadingSheet 
-                    title={caiRange ? 'Editar Rango de Facturación' : 'Nuevo Rango de Facturación'}
-                    description={caiRange ? 'Actualice la información del rango de facturación aquí.' : 'Complete los campos para registrar un nuevo rango de facturación y alertar a la administración.'}
+            <SheetContent className="w-full overflow-y-auto sm:max-w-[600px]">
+                <HeadingSheet
+                    title={
+                        caiRange
+                            ? 'Editar Rango de Facturación'
+                            : 'Nuevo Rango de Facturación'
+                    }
+                    description={
+                        caiRange
+                            ? 'Actualice la información del rango de facturación aquí.'
+                            : 'Complete los campos para registrar un nuevo rango de facturación y alertar a la administración.'
+                    }
                 />
-                <CaiRangeForm 
-                    caiRange={caiRange || undefined} 
+                <CaiRangeForm
+                    caiRange={caiRange || undefined}
                     locations={locations}
-                    onSuccess={() => onOpenChange(false)} 
+                    onSuccess={() => onOpenChange(false)}
                 />
             </SheetContent>
         </Sheet>

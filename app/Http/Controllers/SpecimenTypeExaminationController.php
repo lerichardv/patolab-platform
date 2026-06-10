@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\SpecimenTypeExamination;
 use App\Models\SpecimenType;
+use App\Models\SpecimenTypeExamination;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 

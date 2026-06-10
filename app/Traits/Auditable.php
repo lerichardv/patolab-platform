@@ -3,8 +3,9 @@
 namespace App\Traits;
 
 use App\Models\AuditLog;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 trait Auditable
 {
@@ -26,17 +27,19 @@ trait Auditable
     protected function logAudit(string $action)
     {
         $userId = Auth::id();
-        if (!$userId) {
+        if (! $userId) {
             return;
         }
 
         $table = $this->getTable();
         $rowId = $this->getKey();
-        $auditSessionCode = substr(str_replace('-', '', (string) \Illuminate\Support\Str::uuid()), 0, 24);
+        $auditSessionCode = substr(str_replace('-', '', (string) Str::uuid()), 0, 24);
 
         if ($action === 'create') {
             foreach ($this->getAttributes() as $column => $value) {
-                if ($this->shouldIgnoreColumn($column)) continue;
+                if ($this->shouldIgnoreColumn($column)) {
+                    continue;
+                }
 
                 AuditLog::create([
                     'audit_session_code' => $auditSessionCode,
@@ -51,7 +54,9 @@ trait Auditable
             }
         } elseif ($action === 'update') {
             foreach ($this->getChanges() as $column => $newValue) {
-                if ($this->shouldIgnoreColumn($column)) continue;
+                if ($this->shouldIgnoreColumn($column)) {
+                    continue;
+                }
 
                 $oldValue = $this->getOriginal($column);
                 AuditLog::create([
@@ -73,17 +78,18 @@ trait Auditable
         if (is_array($value) || is_object($value)) {
             return json_encode($value);
         }
+
         return (string) $value;
     }
 
     protected function logAuditDelete()
     {
         $userId = Auth::id();
-        if (!$userId) {
+        if (! $userId) {
             return;
         }
 
-        $auditSessionCode = substr(str_replace('-', '', (string) \Illuminate\Support\Str::uuid()), 0, 24);
+        $auditSessionCode = substr(str_replace('-', '', (string) Str::uuid()), 0, 24);
 
         AuditLog::create([
             'audit_session_code' => $auditSessionCode,
@@ -100,6 +106,7 @@ trait Auditable
     protected function shouldIgnoreColumn(string $column): bool
     {
         $ignored = ['created_at', 'updated_at', 'deleted_at', 'password', 'remember_token'];
+
         return in_array($column, $ignored);
     }
 }

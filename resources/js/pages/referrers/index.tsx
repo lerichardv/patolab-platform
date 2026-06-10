@@ -3,9 +3,9 @@ import debounce from 'lodash/debounce';
 import { Edit2, Plus, Search, UserRound, Trash2 } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { 
-    index as referrersIndex, 
-    destroy as destroyReferrer 
+import {
+    index as referrersIndex,
+    destroy as destroyReferrer,
 } from '@/actions/App/Http/Controllers/ReferrerController';
 import { Pagination } from '@/components/pagination';
 import {
@@ -20,14 +20,20 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from '@/components/ui/table';
 import ReferrerSheet from './referrer-sheet';
 
@@ -65,20 +71,28 @@ interface Props {
     };
 }
 
-export default function ReferrersIndex({ referrers, referrerTypes, filters }: Props) {
+export default function ReferrersIndex({
+    referrers,
+    referrerTypes,
+    filters,
+}: Props) {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [selectedReferrer, setSelectedReferrer] = useState<Referrer | null>(null);
-    const [referrerToDelete, setReferrerToDelete] = useState<Referrer | null>(null);
+    const [selectedReferrer, setSelectedReferrer] = useState<Referrer | null>(
+        null,
+    );
+    const [referrerToDelete, setReferrerToDelete] = useState<Referrer | null>(
+        null,
+    );
     const [search, setSearch] = useState(filters.search || '');
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
 
         if (value === 'all' || value === '') {
-delete newFilters[key as keyof typeof filters];
-}
-        
+            delete newFilters[key as keyof typeof filters];
+        }
+
         router.get(referrersIndex().url, newFilters, {
             preserveState: true,
             replace: true,
@@ -89,7 +103,7 @@ delete newFilters[key as keyof typeof filters];
         debounce((value: string) => {
             handleFilterChange('search', value);
         }, 300),
-        [filters]
+        [filters],
     );
 
     useEffect(() => {
@@ -132,12 +146,20 @@ delete newFilters[key as keyof typeof filters];
                     <div>
                         <div className="flex items-center gap-2">
                             <UserRound className="h-6 w-6 text-primary" />
-                            <h1 className="text-2xl font-bold tracking-tight">Remitentes</h1>
+                            <h1 className="text-2xl font-bold tracking-tight">
+                                Remitentes
+                            </h1>
                         </div>
-                        <p className="text-muted-foreground">Administre los médicos y clínicas que remiten muestras.</p>
+                        <p className="text-muted-foreground">
+                            Administre los médicos y clínicas que remiten
+                            muestras.
+                        </p>
                     </div>
                     <div className="flex gap-2">
-                        <Button onClick={handleCreate} className="h-10 px-5 text-sm w-full md:w-auto">
+                        <Button
+                            onClick={handleCreate}
+                            className="h-10 w-full px-5 text-sm md:w-auto"
+                        >
                             <Plus className="mr-2 h-4 w-4" /> Nuevo Remitente
                         </Button>
                     </div>
@@ -145,7 +167,7 @@ delete newFilters[key as keyof typeof filters];
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
                     <div className="relative">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Buscar por nombre, correo..."
                             className="pl-8"
@@ -153,14 +175,22 @@ delete newFilters[key as keyof typeof filters];
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <Select value={filters.referrer_type || 'all'} onValueChange={(v) => handleFilterChange('referrer_type', v)}>
+                    <Select
+                        value={filters.referrer_type || 'all'}
+                        onValueChange={(v) =>
+                            handleFilterChange('referrer_type', v)
+                        }
+                    >
                         <SelectTrigger>
                             <SelectValue placeholder="Tipo de Remitente" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Todos los tipos</SelectItem>
                             {referrerTypes.map((type) => (
-                                <SelectItem key={type.id} value={type.id.toString()}>
+                                <SelectItem
+                                    key={type.id}
+                                    value={type.id.toString()}
+                                >
                                     {type.name}
                                 </SelectItem>
                             ))}
@@ -176,14 +206,18 @@ delete newFilters[key as keyof typeof filters];
                                 <TableHead>Tipo</TableHead>
                                 <TableHead>Contacto</TableHead>
                                 <TableHead>Fecha Creación</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
+                                <TableHead className="text-right">
+                                    Acciones
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {referrers.data.length > 0 ? (
                                 referrers.data.map((referrer) => (
                                     <TableRow key={referrer.id}>
-                                        <TableCell className="font-medium">{referrer.name}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {referrer.name}
+                                        </TableCell>
                                         <TableCell>
                                             <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
                                                 {referrer.type?.name || 'N/A'}
@@ -191,19 +225,42 @@ delete newFilters[key as keyof typeof filters];
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex flex-col text-sm">
-                                                <span>{referrer.phone || 'Sin teléfono'}</span>
-                                                <span className="text-muted-foreground text-xs">{referrer.email || 'Sin correo'}</span>
+                                                <span>
+                                                    {referrer.phone ||
+                                                        'Sin teléfono'}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {referrer.email ||
+                                                        'Sin correo'}
+                                                </span>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
-                                            {new Date(referrer.created_at).toLocaleDateString('es-ES')}
+                                            {new Date(
+                                                referrer.created_at,
+                                            ).toLocaleDateString('es-ES')}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(referrer)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        handleEdit(referrer)
+                                                    }
+                                                >
                                                     <Edit2 className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteClick(referrer)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-destructive"
+                                                    onClick={() =>
+                                                        handleDeleteClick(
+                                                            referrer,
+                                                        )
+                                                    }
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -212,7 +269,10 @@ delete newFilters[key as keyof typeof filters];
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
+                                    <TableCell
+                                        colSpan={5}
+                                        className="h-24 text-center"
+                                    >
                                         No se encontraron resultados.
                                     </TableCell>
                                 </TableRow>
@@ -221,13 +281,13 @@ delete newFilters[key as keyof typeof filters];
                     </Table>
                 </div>
 
-                <Pagination 
-                    links={referrers.links} 
+                <Pagination
+                    links={referrers.links}
                     meta={{
                         from: referrers.from,
                         to: referrers.to,
-                        total: referrers.total
-                    }} 
+                        total: referrers.total,
+                    }}
                 />
             </div>
 
@@ -238,17 +298,26 @@ delete newFilters[key as keyof typeof filters];
                 onOpenChange={setIsSheetOpen}
             />
 
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>¿Eliminar remitente?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            ¿Eliminar remitente?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción desactivará al remitente <strong>{referrerToDelete?.name}</strong>.
+                            Esta acción desactivará al remitente{' '}
+                            <strong>{referrerToDelete?.name}</strong>.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-white hover:bg-destructive/90">
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                        >
                             Eliminar
                         </AlertDialogAction>
                     </AlertDialogFooter>

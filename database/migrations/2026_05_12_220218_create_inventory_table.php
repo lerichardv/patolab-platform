@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('inventory', function (Blueprint $table) {
             $table->id();
-			$table->foreignId('storage')->constrained('storage')->cascadeOnDelete();
-			$table->foreignId('product')->constrained('products')->cascadeOnDelete();
+            $table->foreignId('storage')->constrained('storage')->cascadeOnDelete();
+            $table->foreignId('product')->constrained('products')->cascadeOnDelete();
             $table->integer('quantity')->default('0');
             $table->boolean('active')->default(true);
             $table->timestamps();

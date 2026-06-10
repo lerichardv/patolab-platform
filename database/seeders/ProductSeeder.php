@@ -2,7 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\Inventory;
 use App\Models\Product;
+use App\Models\Storage;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -96,7 +98,7 @@ class ProductSeeder extends Seeder
             ],
         ];
 
-        $storages = \App\Models\Storage::all();
+        $storages = Storage::all();
 
         foreach ($products as $productData) {
             $product = Product::create([
@@ -132,7 +134,7 @@ class ProductSeeder extends Seeder
 
             // Seed inventory for this product in all storages
             foreach ($storages as $storage) {
-                \App\Models\Inventory::updateOrCreate(
+                Inventory::updateOrCreate(
                     [
                         'storage' => $storage->id,
                         'product' => $product->id,

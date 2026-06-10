@@ -2,7 +2,10 @@ import { useForm } from '@inertiajs/react';
 import type { FormEventHandler } from 'react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
-import { update as updateUser, store as storeUser } from '@/actions/App/Http/Controllers/UserController';
+import {
+    update as updateUser,
+    store as storeUser,
+} from '@/actions/App/Http/Controllers/UserController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,7 +79,7 @@ export default function UserForm({ user, roles, onSuccess }: UserFormProps) {
     };
 
     return (
-        <form onSubmit={submit} className="space-y-4 py-4 px-5">
+        <form onSubmit={submit} className="space-y-4 px-5 py-4">
             <div className="space-y-2">
                 <Label htmlFor="name">Nombre Completo *</Label>
                 <Input
@@ -111,7 +114,10 @@ export default function UserForm({ user, roles, onSuccess }: UserFormProps) {
                     </SelectTrigger>
                     <SelectContent>
                         {roles.map((role) => (
-                            <SelectItem key={role.id} value={role.id.toString()}>
+                            <SelectItem
+                                key={role.id}
+                                value={role.id.toString()}
+                            >
                                 {role.name}
                             </SelectItem>
                         ))}
@@ -122,7 +128,9 @@ export default function UserForm({ user, roles, onSuccess }: UserFormProps) {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                    <Label htmlFor="password">Contraseña {user ? '(Opcional)' : '*'}</Label>
+                    <Label htmlFor="password">
+                        Contraseña {user ? '(Opcional)' : '*'}
+                    </Label>
                     <Input
                         id="password"
                         type="password"
@@ -133,12 +141,16 @@ export default function UserForm({ user, roles, onSuccess }: UserFormProps) {
                     <InputError message={errors.password} />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="password_confirmation">Confirmar Contraseña {user ? '(Opcional)' : '*'}</Label>
+                    <Label htmlFor="password_confirmation">
+                        Confirmar Contraseña {user ? '(Opcional)' : '*'}
+                    </Label>
                     <Input
                         id="password_confirmation"
                         type="password"
                         value={data.password_confirmation}
-                        onChange={(e) => setData('password_confirmation', e.target.value)}
+                        onChange={(e) =>
+                            setData('password_confirmation', e.target.value)
+                        }
                         placeholder="••••••••"
                     />
                     <InputError message={errors.password_confirmation} />

@@ -3,11 +3,12 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
-
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Representa una muestra o examen (espécimen) en el sistema.
@@ -41,7 +42,7 @@ class Specimen extends Model
         'clinical_notes',
         'status',
         'medical_order_file',
-		'priority_id',
+        'priority_id',
         'active',
         'access_token',
         'is_group',
@@ -83,13 +84,13 @@ class Specimen extends Model
         return $this->belongsTo(SpecimenCategory::class, 'specimen_category');
     }
 
-    public function getExpectedFinalizationDateAttribute(): ?\Carbon\Carbon
+    public function getExpectedFinalizationDateAttribute(): ?Carbon
     {
-        if (!$this->category || !$this->category->unit || !$this->category->quantity || !$this->created_at) {
+        if (! $this->category || ! $this->category->unit || ! $this->category->quantity || ! $this->created_at) {
             return null;
         }
 
-        $createdAt = \Carbon\Carbon::parse($this->created_at);
+        $createdAt = Carbon::parse($this->created_at);
         $unit = $this->category->unit;
         $quantity = $this->category->quantity;
 
@@ -110,13 +111,15 @@ class Specimen extends Model
     {
         return $this->belongsTo(Referrer::class, 'referrer');
     }
+
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class, 'specimen_products', 'specimen', 'product')
             ->withPivot(['quantity', 'price'])
             ->withTimestamps();
     }
-	public function priority(): BelongsTo
+
+    public function priority(): BelongsTo
     {
         return $this->belongsTo(Priority::class, 'priority_id');
     }
@@ -130,7 +133,7 @@ class Specimen extends Model
             ->withTimestamps();
     }
 
-    public function invoiceRelation(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function invoiceRelation(): HasOne
     {
         return $this->hasOne(Invoice::class, 'specimen_id');
     }

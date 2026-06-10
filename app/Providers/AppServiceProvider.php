@@ -2,12 +2,14 @@
 
 namespace App\Providers;
 
+use App\Models\Product;
+use App\Models\SpecimenType;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
-use Illuminate\Database\Eloquent\Relations\Relation;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,8 +29,8 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
 
         Relation::morphMap([
-            'product' => \App\Models\Product::class,
-            'specimen type' => \App\Models\SpecimenType::class,
+            'product' => Product::class,
+            'specimen type' => SpecimenType::class,
         ]);
     }
 

@@ -1,8 +1,8 @@
 import { useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
-import { 
-    store as storeType, 
-    update as updateType 
+import {
+    store as storeType,
+    update as updateType,
 } from '@/actions/App/Http/Controllers/ReferrerTypeController';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,11 @@ export default function ReferrerTypeForm({ referrerType, onSuccess }: Props) {
 
         const options = {
             onSuccess: () => {
-                toast.success(referrerType ? 'Tipo de remitente actualizado' : 'Tipo de remitente creado');
+                toast.success(
+                    referrerType
+                        ? 'Tipo de remitente actualizado'
+                        : 'Tipo de remitente creado',
+                );
                 onSuccess();
             },
         };
@@ -42,7 +46,7 @@ export default function ReferrerTypeForm({ referrerType, onSuccess }: Props) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6 py-4 px-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6 px-5 py-4">
             <div className="grid gap-2">
                 <Label htmlFor="name">Nombre</Label>
                 <Input
@@ -51,11 +55,17 @@ export default function ReferrerTypeForm({ referrerType, onSuccess }: Props) {
                     onChange={(e) => setData('name', e.target.value)}
                     placeholder="Ej. Médico, Clínica, Hospital..."
                 />
-                {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                {errors.name && (
+                    <p className="text-sm text-destructive">{errors.name}</p>
+                )}
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
-                <Button type="submit" disabled={processing} className="w-full md:w-auto">
+                <Button
+                    type="submit"
+                    disabled={processing}
+                    className="w-full md:w-auto"
+                >
                     {processing && <Spinner className="mr-2" />}
                     {referrerType ? 'Guardar Cambios' : 'Crear Tipo'}
                 </Button>

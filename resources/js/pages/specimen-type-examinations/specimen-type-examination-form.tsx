@@ -1,13 +1,19 @@
 import { useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
-import { 
-    store as storeExamination, 
-    update as updateExamination 
+import {
+    store as storeExamination,
+    update as updateExamination,
 } from '@/actions/App/Http/Controllers/SpecimenTypeExaminationController';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '../../components/ui/textarea';
 
@@ -30,9 +36,17 @@ interface Props {
     defaultSpecimenTypeId?: string;
 }
 
-export default function SpecimenTypeExaminationForm({ examination, specimenTypes, onSuccess, defaultSpecimenTypeId }: Props) {
+export default function SpecimenTypeExaminationForm({
+    examination,
+    specimenTypes,
+    onSuccess,
+    defaultSpecimenTypeId,
+}: Props) {
     const { data, setData, post, put, processing, errors } = useForm({
-        specimen_type: examination?.specimen_type.toString() || defaultSpecimenTypeId || '',
+        specimen_type:
+            examination?.specimen_type.toString() ||
+            defaultSpecimenTypeId ||
+            '',
         name: examination?.name || '',
         description: examination?.description || '',
     });
@@ -42,7 +56,11 @@ export default function SpecimenTypeExaminationForm({ examination, specimenTypes
 
         const options = {
             onSuccess: () => {
-                toast.success(examination ? 'Tipo de análisis actualizado' : 'Tipo de análisis creado');
+                toast.success(
+                    examination
+                        ? 'Tipo de análisis actualizado'
+                        : 'Tipo de análisis creado',
+                );
                 onSuccess();
             },
         };
@@ -55,22 +73,32 @@ export default function SpecimenTypeExaminationForm({ examination, specimenTypes
     };
 
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6 py-4 px-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6 px-5 py-4">
             <div className="grid gap-2">
                 <Label htmlFor="specimen_type">Tipo de Muestra</Label>
-                <Select value={data.specimen_type} onValueChange={(v) => setData('specimen_type', v)}>
+                <Select
+                    value={data.specimen_type}
+                    onValueChange={(v) => setData('specimen_type', v)}
+                >
                     <SelectTrigger>
                         <SelectValue placeholder="Seleccione un tipo de muestra" />
                     </SelectTrigger>
                     <SelectContent>
                         {specimenTypes.map((type) => (
-                            <SelectItem key={type.id} value={type.id.toString()}>
+                            <SelectItem
+                                key={type.id}
+                                value={type.id.toString()}
+                            >
                                 {type.name}
                             </SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
-                {errors.specimen_type && <p className="text-sm text-destructive">{errors.specimen_type}</p>}
+                {errors.specimen_type && (
+                    <p className="text-sm text-destructive">
+                        {errors.specimen_type}
+                    </p>
+                )}
             </div>
 
             <div className="grid gap-2">
@@ -81,7 +109,9 @@ export default function SpecimenTypeExaminationForm({ examination, specimenTypes
                     onChange={(e) => setData('name', e.target.value)}
                     placeholder="Ej. Estudio Histopatológico, Biopsia Simple..."
                 />
-                {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                {errors.name && (
+                    <p className="text-sm text-destructive">{errors.name}</p>
+                )}
             </div>
 
             <div className="grid gap-2">
@@ -94,11 +124,19 @@ export default function SpecimenTypeExaminationForm({ examination, specimenTypes
                     className="resize-none"
                     rows={4}
                 />
-                {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
+                {errors.description && (
+                    <p className="text-sm text-destructive">
+                        {errors.description}
+                    </p>
+                )}
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
-                <Button type="submit" disabled={processing} className="w-full md:w-auto">
+                <Button
+                    type="submit"
+                    disabled={processing}
+                    className="w-full md:w-auto"
+                >
                     {processing && <Spinner className="mr-2" />}
                     {examination ? 'Guardar Cambios' : 'Crear Tipo de Análisis'}
                 </Button>

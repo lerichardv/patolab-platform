@@ -2,11 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
-
-use App\Models\Role;
 use App\Models\Permission;
+use App\Models\Role;
+use Illuminate\Database\Seeder;
 
 class RolesSeeder extends Seeder
 {
@@ -38,15 +36,15 @@ class RolesSeeder extends Seeder
             'specimens.create',
             'specimens.edit',
             'specimens.delete',
-            
+
             // Patients (view, create, edit)
             'patients.view',
             'patients.create',
             'patients.edit',
-            
+
             // Users (view only)
             'users.view',
-            
+
             // All inventory permissions
             'products.create',
             'products.edit',
@@ -57,7 +55,7 @@ class RolesSeeder extends Seeder
             'storages.edit',
             'storages.delete',
             'inventory.movements.view',
-            
+
             // All specimen administration except sequences
             'specimen_types.create',
             'specimen_types.edit',

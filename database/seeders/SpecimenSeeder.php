@@ -2,16 +2,16 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Specimen;
 use App\Models\Customer;
-use App\Models\SpecimenType;
-use App\Models\SpecimenTypeExamination;
-use App\Models\SpecimenCategory;
-use App\Models\Referrer;
 use App\Models\Priority;
 use App\Models\PrioritySpecimenOrder;
+use App\Models\Referrer;
 use App\Models\Sequence;
+use App\Models\Specimen;
+use App\Models\SpecimenCategory;
+use App\Models\SpecimenType;
+use App\Models\SpecimenTypeExamination;
+use Illuminate\Database\Seeder;
 
 class SpecimenSeeder extends Seeder
 {
@@ -27,7 +27,7 @@ class SpecimenSeeder extends Seeder
                     'company' => 'Empresa Test',
                     'address' => 'Dirección 1',
                     'active' => true,
-                ])
+                ]),
             ]);
         }
 
@@ -38,7 +38,7 @@ class SpecimenSeeder extends Seeder
                     'name' => 'Biopsia',
                     'description' => 'Biopsia General',
                     'active' => true,
-                ])
+                ]),
             ]);
         }
 
@@ -50,7 +50,7 @@ class SpecimenSeeder extends Seeder
                     'quantity' => 4,
                     'unit' => 'days',
                     'active' => true,
-                ])
+                ]),
             ]);
         }
 
@@ -63,7 +63,7 @@ class SpecimenSeeder extends Seeder
                     'phone' => '12345678',
                     'email' => 'doc@test.com',
                     'active' => true,
-                ])
+                ]),
             ]);
         }
 
@@ -77,13 +77,13 @@ class SpecimenSeeder extends Seeder
         for ($i = 1; $i <= 20; $i++) {
             $customer = $customers->random();
             $type = $specimenTypes->random();
-            
+
             // Get an examination belonging to this specimen type or create one
             $examination = SpecimenTypeExamination::where('specimen_type', $type->id)->inRandomOrder()->first();
-            if (!$examination) {
+            if (! $examination) {
                 $examination = SpecimenTypeExamination::create([
                     'specimen_type' => $type->id,
-                    'name' => 'Examen General de ' . $type->name,
+                    'name' => 'Examen General de '.$type->name,
                     'description' => 'Descripción del examen de prueba.',
                     'active' => true,
                 ]);
@@ -98,10 +98,10 @@ class SpecimenSeeder extends Seeder
             if ($sequence) {
                 $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
                 $paddedMonth = str_pad($sequence->month, 2, '0', STR_PAD_LEFT);
-                $sequenceCode = $sequence->prefix . $sequence->separator . $paddedSeq . $sequence->separator . $paddedMonth . $sequence->separator . $sequence->year;
+                $sequenceCode = $sequence->prefix.$sequence->separator.$paddedSeq.$sequence->separator.$paddedMonth.$sequence->separator.$sequence->year;
                 $sequence->increment('current_sequence');
             } else {
-                $sequenceCode = 'MOCK-' . strtoupper(substr($type->name, 0, 3)) . '-' . str_pad($i, 4, '0', STR_PAD_LEFT);
+                $sequenceCode = 'MOCK-'.strtoupper(substr($type->name, 0, 3)).'-'.str_pad($i, 4, '0', STR_PAD_LEFT);
             }
 
             // Generate past date between 1 and 60 days ago
@@ -114,9 +114,9 @@ class SpecimenSeeder extends Seeder
                 'specimen_type_examination' => $examination->id,
                 'specimen_category' => $category->id,
                 'referrer' => $referrer->id,
-                'anatomic_site' => 'Sitio Anatómico ' . $i,
-                'diagnosis' => 'Diagnóstico de prueba ' . $i,
-                'clinical_notes' => 'Notas clínicas generadas para la muestra ' . $i,
+                'anatomic_site' => 'Sitio Anatómico '.$i,
+                'diagnosis' => 'Diagnóstico de prueba '.$i,
+                'clinical_notes' => 'Notas clínicas generadas para la muestra '.$i,
                 'status' => $statuses[array_rand($statuses)],
                 'priority_id' => $priority->id,
                 'active' => true,

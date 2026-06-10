@@ -20,6 +20,7 @@ use App\Http\Controllers\SpecimenController;
 use App\Http\Controllers\SpecimenGroupController;
 use App\Http\Controllers\SpecimenTypeController;
 use App\Http\Controllers\SpecimenTypeExaminationController;
+use App\Http\Controllers\SpecimenTypeTemplateController;
 use App\Http\Controllers\StorageController;
 use App\Http\Controllers\UserController;
 use App\Models\Customer;
@@ -91,7 +92,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'todaySpecimens' => $todaySpecimens,
         ]);
     })->name('dashboard');
-    Route::inertia('test-page', 'test-page')->name('test-page');
     Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
     Route::resource('customers', CustomerController::class);
 
@@ -126,6 +126,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('credits/export', [CreditController::class, 'export'])->name('credits.export');
     Route::resource('credits', CreditController::class)->only(['index']);
     Route::post('credits/{credit}/pay', [CreditController::class, 'pay'])->name('credits.pay');
+    Route::post('specimen-type-templates/upload-image', [SpecimenTypeTemplateController::class, 'uploadImage'])->name('specimen-type-templates.upload-image');
+    Route::resource('specimen-type-templates', SpecimenTypeTemplateController::class);
     Route::resource('specimen-categories', SpecimenCategoryController::class);
     Route::resource('specimen-types', SpecimenTypeController::class);
     Route::resource('specimen-type-examinations', SpecimenTypeExaminationController::class);

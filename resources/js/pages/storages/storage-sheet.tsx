@@ -18,14 +18,18 @@ interface Props {
 export default function StorageSheet({ storage, open, onOpenChange }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-[540px] overflow-y-auto">
-                <HeadingSheet 
+            <SheetContent className="w-full overflow-y-auto sm:max-w-[540px]">
+                <HeadingSheet
                     title={storage ? 'Editar Almacén' : 'Nuevo Almacén'}
-                    description={storage ? 'Actualice la información del almacén aquí.' : 'Complete los campos para registrar un nuevo almacén o bodega.'}
+                    description={
+                        storage
+                            ? 'Actualice la información del almacén aquí.'
+                            : 'Complete los campos para registrar un nuevo almacén o bodega.'
+                    }
                 />
-                <StorageForm 
-                    storage={storage || undefined} 
-                    onSuccess={() => onOpenChange(false)} 
+                <StorageForm
+                    storage={storage || undefined}
+                    onSuccess={() => onOpenChange(false)}
                 />
             </SheetContent>
         </Sheet>

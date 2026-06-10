@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
     index as sequencesIndex,
-    destroy as destroySequence
+    destroy as destroySequence,
 } from '@/actions/App/Http/Controllers/SequenceController';
 import { Pagination } from '@/components/pagination';
 import {
@@ -26,7 +26,7 @@ import {
     TableCell,
     TableHead,
     TableHeader,
-    TableRow
+    TableRow,
 } from '@/components/ui/table';
 import SequenceSheet from './sequence-sheet';
 
@@ -76,7 +76,13 @@ interface Props {
     };
 }
 
-export default function SequencesIndex({ sequences, locations, specimenTypes, allSequences = [], filters }: Props) {
+export default function SequencesIndex({
+    sequences,
+    locations,
+    specimenTypes,
+    allSequences = [],
+    filters,
+}: Props) {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedSequence, setSelectedSequence] = useState<any | null>(null);
@@ -87,8 +93,8 @@ export default function SequencesIndex({ sequences, locations, specimenTypes, al
         const newFilters = { ...filters, [key]: value };
 
         if (value === '') {
-delete newFilters[key as keyof typeof filters];
-}
+            delete newFilters[key as keyof typeof filters];
+        }
 
         router.get(sequencesIndex().url, newFilters, {
             preserveState: true,
@@ -100,7 +106,7 @@ delete newFilters[key as keyof typeof filters];
         debounce((value: string) => {
             handleFilterChange('search', value);
         }, 300),
-        [filters]
+        [filters],
     );
 
     useEffect(() => {
@@ -150,19 +156,27 @@ delete newFilters[key as keyof typeof filters];
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Secuencias</h1>
-                        <p className="text-muted-foreground">Administre los formatos y contadores de las muestras por sucursal.</p>
+                        <h1 className="text-2xl font-bold tracking-tight">
+                            Secuencias
+                        </h1>
+                        <p className="text-muted-foreground">
+                            Administre los formatos y contadores de las muestras
+                            por sucursal.
+                        </p>
                     </div>
                     <div className="flex gap-2">
-                        <Button onClick={handleCreate} className="h-10 px-5 text-sm w-full md:w-auto">
+                        <Button
+                            onClick={handleCreate}
+                            className="h-10 w-full px-5 text-sm md:w-auto"
+                        >
                             <Plus className="mr-2 h-4 w-4" /> Nueva Secuencia
                         </Button>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 max-w-sm">
+                <div className="flex max-w-sm items-center gap-2">
                     <div className="relative flex-1">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Buscar por prefijo, sucursal o tipo..."
                             className="pl-8"
@@ -181,7 +195,9 @@ delete newFilters[key as keyof typeof filters];
                                 <TableHead>Siguiente secuencia</TableHead>
                                 <TableHead>Formato / Preview</TableHead>
                                 <TableHead>Mes / Año</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
+                                <TableHead className="text-right">
+                                    Acciones
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -190,45 +206,69 @@ delete newFilters[key as keyof typeof filters];
                                     <TableRow key={sequence.id}>
                                         <TableCell>
                                             <div className="flex flex-col">
-                                                <span className="font-medium text-sm">
-                                                    {sequence.location?.name || 'Sucursal Desconocida'}
+                                                <span className="text-sm font-medium">
+                                                    {sequence.location?.name ||
+                                                        'Sucursal Desconocida'}
                                                 </span>
                                                 <span className="text-xs text-muted-foreground">
-                                                    {sequence.specimen_type_relation?.name || 'Muestra Desconocida'}
+                                                    {sequence
+                                                        .specimen_type_relation
+                                                        ?.name ||
+                                                        'Muestra Desconocida'}
                                                 </span>
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="bg-primary/10 px-2 py-1 rounded inline-flex items-center font-mono text-xs font-bold text-primary">
+                                            <div className="inline-flex items-center rounded bg-primary/10 px-2 py-1 font-mono text-xs font-bold text-primary">
                                                 {sequence.prefix}
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="bg-muted px-2.5 py-1 rounded inline-flex items-center font-mono text-xs font-bold text-muted-foreground border">
+                                            <div className="inline-flex items-center rounded border bg-muted px-2.5 py-1 font-mono text-xs font-bold text-muted-foreground">
                                                 {sequence.current_sequence}
                                             </div>
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex flex-col gap-1">
-                                                <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
+                                                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
                                                     {formatPreview(sequence)}
                                                 </code>
                                                 <span className="text-[10px] text-muted-foreground italic">
-                                                    Próximo correlativo: {sequence.current_sequence} (relleno de {sequence.fill})
+                                                    Próximo correlativo:{' '}
+                                                    {sequence.current_sequence}{' '}
+                                                    (relleno de {sequence.fill})
                                                 </span>
                                             </div>
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-xs">
-                                                {String(sequence.month).padStart(2, '0')} / {sequence.year}
+                                                {String(
+                                                    sequence.month,
+                                                ).padStart(2, '0')}{' '}
+                                                / {sequence.year}
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(sequence)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        handleEdit(sequence)
+                                                    }
+                                                >
                                                     <Edit2 className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteClick(sequence)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-destructive"
+                                                    onClick={() =>
+                                                        handleDeleteClick(
+                                                            sequence,
+                                                        )
+                                                    }
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -237,7 +277,10 @@ delete newFilters[key as keyof typeof filters];
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
+                                    <TableCell
+                                        colSpan={6}
+                                        className="h-24 text-center"
+                                    >
                                         No se encontraron resultados.
                                     </TableCell>
                                 </TableRow>
@@ -251,7 +294,7 @@ delete newFilters[key as keyof typeof filters];
                     meta={{
                         from: sequences.from,
                         to: sequences.to,
-                        total: sequences.total
+                        total: sequences.total,
                     }}
                 />
             </div>
@@ -265,18 +308,28 @@ delete newFilters[key as keyof typeof filters];
                 onOpenChange={setIsSheetOpen}
             />
 
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>¿Está completamente seguro?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            ¿Está completamente seguro?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción desactivará la secuencia para <strong>{sequenceToDelete?.location?.name}</strong> ({sequenceToDelete?.prefix}).
-                            Ya no se utilizará para generar nuevos correlativos de muestras.
+                            Esta acción desactivará la secuencia para{' '}
+                            <strong>{sequenceToDelete?.location?.name}</strong>{' '}
+                            ({sequenceToDelete?.prefix}). Ya no se utilizará
+                            para generar nuevos correlativos de muestras.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-white hover:bg-destructive/90">
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                        >
                             Desactivar
                         </AlertDialogAction>
                     </AlertDialogFooter>

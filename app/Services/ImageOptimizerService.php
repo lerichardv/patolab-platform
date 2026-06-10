@@ -12,9 +12,6 @@ class ImageOptimizerService
     /**
      * Optimize an uploaded image to stay under 300KB and store it on the specified disk.
      *
-     * @param UploadedFile $file
-     * @param string $folder
-     * @param string $disk
      * @return string Stored file path relative to disk root
      */
     public function optimizeAndStore(UploadedFile $file, string $folder, string $disk = 'public'): string
@@ -22,7 +19,7 @@ class ImageOptimizerService
         $mime = $file->getMimeType();
 
         // If it's not a GD-supported image, save it directly
-        if (!str_starts_with($mime, 'image/')) {
+        if (! str_starts_with($mime, 'image/')) {
             return $file->store($folder, $disk);
         }
 
@@ -40,7 +37,7 @@ class ImageOptimizerService
         }
 
         // If GD image load failed, save it directly
-        if (!$gdImage) {
+        if (! $gdImage) {
             return $file->store($folder, $disk);
         }
 
@@ -62,7 +59,7 @@ class ImageOptimizerService
             $h = (int) ($originalHeight * $scale);
 
             $tmpImg = imagecreatetruecolor($w, $h);
-            
+
             // Handle transparency for PNG/WebP or fallback to white fill
             imagefill($tmpImg, 0, 0, imagecolorallocate($tmpImg, 255, 255, 255));
             imagecopyresampled($tmpImg, $gdImage, 0, 0, 0, 0, $w, $h, $originalWidth, $originalHeight);
@@ -79,11 +76,13 @@ class ImageOptimizerService
 
             if ($scale > $minScale) {
                 $scale = max($minScale, $scale - 0.1);
+
                 continue;
             }
 
             if ($quality > 10) {
                 $quality -= 10;
+
                 continue;
             }
 
@@ -92,10 +91,10 @@ class ImageOptimizerService
 
         imagedestroy($gdImage);
 
-        $filename = Str::random(40) . '.jpg';
+        $filename = Str::random(40).'.jpg';
         Storage::disk($disk)->putFileAs($folder, new File($tempPath), $filename);
         @unlink($tempPath);
 
-        return $folder . '/' . $filename;
+        return $folder.'/'.$filename;
     }
 }

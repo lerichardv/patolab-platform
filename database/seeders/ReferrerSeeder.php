@@ -54,9 +54,9 @@ class ReferrerSeeder extends Seeder
                 Referrer::create([
                     'name' => $name,
                     'referrer_type' => $type->id,
-                    'phone' => '9' . rand(700, 999) . '-' . rand(1000, 9999),
-                    'email' => strtolower(str_replace([' ', '.'], ['', ''], $name)) . '@ejemplo.com',
-                    'address' => "Colonia El Prado, Edificio $typeName, Local " . rand(1, 50),
+                    'phone' => '9'.rand(700, 999).'-'.rand(1000, 9999),
+                    'email' => strtolower(str_replace([' ', '.'], ['', ''], $name)).'@ejemplo.com',
+                    'address' => "Colonia El Prado, Edificio $typeName, Local ".rand(1, 50),
                     'active' => true,
                 ]);
             }

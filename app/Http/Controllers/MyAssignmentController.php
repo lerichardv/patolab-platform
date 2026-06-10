@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\Priority;
 use Inertia\Inertia;
 
 class MyAssignmentController extends Controller
@@ -20,7 +20,7 @@ class MyAssignmentController extends Controller
             ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank'])
             ->get();
 
-        $priorities = \App\Models\Priority::orderBy('order', 'asc')->get();
+        $priorities = Priority::orderBy('order', 'asc')->get();
 
         return Inertia::render('my-assignments/index', [
             'specimens' => $specimens,

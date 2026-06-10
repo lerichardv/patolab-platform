@@ -3,9 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bank;
+use App\Models\CaiRange;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Location;
+use App\Models\Priority;
+use App\Models\Product;
+use App\Models\Referrer;
+use App\Models\ReferrerType;
+use App\Models\Sequence;
+use App\Models\Specimen;
+use App\Models\SpecimenCategory;
+use App\Models\SpecimenGroup;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use Illuminate\Http\Request;
@@ -134,36 +143,37 @@ class InvoiceController extends Controller
         $specimenTypes = SpecimenType::where('active', true)->orderBy('name', 'asc')->with('prices')->get();
         $banks = Bank::all();
 
-        $examinations = \App\Models\SpecimenTypeExamination::where('active', true)->get();
-        $categories = \App\Models\SpecimenCategory::where('active', true)->get();
-        $referrers = \App\Models\Referrer::where('active', true)->get();
-        $referrerTypes = \App\Models\ReferrerType::where('active', true)->get();
-        $priorities = \App\Models\Priority::orderBy('order', 'desc')->get();
+        $examinations = SpecimenTypeExamination::where('active', true)->get();
+        $categories = SpecimenCategory::where('active', true)->get();
+        $referrers = Referrer::where('active', true)->get();
+        $referrerTypes = ReferrerType::where('active', true)->get();
+        $priorities = Priority::orderBy('order', 'desc')->get();
         $locations = Location::where('active', true)->get();
 
-        $activeCai = \App\Models\CaiRange::where('status', 'active')->first();
+        $activeCai = CaiRange::where('status', 'active')->first();
         $activeLocationId = $activeCai ? $activeCai->location_id : null;
-        $sequences = \App\Models\Sequence::where('active', true)->get()->map(function ($sequence) {
+        $sequences = Sequence::where('active', true)->get()->map(function ($sequence) {
             $tempSequence = clone $sequence;
             do {
                 $paddedSeq = str_pad($tempSequence->current_sequence, $tempSequence->fill ?? 4, '0', STR_PAD_LEFT);
                 $paddedMonth = str_pad($tempSequence->month, 2, '0', STR_PAD_LEFT);
                 $sequenceCode = $tempSequence->prefix.$tempSequence->separator.$paddedSeq.$tempSequence->separator.$paddedMonth.$tempSequence->separator.$tempSequence->year;
 
-                $exists = \App\Models\Specimen::where('sequence_code', $sequenceCode)->exists();
+                $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
                 if ($exists) {
                     $tempSequence->current_sequence++;
                 }
             } while ($exists);
             $sequence->current_sequence = $tempSequence->current_sequence;
+
             return $sequence;
         });
 
-        $products = \App\Models\Product::where('active', true)
-            ->whereHas('inventory', function($q) {
+        $products = Product::where('active', true)
+            ->whereHas('inventory', function ($q) {
                 $q->where('active', true);
             })
-            ->withSum(['inventory as total_stock' => function($q) {
+            ->withSum(['inventory as total_stock' => function ($q) {
                 $q->where('active', true);
             }], 'quantity')
             ->with('prices')
@@ -187,7 +197,7 @@ class InvoiceController extends Controller
             'sequences' => $sequences,
             'activeLocationId' => $activeLocationId,
             'products' => $products,
-            'groups' => \App\Models\SpecimenGroup::orderBy('name', 'asc')->get(),
+            'groups' => SpecimenGroup::orderBy('name', 'asc')->get(),
         ]);
     }
 

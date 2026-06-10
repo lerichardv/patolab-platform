@@ -5,9 +5,15 @@ import { toast } from 'sonner';
 import { update as updateSettings } from '@/actions/App/Http/Controllers/SettingController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface Props {
     settings: {
@@ -37,39 +43,45 @@ export default function SystemSettingsIndex({ settings }: Props) {
     return (
         <>
             <Head title="Ajustes del Sistema" />
-            
-            <div className="flex h-full flex-1 flex-col gap-6 p-6 max-w-4xl mx-auto">
-                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b pb-5">
+
+            <div className="mx-auto flex h-full max-w-4xl flex-1 flex-col gap-6 p-6">
+                <div className="flex flex-col gap-2 border-b pb-5 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-primary/10 text-primary rounded-xl shadow-inner border border-primary/20">
+                        <div className="rounded-xl border border-primary/20 bg-primary/10 p-2.5 text-primary shadow-inner">
                             <Settings className="h-6 w-6 animate-[spin_8s_linear_infinite]" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                            <h1 className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent">
                                 Ajustes del Sistema
                             </h1>
-                            <p className="text-muted-foreground text-sm">
-                                Configure los parámetros generales de la plataforma y valores por defecto.
+                            <p className="text-sm text-muted-foreground">
+                                Configure los parámetros generales de la
+                                plataforma y valores por defecto.
                             </p>
                         </div>
                     </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <Card className="border border-muted shadow-lg bg-card/60 backdrop-blur-md overflow-hidden transition-all duration-300 hover:shadow-xl hover:border-primary/20">
-                        <CardHeader className="bg-gradient-to-r from-primary/5 via-transparent to-transparent border-b pb-4">
-                            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    <Card className="overflow-hidden border border-muted bg-card/60 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-primary/20 hover:shadow-xl">
+                        <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-transparent to-transparent pb-4">
+                            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                                 <span className="flex h-2 w-2 rounded-full bg-primary" />
                                 Descuentos de Pacientes
                             </CardTitle>
                             <CardDescription>
-                                Establezca los porcentajes de descuento automáticos aplicados en base a la edad de los pacientes.
+                                Establezca los porcentajes de descuento
+                                automáticos aplicados en base a la edad de los
+                                pacientes.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="pt-6 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2 group">
-                                    <Label htmlFor="third_age_discount" className="text-sm font-semibold transition-colors group-focus-within:text-primary">
+                        <CardContent className="space-y-6 pt-6">
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                <div className="group space-y-2">
+                                    <Label
+                                        htmlFor="third_age_discount"
+                                        className="text-sm font-semibold transition-colors group-focus-within:text-primary"
+                                    >
                                         Descuento Tercera Edad
                                     </Label>
                                     <div className="relative rounded-md shadow-sm transition-all duration-200">
@@ -80,22 +92,33 @@ export default function SystemSettingsIndex({ settings }: Props) {
                                             max="100"
                                             step="any"
                                             value={data.third_age_discount}
-                                            onChange={(e) => setData('third_age_discount', e.target.value)}
-                                            className="pr-10 border-muted-foreground/20 focus-visible:ring-primary focus-visible:border-primary"
+                                            onChange={(e) =>
+                                                setData(
+                                                    'third_age_discount',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className="border-muted-foreground/20 pr-10 focus-visible:border-primary focus-visible:ring-primary"
                                             placeholder="30"
                                         />
-                                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-muted-foreground">
+                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground">
                                             <Percent className="h-4 w-4" />
                                         </div>
                                     </div>
                                     <p className="text-xs text-muted-foreground">
-                                        Se aplica automáticamente a los pacientes de la tercera edad.
+                                        Se aplica automáticamente a los
+                                        pacientes de la tercera edad.
                                     </p>
-                                    <InputError message={errors.third_age_discount} />
+                                    <InputError
+                                        message={errors.third_age_discount}
+                                    />
                                 </div>
 
-                                <div className="space-y-2 group">
-                                    <Label htmlFor="fourth_age_discount" className="text-sm font-semibold transition-colors group-focus-within:text-primary">
+                                <div className="group space-y-2">
+                                    <Label
+                                        htmlFor="fourth_age_discount"
+                                        className="text-sm font-semibold transition-colors group-focus-within:text-primary"
+                                    >
                                         Descuento Cuarta Edad
                                     </Label>
                                     <div className="relative rounded-md shadow-sm transition-all duration-200">
@@ -106,30 +129,38 @@ export default function SystemSettingsIndex({ settings }: Props) {
                                             max="100"
                                             step="any"
                                             value={data.fourth_age_discount}
-                                            onChange={(e) => setData('fourth_age_discount', e.target.value)}
-                                            className="pr-10 border-muted-foreground/20 focus-visible:ring-primary focus-visible:border-primary"
+                                            onChange={(e) =>
+                                                setData(
+                                                    'fourth_age_discount',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className="border-muted-foreground/20 pr-10 focus-visible:border-primary focus-visible:ring-primary"
                                             placeholder="40"
                                         />
-                                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-muted-foreground">
+                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground">
                                             <Percent className="h-4 w-4" />
                                         </div>
                                     </div>
                                     <p className="text-xs text-muted-foreground">
-                                        Se aplica automáticamente a los pacientes de la cuarta edad.
+                                        Se aplica automáticamente a los
+                                        pacientes de la cuarta edad.
                                     </p>
-                                    <InputError message={errors.fourth_age_discount} />
+                                    <InputError
+                                        message={errors.fourth_age_discount}
+                                    />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
                     <div className="flex justify-end pt-2">
-                        <Button 
-                            type="submit" 
+                        <Button
+                            type="submit"
                             disabled={processing}
-                            className="h-10 px-5 text-sm w-full md:w-auto flex items-center gap-2"
+                            className="flex h-10 w-full items-center gap-2 px-5 text-sm md:w-auto"
                         >
-                            <Save className="h-4 w-4 mr-2" />
+                            <Save className="mr-2 h-4 w-4" />
                             {processing ? 'Guardando...' : 'Guardar Cambios'}
                         </Button>
                     </div>

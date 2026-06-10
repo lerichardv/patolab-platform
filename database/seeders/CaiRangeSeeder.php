@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\CaiRange;
 use App\Models\Location;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
 
 class CaiRangeSeeder extends Seeder
 {
@@ -13,12 +14,12 @@ class CaiRangeSeeder extends Seeder
      */
     public function run(): void
     {
-        \Illuminate\Support\Facades\Schema::disableForeignKeyConstraints();
+        Schema::disableForeignKeyConstraints();
         CaiRange::truncate();
-        \Illuminate\Support\Facades\Schema::enableForeignKeyConstraints();
-        
+        Schema::enableForeignKeyConstraints();
+
         $locations = Location::all();
-        
+
         if ($locations->isEmpty()) {
             return;
         }

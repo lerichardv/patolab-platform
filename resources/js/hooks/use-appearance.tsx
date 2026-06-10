@@ -85,6 +85,7 @@ export function initializeTheme(): void {
 
     // Set up system theme change listener
     const mq = mediaQuery();
+
     if (mq) {
         if (mq.addEventListener) {
             mq.addEventListener('change', handleSystemThemeChange);

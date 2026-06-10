@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -18,9 +18,9 @@ return new class extends Migration
         foreach ($specimens as $s) {
             $code = $s->sequence_code;
             if (empty($code) || $code === 'XXX-0000-00-0000' || in_array($code, $seen)) {
-                $uniqueCode = 'FIX-' . strtoupper(substr(uniqid(), -8)) . '-' . date('m-Y');
+                $uniqueCode = 'FIX-'.strtoupper(substr(uniqid(), -8)).'-'.date('m-Y');
                 while (DB::table('specimen')->where('sequence_code', $uniqueCode)->exists() || in_array($uniqueCode, $seen)) {
-                    $uniqueCode = 'FIX-' . strtoupper(substr(uniqid(), -8)) . '-' . date('m-Y');
+                    $uniqueCode = 'FIX-'.strtoupper(substr(uniqid(), -8)).'-'.date('m-Y');
                 }
                 DB::table('specimen')->where('id', $s->id)->update(['sequence_code' => $uniqueCode]);
                 $code = $uniqueCode;

@@ -2,9 +2,9 @@ import { useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { 
-    store as storeSpecimenType, 
-    update as updateSpecimenType 
+import {
+    store as storeSpecimenType,
+    update as updateSpecimenType,
 } from '@/actions/App/Http/Controllers/SpecimenTypeController';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +33,7 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
     const { data, setData, post, put, processing, errors } = useForm({
         name: specimenType?.name || '',
         description: specimenType?.description || '',
-        prices: specimenType?.prices || [] as Price[],
+        prices: specimenType?.prices || ([] as Price[]),
     });
 
     const [newPrice, setNewPrice] = useState<string>('');
@@ -46,11 +46,8 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
         }
 
         const priceAmount = parseFloat(newPrice).toFixed(2);
-        
-        setData('prices', [
-            ...data.prices,
-            { amount: priceAmount }
-        ]);
+
+        setData('prices', [...data.prices, { amount: priceAmount }]);
         setNewPrice('');
     };
 
@@ -58,7 +55,7 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
         const updatedPrices = [...data.prices];
         updatedPrices[index] = {
             ...updatedPrices[index],
-            amount: value
+            amount: value,
         };
         setData('prices', updatedPrices);
     };
@@ -72,14 +69,20 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
         e.preventDefault();
 
         if (newPrice.trim() !== '') {
-            toast.error('Tiene un precio ingresado sin agregar. Por favor, haga clic en el botón "Agregar" para incluirlo en la lista o limpie el campo antes de continuar.');
+            toast.error(
+                'Tiene un precio ingresado sin agregar. Por favor, haga clic en el botón "Agregar" para incluirlo en la lista o limpie el campo antes de continuar.',
+            );
 
             return;
         }
 
         const options = {
             onSuccess: () => {
-                toast.success(specimenType ? 'Tipo de muestra actualizado' : 'Tipo de muestra creado');
+                toast.success(
+                    specimenType
+                        ? 'Tipo de muestra actualizado'
+                        : 'Tipo de muestra creado',
+                );
                 onSuccess();
             },
         };
@@ -92,7 +95,7 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6 py-4 px-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6 px-5 py-4">
             <div className="grid gap-2">
                 <Label htmlFor="name">Nombre</Label>
                 <Input
@@ -101,7 +104,9 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
                     onChange={(e) => setData('name', e.target.value)}
                     placeholder="Ej. Biopsia, Citología..."
                 />
-                {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                {errors.name && (
+                    <p className="text-sm text-destructive">{errors.name}</p>
+                )}
             </div>
 
             <div className="grid gap-2">
@@ -114,14 +119,20 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
                     className="resize-none"
                     rows={3}
                 />
-                {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
+                {errors.description && (
+                    <p className="text-sm text-destructive">
+                        {errors.description}
+                    </p>
+                )}
             </div>
 
             <div className="grid gap-3">
                 <Label>Lista de Precios (L.)</Label>
                 <div className="flex gap-2">
                     <div className="relative flex-1">
-                        <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">L.</span>
+                        <span className="absolute top-2.5 left-3 text-sm text-muted-foreground">
+                            L.
+                        </span>
                         <Input
                             type="number"
                             step="0.01"
@@ -138,26 +149,42 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
                             }}
                         />
                     </div>
-                    <Button type="button" variant="outline" onClick={handleAddPrice}>
-                        <Plus className="h-4 w-4 mr-1" /> Agregar
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleAddPrice}
+                    >
+                        <Plus className="mr-1 h-4 w-4" /> Agregar
                     </Button>
                 </div>
 
-                <div className="max-h-48 overflow-y-auto border rounded-md p-2 flex flex-col gap-2">
+                <div className="flex max-h-48 flex-col gap-2 overflow-y-auto rounded-md border p-2">
                     {data.prices.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">No se han agregado precios aún.</p>
+                        <p className="py-4 text-center text-sm text-muted-foreground">
+                            No se han agregado precios aún.
+                        </p>
                     ) : (
                         data.prices.map((price, idx) => (
-                            <div key={idx} className="flex items-center justify-between gap-3">
+                            <div
+                                key={idx}
+                                className="flex items-center justify-between gap-3"
+                            >
                                 <div className="relative flex-1">
-                                    <span className="absolute left-3 top-2 text-sm text-muted-foreground font-mono">L.</span>
+                                    <span className="absolute top-2 left-3 font-mono text-sm text-muted-foreground">
+                                        L.
+                                    </span>
                                     <Input
                                         type="number"
                                         step="0.01"
                                         min="0"
                                         value={price.amount}
-                                        onChange={(e) => handlePriceChange(idx, e.target.value)}
-                                        className="pl-7 h-8 font-mono"
+                                        onChange={(e) =>
+                                            handlePriceChange(
+                                                idx,
+                                                e.target.value,
+                                            )
+                                        }
+                                        className="h-8 pl-7 font-mono"
                                     />
                                 </div>
                                 <Button
@@ -173,14 +200,24 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
                         ))
                     )}
                 </div>
-                {errors.prices && <p className="text-sm text-destructive">{errors.prices}</p>}
-                {Object.keys(errors).some(key => key.startsWith('prices.')) && (
-                    <p className="text-sm text-destructive">Por favor, revise que todos los precios sean válidos.</p>
+                {errors.prices && (
+                    <p className="text-sm text-destructive">{errors.prices}</p>
+                )}
+                {Object.keys(errors).some((key) =>
+                    key.startsWith('prices.'),
+                ) && (
+                    <p className="text-sm text-destructive">
+                        Por favor, revise que todos los precios sean válidos.
+                    </p>
                 )}
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
-                <Button type="submit" disabled={processing} className="w-full md:w-auto">
+                <Button
+                    type="submit"
+                    disabled={processing}
+                    className="w-full md:w-auto"
+                >
                     {processing && <Spinner className="mr-2" />}
                     {specimenType ? 'Guardar Cambios' : 'Crear Tipo de Muestra'}
                 </Button>

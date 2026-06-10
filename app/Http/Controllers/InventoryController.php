@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Inventory;
+use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\Storage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -21,7 +23,7 @@ class InventoryController extends Controller
             $search = $request->get('search');
             $query->whereHas('productRelation', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                    ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
@@ -146,7 +148,7 @@ class InventoryController extends Controller
 
     private function logMovement(Inventory $inventory, $quantityAdded, $before, $after, $type)
     {
-        \App\Models\InventoryMovement::create([
+        InventoryMovement::create([
             'inventory_name' => $inventory->productRelation->name,
             'inventory' => $inventory->id,
             'storage_name' => $inventory->storageRelation->name,
@@ -155,7 +157,7 @@ class InventoryController extends Controller
             'quantity_before_update' => $before,
             'quantity_after_update' => $after,
             'movement' => $type,
-            'user_id' => \Illuminate\Support\Facades\Auth::id(),
+            'user_id' => Auth::id(),
         ]);
     }
 }

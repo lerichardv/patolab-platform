@@ -9,13 +9,14 @@ interface HeadingSheetProps {
     description: string;
 }
 
-export default function HeadingSheet({ title, description }: HeadingSheetProps) {
+export default function HeadingSheet({
+    title,
+    description,
+}: HeadingSheetProps) {
     return (
         <SheetHeader className="px-5 pt-4">
             <SheetTitle className="text-2xl">{title}</SheetTitle>
-            <SheetDescription>
-                {description}
-            </SheetDescription>
+            <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
     );
 }

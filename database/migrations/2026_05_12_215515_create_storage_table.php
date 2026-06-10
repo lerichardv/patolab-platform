@@ -13,10 +13,10 @@ return new class extends Migration
     {
         Schema::create('storage', function (Blueprint $table) {
             $table->id();
-			$table->string('name');
+            $table->string('name');
             $table->string('location');
-			$table->string('description');
-			$table->boolean('active')->default(true);
+            $table->string('description');
+            $table->boolean('active')->default(true);
             $table->timestamps();
         });
     }

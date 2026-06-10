@@ -12,7 +12,7 @@ class WhatsAppService
 
         $response = Http::withToken(config('services.whatsapp.token'))
             ->post(
-                'https://graph.facebook.com/' . config('services.whatsapp.version', 'v23.0') . '/' . config('services.whatsapp.phone_number_id') . '/messages',
+                'https://graph.facebook.com/'.config('services.whatsapp.version', 'v23.0').'/'.config('services.whatsapp.phone_number_id').'/messages',
                 [
                     'messaging_product' => 'whatsapp',
                     'recipient_type' => 'individual',
@@ -48,13 +48,13 @@ class WhatsAppService
             ],
         ];
 
-        if (!empty($components)) {
+        if (! empty($components)) {
             $payload['template']['components'] = $components;
         }
 
         $response = Http::withToken(config('services.whatsapp.token'))
             ->post(
-                'https://graph.facebook.com/' . config('services.whatsapp.version', 'v23.0') . '/' . config('services.whatsapp.phone_number_id') . '/messages',
+                'https://graph.facebook.com/'.config('services.whatsapp.version', 'v23.0').'/'.config('services.whatsapp.phone_number_id').'/messages',
                 $payload
             );
 
@@ -73,8 +73,8 @@ class WhatsAppService
                     [
                         'type' => 'text',
                         'text' => $bodyText,
-                    ]
-                ]
+                    ],
+                ],
             ],
             [
                 'type' => 'button',
@@ -84,12 +84,11 @@ class WhatsAppService
                     [
                         'type' => 'text',
                         'text' => $buttonUrlSuffix,
-                    ]
-                ]
-            ]
+                    ],
+                ],
+            ],
         ];
 
         return $this->sendTemplate($phone, $templateName, $languageCode, $components);
     }
 }
-

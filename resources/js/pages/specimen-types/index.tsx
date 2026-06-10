@@ -3,9 +3,9 @@ import debounce from 'lodash/debounce';
 import { Edit2, Microscope, Plus, Search, Trash2 } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { 
-    index as specimenTypesIndex, 
-    destroy as destroySpecimenType 
+import {
+    index as specimenTypesIndex,
+    destroy as destroySpecimenType,
 } from '@/actions/App/Http/Controllers/SpecimenTypeController';
 import { Pagination } from '@/components/pagination';
 import {
@@ -21,13 +21,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableHead, 
-    TableHeader, 
-    TableRow 
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from '@/components/ui/table';
 import SpecimenTypeSheet from './specimen-type-sheet';
 
@@ -66,17 +66,19 @@ interface Props {
 export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [selectedSpecimenType, setSelectedSpecimenType] = useState<SpecimenType | null>(null);
-    const [specimenTypeToDelete, setSpecimenTypeToDelete] = useState<SpecimenType | null>(null);
+    const [selectedSpecimenType, setSelectedSpecimenType] =
+        useState<SpecimenType | null>(null);
+    const [specimenTypeToDelete, setSpecimenTypeToDelete] =
+        useState<SpecimenType | null>(null);
     const [search, setSearch] = useState(filters.search || '');
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
 
         if (value === '') {
-delete newFilters[key as keyof typeof filters];
-}
-        
+            delete newFilters[key as keyof typeof filters];
+        }
+
         router.get(specimenTypesIndex().url, newFilters, {
             preserveState: true,
             replace: true,
@@ -87,7 +89,7 @@ delete newFilters[key as keyof typeof filters];
         debounce((value: string) => {
             handleFilterChange('search', value);
         }, 300),
-        [filters]
+        [filters],
     );
 
     useEffect(() => {
@@ -130,12 +132,20 @@ delete newFilters[key as keyof typeof filters];
                     <div>
                         <div className="flex items-center gap-2">
                             <Microscope className="h-6 w-6 text-primary" />
-                            <h1 className="text-2xl font-bold tracking-tight">Tipos de Muestras</h1>
+                            <h1 className="text-2xl font-bold tracking-tight">
+                                Tipos de Muestras
+                            </h1>
                         </div>
-                        <p className="text-muted-foreground">Administre los diferentes tipos de muestras para los análisis.</p>
+                        <p className="text-muted-foreground">
+                            Administre los diferentes tipos de muestras para los
+                            análisis.
+                        </p>
                     </div>
                     <div className="flex gap-2">
-                        <Button onClick={handleCreate} className="h-10 px-5 text-sm w-full md:w-auto">
+                        <Button
+                            onClick={handleCreate}
+                            className="h-10 w-full px-5 text-sm md:w-auto"
+                        >
                             <Plus className="mr-2 h-4 w-4" /> Nuevo Tipo
                         </Button>
                     </div>
@@ -143,7 +153,7 @@ delete newFilters[key as keyof typeof filters];
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <div className="relative">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Buscar por nombre o descripción..."
                             className="pl-8"
@@ -161,43 +171,75 @@ delete newFilters[key as keyof typeof filters];
                                 <TableHead>Descripción</TableHead>
                                 <TableHead>Precios</TableHead>
                                 <TableHead>Fecha Creación</TableHead>
-                                <TableHead className="text-right">Acciones</TableHead>
+                                <TableHead className="text-right">
+                                    Acciones
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {specimenTypes.data.length > 0 ? (
                                 specimenTypes.data.map((type) => (
                                     <TableRow key={type.id}>
-                                        <TableCell className="font-medium">{type.name}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {type.name}
+                                        </TableCell>
                                         <TableCell className="max-w-md truncate text-muted-foreground">
-                                            {type.description || 'Sin descripción'}
+                                            {type.description ||
+                                                'Sin descripción'}
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex flex-wrap gap-1 max-w-xs">
-                                                {type.prices && type.prices.length > 0 ? (
+                                            <div className="flex max-w-xs flex-wrap gap-1">
+                                                {type.prices &&
+                                                type.prices.length > 0 ? (
                                                     type.prices.map((price) => (
-                                                        <Badge key={price.id} variant="secondary" className="font-mono">
-                                                            L. {parseFloat(String(price.amount)).toFixed(2)}
+                                                        <Badge
+                                                            key={price.id}
+                                                            variant="secondary"
+                                                            className="font-mono"
+                                                        >
+                                                            L.{' '}
+                                                            {parseFloat(
+                                                                String(
+                                                                    price.amount,
+                                                                ),
+                                                            ).toFixed(2)}
                                                         </Badge>
                                                     ))
                                                 ) : (
-                                                    <span className="text-xs text-muted-foreground">Sin precio</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        Sin precio
+                                                    </span>
                                                 )}
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
-                                            {new Date(type.created_at).toLocaleDateString('es-ES', {
+                                            {new Date(
+                                                type.created_at,
+                                            ).toLocaleDateString('es-ES', {
                                                 day: '2-digit',
                                                 month: '2-digit',
-                                                year: 'numeric'
+                                                year: 'numeric',
                                             })}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => handleEdit(type)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        handleEdit(type)
+                                                    }
+                                                >
                                                     <Edit2 className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteClick(type)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-destructive"
+                                                    onClick={() =>
+                                                        handleDeleteClick(type)
+                                                    }
+                                                >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -206,7 +248,10 @@ delete newFilters[key as keyof typeof filters];
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
+                                    <TableCell
+                                        colSpan={5}
+                                        className="h-24 text-center"
+                                    >
                                         No se encontraron resultados.
                                     </TableCell>
                                 </TableRow>
@@ -215,13 +260,13 @@ delete newFilters[key as keyof typeof filters];
                     </Table>
                 </div>
 
-                <Pagination 
-                    links={specimenTypes.links} 
+                <Pagination
+                    links={specimenTypes.links}
                     meta={{
                         from: specimenTypes.from,
                         to: specimenTypes.to,
-                        total: specimenTypes.total
-                    }} 
+                        total: specimenTypes.total,
+                    }}
                 />
             </div>
 
@@ -231,18 +276,28 @@ delete newFilters[key as keyof typeof filters];
                 onOpenChange={setIsSheetOpen}
             />
 
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>¿Está completamente seguro?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            ¿Está completamente seguro?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción desactivará el tipo de muestra <strong>{specimenTypeToDelete?.name}</strong>. 
-                            Ya no aparecerá en la lista activa ni estará disponible para nuevos análisis.
+                            Esta acción desactivará el tipo de muestra{' '}
+                            <strong>{specimenTypeToDelete?.name}</strong>. Ya no
+                            aparecerá en la lista activa ni estará disponible
+                            para nuevos análisis.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-white hover:bg-destructive/90">
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                        >
                             Desactivar
                         </AlertDialogAction>
                     </AlertDialogFooter>

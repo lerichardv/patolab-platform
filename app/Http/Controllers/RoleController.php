@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Role;
 use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 
 class RoleController extends Controller
 {
@@ -43,7 +43,7 @@ class RoleController extends Controller
     public function update(Request $request, Role $role)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:roles,name,' . $role->id,
+            'name' => 'required|string|max:255|unique:roles,name,'.$role->id,
             'permission_ids' => 'nullable|array',
             'permission_ids.*' => 'integer|exists:permissions,id',
         ]);
@@ -53,7 +53,7 @@ class RoleController extends Controller
         ];
 
         // Do not update the slug for protected roles (ID 1 and 2) to prevent breaking system logic
-        if (!in_array($role->id, [1, 2])) {
+        if (! in_array($role->id, [1, 2])) {
             $updateData['slug'] = Str::slug($validated['name']);
         }
 

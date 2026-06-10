@@ -3,12 +3,21 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEventHandler } from 'react';
 import { toast } from 'sonner';
-import { update as updateProduct, store as storeProduct } from '@/actions/App/Http/Controllers/ProductController';
+import {
+    update as updateProduct,
+    store as storeProduct,
+} from '@/actions/App/Http/Controllers/ProductController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -43,7 +52,7 @@ export default function ProductForm({ product, onSuccess }: Props) {
         unit_value: product?.unit_value || 0,
         purchase_price: product?.purchase_price || 0,
         isv: product?.isv || false,
-        prices: product?.prices || [] as Price[],
+        prices: product?.prices || ([] as Price[]),
     });
 
     const [newPrice, setNewPrice] = useState<string>('');
@@ -56,11 +65,8 @@ export default function ProductForm({ product, onSuccess }: Props) {
         }
 
         const priceAmount = parseFloat(newPrice).toFixed(2);
-        
-        setData('prices', [
-            ...data.prices,
-            { amount: priceAmount }
-        ]);
+
+        setData('prices', [...data.prices, { amount: priceAmount }]);
         setNewPrice('');
     };
 
@@ -68,7 +74,7 @@ export default function ProductForm({ product, onSuccess }: Props) {
         const updatedPrices = [...data.prices];
         updatedPrices[index] = {
             ...updatedPrices[index],
-            amount: value
+            amount: value,
         };
         setData('prices', updatedPrices);
     };
@@ -101,7 +107,7 @@ export default function ProductForm({ product, onSuccess }: Props) {
     };
 
     return (
-        <form onSubmit={submit} className="space-y-4 py-4 px-5">
+        <form onSubmit={submit} className="space-y-4 px-5 py-4">
             <div className="space-y-2">
                 <Label htmlFor="name">Nombre del Producto *</Label>
                 <Input
@@ -128,14 +134,21 @@ export default function ProductForm({ product, onSuccess }: Props) {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                     <Label htmlFor="unit">Unidad de Medida *</Label>
-                    <Select value={data.unit} onValueChange={(value: any) => setData('unit', value)}>
+                    <Select
+                        value={data.unit}
+                        onValueChange={(value: any) => setData('unit', value)}
+                    >
                         <SelectTrigger className="w-full">
                             <SelectValue placeholder="Seleccione unidad" />
                         </SelectTrigger>
-                        <SelectContent >
+                        <SelectContent>
                             <SelectItem value="unit">Unidad</SelectItem>
-                            <SelectItem value="percentage">Porcentaje</SelectItem>
-                            <SelectItem value="miligrams">Miligramos</SelectItem>
+                            <SelectItem value="percentage">
+                                Porcentaje
+                            </SelectItem>
+                            <SelectItem value="miligrams">
+                                Miligramos
+                            </SelectItem>
                         </SelectContent>
                     </Select>
                     <InputError message={errors.unit} />
@@ -147,7 +160,9 @@ export default function ProductForm({ product, onSuccess }: Props) {
                         id="unit_value"
                         type="number"
                         value={data.unit_value}
-                        onChange={(e) => setData('unit_value', Number(e.target.value))}
+                        onChange={(e) =>
+                            setData('unit_value', Number(e.target.value))
+                        }
                     />
                     <InputError message={errors.unit_value} />
                 </div>
@@ -155,13 +170,17 @@ export default function ProductForm({ product, onSuccess }: Props) {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                    <Label htmlFor="purchase_price">Precio de Compra (L.) *</Label>
+                    <Label htmlFor="purchase_price">
+                        Precio de Compra (L.) *
+                    </Label>
                     <Input
                         id="purchase_price"
                         type="number"
                         step="0.01"
                         value={data.purchase_price}
-                        onChange={(e) => setData('purchase_price', Number(e.target.value))}
+                        onChange={(e) =>
+                            setData('purchase_price', Number(e.target.value))
+                        }
                     />
                     <InputError message={errors.purchase_price} />
                 </div>
@@ -181,7 +200,9 @@ export default function ProductForm({ product, onSuccess }: Props) {
                 <Label>Precios de Venta (L.)</Label>
                 <div className="flex gap-2">
                     <div className="relative flex-1">
-                        <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">L.</span>
+                        <span className="absolute top-2.5 left-3 text-sm text-muted-foreground">
+                            L.
+                        </span>
                         <Input
                             type="number"
                             step="0.01"
@@ -198,26 +219,42 @@ export default function ProductForm({ product, onSuccess }: Props) {
                             }}
                         />
                     </div>
-                    <Button type="button" variant="outline" onClick={handleAddPrice}>
-                        <Plus className="h-4 w-4 mr-1" /> Agregar
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleAddPrice}
+                    >
+                        <Plus className="mr-1 h-4 w-4" /> Agregar
                     </Button>
                 </div>
 
-                <div className="max-h-48 overflow-y-auto border rounded-md p-2 flex flex-col gap-2">
+                <div className="flex max-h-48 flex-col gap-2 overflow-y-auto rounded-md border p-2">
                     {data.prices.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">No se han agregado precios aún.</p>
+                        <p className="py-4 text-center text-sm text-muted-foreground">
+                            No se han agregado precios aún.
+                        </p>
                     ) : (
                         data.prices.map((price, idx) => (
-                            <div key={idx} className="flex items-center justify-between gap-3">
+                            <div
+                                key={idx}
+                                className="flex items-center justify-between gap-3"
+                            >
                                 <div className="relative flex-1">
-                                    <span className="absolute left-3 top-2 text-sm text-muted-foreground font-mono">L.</span>
+                                    <span className="absolute top-2 left-3 font-mono text-sm text-muted-foreground">
+                                        L.
+                                    </span>
                                     <Input
                                         type="number"
                                         step="0.01"
                                         min="0"
                                         value={price.amount}
-                                        onChange={(e) => handlePriceChange(idx, e.target.value)}
-                                        className="pl-7 h-8 font-mono"
+                                        onChange={(e) =>
+                                            handlePriceChange(
+                                                idx,
+                                                e.target.value,
+                                            )
+                                        }
+                                        className="h-8 pl-7 font-mono"
                                     />
                                 </div>
                                 <Button
@@ -233,9 +270,15 @@ export default function ProductForm({ product, onSuccess }: Props) {
                         ))
                     )}
                 </div>
-                {errors.prices && <p className="text-sm text-destructive">{errors.prices}</p>}
-                {Object.keys(errors).some(key => key.startsWith('prices.')) && (
-                    <p className="text-sm text-destructive">Por favor, revise que todos los precios sean válidos.</p>
+                {errors.prices && (
+                    <p className="text-sm text-destructive">{errors.prices}</p>
+                )}
+                {Object.keys(errors).some((key) =>
+                    key.startsWith('prices.'),
+                ) && (
+                    <p className="text-sm text-destructive">
+                        Por favor, revise que todos los precios sean válidos.
+                    </p>
                 )}
             </div>
 

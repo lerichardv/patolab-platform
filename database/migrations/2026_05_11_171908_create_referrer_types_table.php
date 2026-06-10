@@ -14,8 +14,8 @@ return new class extends Migration
         // Spanish: tipos de remitentes
         Schema::create('referrer_types', function (Blueprint $table) {
             $table->id();
-			$table->string('name');
-			$table->boolean('active')->default(true);
+            $table->string('name');
+            $table->boolean('active')->default(true);
             $table->timestamps();
         });
     }

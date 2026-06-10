@@ -19,15 +19,31 @@ if (typeof window !== 'undefined') {
 
     const originalWarn = console.warn;
     console.warn = (...args) => {
-        const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
-        if (filterWarning(msg)) return;
+        const msg = args
+            .map((arg) =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
+            )
+            .join(' ');
+
+        if (filterWarning(msg)) {
+            return;
+        }
+
         originalWarn(...args);
     };
 
     const originalError = console.error;
     console.error = (...args) => {
-        const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
-        if (filterWarning(msg)) return;
+        const msg = args
+            .map((arg) =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
+            )
+            .join(' ');
+
+        if (filterWarning(msg)) {
+            return;
+        }
+
         originalError(...args);
     };
 }

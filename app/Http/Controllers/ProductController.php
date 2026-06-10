@@ -4,9 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 
 class ProductController extends Controller
 {
@@ -66,7 +65,7 @@ class ProductController extends Controller
             'isv' => $validated['isv'],
         ]);
 
-        if (!empty($validated['prices'])) {
+        if (! empty($validated['prices'])) {
             foreach ($validated['prices'] as $priceData) {
                 $product->prices()->create([
                     'amount' => $priceData['amount'],

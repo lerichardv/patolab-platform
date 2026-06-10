@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('column');
             $table->text('old_value')->nullable();
             $table->text('new_value');
-			$table->foreignId('user')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('user')->constrained('users')->cascadeOnDelete();
             $table->timestamps();
         });
     }

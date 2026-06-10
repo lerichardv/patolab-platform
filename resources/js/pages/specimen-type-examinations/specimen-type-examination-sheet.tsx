@@ -1,8 +1,5 @@
 import HeadingSheet from '@/components/heading-sheet';
-import {
-    Sheet,
-    SheetContent,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import SpecimenTypeExaminationForm from './specimen-type-examination-form';
 
 interface SpecimenType {
@@ -25,21 +22,33 @@ interface Props {
     defaultSpecimenTypeId?: string;
 }
 
-export default function SpecimenTypeExaminationSheet({ examination, specimenTypes, open, onOpenChange, defaultSpecimenTypeId }: Props) {
+export default function SpecimenTypeExaminationSheet({
+    examination,
+    specimenTypes,
+    open,
+    onOpenChange,
+    defaultSpecimenTypeId,
+}: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="sm:max-w-[540px]">
-                <HeadingSheet 
-                    title={examination ? 'Editar Tipo de Análisis' : 'Nuevo Tipo de Análisis'}
-                    description={examination 
-                        ? 'Realice cambios en la información del tipo de análisis aquí.' 
-                        : 'Complete el formulario para crear un nuevo tipo de análisis asociado a una muestra.'}
+                <HeadingSheet
+                    title={
+                        examination
+                            ? 'Editar Tipo de Análisis'
+                            : 'Nuevo Tipo de Análisis'
+                    }
+                    description={
+                        examination
+                            ? 'Realice cambios en la información del tipo de análisis aquí.'
+                            : 'Complete el formulario para crear un nuevo tipo de análisis asociado a una muestra.'
+                    }
                 />
                 {open && (
-                    <SpecimenTypeExaminationForm 
-                        examination={examination} 
+                    <SpecimenTypeExaminationForm
+                        examination={examination}
                         specimenTypes={specimenTypes}
-                        onSuccess={() => onOpenChange(false)} 
+                        onSuccess={() => onOpenChange(false)}
                         defaultSpecimenTypeId={defaultSpecimenTypeId}
                     />
                 )}

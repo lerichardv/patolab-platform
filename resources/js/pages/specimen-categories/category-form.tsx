@@ -1,13 +1,19 @@
 import { useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
-import { 
-    store as storeCategory, 
-    update as updateCategory 
+import {
+    store as storeCategory,
+    update as updateCategory,
 } from '@/actions/App/Http/Controllers/SpecimenCategoryController';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 
 interface Category {
@@ -41,7 +47,9 @@ export default function CategoryForm({ category, onSuccess }: Props) {
 
         const options = {
             onSuccess: () => {
-                toast.success(category ? 'Categoría actualizada' : 'Categoría creada');
+                toast.success(
+                    category ? 'Categoría actualizada' : 'Categoría creada',
+                );
                 onSuccess();
             },
         };
@@ -54,7 +62,7 @@ export default function CategoryForm({ category, onSuccess }: Props) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6 py-4 px-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6 px-5 py-4">
             <div className="grid gap-2">
                 <Label htmlFor="name">Nombre</Label>
                 <Input
@@ -63,7 +71,9 @@ export default function CategoryForm({ category, onSuccess }: Props) {
                     onChange={(e) => setData('name', e.target.value)}
                     placeholder="Ej. Rutina, Urgente..."
                 />
-                {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                {errors.name && (
+                    <p className="text-sm text-destructive">{errors.name}</p>
+                )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -78,29 +88,46 @@ export default function CategoryForm({ category, onSuccess }: Props) {
                         onChange={(e) => setData('quantity', e.target.value)}
                         placeholder="Ej. 24"
                     />
-                    {errors.quantity && <p className="text-sm text-destructive">{errors.quantity}</p>}
+                    {errors.quantity && (
+                        <p className="text-sm text-destructive">
+                            {errors.quantity}
+                        </p>
+                    )}
                 </div>
 
                 <div className="grid gap-2">
                     <Label htmlFor="unit">Unidad</Label>
-                    <Select value={data.unit} onValueChange={(v) => setData('unit', v)}>
+                    <Select
+                        value={data.unit}
+                        onValueChange={(v) => setData('unit', v)}
+                    >
                         <SelectTrigger>
                             <SelectValue placeholder="Unidad" />
                         </SelectTrigger>
                         <SelectContent>
-                            {Object.entries(UNIT_LABELS).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>
-                                    {label}
-                                </SelectItem>
-                            ))}
+                            {Object.entries(UNIT_LABELS).map(
+                                ([value, label]) => (
+                                    <SelectItem key={value} value={value}>
+                                        {label}
+                                    </SelectItem>
+                                ),
+                            )}
                         </SelectContent>
                     </Select>
-                    {errors.unit && <p className="text-sm text-destructive">{errors.unit}</p>}
+                    {errors.unit && (
+                        <p className="text-sm text-destructive">
+                            {errors.unit}
+                        </p>
+                    )}
                 </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-4">
-                <Button type="submit" disabled={processing} className="w-full md:w-auto">
+                <Button
+                    type="submit"
+                    disabled={processing}
+                    className="w-full md:w-auto"
+                >
                     {processing && <Spinner className="mr-2" />}
                     {category ? 'Guardar Cambios' : 'Crear Categoría'}
                 </Button>

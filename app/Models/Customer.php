@@ -3,14 +3,15 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
-
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Customer extends Model
 {
     use Auditable;
     use HasFactory;
+
     protected $fillable = [
         'name',
         'id_number',
@@ -36,7 +37,7 @@ class Customer extends Model
         return $this->belongsTo(Municipality::class, 'city');
     }
 
-    public function specimenGroups(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function specimenGroups(): BelongsToMany
     {
         return $this->belongsToMany(SpecimenGroup::class, 'specimen_group_customers', 'customer_id', 'specimen_group_id')
             ->withTimestamps();

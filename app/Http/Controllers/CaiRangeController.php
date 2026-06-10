@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\CaiRange;
+use App\Models\Location;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class CaiRangeController extends Controller
 {
@@ -49,9 +51,9 @@ class CaiRangeController extends Controller
         }
 
         $caiRanges = $query->latest()->paginate(10)->withQueryString();
-        $locations = \App\Models\Location::where('active', true)->get();
+        $locations = Location::where('active', true)->get();
 
-        return \Inertia\Inertia::render('cai-ranges/index', [
+        return Inertia::render('cai-ranges/index', [
             'caiRanges' => $caiRanges,
             'locations' => $locations,
             'filters' => $request->only(['search', 'status']),

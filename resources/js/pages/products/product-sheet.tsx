@@ -1,4 +1,3 @@
-
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import ProductForm from '@/pages/products/product-form';
@@ -30,14 +29,18 @@ interface Props {
 export default function ProductSheet({ product, open, onOpenChange }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-[540px] overflow-y-auto">
-                <HeadingSheet 
+            <SheetContent className="w-full overflow-y-auto sm:max-w-[540px]">
+                <HeadingSheet
                     title={product ? 'Editar Producto' : 'Nuevo Producto'}
-                    description={product ? 'Actualice la información del producto aquí.' : 'Complete los campos para registrar un nuevo producto o insumo.'}
+                    description={
+                        product
+                            ? 'Actualice la información del producto aquí.'
+                            : 'Complete los campos para registrar un nuevo producto o insumo.'
+                    }
                 />
-                <ProductForm 
-                    product={product || undefined} 
-                    onSuccess={() => onOpenChange(false)} 
+                <ProductForm
+                    product={product || undefined}
+                    onSuccess={() => onOpenChange(false)}
                 />
             </SheetContent>
         </Sheet>

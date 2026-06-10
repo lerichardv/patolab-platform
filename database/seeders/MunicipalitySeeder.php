@@ -352,7 +352,7 @@ class MunicipalitySeeder extends Seeder
 
         foreach ($data as $deptCode => $municipalities) {
             $department = Department::where('code', $deptCode)->first();
-            if (!$department) {
+            if (! $department) {
                 continue;
             }
 
@@ -360,10 +360,10 @@ class MunicipalitySeeder extends Seeder
                 Municipality::updateOrCreate(
                     [
                         'department_id' => $department->id,
-                        'name' => $mun['name']
+                        'name' => $mun['name'],
                     ],
                     [
-                        'code' => $mun['code']
+                        'code' => $mun['code'],
                     ]
                 );
             }

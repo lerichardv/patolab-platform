@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
-            
+
             // Required columns
             $table->string('name');
             $table->string('id_number')->unique(); // Identidad o RTN
@@ -22,13 +22,13 @@ return new class extends Migration
             $table->string('state');  // Departamento
             $table->string('city');   // Municipio
             $table->enum('type', ['cliente', 'empresa']); // Tipo Cliente: Cliente (individual) / Empresa (company)
-            
+
             // Not required columns
             $table->integer('age')->nullable(); // will be required if the type is 'cliente'
             $table->string('secondary_phone')->nullable();
             $table->text('address')->nullable();
             $table->string('email')->nullable();
-            
+
             $table->timestamps();
         });
     }

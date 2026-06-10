@@ -9,11 +9,8 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-    Sheet,
-    SheetContent,
-} from '@/components/ui/sheet';
+} from '@/components/ui/alert-dialog';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import SpecimenForm from './specimen-form';
 
 interface Props {
@@ -49,7 +46,7 @@ export default function SpecimenSheet({
     sequences,
     activeLocationId,
     products,
-    banks
+    banks,
 }: Props) {
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -85,12 +82,14 @@ export default function SpecimenSheet({
     return (
         <>
             <Sheet open={open} onOpenChange={handleOpenChange}>
-                <SheetContent className="w-full sm:max-w-[90vw] md:max-w-[1000px] lg:max-w-[1100px] overflow-y-auto">
+                <SheetContent className="w-full overflow-y-auto sm:max-w-[90vw] md:max-w-[1000px] lg:max-w-[1100px]">
                     <HeadingSheet
                         title={specimen ? 'Editar Muestra' : 'Nueva Muestra'}
-                        description={specimen
-                            ? 'Realice cambios en la información de la muestra aquí.'
-                            : 'Complete el formulario para registrar una nueva muestra en el sistema.'}
+                        description={
+                            specimen
+                                ? 'Realice cambios en la información de la muestra aquí.'
+                                : 'Complete el formulario para registrar una nueva muestra en el sistema.'
+                        }
                     />
                     <SpecimenForm
                         specimen={specimen}
@@ -112,16 +111,24 @@ export default function SpecimenSheet({
                 </SheetContent>
             </Sheet>
 
-            <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+            <AlertDialog
+                open={showCloseConfirm}
+                onOpenChange={setShowCloseConfirm}
+            >
                 <AlertDialogContent className="max-w-[450px]">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>¿Estás seguro de salir?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            ¿Estás seguro de salir?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Todos los datos ingresados en la nueva muestra se perderán permanentemente.
+                            Todos los datos ingresados en la nueva muestra se
+                            perderán permanentemente.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setShowCloseConfirm(false)}>
+                        <AlertDialogCancel
+                            onClick={() => setShowCloseConfirm(false)}
+                        >
                             Cancelar
                         </AlertDialogCancel>
                         <AlertDialogAction
@@ -129,7 +136,7 @@ export default function SpecimenSheet({
                                 setShowCloseConfirm(false);
                                 onOpenChange(false);
                             }}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-white"
+                            className="bg-destructive text-destructive-foreground text-white hover:bg-destructive/90"
                         >
                             Sí, salir
                         </AlertDialogAction>

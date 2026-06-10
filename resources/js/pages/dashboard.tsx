@@ -241,8 +241,8 @@ export default function Dashboard({
                                     Registrar Muestra
                                 </h3>
                                 <p className="text-xs text-muted-foreground">
-                                    Crea una nueva muestra de paciente y
-                                    genera su orden de facturación.
+                                    Crea una nueva muestra de paciente y genera
+                                    su orden de facturación.
                                 </p>
                             </div>
                         </Link>
@@ -259,8 +259,8 @@ export default function Dashboard({
                                     Pacientes y Clientes
                                 </h3>
                                 <p className="text-xs text-muted-foreground">
-                                    Administra y registra nuevos clientes y
-                                    sus expedientes en el sistema.
+                                    Administra y registra nuevos clientes y sus
+                                    expedientes en el sistema.
                                 </p>
                             </div>
                         </Link>
@@ -278,8 +278,7 @@ export default function Dashboard({
                                 </h3>
                                 <p className="text-xs text-muted-foreground">
                                     Consulta las facturas emitidas, los
-                                    comprobantes de pago y cuentas por
-                                    cobrar.
+                                    comprobantes de pago y cuentas por cobrar.
                                 </p>
                             </div>
                         </Link>
@@ -296,9 +295,8 @@ export default function Dashboard({
                                     Control de Inventario
                                 </h3>
                                 <p className="text-xs text-muted-foreground">
-                                    Monitorea el stock disponible,
-                                    reabastece productos y revisa
-                                    movimientos.
+                                    Monitorea el stock disponible, reabastece
+                                    productos y revisa movimientos.
                                 </p>
                             </div>
                         </Link>
@@ -340,7 +338,10 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
     const chartHeight = height - paddingTop - paddingBottom;
 
     // Calculate total weekly earnings
-    const totalWeeklyEarnings = data.reduce((sum, d) => sum + (d.earnings || 0), 0);
+    const totalWeeklyEarnings = data.reduce(
+        (sum, d) => sum + (d.earnings || 0),
+        0,
+    );
 
     // Find the maximum count, minimum of 5 to keep the scale nice
     const maxVal = Math.max(...data.map((d) => d.count), 0);
@@ -362,8 +363,8 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
     const linePath =
         points.length > 0
             ? points
-                .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
-                .join(' ')
+                  .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+                  .join(' ')
             : '';
 
     // Generate Y-axis grid ticks (e.g. 4 ticks)
@@ -388,24 +389,29 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
                 </div>
                 <div className="flex items-center gap-4 text-right">
                     {activeIndex !== null && points[activeIndex] && (
-                        <div className="hidden sm:block animate-in fade-in slide-in-from-right-1 duration-200">
-                            <span className="text-[10px] uppercase tracking-wider text-blue-600 dark:text-blue-400 block font-semibold">
+                        <div className="hidden animate-in duration-200 fade-in slide-in-from-right-1 sm:block">
+                            <span className="block text-[10px] font-semibold tracking-wider text-blue-600 uppercase dark:text-blue-400">
                                 {points[activeIndex].day}
                             </span>
                             <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
-                                L. {points[activeIndex].earnings.toLocaleString('es-HN', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                })}
+                                L.{' '}
+                                {points[activeIndex].earnings.toLocaleString(
+                                    'es-HN',
+                                    {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    },
+                                )}
                             </span>
                         </div>
                     )}
                     <div>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-semibold">
+                        <span className="block text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                             Total Facturado
                         </span>
                         <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                            L. {totalWeeklyEarnings.toLocaleString('es-HN', {
+                            L.{' '}
+                            {totalWeeklyEarnings.toLocaleString('es-HN', {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                             })}
@@ -487,10 +493,11 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
                                 x={p.x}
                                 y={height - paddingBottom + 20}
                                 textAnchor="middle"
-                                className={`text-[10px] font-medium transition-colors duration-150 ${activeIndex === i
+                                className={`text-[10px] font-medium transition-colors duration-150 ${
+                                    activeIndex === i
                                         ? 'fill-blue-600 font-bold dark:fill-blue-400'
                                         : 'fill-muted-foreground'
-                                    }`}
+                                }`}
                             >
                                 {p.day}
                             </text>
@@ -545,10 +552,11 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
                                         cx={p.x}
                                         cy={p.y}
                                         r={isHovered ? '7' : '4'}
-                                        className={`transition-all duration-150 ${isHovered
+                                        className={`transition-all duration-150 ${
+                                            isHovered
                                                 ? 'fill-blue-500 stroke-background stroke-2 shadow-sm'
                                                 : 'fill-background stroke-blue-500 stroke-2 dark:stroke-blue-400'
-                                            }`}
+                                        }`}
                                     />
                                     {isHovered && (
                                         <circle
@@ -569,12 +577,18 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
                                 x={p.x}
                                 y={p.y - 10}
                                 textAnchor="middle"
-                                className={`text-[9px] font-semibold transition-all duration-150 ${activeIndex === i
-                                        ? 'fill-emerald-600 font-bold dark:fill-emerald-400 scale-105'
+                                className={`text-[9px] font-semibold transition-all duration-150 ${
+                                    activeIndex === i
+                                        ? 'scale-105 fill-emerald-600 font-bold dark:fill-emerald-400'
                                         : 'fill-muted-foreground/75'
-                                    }`}
+                                }`}
                             >
-                                {p.count} {p.count === 1 ? 'muestra' : 'muestras'} • L. {p.earnings.toLocaleString('es-HN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                {p.count}{' '}
+                                {p.count === 1 ? 'muestra' : 'muestras'} • L.{' '}
+                                {p.earnings.toLocaleString('es-HN', {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0,
+                                })}
                             </text>
                         ))}
 
@@ -625,7 +639,10 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
                                 </div>
                                 <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
                                     <span className="size-2 rounded-full bg-emerald-500" />
-                                    L. {points[activeIndex].earnings.toLocaleString('es-HN', {
+                                    L.{' '}
+                                    {points[
+                                        activeIndex
+                                    ].earnings.toLocaleString('es-HN', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
                                     })}
@@ -780,7 +797,7 @@ function TodaySpecimensList({
                                     <TableHead className="text-right font-semibold">
                                         Total / Pago
                                     </TableHead>
-                                    <TableHead className="pr-6 text-center w-[90px] font-semibold">
+                                    <TableHead className="w-[90px] pr-6 text-center font-semibold">
                                         Acción
                                     </TableHead>
                                 </TableRow>
@@ -790,13 +807,13 @@ function TodaySpecimensList({
                                     const amountVal = parseFloat(
                                         String(
                                             specimen.invoice_relation?.amount ||
-                                            0,
+                                                0,
                                         ),
                                     );
                                     const totalVal = parseFloat(
                                         String(
                                             specimen.invoice_relation?.total ||
-                                            0,
+                                                0,
                                         ),
                                     );
                                     const hasDiscount = amountVal > totalVal;
@@ -827,15 +844,15 @@ function TodaySpecimensList({
                                                     </span>
                                                     {specimen.customer_relation
                                                         ?.id_number && (
-                                                            <span className="mt-0.5 text-[10px] text-muted-foreground">
-                                                                RTN/ID:{' '}
-                                                                {
-                                                                    specimen
-                                                                        .customer_relation
-                                                                        .id_number
-                                                                }
-                                                            </span>
-                                                        )}
+                                                        <span className="mt-0.5 text-[10px] text-muted-foreground">
+                                                            RTN/ID:{' '}
+                                                            {
+                                                                specimen
+                                                                    .customer_relation
+                                                                    .id_number
+                                                            }
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -846,14 +863,14 @@ function TodaySpecimensList({
                                                     </span>
                                                     {specimen.examination
                                                         ?.name && (
-                                                            <span className="mt-0.5 text-xs text-muted-foreground">
-                                                                {
-                                                                    specimen
-                                                                        .examination
-                                                                        .name
-                                                                }
-                                                            </span>
-                                                        )}
+                                                        <span className="mt-0.5 text-xs text-muted-foreground">
+                                                            {
+                                                                specimen
+                                                                    .examination
+                                                                    .name
+                                                            }
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -912,16 +929,16 @@ function TodaySpecimensList({
                                                     </div>
                                                     {specimen.invoice_relation
                                                         ?.payment_type && (
-                                                            <span className="mt-0.5 text-[10px] text-muted-foreground">
-                                                                (
-                                                                {getPaymentTypeLabel(
-                                                                    specimen
-                                                                        .invoice_relation
-                                                                        .payment_type,
-                                                                )}
-                                                                )
-                                                            </span>
-                                                        )}
+                                                        <span className="mt-0.5 text-[10px] text-muted-foreground">
+                                                            (
+                                                            {getPaymentTypeLabel(
+                                                                specimen
+                                                                    .invoice_relation
+                                                                    .payment_type,
+                                                            )}
+                                                            )
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="pr-6 text-center">

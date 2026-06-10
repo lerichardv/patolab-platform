@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-
 use App\Models\Customer;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class CustomerController extends Controller
@@ -83,7 +82,7 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'id_number' => 'required|string|unique:customers,id_number,' . $customer->id,
+            'id_number' => 'required|string|unique:customers,id_number,'.$customer->id,
             'type' => 'required|in:cliente,empresa',
             'age' => 'required_if:type,cliente|nullable|integer',
             'phone' => 'required|string',
@@ -159,7 +158,7 @@ class CustomerController extends Controller
             $file = fopen('php://output', 'w');
             // UTF-8 BOM for Excel
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            
+
             fputcsv($file, ['Nombre', 'Identidad/RTN', 'Tipo', 'Edad', 'Género', 'Teléfono', 'Estado/Departamento', 'Ciudad', 'Correo']);
 
             foreach ($customers as $customer) {

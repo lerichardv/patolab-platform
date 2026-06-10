@@ -14,10 +14,10 @@ return new class extends Migration
         // Spanish: tipos de examenes
         Schema::create('specimen_type_examination', function (Blueprint $table) {
             $table->id();
-			$table->integer('specimen_type');
-			$table->string('name');
-			$table->string('description');
-			$table->boolean('active')->default(true);
+            $table->integer('specimen_type');
+            $table->string('name');
+            $table->string('description');
+            $table->boolean('active')->default(true);
             $table->timestamps();
         });
     }

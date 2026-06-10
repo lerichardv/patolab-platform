@@ -1,5 +1,7 @@
 Object.defineProperty(globalThis, '__ $YJS$ __', {
-	get() { return false; },
+	get() {
+ return false; 
+},
 	set() {},
 	configurable: true,
 });

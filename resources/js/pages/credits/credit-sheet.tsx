@@ -26,15 +26,15 @@ interface Props {
 export default function CreditSheet({ credit, open, onOpenChange }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-[540px] overflow-y-auto">
-                <HeadingSheet 
+            <SheetContent className="w-full overflow-y-auto sm:max-w-[540px]">
+                <HeadingSheet
                     title="Registrar Pago de Crédito"
                     description="Ingrese el monto recibido, seleccione el tipo de pago y suba el comprobante correspondiente."
                 />
                 {credit && (
-                    <CreditForm 
-                        credit={credit} 
-                        onSuccess={() => onOpenChange(false)} 
+                    <CreditForm
+                        credit={credit}
+                        onSuccess={() => onOpenChange(false)}
                     />
                 )}
             </SheetContent>

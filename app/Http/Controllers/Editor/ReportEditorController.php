@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Editor;
 use App\Http\Controllers\Controller;
 use App\Models\Specimen;
 use App\Models\SpecimenReport;
+use App\Models\SpecimenTypeTemplate;
 use App\Services\ImageOptimizerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -119,7 +120,7 @@ class ReportEditorController extends Controller
             $htmlValue = $payload['html'] ?? '';
 
             if ($htmlColumn === 'report_date') {
-                if (!empty($htmlValue) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $htmlValue)) {
+                if (! empty($htmlValue) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $htmlValue)) {
                     $updateData[$htmlColumn] = $htmlValue;
                 }
             } else {
@@ -179,11 +180,13 @@ class ReportEditorController extends Controller
         }
 
         DB::transaction(function () use ($specimen) {
+            $template = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)->first();
+
             $report = SpecimenReport::create([
                 'report_date' => now()->format('Y-m-d'),
-                'macroscopy_html' => '',
-                'microscopy_html' => '',
-                'diagnosis_html' => '',
+                'macroscopy_html' => $template?->macroscopy_html ?? '',
+                'microscopy_html' => $template?->microscopy_html ?? '',
+                'diagnosis_html' => $template?->diagnosis_html ?? '',
             ]);
 
             $specimen->update([
@@ -241,7 +244,7 @@ class ReportEditorController extends Controller
 
         if ($request->has('report_date')) {
             $reportDate = $request->input('report_date');
-            if (!empty($reportDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportDate)) {
+            if (! empty($reportDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportDate)) {
                 $updateData['report_date'] = $reportDate;
             }
         }
@@ -269,7 +272,7 @@ class ReportEditorController extends Controller
             $updateData['yjs_report_date_state'] = base64_decode($request->input('yjs_report_date_state'));
         }
 
-        if (!empty($updateData)) {
+        if (! empty($updateData)) {
             $specimen->report->update($updateData);
         }
 
@@ -378,7 +381,7 @@ class ReportEditorController extends Controller
 
             $base64 = $this->getImageBase64($url);
             if ($base64) {
-                return '<img ' . $beforeSrc . 'src="' . $base64 . '"' . $afterSrc;
+                return '<img '.$beforeSrc.'src="'.$base64.'"'.$afterSrc;
             }
 
             return $matches[0];
@@ -395,11 +398,12 @@ class ReportEditorController extends Controller
             // Check if it's a storage path (e.g. /storage/report-images/...)
             if (preg_match('/^\/storage\/(.+)$/', $path, $storageMatches)) {
                 $relativePath = $storageMatches[1];
-                $localPath = storage_path('app/public/' . $relativePath);
+                $localPath = storage_path('app/public/'.$relativePath);
                 if (file_exists($localPath)) {
                     $data = file_get_contents($localPath);
                     $mime = mime_content_type($localPath) ?: 'image/jpeg';
-                    return 'data:' . $mime . ';base64,' . base64_encode($data);
+
+                    return 'data:'.$mime.';base64,'.base64_encode($data);
                 }
             }
 
@@ -408,7 +412,8 @@ class ReportEditorController extends Controller
             if (file_exists($publicPath)) {
                 $data = file_get_contents($publicPath);
                 $mime = mime_content_type($publicPath) ?: 'image/jpeg';
-                return 'data:' . $mime . ';base64,' . base64_encode($data);
+
+                return 'data:'.$mime.';base64,'.base64_encode($data);
             }
         }
 
@@ -419,12 +424,13 @@ class ReportEditorController extends Controller
                 $mime = 'image/jpeg';
                 $ext = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
                 if (in_array(strtolower($ext), ['png', 'gif', 'webp', 'svg'])) {
-                    $mime = 'image/' . strtolower($ext);
+                    $mime = 'image/'.strtolower($ext);
                     if (strtolower($ext) === 'svg') {
                         $mime = 'image/svg+xml';
                     }
                 }
-                return 'data:' . $mime . ';base64,' . base64_encode($data);
+
+                return 'data:'.$mime.';base64,'.base64_encode($data);
             }
         } catch (\Exception $e) {
             // Ignore/Log
@@ -432,7 +438,6 @@ class ReportEditorController extends Controller
 
         return null;
     }
-
 
     /**
      * Upload and optimize an image for use inside the report editor.

@@ -10,7 +10,13 @@ import AuthLayout from '@/layouts/auth-layout';
 import { login as loginRoute, register } from '@/routes';
 import { request as forgotPassword } from '@/routes/password';
 
-export default function Login({ status, canResetPassword }: { status?: string; canResetPassword?: boolean }) {
+export default function Login({
+    status,
+    canResetPassword,
+}: {
+    status?: string;
+    canResetPassword?: boolean;
+}) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
@@ -71,7 +77,9 @@ export default function Login({ status, canResetPassword }: { status?: string; c
                             value={data.password}
                             className="mt-1 block w-full"
                             autoComplete="current-password"
-                            onChange={(e) => setData('password', e.target.value)}
+                            onChange={(e) =>
+                                setData('password', e.target.value)
+                            }
                             placeholder="********"
                         />
                         <InputError message={errors.password} />
@@ -82,14 +90,23 @@ export default function Login({ status, canResetPassword }: { status?: string; c
                             id="remember"
                             name="remember"
                             checked={data.remember}
-                            onCheckedChange={(checked) => setData('remember', checked as boolean)}
+                            onCheckedChange={(checked) =>
+                                setData('remember', checked as boolean)
+                            }
                         />
-                        <Label htmlFor="remember" className="text-sm font-normal">
+                        <Label
+                            htmlFor="remember"
+                            className="text-sm font-normal"
+                        >
                             Recordarme
                         </Label>
                     </div>
 
-                    <Button type="submit" className="w-full" disabled={processing}>
+                    <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={processing}
+                    >
                         Iniciar sesión
                     </Button>
                 </div>

@@ -15,17 +15,21 @@ interface Props {
     onOpenChange: (open: boolean) => void;
 }
 
-export default function AbastecerSheet({ inventories, open, onOpenChange }: Props) {
+export default function AbastecerSheet({
+    inventories,
+    open,
+    onOpenChange,
+}: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-[540px] overflow-y-auto">
-                <HeadingSheet 
+            <SheetContent className="w-full overflow-y-auto sm:max-w-[540px]">
+                <HeadingSheet
                     title="Abastecer Inventario"
                     description="Seleccione un producto existente en bodega y sume la cantidad abastecida."
                 />
-                <AbastecerForm 
-                    inventories={inventories} 
-                    onSuccess={() => onOpenChange(false)} 
+                <AbastecerForm
+                    inventories={inventories}
+                    onSuccess={() => onOpenChange(false)}
                 />
             </SheetContent>
         </Sheet>

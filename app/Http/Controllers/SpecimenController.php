@@ -22,8 +22,8 @@ use App\Models\SpecimenCategory;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Models\User;
+use App\Services\ImageOptimizerService;
 use App\Services\WhatsAppService;
-use Illuminate\Http\File;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -67,6 +67,7 @@ class SpecimenController extends Controller
                 }
             } while ($exists);
             $sequence->current_sequence = $tempSequence->current_sequence;
+
             return $sequence;
         });
 
@@ -595,7 +596,7 @@ class SpecimenController extends Controller
      */
     protected function storeMedicalOrder(UploadedFile $file): string
     {
-        return app(\App\Services\ImageOptimizerService::class)->optimizeAndStore($file, 'medical_orders');
+        return app(ImageOptimizerService::class)->optimizeAndStore($file, 'medical_orders');
     }
 
     /**
@@ -603,7 +604,7 @@ class SpecimenController extends Controller
      */
     protected function storeUploadedFile(UploadedFile $file, string $folder): string
     {
-        return app(\App\Services\ImageOptimizerService::class)->optimizeAndStore($file, $folder);
+        return app(ImageOptimizerService::class)->optimizeAndStore($file, $folder);
     }
 
     /**

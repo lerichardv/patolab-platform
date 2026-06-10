@@ -33,23 +33,32 @@ interface Props {
     onOpenChange: (open: boolean) => void;
 }
 
-export default function SequenceSheet({ sequence, locations, specimenTypes, allSequences = [], open, onOpenChange }: Props) {
+export default function SequenceSheet({
+    sequence,
+    locations,
+    specimenTypes,
+    allSequences = [],
+    open,
+    onOpenChange,
+}: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-[540px] overflow-y-auto">
-                <HeadingSheet 
-                    title={sequence ? 'Editar Secuencia' : 'Nueva Secuencia'} 
-                    description={sequence 
-                        ? 'Actualice la configuración de la secuencia aquí.' 
-                        : 'Configure los parámetros para una nueva secuencia de muestras.'} 
+            <SheetContent className="w-full overflow-y-auto sm:max-w-[540px]">
+                <HeadingSheet
+                    title={sequence ? 'Editar Secuencia' : 'Nueva Secuencia'}
+                    description={
+                        sequence
+                            ? 'Actualice la configuración de la secuencia aquí.'
+                            : 'Configure los parámetros para una nueva secuencia de muestras.'
+                    }
                 />
-                
-                <SequenceForm 
+
+                <SequenceForm
                     sequence={sequence || undefined}
                     locations={locations}
                     specimenTypes={specimenTypes}
                     sequences={allSequences}
-                    onSuccess={() => onOpenChange(false)} 
+                    onSuccess={() => onOpenChange(false)}
                 />
             </SheetContent>
         </Sheet>

@@ -15,10 +15,10 @@ class ReferrerController extends Controller
 
         if ($request->has('search')) {
             $search = $request->get('search');
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
@@ -68,6 +68,7 @@ class ReferrerController extends Controller
     public function destroy(Referrer $referrer)
     {
         $referrer->update(['active' => false]);
+
         return redirect()->back();
     }
 }

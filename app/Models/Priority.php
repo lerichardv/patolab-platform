@@ -3,12 +3,12 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
-
 use Illuminate\Database\Eloquent\Model;
 
 class Priority extends Model
 {
     use Auditable;
+
     protected $fillable = [
         'name',
         'color',

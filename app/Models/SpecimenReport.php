@@ -1,19 +1,19 @@
 <?php
- 
+
 namespace App\Models;
- 
+
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
- 
+
 class SpecimenReport extends Model
 {
     use Auditable;
     use HasFactory;
- 
+
     protected $table = 'specimen_reports';
- 
+
     protected $fillable = [
         'report_date',
         'generated_at',
@@ -24,7 +24,7 @@ class SpecimenReport extends Model
         'diagnosis_html',
         'report_finalization_datetime',
     ];
- 
+
     protected $casts = [
         'report_date' => 'date',
         'generated_at' => 'datetime',
@@ -39,7 +39,7 @@ class SpecimenReport extends Model
         'yjs_diagnosis_state',
         'yjs_report_date_state',
     ];
- 
+
     /**
      * Get the specimens associated with this report.
      */

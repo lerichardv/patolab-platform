@@ -1,18 +1,21 @@
 import { useForm } from '@inertiajs/react';
-import type { FormEventHandler} from 'react';
+import type { FormEventHandler } from 'react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
-import { store as storeSequence, update as updateSequence } from '@/actions/App/Http/Controllers/SequenceController';
+import {
+    store as storeSequence,
+    update as updateSequence,
+} from '@/actions/App/Http/Controllers/SequenceController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-    Select, 
-    SelectContent, 
-    SelectItem, 
-    SelectTrigger, 
-    SelectValue 
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from '@/components/ui/select';
 
 interface Location {
@@ -47,10 +50,24 @@ interface Props {
     defaultSpecimenTypeId?: number;
 }
 
-export default function SequenceForm({ sequence, locations, specimenTypes, sequences = [], onSuccess, defaultLocationId, defaultSpecimenTypeId }: Props) {
+export default function SequenceForm({
+    sequence,
+    locations,
+    specimenTypes,
+    sequences = [],
+    onSuccess,
+    defaultLocationId,
+    defaultSpecimenTypeId,
+}: Props) {
     const { data, setData, post, put, processing, errors, reset } = useForm({
-        location_id: sequence?.location_id || defaultLocationId || (locations.length > 0 ? locations[0].id : 0),
-        specimen_type: sequence?.specimen_type || defaultSpecimenTypeId || (specimenTypes.length > 0 ? specimenTypes[0].id : 0),
+        location_id:
+            sequence?.location_id ||
+            defaultLocationId ||
+            (locations.length > 0 ? locations[0].id : 0),
+        specimen_type:
+            sequence?.specimen_type ||
+            defaultSpecimenTypeId ||
+            (specimenTypes.length > 0 ? specimenTypes[0].id : 0),
         prefix: sequence?.prefix || '',
         separator: sequence?.separator || '-',
         fill: sequence?.fill || 4,
@@ -60,10 +77,11 @@ export default function SequenceForm({ sequence, locations, specimenTypes, seque
     });
 
     const hasSequence = (specimenTypeId: number) => {
-        return sequences.some(s => 
-            s.location_id === data.location_id && 
-            s.specimen_type === specimenTypeId &&
-            s.id !== sequence?.id
+        return sequences.some(
+            (s) =>
+                s.location_id === data.location_id &&
+                s.specimen_type === specimenTypeId &&
+                s.id !== sequence?.id,
         );
     };
 
@@ -81,8 +99,12 @@ export default function SequenceForm({ sequence, locations, specimenTypes, seque
             });
         } else {
             setData({
-                location_id: defaultLocationId || (locations.length > 0 ? locations[0].id : 0),
-                specimen_type: defaultSpecimenTypeId || (specimenTypes.length > 0 ? specimenTypes[0].id : 0),
+                location_id:
+                    defaultLocationId ||
+                    (locations.length > 0 ? locations[0].id : 0),
+                specimen_type:
+                    defaultSpecimenTypeId ||
+                    (specimenTypes.length > 0 ? specimenTypes[0].id : 0),
                 prefix: '',
                 separator: '-',
                 fill: 4,
@@ -96,7 +118,7 @@ export default function SequenceForm({ sequence, locations, specimenTypes, seque
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         if (sequence?.id) {
             put(updateSequence(sequence.id).url, {
                 preserveState: true,
@@ -129,26 +151,33 @@ export default function SequenceForm({ sequence, locations, specimenTypes, seque
     };
 
     return (
-        <form onSubmit={submit} className="space-y-4 py-4 px-5">
-            <div className="bg-muted/50 p-4 rounded-lg border border-dashed flex flex-col items-center justify-center gap-2">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Previsualización en tiempo real</span>
-                <code className="text-xl font-mono font-bold text-primary tracking-tight">
+        <form onSubmit={submit} className="space-y-4 px-5 py-4">
+            <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/50 p-4">
+                <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    Previsualización en tiempo real
+                </span>
+                <code className="font-mono text-xl font-bold tracking-tight text-primary">
                     {formatPreview()}
                 </code>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                     <Label htmlFor="location_id">Sucursal *</Label>
-                    <Select 
-                        value={data.location_id.toString()} 
-                        onValueChange={(value) => setData('location_id', parseInt(value))}
+                    <Select
+                        value={data.location_id.toString()}
+                        onValueChange={(value) =>
+                            setData('location_id', parseInt(value))
+                        }
                     >
                         <SelectTrigger className="w-full">
                             <SelectValue placeholder="Seleccione sucursal" />
                         </SelectTrigger>
                         <SelectContent>
                             {locations.map((loc) => (
-                                <SelectItem key={loc.id} value={loc.id.toString()}>
+                                <SelectItem
+                                    key={loc.id}
+                                    value={loc.id.toString()}
+                                >
                                     {loc.name}
                                 </SelectItem>
                             ))}
@@ -159,9 +188,11 @@ export default function SequenceForm({ sequence, locations, specimenTypes, seque
 
                 <div className="space-y-2">
                     <Label htmlFor="specimen_type">Tipo de Muestra *</Label>
-                    <Select 
-                        value={data.specimen_type.toString()} 
-                        onValueChange={(value) => setData('specimen_type', parseInt(value))}
+                    <Select
+                        value={data.specimen_type.toString()}
+                        onValueChange={(value) =>
+                            setData('specimen_type', parseInt(value))
+                        }
                     >
                         <SelectTrigger className="w-full">
                             <SelectValue placeholder="Seleccione tipo" />
@@ -171,13 +202,18 @@ export default function SequenceForm({ sequence, locations, specimenTypes, seque
                                 const exists = hasSequence(type.id);
 
                                 return (
-                                    <SelectItem 
-                                        key={type.id} 
+                                    <SelectItem
+                                        key={type.id}
                                         value={type.id.toString()}
                                         disabled={exists}
-                                        className={exists ? "text-muted-foreground opacity-60 font-normal" : ""}
+                                        className={
+                                            exists
+                                                ? 'font-normal text-muted-foreground opacity-60'
+                                                : ''
+                                        }
                                     >
-                                        {type.name} {exists ? ' (Ya configurado)' : ''}
+                                        {type.name}{' '}
+                                        {exists ? ' (Ya configurado)' : ''}
                                     </SelectItem>
                                 );
                             })}
@@ -222,9 +258,11 @@ export default function SequenceForm({ sequence, locations, specimenTypes, seque
                 <InputError message={errors.fill} />
             </div>
 
-            <div className="rounded-lg bg-accent/50 p-3 text-sm text-muted-foreground border border-accent">
+            <div className="rounded-lg border border-accent bg-accent/50 p-3 text-sm text-muted-foreground">
                 <p>
-                    <strong>Nota:</strong> El mes y el año se asignarán automáticamente según la fecha actual al momento de generar el número de secuencia para la muestra.
+                    <strong>Nota:</strong> El mes y el año se asignarán
+                    automáticamente según la fecha actual al momento de generar
+                    el número de secuencia para la muestra.
                 </p>
             </div>
 
@@ -235,14 +273,18 @@ export default function SequenceForm({ sequence, locations, specimenTypes, seque
                     type="number"
                     min="1"
                     value={data.current_sequence}
-                    onChange={(e) => setData('current_sequence', parseInt(e.target.value))}
+                    onChange={(e) =>
+                        setData('current_sequence', parseInt(e.target.value))
+                    }
                 />
                 <InputError message={errors.current_sequence} />
             </div>
 
             <div className="flex justify-end pt-4">
                 <Button type="submit" disabled={processing}>
-                    {sequence?.id ? 'Actualizar Secuencia' : 'Guardar Secuencia'}
+                    {sequence?.id
+                        ? 'Actualizar Secuencia'
+                        : 'Guardar Secuencia'}
                 </Button>
             </div>
         </form>

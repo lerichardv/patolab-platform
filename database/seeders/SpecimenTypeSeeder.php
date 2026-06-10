@@ -10,7 +10,7 @@ class SpecimenTypeSeeder extends Seeder
 {
     public function run(): void
     {
-        // Truncate only the examinations to avoid re-creating specimen types if they exist, 
+        // Truncate only the examinations to avoid re-creating specimen types if they exist,
         // or just use updateOrCreate for everything.
         SpecimenTypeExamination::query()->delete();
 
@@ -60,7 +60,7 @@ class SpecimenTypeSeeder extends Seeder
             $type = SpecimenType::updateOrCreate(
                 ['name' => $typeName],
                 [
-                    'description' => 'Descripción para ' . $typeName,
+                    'description' => 'Descripción para '.$typeName,
                     'active' => true,
                 ]
             );
@@ -85,7 +85,7 @@ class SpecimenTypeSeeder extends Seeder
             }
 
             $exams = $types[$typeName] ?? [];
-            
+
             if (empty($exams)) {
                 // Default generic exams if none specified
                 for ($i = 1; $i <= 3; $i++) {

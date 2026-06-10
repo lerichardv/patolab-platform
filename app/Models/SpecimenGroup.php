@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class SpecimenGroup extends Model
 {
@@ -25,7 +26,7 @@ class SpecimenGroup extends Model
     {
         static::creating(function ($group) {
             if (empty($group->access_token)) {
-                $group->access_token = \Illuminate\Support\Str::random(32);
+                $group->access_token = Str::random(32);
             }
         });
     }

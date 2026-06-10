@@ -3,12 +3,12 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
-
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -18,6 +18,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable
 {
     use Auditable;
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
@@ -29,7 +30,7 @@ class User extends Authenticatable
     /**
      * Obtiene las muestras asignadas al usuario.
      */
-    public function specimens(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function specimens(): BelongsToMany
     {
         return $this->belongsToMany(Specimen::class, 'specimen_user', 'user_id', 'specimen_id')
             ->withTimestamps();

@@ -629,4 +629,3 @@ class SpecimenGroupController extends Controller
         ]);
     }
 }
-

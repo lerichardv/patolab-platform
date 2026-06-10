@@ -7,13 +7,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { update } from '@/routes/profile';
 
-export default function UpdateProfileInformationForm({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
+export default function UpdateProfileInformationForm({
+    mustVerifyEmail,
+    status,
+}: {
+    mustVerifyEmail: boolean;
+    status?: string;
+}) {
     const user = usePage().props.auth.user;
 
-    const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
-        name: user.name,
-        email: user.email,
-    });
+    const { data, setData, patch, errors, processing, recentlySuccessful } =
+        useForm({
+            name: user.name,
+            email: user.email,
+        });
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -24,9 +31,12 @@ export default function UpdateProfileInformationForm({ mustVerifyEmail, status }
     return (
         <section className="space-y-6">
             <header>
-                <h2 className="text-lg font-medium text-foreground">Información del perfil</h2>
+                <h2 className="text-lg font-medium text-foreground">
+                    Información del perfil
+                </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    Actualice la información de su cuenta y su dirección de correo electrónico.
+                    Actualice la información de su cuenta y su dirección de
+                    correo electrónico.
                 </p>
             </header>
 
@@ -61,20 +71,23 @@ export default function UpdateProfileInformationForm({ mustVerifyEmail, status }
                 {mustVerifyEmail && user.email_verified_at === null && (
                     <div>
                         <p className="mt-2 text-sm text-foreground">
-                            Su dirección de correo electrónico no está verificada.
+                            Su dirección de correo electrónico no está
+                            verificada.
                             <Link
                                 href="/email/verification-notification"
                                 method="post"
                                 as="button"
-                                className="rounded-md text-sm text-muted-foreground underline hover:text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                className="rounded-md text-sm text-muted-foreground underline hover:text-foreground focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
                             >
-                                Haga clic aquí para volver a enviar el correo de verificación.
+                                Haga clic aquí para volver a enviar el correo de
+                                verificación.
                             </Link>
                         </p>
 
                         {status === 'verification-link-sent' && (
                             <div className="mt-2 text-sm font-medium text-green-600">
-                                Se ha enviado un nuevo enlace de verificación a su dirección de correo electrónico.
+                                Se ha enviado un nuevo enlace de verificación a
+                                su dirección de correo electrónico.
                             </div>
                         )}
                     </div>
@@ -90,7 +103,9 @@ export default function UpdateProfileInformationForm({ mustVerifyEmail, status }
                         leave="transition ease-in-out"
                         leaveTo="opacity-0"
                     >
-                        <p className="text-sm text-muted-foreground">Guardado.</p>
+                        <p className="text-sm text-muted-foreground">
+                            Guardado.
+                        </p>
                     </Transition>
                 </div>
             </form>

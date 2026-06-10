@@ -1,8 +1,5 @@
 import HeadingSheet from '@/components/heading-sheet';
-import {
-    Sheet,
-    SheetContent,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import ReferrerForm from './referrer-form';
 
 interface ReferrerType {
@@ -27,20 +24,27 @@ interface Props {
     onOpenChange: (open: boolean) => void;
 }
 
-export default function ReferrerSheet({ referrer, referrerTypes, open, onOpenChange }: Props) {
+export default function ReferrerSheet({
+    referrer,
+    referrerTypes,
+    open,
+    onOpenChange,
+}: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="sm:max-w-[540px] overflow-y-auto">
-                <HeadingSheet 
+            <SheetContent className="overflow-y-auto sm:max-w-[540px]">
+                <HeadingSheet
                     title={referrer ? 'Editar Remitente' : 'Nuevo Remitente'}
-                    description={referrer 
-                        ? 'Realice cambios en la información del remitente aquí.' 
-                        : 'Complete el formulario para registrar un nuevo remitente en el sistema.'}
+                    description={
+                        referrer
+                            ? 'Realice cambios en la información del remitente aquí.'
+                            : 'Complete el formulario para registrar un nuevo remitente en el sistema.'
+                    }
                 />
-                <ReferrerForm 
-                    referrer={referrer} 
+                <ReferrerForm
+                    referrer={referrer}
                     referrerTypes={referrerTypes}
-                    onSuccess={() => onOpenChange(false)} 
+                    onSuccess={() => onOpenChange(false)}
                 />
             </SheetContent>
         </Sheet>
