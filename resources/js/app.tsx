@@ -5,7 +5,6 @@ import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { Head } from '@inertiajs/react';
 
 // Silence noisy warnings from browser extensions (e.g., MetaMask)
 if (typeof window !== 'undefined') {
@@ -73,9 +72,6 @@ createInertiaApp({
 	withApp(app) {
 		return (
 			<>
-				<Head>
-					<meta name="robots" content="noindex, nofollow" />
-				</Head>
 				<TooltipProvider delayDuration={0}>
 					{app}
 					<Toaster />
