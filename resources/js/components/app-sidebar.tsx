@@ -29,6 +29,7 @@ import { index as inventoryMovementsIndex } from '@/actions/App/Http/Controllers
 import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
 import { index as locationsIndex } from '@/actions/App/Http/Controllers/LocationController';
 import { index as myAssignmentsIndex } from '@/actions/App/Http/Controllers/MyAssignmentController';
+import { index as rentalsIndex } from '@/actions/App/Http/Controllers/RentalController';
 import { index as productsIndex } from '@/actions/App/Http/Controllers/ProductController';
 import { index as referrersIndex } from '@/actions/App/Http/Controllers/ReferrerController';
 import { index as referrerTypesIndex } from '@/actions/App/Http/Controllers/ReferrerTypeController';
@@ -79,6 +80,11 @@ const mainNavItems: NavItem[] = [
         title: 'Mis Asignaciones',
         href: myAssignmentsIndex(),
         icon: ClipboardList,
+    },
+    {
+        title: 'Alquileres',
+        href: rentalsIndex(),
+        icon: Tag,
     },
 ];
 

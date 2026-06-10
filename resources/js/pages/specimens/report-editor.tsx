@@ -221,48 +221,62 @@ const editorStyles = `
 
   /* ── Paragraphs ── */
   .tiptap p { margin-bottom: 0.5rem; }
-  .preview-content p { margin-bottom: 7.5px; line-height: 15px; text-align: justify; font-size: 9.5px; }
+  .preview-content p { margin-bottom: 1.98mm; line-height: 3.97mm; text-align: justify; font-size: 2.51mm; }
 
   /* ── Headings ── */
   .tiptap h1 { font-size: 1.4rem; font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; color: #111827; }
-  .preview-content h1 { font-size: 16px; font-weight: 700; margin-top: 15px; margin-bottom: 10px; color: #111827; line-height: 20px; }
+  .preview-content h1 { font-size: 4.23mm; font-weight: 700; margin-top: 3.97mm; margin-bottom: 2.65mm; color: #111827; line-height: 5.29mm; }
   
   .tiptap h2 { font-size: 1.2rem; font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.4rem; color: #1f2937; }
-  .preview-content h2 { font-size: 14px; font-weight: 600; margin-top: 6px; margin-bottom: 6px; color: #1f2937; line-height: 18px; }
+  .preview-content h2 { font-size: 3.70mm; font-weight: 600; margin-top: 1.59mm; margin-bottom: 1.59mm; color: #1f2937; line-height: 4.76mm; }
   
   .tiptap h3 { font-size: 1.05rem; font-weight: 600; margin-top: 0.6rem; margin-bottom: 0.3rem; color: #374151; }
-  .preview-content h3 { font-size: 12px; font-weight: 600; margin-top: 7.5px; margin-bottom: 7.5px; color: #374151; line-height: 15px; }
+  .preview-content h3 { font-size: 3.18mm; font-weight: 600; margin-top: 1.98mm; margin-bottom: 1.98mm; color: #374151; line-height: 3.97mm; }
   
   .tiptap h4 { font-size: 0.95rem; font-weight: 600; margin-top: 0.5rem; margin-bottom: 0.25rem; color: #4b5563; }
-  .preview-content h4 { font-size: 11px; font-weight: 600; margin-top: 5px; margin-bottom: 5px; color: #4b5563; line-height: 15px; }
+  .preview-content h4 { font-size: 2.91mm; font-weight: 600; margin-top: 1.32mm; margin-bottom: 1.32mm; color: #4b5563; line-height: 3.97mm; }
 
   /* ── Lists ── */
   .tiptap ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
-  .preview-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 7.5px; }
+  .preview-content ul { list-style-type: disc; padding-left: 6.35mm; margin-bottom: 1.98mm; }
   
   .tiptap ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.5rem; }
-  .preview-content ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 7.5px; }
+  .preview-content ol { list-style-type: decimal; padding-left: 6.35mm; margin-bottom: 1.98mm; }
   
   .tiptap li { margin-bottom: 0.15rem; }
-  .preview-content li { margin-bottom: 0px; line-height: 15px; }
+  .preview-content li { margin-bottom: 0mm; line-height: 3.97mm; }
 
   /* ── Inline marks ── */
   .tiptap u, .preview-content u { text-decoration: underline; }
   .tiptap s, .preview-content s { text-decoration: line-through; }
 
   /* ── Blockquote ── */
-  .tiptap blockquote, .preview-content blockquote {
+  .tiptap blockquote {
     border-left: 3px solid #d1d5db;
     padding-left: 1rem;
     color: #6b7280;
     font-style: italic;
     margin: 0.5rem 0;
   }
+  .preview-content blockquote {
+    border-left: 0.79mm solid #d1d5db;
+    padding-left: 4.23mm;
+    color: #6b7280;
+    font-style: italic;
+    margin: 1.32mm 0mm;
+  }
 
   /* ── Code ── */
-  .tiptap code, .preview-content code {
+  .tiptap code {
     background: #f3f4f6;
     border-radius: 3px;
+    padding: 0.1em 0.3em;
+    font-size: 0.85em;
+    font-family: monospace;
+  }
+  .preview-content code {
+    background: #f3f4f6;
+    border-radius: 0.79mm;
     padding: 0.1em 0.3em;
     font-size: 0.85em;
     font-family: monospace;
@@ -275,11 +289,18 @@ const editorStyles = `
   .tiptap .align-justify, .preview-content .align-justify { text-align: justify; }
 
   /* ── Images ── */
-  .tiptap img, .preview-content img {
+  .tiptap img {
     max-width: 100%;
     height: auto;
     border-radius: 4px;
     margin: 0.5rem 0;
+    display: block;
+  }
+  .preview-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 1.06mm;
+    margin: 1.32mm 0mm;
     display: block;
   }
   .tiptap img.ProseMirror-selectednode { outline: 2px solid #6366f1; outline-offset: 2px; }
@@ -347,8 +368,8 @@ const editorStyles = `
   .preview-content table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 5px;
-    margin-bottom: 10px;
+    margin-top: 1.32mm;
+    margin-bottom: 2.65mm;
   }
   
   .tiptap table th, .tiptap table td {
@@ -359,14 +380,18 @@ const editorStyles = `
     position: relative;
   }
   .preview-content table th, .preview-content table td {
-    border: 1px solid #d1d5db;
-    padding: 4px 6px;
+    border: 0.26mm solid #d1d5db;
+    padding: 1.06mm 1.59mm;
     text-align: left;
     vertical-align: top;
-    font-size: 9.5px;
-    line-height: 15px;
+    font-size: 2.51mm;
+    line-height: 3.97mm;
   }
-  .tiptap table th, .preview-content table th {
+  .tiptap table th {
+    background-color: #f3f4f6;
+    font-weight: 600;
+  }
+  .preview-content table th {
     background-color: #f3f4f6;
     font-weight: 600;
   }
@@ -2136,7 +2161,7 @@ interface MeasuredBlock {
 	className?: string;
 }
 
-function estimatePatientCardLines(specimen: Specimen) {
+function estimatePatientCardHeight(specimen: Specimen) {
 	const customer = specimen.customer_relation;
 	const referrer = specimen.referrer_relation;
 
@@ -2158,12 +2183,13 @@ function estimatePatientCardLines(specimen: Specimen) {
 	const right2 = Math.ceil((29 + anatomicSite.length) / 50);
 	const rightLines = right1 + right2 + 2;
 
-	return Math.max(leftLines, rightLines) + 2;
+	const totalLines = Math.max(leftLines, rightLines) + 2;
+	return totalLines * 3.97;
 }
 
 function splitHtmlIntoLines(
 	html: string,
-	maxCharsPerLine: number = 85,
+	maxCharsPerLine: number = 140,
 ): string[] {
 	if (!html) {
 		return [];
@@ -2249,7 +2275,7 @@ function splitHtmlIntoLines(
 	return lines;
 }
 
-function getImageLines(blockHtml: string): number {
+function getImageHeight(blockHtml: string): number {
 	const srcMatch = blockHtml.match(/<img[^>]+src=["\']([^"\']+)["\']/i);
 	const heightMatch = blockHtml.match(/<img[^>]+height=["\'](\d+)["\']/i);
 	const widthMatch = blockHtml.match(/<img[^>]+width=["\'](\d+)["\']/i);
@@ -2262,10 +2288,11 @@ function getImageLines(blockHtml: string): number {
 			height = Math.round(height * (704 / width));
 		}
 
-		return Math.ceil(height / 15) + 2;
+		const heightMm = (height * 25.4) / 96;
+		return heightMm + 7.94;
 	}
 
-	return 12;
+	return 47.64;
 }
 
 function getInnerHtml(html: string, tag: string): string {
@@ -2287,24 +2314,24 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
 		return {
 			type: 'page-break',
 			html: blockHtml,
-			lines: 0,
+			height: 0.0,
 		};
 	}
 
 	if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
-		let lines = 2;
+		let height = 7.94;
 
 		if (tag === 'h1') {
-			lines = 3;
+			height = 11.91;
 		} else if (tag === 'h2') {
-			lines = 2.5;
+			height = 9.925;
 		}
 
 		return {
 			type: 'heading',
 			tag,
 			html: blockHtml,
-			lines,
+			height,
 		};
 	}
 
@@ -2313,7 +2340,7 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
 			type: 'list',
 			tag,
 			html: blockHtml,
-			lines: 0,
+			height: 0.0,
 		};
 	}
 
@@ -2321,7 +2348,7 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
 		return {
 			type: 'table',
 			html: blockHtml,
-			lines: 0,
+			height: 0.0,
 		};
 	}
 
@@ -2332,7 +2359,7 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
 		return {
 			type: 'image',
 			html: blockHtml,
-			lines: getImageLines(blockHtml),
+			height: getImageHeight(blockHtml),
 		};
 	}
 
@@ -2347,7 +2374,7 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
 		tag,
 		html: blockHtml,
 		className,
-		lines,
+		height: lines * 3.97,
 	};
 }
 
@@ -2439,67 +2466,113 @@ function parseHtmlToBlocks(html: string): string[] {
 
 function PatientMetadataCard({ specimen }: { specimen: Specimen }) {
 	return (
-		<div className="mb-4 grid shrink-0 grid-cols-2 gap-4 rounded border border-blue-200 bg-blue-50/50 p-3 text-[9.5px] leading-[15px]">
-			<div className="space-y-1">
-				<p>
-					<strong className="font-semibold text-blue-900">
-						Nombre:
-					</strong>{' '}
-					{specimen.customer_relation.name}
-				</p>
-				<p>
-					<strong className="font-semibold text-blue-900">
-						Edad / Sexo:
-					</strong>{' '}
-					{specimen.customer_relation.age ?? 'N/A'} años /{' '}
-					{specimen.customer_relation.gender}
-				</p>
-				<p>
-					<strong className="font-semibold text-blue-900">
-						Médico Remitente:
-					</strong>{' '}
-					{specimen.referrer_relation.name}
-				</p>
-				<p>
-					<strong className="font-semibold text-blue-900">
-						Diagnóstico Clínico:
-					</strong>{' '}
-					{specimen.diagnosis || 'N/A'}
-				</p>
-			</div>
-			<div className="space-y-1">
-				<p>
-					<strong className="font-semibold text-blue-900">
-						Hospital/Clínica:
-					</strong>{' '}
-					{specimen.referrer_relation.notes || 'HDV'}
-				</p>
-				<p>
-					<strong className="font-semibold text-blue-900">
-						Sitio Preciso de la Muestra:
-					</strong>{' '}
-					{specimen.anatomic_site}
-				</p>
-				<p>
-					<strong className="font-semibold text-blue-900">
-						Fecha de la Toma:
-					</strong>{' '}
-					{new Date(specimen.created_at).toLocaleDateString('es-HN')}
-				</p>
-				<p>
-					<strong className="font-semibold text-blue-900">
-						Fecha de Recibo:
-					</strong>{' '}
-					{new Date(specimen.created_at).toLocaleDateString('es-HN')}
-				</p>
-			</div>
-		</div>
+		<table
+			style={{
+				width: '100%',
+				border: '0.26mm solid #bfdbfe',
+				borderRadius: '1.59mm',
+				backgroundColor: '#eff6ff',
+				marginBottom: '3.97mm',
+				padding: '2.65mm 3.70mm',
+				borderCollapse: 'collapse',
+			}}
+			className="shrink-0"
+		>
+			<tbody>
+				<tr>
+					<td
+						style={{
+							width: '55%',
+							padding: '1.32mm 2.12mm',
+							verticalAlign: 'top',
+							fontSize: '2.51mm',
+							lineHeight: '3.97mm',
+							border: 'none',
+						}}
+					>
+						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+							Nombre:
+						</strong>{' '}
+						{specimen.customer_relation.name}
+						<br />
+						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+							Edad:
+						</strong>{' '}
+						{specimen.customer_relation.age ?? 'N/A'} años &nbsp;&nbsp;&nbsp;{' '}
+						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+							Sexo:
+						</strong>{' '}
+						{specimen.customer_relation.gender === 'M' ||
+							specimen.customer_relation.gender === 'masculino' ||
+							specimen.customer_relation.gender === 'Masculino'
+							? 'M'
+							: 'F'}
+						<br />
+						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+							Médico Remitente:
+						</strong>{' '}
+						{specimen.referrer_relation.name}
+						<br />
+						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+							Diagnóstico Clínico:
+						</strong>{' '}
+						{specimen.diagnosis || 'N/A'}
+					</td>
+					<td
+						style={{
+							width: '45%',
+							padding: '1.32mm 2.12mm 1.32mm 3.18mm',
+							verticalAlign: 'top',
+							fontSize: '2.51mm',
+							lineHeight: '3.97mm',
+							border: 'none',
+						}}
+					>
+						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+							Hospital/Clínica:
+						</strong>{' '}
+						{specimen.referrer_relation.notes || 'HDV'}
+						<br />
+						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+							Sitio Preciso de la Muestra:
+						</strong>{' '}
+						{specimen.anatomic_site}
+						<br />
+						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+							Fecha de la Toma:
+						</strong>{' '}
+						{new Date(specimen.created_at).toLocaleDateString(
+							'es-HN',
+						)}
+						<br />
+						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+							Fecha de Recibo:
+						</strong>{' '}
+						{new Date(specimen.created_at).toLocaleDateString(
+							'es-HN',
+						)}
+					</td>
+				</tr>
+			</tbody>
+		</table>
 	);
 }
 
 function SectionHeader({ title }: { title: string }) {
 	return (
-		<div className="mt-[10px] mb-[5px] h-[15px] shrink-0 text-[11px] leading-[15px] font-bold text-black uppercase">
+		<div
+			style={{
+				fontSize: '2.91mm',
+				fontWeight: 700,
+				color: '#000000',
+				marginTop: '2.65mm',
+				marginBottom: '1.32mm',
+				textTransform: 'uppercase',
+				lineHeight: '3.97mm',
+				height: '3.97mm',
+			}}
+			className="shrink-0"
+		>
 			{title}
 		</div>
 	);
@@ -2516,15 +2589,50 @@ function SignatureBlock({
 	isLastPage?: boolean;
 }) {
 	return (
-		<div className="mt-[15px] h-[75px] shrink-0 text-center leading-[15px]">
-			<div className="mx-auto mb-[5px] w-[220px] border-t-[1.5px] border-gray-600" />
-			<div className="text-[10px] font-bold text-gray-800 uppercase">
+		<div
+			style={{
+				marginTop: '3.97mm',
+				height: '19.84mm',
+				textAlign: 'center',
+				lineHeight: '3.97mm',
+			}}
+			className="shrink-0"
+		>
+			<div
+				style={{
+					width: '58.21mm',
+					borderTop: '0.40mm solid #4b5563',
+					margin: '0 auto 1.32mm auto',
+				}}
+			/>
+			<div
+				style={{
+					fontSize: '2.65mm',
+					fontWeight: 700,
+					color: '#1f2937',
+					textTransform: 'uppercase',
+				}}
+			>
 				{pathologistName}
 			</div>
-			<div className="text-[8.5px] font-medium text-gray-500 uppercase">
+			<div
+				style={{
+					fontSize: '2.25mm',
+					color: '#4b5563',
+					fontWeight: 500,
+					textTransform: 'uppercase',
+				}}
+			>
 				{pathologistTitle}
 			</div>
-			<div className="mt-[5px] text-[9px] font-bold text-gray-600">
+			<div
+				style={{
+					fontSize: '2.38mm',
+					fontWeight: 600,
+					color: '#374151',
+					marginTop: '1.32mm',
+				}}
+			>
 				FECHA:{' '}
 				{reportDate
 					? new Date(reportDate + 'T00:00:00').toLocaleDateString(
@@ -2760,18 +2868,19 @@ export default function ReportWorkspace({
 	const dialogPreviewContainerRef = useRef<HTMLDivElement>(null);
 
 	const calculateLayout = () => {
-		const maxLinesPerPage = 48;
-		const maxCharsPerLine = 85;
-		const signatureLines = 5;
+		const pageContentHeight = 190.50; // mm
+		const lineHeight = 3.97; // mm
+		const maxCharsPerLine = 140;
+		const signatureHeight = 19.84; // mm
 
-		const patientCardLines = estimatePatientCardLines(specimen);
+		const patientCardHeight = estimatePatientCardHeight(specimen);
 
 		const blocks: any[] = [];
 
 		// 1. Patient card block
 		blocks.push({
 			type: 'patient-card',
-			lines: patientCardLines,
+			height: patientCardHeight,
 			id: 'patient-card',
 		});
 
@@ -2782,7 +2891,7 @@ export default function ReportWorkspace({
 			blocks.push({
 				type: 'section-header',
 				title: 'Diagnóstico',
-				lines: 2,
+				height: 7.94, // 2 lines * 3.97
 				id: 'diag-header',
 			});
 			const diagBlocks = parseHtmlToBlocks(diagHtml);
@@ -2799,7 +2908,7 @@ export default function ReportWorkspace({
 		blocks.push({
 			type: 'section-header',
 			title: 'Descripción Macroscópica',
-			lines: 2,
+			height: 7.94,
 			id: 'macro-header',
 		});
 		const macroBlocks = parseHtmlToBlocks(macroHtml);
@@ -2816,7 +2925,7 @@ export default function ReportWorkspace({
 			blocks.push({
 				type: 'section-header',
 				title: 'Descripción Microscópica',
-				lines: 2,
+				height: 7.94,
 				id: 'micro-header',
 			});
 			const microBlocks = parseHtmlToBlocks(microHtml);
@@ -2829,33 +2938,30 @@ export default function ReportWorkspace({
 
 		const computedPages: MeasuredBlock[][] = [];
 		let currentPage: MeasuredBlock[] = [];
-		let currentLines = 0.0;
+		let currentHeight = 0.0;
 		let pageIndex = 0;
 
 		for (let bIndex = 0; bIndex < blocks.length; bIndex++) {
 			const block = blocks[bIndex];
-			let maxLinesForPage =
-				pageIndex === 0
-					? maxLinesPerPage - patientCardLines
-					: maxLinesPerPage;
+			let maxHeightForPage = pageContentHeight;
 
 			if (block.type === 'patient-card') {
 				currentPage.push(block);
-				currentLines += block.lines;
+				currentHeight += block.height;
 				continue;
 			}
 
 			if (block.type === 'section-header') {
-				if (currentLines + block.lines > maxLinesForPage) {
+				if (currentHeight + block.height > maxHeightForPage) {
 					computedPages.push(currentPage);
 					currentPage = [];
-					currentLines = 0.0;
+					currentHeight = 0.0;
 					pageIndex++;
-					maxLinesForPage = maxLinesPerPage;
+					maxHeightForPage = pageContentHeight;
 				}
 
 				currentPage.push(block);
-				currentLines += block.lines;
+				currentHeight += block.height;
 				continue;
 			}
 
@@ -2863,7 +2969,7 @@ export default function ReportWorkspace({
 				if (currentPage.length > 0) {
 					computedPages.push(currentPage);
 					currentPage = [];
-					currentLines = 0.0;
+					currentHeight = 0.0;
 					pageIndex++;
 				}
 
@@ -2871,57 +2977,57 @@ export default function ReportWorkspace({
 			}
 
 			if (block.type === 'heading') {
-				const headingCost = block.lines;
+				const headingCost = block.height;
 				let nextBlockStartsNewPage = false;
 
 				// Keep with Next constraint
 				if (bIndex + 1 < blocks.length) {
 					const nextBlock = blocks[bIndex + 1];
-					let minNextLines = 2.0;
+					let minNextHeight = 2.0 * lineHeight;
 
 					if (nextBlock.type === 'image') {
-						minNextLines = nextBlock.lines;
+						minNextHeight = nextBlock.height;
 					} else if (nextBlock.type === 'heading') {
-						minNextLines = nextBlock.lines;
+						minNextHeight = nextBlock.height;
 					}
 
 					if (
-						currentLines + headingCost + minNextLines >
-						maxLinesForPage
+						currentHeight + headingCost + minNextHeight >
+						maxHeightForPage
 					) {
 						nextBlockStartsNewPage = true;
 					}
 				}
 
 				if (
-					currentLines + headingCost > maxLinesForPage ||
+					currentHeight + headingCost > maxHeightForPage ||
 					nextBlockStartsNewPage
 				) {
 					if (currentPage.length > 0) {
 						computedPages.push(currentPage);
 						currentPage = [];
-						currentLines = 0.0;
+						currentHeight = 0.0;
 						pageIndex++;
-						maxLinesForPage = maxLinesPerPage;
+						maxHeightForPage = pageContentHeight;
 					}
 				}
 
 				currentPage.push(block);
-				currentLines += headingCost;
+				currentHeight += headingCost;
 				continue;
 			}
 
 			if (block.type === 'image') {
-				if (currentLines + block.lines > maxLinesForPage) {
+				if (currentHeight + block.height > maxHeightForPage) {
 					computedPages.push(currentPage);
 					currentPage = [];
-					currentLines = 0.0;
+					currentHeight = 0.0;
 					pageIndex++;
-					maxLinesForPage = maxLinesPerPage;
+					maxHeightForPage = pageContentHeight;
 				}
 
 				currentPage.push(block);
-				currentLines += block.lines;
+				currentHeight += block.height;
 				continue;
 			}
 
@@ -2935,29 +3041,26 @@ export default function ReportWorkspace({
 				let i = 0;
 
 				while (i < lines.length) {
-					maxLinesForPage =
-						pageIndex === 0
-							? maxLinesPerPage - patientCardLines
-							: maxLinesPerPage;
-					const remaining = maxLinesForPage - currentLines;
+					maxHeightForPage = pageContentHeight;
+					const remaining = maxHeightForPage - currentHeight;
 
-					if (remaining <= 0.5) {
+					if (remaining <= 0.5 * lineHeight) {
 						computedPages.push(currentPage);
 						currentPage = [];
-						currentLines = 0.0;
+						currentHeight = 0.0;
 						pageIndex++;
 						continue;
 					}
 
 					const linesToFit = Math.min(
-						Math.floor(remaining),
+						Math.floor(remaining / lineHeight),
 						lines.length - i,
 					);
 
 					if (linesToFit <= 0) {
 						computedPages.push(currentPage);
 						currentPage = [];
-						currentLines = 0.0;
+						currentHeight = 0.0;
 						pageIndex++;
 						continue;
 					}
@@ -2971,16 +3074,16 @@ export default function ReportWorkspace({
 						: 'style="margin-bottom: 0px;"';
 
 					const sliceHtml = `<${block.tag} class="${classAttr}" ${style}>${slice.join('')}</${block.tag}>`;
-					const blockCost = linesToFit + (isLastSlice ? 0.5 : 0.0);
+					const blockCost = (linesToFit * lineHeight) + (isLastSlice ? 0.5 * lineHeight : 0.0);
 
 					currentPage.push({
 						id: `${block.id}-slice-${i}`,
 						type: 'html',
 						html: sliceHtml,
-						height: blockCost * 15,
+						height: blockCost,
 					});
 
-					currentLines += blockCost;
+					currentHeight += blockCost;
 					i += linesToFit;
 				}
 
@@ -2996,16 +3099,13 @@ export default function ReportWorkspace({
 				let olStartIndex = 1;
 
 				while (i < listItems.length) {
-					maxLinesForPage =
-						pageIndex === 0
-							? maxLinesPerPage - patientCardLines
-							: maxLinesPerPage;
-					const remaining = maxLinesForPage - currentLines;
+					maxHeightForPage = pageContentHeight;
+					const remaining = maxHeightForPage - currentHeight;
 
-					if (remaining <= 1.0) {
+					if (remaining <= 1.0 * lineHeight) {
 						computedPages.push(currentPage);
 						currentPage = [];
-						currentLines = 0.0;
+						currentHeight = 0.0;
 						pageIndex++;
 						continue;
 					}
@@ -3018,9 +3118,10 @@ export default function ReportWorkspace({
 						1,
 						Math.ceil(itemPlainText.length / (maxCharsPerLine - 5)),
 					);
+					const itemHeight = itemTextLines * lineHeight;
 
-					if (itemTextLines > remaining) {
-						if (currentLines === 0) {
+					if (itemHeight > remaining) {
+						if (currentHeight === 0) {
 							const startAttr =
 								tag === 'ol' && olStartIndex > 1
 									? ` start="${olStartIndex}"`
@@ -3029,20 +3130,20 @@ export default function ReportWorkspace({
 								id: `${block.id}-item-${i}`,
 								type: 'html',
 								html: `<${tag} class="section-content"${startAttr}>${itemHtml}</${tag}>`,
-								height: (itemTextLines + 0.5) * 15,
+								height: itemHeight + 0.5 * lineHeight,
 							});
-							currentLines += itemTextLines + 0.5;
+							currentHeight += itemHeight + 0.5 * lineHeight;
 							i++;
 							olStartIndex++;
 						} else {
 							computedPages.push(currentPage);
 							currentPage = [];
-							currentLines = 0.0;
+							currentHeight = 0.0;
 							pageIndex++;
 						}
 					} else {
 						const itemsToFit: string[] = [];
-						let accumulatedTextLines = 0;
+						let accumulatedHeight = 0;
 
 						while (i < listItems.length) {
 							const nextItemHtml = listItems[i];
@@ -3056,13 +3157,14 @@ export default function ReportWorkspace({
 									(maxCharsPerLine - 5),
 								),
 							);
+							const nextItemHeight = nextItemLines * lineHeight;
 
 							const isLastOfAll = i === listItems.length - 1;
-							const spacingOverhead = isLastOfAll ? 0.5 : 0.0;
+							const spacingOverhead = isLastOfAll ? 0.5 * lineHeight : 0.0;
 
 							if (
-								accumulatedTextLines +
-								nextItemLines +
+								accumulatedHeight +
+								nextItemHeight +
 								spacingOverhead >
 								remaining
 							) {
@@ -3070,15 +3172,15 @@ export default function ReportWorkspace({
 							}
 
 							itemsToFit.push(nextItemHtml);
-							accumulatedTextLines += nextItemLines;
+							accumulatedHeight += nextItemHeight;
 							i++;
 						}
 
 						if (itemsToFit.length > 0) {
 							const isLastOfAll = i >= listItems.length;
 							const cost =
-								accumulatedTextLines +
-								(isLastOfAll ? 0.5 : 0.0);
+								accumulatedHeight +
+								(isLastOfAll ? 0.5 * lineHeight : 0.0);
 
 							const startAttr =
 								tag === 'ol' && olStartIndex > 1
@@ -3088,14 +3190,14 @@ export default function ReportWorkspace({
 								id: `${block.id}-items-${i}`,
 								type: 'html',
 								html: `<${tag} class="section-content"${startAttr}>${itemsToFit.join('')}</${tag}>`,
-								height: cost * 15,
+								height: cost,
 							});
-							currentLines += cost;
+							currentHeight += cost;
 							olStartIndex += itemsToFit.length;
 						} else {
 							computedPages.push(currentPage);
 							currentPage = [];
-							currentLines = 0.0;
+							currentHeight = 0.0;
 							pageIndex++;
 						}
 					}
@@ -3113,25 +3215,22 @@ export default function ReportWorkspace({
 				let i = 0;
 
 				while (i < rows.length) {
-					maxLinesForPage =
-						pageIndex === 0
-							? maxLinesPerPage - patientCardLines
-							: maxLinesPerPage;
-					const remaining = maxLinesForPage - currentLines;
+					maxHeightForPage = pageContentHeight;
+					const remaining = maxHeightForPage - currentHeight;
 
-					if (remaining <= 5) {
+					if (remaining <= 5 * lineHeight) {
 						computedPages.push(currentPage);
 						currentPage = [];
-						currentLines = 0.0;
+						currentHeight = 0.0;
 						pageIndex++;
 						continue;
 					}
 
-					const headerLines = headerHtml === '' ? 0 : 2;
-					const remainingForRows = remaining - headerLines;
+					const headerHeight = headerHtml === '' ? 0.0 : 2.0 * lineHeight;
+					const remainingForRows = remaining - headerHeight;
 
 					const rowsToFit: string[] = [];
-					let accumulatedTextLines = 0;
+					let accumulatedHeight = 0;
 
 					while (i < rows.length) {
 						const row = rows[i];
@@ -3143,17 +3242,18 @@ export default function ReportWorkspace({
 								1,
 								Math.ceil(row.maxCellTextLen / charsPerCell),
 							) + 1;
+						const rowHeight = rowLines * lineHeight;
 
 						const isLastRow = i === rows.length - 1;
-						const tableSpacing = isLastRow ? 1.0 : 0.0;
+						const tableSpacing = isLastRow ? 1.0 * lineHeight : 0.0;
 
 						if (
-							accumulatedTextLines + rowLines + tableSpacing >
+							accumulatedHeight + rowHeight + tableSpacing >
 							remainingForRows
 						) {
-							if (rowsToFit.length === 0 && currentLines === 0) {
+							if (rowsToFit.length === 0 && currentHeight === 0) {
 								rowsToFit.push(row.html);
-								accumulatedTextLines += rowLines;
+								accumulatedHeight += rowHeight;
 								i++;
 							}
 
@@ -3161,16 +3261,16 @@ export default function ReportWorkspace({
 						}
 
 						rowsToFit.push(row.html);
-						accumulatedTextLines += rowLines;
+						accumulatedHeight += rowHeight;
 						i++;
 					}
 
 					if (rowsToFit.length > 0) {
 						const isLastRow = i >= rows.length;
 						const cost =
-							accumulatedTextLines +
-							headerLines +
-							(isLastRow ? 1.0 : 0.0);
+							accumulatedHeight +
+							headerHeight +
+							(isLastRow ? 1.0 * lineHeight : 0.0);
 
 						const classMatch = block.html.match(
 							/class=["\']([^"\']+)["\']/i,
@@ -3191,13 +3291,13 @@ export default function ReportWorkspace({
 							id: `${block.id}-table-slice-${i}`,
 							type: 'html',
 							html: tableWrapperHtml,
-							height: cost * 15,
+							height: cost,
 						});
-						currentLines += cost;
+						currentHeight += cost;
 					} else {
 						computedPages.push(currentPage);
 						currentPage = [];
-						currentLines = 0.0;
+						currentHeight = 0.0;
 						pageIndex++;
 					}
 				}
@@ -3215,36 +3315,32 @@ export default function ReportWorkspace({
 				{
 					id: 'patient-card',
 					type: 'patient-card',
-					height: patientCardLines * 15,
+					height: patientCardHeight,
 				},
 			]);
 		}
 
 		const lastPageIndex = computedPages.length - 1;
-		let lastPageLines = 0.0;
+		let lastPageHeight = 0.0;
 		computedPages[lastPageIndex].forEach((b) => {
-			const blockLines = (b as any).lines || Math.ceil(b.height / 15);
-			lastPageLines += blockLines;
+			lastPageHeight += b.height;
 		});
 
-		const maxLinesForLastPage =
-			lastPageIndex === 0
-				? maxLinesPerPage - patientCardLines
-				: maxLinesPerPage;
+		const maxHeightForLastPage = pageContentHeight;
 
-		if (lastPageLines + signatureLines > maxLinesForLastPage) {
+		if (lastPageHeight + signatureHeight > maxHeightForLastPage) {
 			computedPages.push([
 				{
 					id: 'signature',
 					type: 'signature',
-					height: signatureLines * 15,
+					height: signatureHeight,
 				},
 			]);
 		} else {
 			computedPages[lastPageIndex].push({
 				id: 'signature',
 				type: 'signature',
-				height: signatureLines * 15,
+				height: signatureHeight,
 			});
 		}
 
@@ -3911,17 +4007,20 @@ export default function ReportWorkspace({
 
 		return (
 			<ShadowRoot
-				className="relative mb-6 flex h-[1056px] w-[816px] shrink-0 origin-top-left flex-col overflow-hidden border bg-white px-[56px] py-[45px] text-left font-sans text-slate-800 shadow-2xl select-none"
+				className="relative mb-6 flex shrink-0 origin-top-left flex-col overflow-hidden border bg-white text-left font-sans text-slate-800 shadow-2xl select-none"
 				style={{
+					width: '215.9mm',
+					height: '279.4mm',
+					padding: '12mm 15mm 12mm 15mm',
 					aspectRatio: '8.5/11',
 				}}
 			>
 				{/* Header preview */}
-				<div className="mb-[15px] shrink-0 border-b-2 border-slate-800 pb-3">
-					<div className="flex items-start justify-between">
-						<div>
+				<div style={{ width: '100%', height: '34.93mm', marginBottom: '3.97mm' }}>
+					<div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.53mm' }}>
+						<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
 							<img
-								className="mb-1 max-h-[52px] w-auto"
+								style={{ maxHeight: '13.76mm', width: 'auto', marginBottom: '1.06mm' }}
 								src="/images/patolab-logo-horizontal.png"
 								alt="Logo PatoLab"
 								onError={(e) => {
@@ -3939,30 +4038,41 @@ export default function ReportWorkspace({
 								id={`preview-logo-text-fallback-${pageNum}`}
 								style={{ display: 'none' }}
 							>
-								<h2 className="text-xl font-bold tracking-tight text-blue-900">
+								<div style={{ fontSize: '5.82mm', fontWeight: 800, color: '#1e3a8a', fontFamily: 'Outfit, sans-serif' }}>
 									PatoLab
-								</h2>
-								<span className="block text-[7.5px] font-bold tracking-wider text-gray-500 uppercase">
-									Laboratorio de Patología & Citología
-								</span>
+								</div>
+								<div style={{ fontSize: '2.12mm', color: '#6b7280', fontFamily: 'Outfit, sans-serif', letterSpacing: '0.13mm' }}>
+									LABORATORIO DE PATOLOGÍA & CITOLOGÍA
+								</div>
 							</div>
-							<span className="mt-0.5 block text-[8px] text-gray-600 italic">
+							<div style={{ fontSize: '2.38mm', fontStyle: 'italic', color: '#4b5563', marginTop: '0.26mm' }}>
 								Calidad Diagnóstica a su Servicio
-							</span>
+							</div>
 						</div>
-						<div className="text-right">
-							<div className="rounded border border-slate-300 bg-slate-100 px-2.5 py-1 font-mono text-[9.5px] font-bold text-slate-800">
+						<div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
+							<div style={{ backgroundColor: '#f3f4f6', border: '0.26mm solid #d1d5db', color: '#374151', fontFamily: 'monospace', fontWeight: 800, fontSize: '2.91mm', padding: '1.06mm 2.12mm', borderRadius: '1.06mm', display: 'inline-block' }}>
 								Biopsia N° {specimen.sequence_code}
 							</div>
 						</div>
 					</div>
-					<h3 className="mt-3 text-center text-md font-bold text-slate-800 uppercase">
-						Informe de Muestra {specimen.sequence_code}
-					</h3>
+					<div style={{ textAlign: 'center', fontSize: '4.23mm', fontWeight: 700, color: '#000000', marginTop: '0.53mm', marginBottom: '0.79mm', letterSpacing: '0.13mm', paddingBottom: '3.18mm', textTransform: 'uppercase' }}>
+						INFORME DE MUESTRA {specimen.sequence_code}
+					</div>
+					<div style={{ width: '100%', height: '0.53mm', backgroundColor: '#000000', marginTop: '0.53mm' }}></div>
 				</div>
 
 				{/* Page Content */}
-				<div className="flex h-[720px] max-h-[720px] flex-col gap-0 overflow-hidden text-left">
+				<div
+					style={{
+						width: '100%',
+						height: '190.50mm',
+						maxHeight: '190.50mm',
+						overflow: 'hidden',
+						display: 'flex',
+						flexDirection: 'column',
+						justifyContent: 'flex-start',
+					}}
+				>
 					{pageBlocks.map((block) => {
 						if (block.type === 'patient-card') {
 							return (
@@ -4017,33 +4127,36 @@ export default function ReportWorkspace({
 				</div>
 
 				{/* Footer preview */}
-				<div className="absolute right-[56px] bottom-[45px] left-[56px] h-[76px] border-t border-slate-800 pt-3">
-					<div className="mb-1 text-center text-[7.5px] font-semibold text-gray-700">
+				<div style={{ position: 'absolute', bottom: '12mm', left: '15mm', right: '15mm', height: '20.11mm' }}>
+					<div style={{ width: '100%', height: '0.53mm', backgroundColor: '#000000', marginBottom: '0.79mm' }}></div>
+					<div style={{ textAlign: 'center', fontSize: '2.12mm', fontWeight: 600, color: '#374151', marginBottom: '1.32mm' }}>
 						Este reporte contiene información médica confidencial.
 						Consulte a su médico para adecuada interpretación del
 						mismo.
 					</div>
 
-					<table className="w-full table-fixed border-none text-[7.5px] text-gray-500">
+					<table style={{ width: '100%', borderCollapse: 'collapse', border: 'none' }}>
 						<tbody>
-							<tr className="border-none">
-								<td className="w-1/4 border-none p-0 text-left align-middle">
+							<tr style={{ border: 'none' }}>
+								<td style={{ width: '25%', verticalAlign: 'middle', fontSize: '2.12mm', color: '#4b5563', border: 'none', padding: '0mm' }}>
 									✉ info@PatoLab.org
 								</td>
-								<td className="w-1/4 border-none p-0 text-left align-middle">
+								<td style={{ width: '25%', verticalAlign: 'middle', fontSize: '2.12mm', color: '#4b5563', border: 'none', padding: '0mm' }}>
 									☎ +504 2510-6502
 								</td>
-								<td className="w-1/4 border-none p-0 text-left align-middle">
+								<td style={{ width: '25%', verticalAlign: 'middle', fontSize: '2.12mm', color: '#4b5563', border: 'none', padding: '0mm' }}>
 									📞 +504 9442 8529
 								</td>
-								<td className="w-1/4 max-w-[180px] truncate border-none p-0 text-right align-middle leading-tight">
-									📍 Bo. Los Andes, SPS
+								<td style={{ width: '25%', verticalAlign: 'middle', fontSize: '2.12mm', color: '#4b5563', border: 'none', padding: '0mm', textAlign: 'right' }}>
+									<div style={{ display: 'inline-block', textAlign: 'left', maxWidth: '52.92mm' }}>
+										<span style={{ fontSize: '1.98mm' }}>📍 Bo. Los Andes, SPS</span>
+									</div>
 								</td>
 							</tr>
 						</tbody>
 					</table>
 
-					<div className="mt-2 text-[7.5px] font-bold text-gray-600">
+					<div style={{ position: 'absolute', bottom: '0mm', left: '0mm', fontSize: '2.12mm', fontWeight: 600, color: '#4b5563' }}>
 						Página {pageNum} de {totalNumPages}
 					</div>
 				</div>

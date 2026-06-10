@@ -12,6 +12,7 @@ use App\Http\Controllers\MyAssignmentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReferrerController;
 use App\Http\Controllers\ReferrerTypeController;
+use App\Http\Controllers\RentalController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SequenceController;
 use App\Http\Controllers\SettingController;
@@ -126,6 +127,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('credits/export', [CreditController::class, 'export'])->name('credits.export');
     Route::resource('credits', CreditController::class)->only(['index']);
     Route::post('credits/{credit}/pay', [CreditController::class, 'pay'])->name('credits.pay');
+
+    Route::resource('rentals', RentalController::class)->only(['index', 'store', 'update']);
+    Route::post('rentals/{rental}/pay', [RentalController::class, 'pay'])->name('rentals.pay');
     Route::post('specimen-type-templates/upload-image', [SpecimenTypeTemplateController::class, 'uploadImage'])->name('specimen-type-templates.upload-image');
     Route::resource('specimen-type-templates', SpecimenTypeTemplateController::class);
     Route::resource('specimen-categories', SpecimenCategoryController::class);

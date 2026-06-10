@@ -40,6 +40,7 @@ class InvoiceController extends Controller
             'specimen.referrerRelation',
             'specimen.priority',
             'creditRelation',
+            'rental',
             'group.specimens.customerRelation',
             'group.specimens.type',
             'group.specimens.examination',
@@ -87,6 +88,11 @@ class InvoiceController extends Controller
             } elseif ($request->get('has_credit') === 'no') {
                 $query->whereNull('credit_payment_id');
             }
+        }
+
+        // Filter by invoice type
+        if ($request->filled('invoice_type') && $request->get('invoice_type') !== 'all') {
+            $query->where('invoice_type', $request->get('invoice_type'));
         }
 
         // Filter by date range
@@ -184,7 +190,7 @@ class InvoiceController extends Controller
             'invoices' => $invoices,
             'filters' => $request->only([
                 'search', 'payment_type', 'customer_id', 'specimen_type_id',
-                'has_credit', 'date_from', 'date_to', 'sort_field', 'sort_direction', 'group_id',
+                'has_credit', 'date_from', 'date_to', 'sort_field', 'sort_direction', 'group_id', 'invoice_type',
             ]),
             'customers' => $customers,
             'specimenTypes' => $specimenTypes,
@@ -247,6 +253,11 @@ class InvoiceController extends Controller
             } elseif ($request->get('has_credit') === 'no') {
                 $query->whereNull('credit_payment_id');
             }
+        }
+
+        // Filter by invoice type
+        if ($request->filled('invoice_type') && $request->get('invoice_type') !== 'all') {
+            $query->where('invoice_type', $request->get('invoice_type'));
         }
 
         // Filter by date range

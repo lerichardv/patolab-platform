@@ -25,9 +25,9 @@
                 </div>
             </td>
             <td class="contact-col" style="text-align: right;">
-                <div class="contact-item" style="display: inline-block; text-align: left; max-width: 200px;">
+                <div class="contact-item" style="display: inline-block; text-align: left; max-width: 52.92mm;">
                     <span class="contact-icon">&#128205;</span>
-                    <span class="contact-text" style="font-size: 7.5px;">Bo. Los Andes 7 Calle Entre 12 Y 13 Ave. Blvd Los Caminantes, San Pedro Sula, Cortés, Honduras, C. A.</span>
+                    <span class="contact-text" style="font-size: 1.98mm;">Bo. Los Andes 7 Calle Entre 12 Y 13 Ave. Blvd Los Caminantes, San Pedro Sula, Cortés, Honduras, C. A.</span>
                 </div>
             </td>
         </tr>

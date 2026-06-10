@@ -1,6 +1,7 @@
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import CustomerForm from './customer-form';
+import { cn } from '@/lib/utils';
 
 interface Customer {
     id?: number;
@@ -21,12 +22,17 @@ interface Props {
     customer?: Customer | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    className?: string;
+    overlayClassName?: string;
 }
 
-export default function CustomerSheet({ customer, open, onOpenChange }: Props) {
+export default function CustomerSheet({ customer, open, onOpenChange, className, overlayClassName }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full overflow-y-auto sm:max-w-[540px]">
+            <SheetContent
+                className={cn("w-full overflow-y-auto sm:max-w-[540px]", className)}
+                overlayClassName={overlayClassName}
+            >
                 <HeadingSheet
                     title={customer ? 'Editar Cliente' : 'Nuevo Cliente'}
                     description={

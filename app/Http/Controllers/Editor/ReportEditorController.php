@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Editor;
 
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenReport;
 use App\Models\SpecimenTypeTemplate;
+use App\Models\User;
 use App\Services\ImageOptimizerService;
+use App\Services\ReportPaginator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -158,10 +161,10 @@ class ReportEditorController extends Controller
             'invoiceRelation.transferBank',
         ]);
 
-        $pathologistRoleId = \App\Models\Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
+        $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
         $pathologists = [];
         if ($pathologistRoleId) {
-            $pathologists = \App\Models\User::where('active', true)->where('role_id', $pathologistRoleId)->get();
+            $pathologists = User::where('active', true)->where('role_id', $pathologistRoleId)->get();
         }
 
         return Inertia::render('specimens/report-editor', [
@@ -349,7 +352,7 @@ class ReportEditorController extends Controller
 
         $isMicroscopyVisible = in_array($specimen->status, ['microscopic_review', 'finalized', 'delivered']);
 
-        $pages = \App\Services\ReportPaginator::paginate($specimen, $report, $customer, $referrer, $isMicroscopyVisible);
+        $pages = ReportPaginator::paginate($specimen, $report, $customer, $referrer, $isMicroscopyVisible);
 
         $htmlContent = view('pdf.report.body', compact('specimen', 'report', 'customer', 'examination', 'referrer', 'pages'))->render();
 

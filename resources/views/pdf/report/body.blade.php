@@ -19,12 +19,12 @@
 
         body {
             font-family: 'Outfit', 'Helvetica Neue', Arial, sans-serif;
-            font-size: 10.5px;
+            font-size: 2.78mm;
             color: #1f2937;
-            line-height: 15px;
+            line-height: 3.97mm;
             background-color: #ffffff;
-            margin: 0;
-            padding: 0;
+            margin: 0mm;
+            padding: 0mm;
             -webkit-print-color-adjust: exact;
         }
 
@@ -44,10 +44,10 @@
             page-break-after: avoid;
         }
 
-        /* Content height budget (48 lines max at 15px/line = 720px) */
+        /* Content height budget (48 lines max at 3.97mm/line = 190.56mm) */
         .page-content {
             width: 100%;
-            height: 720px;
+            height: 190.50mm;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -57,8 +57,8 @@
         /* Header styling (normal flow inside page) */
         header.report-header {
             width: 100%;
-            height: 132px;
-            margin-bottom: 15px;
+            height: 34.93mm;
+            margin-bottom: 3.97mm;
         }
 
         .header-table {
@@ -66,7 +66,7 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 2px;
+            margin-bottom: 0.53mm;
         }
 
         .header-logo-cell {
@@ -76,15 +76,15 @@
         }
 
         .header-logo-img {
-            max-height: 52px;
+            max-height: 13.76mm;
             width: auto;
         }
 
         .header-tagline {
-            font-size: 9px;
+            font-size: 2.38mm;
             font-style: italic;
             color: #4b5563;
-            margin-top: 1px;
+            margin-top: 0.26mm;
         }
 
         .header-code-cell {
@@ -95,32 +95,32 @@
 
         .specimen-badge {
             background-color: #f3f4f6;
-            border: 1px solid #d1d5db;
+            border: 0.26mm solid #d1d5db;
             color: #374151;
             font-family: monospace;
             font-weight: 800;
-            font-size: 11px;
-            padding: 4px 8px;
-            border-radius: 4px;
+            font-size: 2.91mm;
+            padding: 1.06mm 2.12mm;
+            border-radius: 1.06mm;
             display: inline-block;
         }
 
         .report-title {
             text-align: center;
-            font-size: 16px;
+            font-size: 4.23mm;
             font-weight: 700;
             color: #000000;
-            margin-top: 2px;
-            margin-bottom: 3px;
-            letter-spacing: 0.5px;
-			padding-bottom: 12px;
+            margin-top: 0.53mm;
+            margin-bottom: 0.79mm;
+            letter-spacing: 0.13mm;
+            padding-bottom: 3.18mm;
         }
 
         .header-divider {
             width: 100%;
-            height: 2px;
+            height: 0.53mm;
             background-color: #000000;
-            margin-top: 2px;
+            margin-top: 0.53mm;
         }
 
         /* Footer styling (absolute at the bottom of page box) */
@@ -129,22 +129,22 @@
             bottom: 12mm;
             left: 15mm;
             right: 15mm;
-            height: 76px;
+            height: 20.11mm;
         }
 
         .footer-divider {
             width: 100%;
-            height: 2px;
+            height: 0.53mm;
             background-color: #000000;
-            margin-bottom: 3px;
+            margin-bottom: 0.79mm;
         }
 
         .confidentiality-notice {
             text-align: center;
-            font-size: 8px;
+            font-size: 2.12mm;
             font-weight: 600;
             color: #374151;
-            margin-bottom: 5px;
+            margin-bottom: 1.32mm;
         }
 
         .footer-contact-table {
@@ -155,21 +155,21 @@
         .contact-col {
             width: 25%;
             vertical-align: middle;
-            font-size: 8px;
+            font-size: 2.12mm;
             color: #4b5563;
         }
 
         .contact-icon {
-            font-size: 10px;
-            margin-right: 3px;
+            font-size: 2.65mm;
+            margin-right: 0.79mm;
             color: #1e3a8a;
         }
 
         .page-number-box {
             position: absolute;
-            bottom: 0px;
-            left: 0;
-            font-size: 8px;
+            bottom: 0mm;
+            left: 0mm;
+            font-size: 2.12mm;
             font-weight: 600;
             color: #4b5563;
         }
@@ -177,19 +177,19 @@
         /* Patient Metadata Card */
         .patient-card {
             width: 100%;
-            border: 1px solid #bfdbfe;
-            border-radius: 6px;
+            border: 0.26mm solid #bfdbfe;
+            border-radius: 1.59mm;
             background-color: #eff6ff;
-            margin-bottom: 15px;
-            padding: 10px 14px;
+            margin-bottom: 3.97mm;
+            padding: 2.65mm 3.70mm;
             border-collapse: collapse;
         }
 
         .patient-card td {
-            padding: 5px 8px;
+            padding: 1.32mm 2.12mm;
             vertical-align: top;
-            font-size: 9.5px;
-            line-height: 15px;
+            font-size: 2.51mm;
+            line-height: 3.97mm;
         }
 
         .patient-card strong {
@@ -199,82 +199,82 @@
 
         /* Section titles */
         .section-header-title {
-            font-size: 11px;
+            font-size: 2.91mm;
             font-weight: 700;
             color: #000000;
-            margin-top: 10px;
-            margin-bottom: 5px;
+            margin-top: 2.65mm;
+            margin-bottom: 1.32mm;
             text-transform: uppercase;
-            line-height: 15px;
-            height: 15px;
+            line-height: 3.97mm;
+            height: 3.97mm;
         }
 
         /* Content Styling */
         .section-content {
-            font-size: 9.5px;
+            font-size: 2.51mm;
             color: #1f2937;
             text-align: justify;
-            margin-bottom: 7.5px; /* 0.5 lines */
-            line-height: 15px;
+            margin-bottom: 1.98mm; /* 0.5 lines */
+            line-height: 3.97mm;
         }
 
         .section-content p {
-            margin-bottom: 7.5px;
+            margin-bottom: 1.98mm;
             text-align: justify;
-            line-height: 15px;
+            line-height: 3.97mm;
         }
 
         .section-content ul {
             list-style-type: disc;
-            padding-left: 1.5rem;
-            margin-bottom: 7.5px;
+            padding-left: 6.35mm;
+            margin-bottom: 1.98mm;
         }
 
         .section-content ol {
             list-style-type: decimal;
-            padding-left: 1.5rem;
-            margin-bottom: 7.5px;
+            padding-left: 6.35mm;
+            margin-bottom: 1.98mm;
         }
 
         .section-content li {
-            margin-bottom: 0px;
-            line-height: 15px;
+            margin-bottom: 0mm;
+            line-height: 3.97mm;
         }
 
         .section-content h1 {
-            font-size: 16px;
+            font-size: 4.23mm;
             font-weight: 700;
-            margin-top: 15px;
-            margin-bottom: 10px;
+            margin-top: 3.97mm;
+            margin-bottom: 2.65mm;
             color: #111827;
-            line-height: 20px;
+            line-height: 5.29mm;
         }
 
         .section-content h2 {
-            font-size: 14px;
+            font-size: 3.70mm;
             font-weight: 600;
-            margin-top: 6px;
-            margin-bottom: 6px;
+            margin-top: 1.59mm;
+            margin-bottom: 1.59mm;
             color: #1f2937;
-            line-height: 18px;
+            line-height: 4.76mm;
         }
 
         .section-content h3 {
-            font-size: 12px;
+            font-size: 3.18mm;
             font-weight: 600;
-            margin-top: 7.5px;
-            margin-bottom: 7.5px;
+            margin-top: 1.98mm;
+            margin-bottom: 1.98mm;
             color: #374151;
-            line-height: 15px;
+            line-height: 3.97mm;
         }
 
         .section-content h4 {
-            font-size: 11px;
+            font-size: 2.91mm;
             font-weight: 600;
-            margin-top: 5px;
-            margin-bottom: 5px;
+            margin-top: 1.32mm;
+            margin-bottom: 1.32mm;
             color: #4b5563;
-            line-height: 15px;
+            line-height: 3.97mm;
         }
 
         .section-content u {
@@ -286,16 +286,16 @@
         }
 
         .section-content blockquote {
-            border-left: 3px solid #d1d5db;
-            padding-left: 1rem;
+            border-left: 0.79mm solid #d1d5db;
+            padding-left: 4.23mm;
             color: #6b7280;
             font-style: italic;
-            margin: 5px 0;
+            margin: 1.32mm 0mm;
         }
 
         .section-content code {
             background: #f3f4f6;
-            border-radius: 3px;
+            border-radius: 0.79mm;
             padding: 0.1em 0.3em;
             font-size: 0.85em;
             font-family: monospace;
@@ -320,16 +320,16 @@
         .section-content table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 5px;
-            margin-bottom: 10px;
+            margin-top: 1.32mm;
+            margin-bottom: 2.65mm;
         }
 
         .section-content table th, .section-content table td {
-            border: 1px solid #d1d5db;
-            padding: 4px 6px;
-            font-size: 9.5px;
+            border: 0.26mm solid #d1d5db;
+            padding: 1.06mm 1.59mm;
+            font-size: 2.51mm;
             text-align: left;
-            line-height: 15px;
+            line-height: 3.97mm;
         }
 
         .section-content table th {
@@ -340,9 +340,9 @@
         .section-content img {
             max-width: 100%;
             height: auto;
-            border-radius: 4px;
-            margin-top: 5px;
-            margin-bottom: 5px;
+            border-radius: 1.06mm;
+            margin-top: 1.32mm;
+            margin-bottom: 1.32mm;
             display: block;
         }
 
@@ -370,36 +370,36 @@
 
         /* Pathologist Signature Block */
         .signature-block-container {
-            margin-top: 15px;
+            margin-top: 3.97mm;
             text-align: center;
-            line-height: 15px;
+            line-height: 3.97mm;
         }
 
         .signature-line {
-            width: 220px;
-            border-top: 1.5px solid #4b5563;
-            margin: 0 auto 5px auto;
+            width: 58.21mm;
+            border-top: 0.40mm solid #4b5563;
+            margin: 0 auto 1.32mm auto;
         }
 
         .pathologist-name {
-            font-size: 10px;
+            font-size: 2.65mm;
             font-weight: 700;
             color: #1f2937;
             text-transform: uppercase;
         }
 
         .pathologist-title {
-            font-size: 8.5px;
+            font-size: 2.25mm;
             color: #4b5563;
             font-weight: 500;
             text-transform: uppercase;
         }
 
         .date-signature {
-            font-size: 9px;
+            font-size: 2.38mm;
             font-weight: 600;
             color: #374151;
-            margin-top: 5px;
+            margin-top: 1.32mm;
         }
     </style>
 </head>

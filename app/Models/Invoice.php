@@ -51,6 +51,9 @@ class Invoice extends Model
         'transfer_authorization_code',
         'is_group',
         'group_id',
+        'invoice_type',
+        'rental_id',
+        'description',
     ];
 
     protected $casts = [
@@ -93,6 +96,11 @@ class Invoice extends Model
     public function creditRelation(): BelongsTo
     {
         return $this->belongsTo(Credit::class, 'credit_payment_id');
+    }
+
+    public function rental(): BelongsTo
+    {
+        return $this->belongsTo(Rental::class, 'rental_id');
     }
 
     public function transferBank(): BelongsTo
