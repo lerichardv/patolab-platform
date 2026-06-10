@@ -34,6 +34,10 @@
     </table>
     
     <div class="page-number-box">
-        <span class="page-num-counter"></span>
+        @if(isset($pageNum) && isset($totalPages))
+            <span>Página {{ $pageNum }} de {{ $totalPages }}</span>
+        @else
+            <span class="page-num-counter"></span>
+        @endif
     </div>
 </footer>

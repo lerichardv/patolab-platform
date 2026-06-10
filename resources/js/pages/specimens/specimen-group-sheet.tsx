@@ -778,6 +778,50 @@ export default function SpecimenGroupSheet({
         return Math.max(0, base + customAmountVal - globalDiscountTotal);
     }, [specimens, specimenTypes, customAmountVal, globalDiscountTotal]);
 
+    const estimatedCodes = useMemo(() => {
+        const typeOffsets: Record<number, number> = {};
+        const map: Record<string, string> = {};
+
+        specimens.forEach((spec) => {
+            const typeId = parseInt(spec.specimen_type);
+            if (isNaN(typeId)) {
+                map[spec.client_id] = '';
+                return;
+            }
+
+            const seq = sequences.find(
+                (s) =>
+                    s.specimen_type.toString() === typeId.toString() &&
+                    s.location_id === activeLocationId,
+            );
+
+            if (!seq) {
+                map[spec.client_id] = '';
+                return;
+            }
+
+            if (typeOffsets[typeId] === undefined) {
+                typeOffsets[typeId] = 0;
+            } else {
+                typeOffsets[typeId]++;
+            }
+
+            const currentSeqNum = seq.current_sequence + typeOffsets[typeId];
+            const fillWidth = seq.fill ?? 4;
+            const paddedSeq = String(currentSeqNum).padStart(fillWidth, '0');
+            const paddedMonth = String(
+                seq.month ?? new Date().getMonth() + 1,
+            ).padStart(2, '0');
+            const separator = seq.separator ?? '-';
+            const year = seq.year ?? new Date().getFullYear();
+
+            map[spec.client_id] =
+                `${seq.prefix}${separator}${paddedSeq}${separator}${paddedMonth}${separator}${year}`;
+        });
+
+        return map;
+    }, [specimens, sequences, activeLocationId]);
+
     // Validation for step 1 wizard
     const validateStep1 = () => {
         if (!globalCustomerId) {
@@ -1410,106 +1454,148 @@ export default function SpecimenGroupSheet({
                                     </p>
                                 </div>
                             ) : (
-                                <div className="overflow-hidden rounded-xl border bg-card">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="bg-muted/40">
-                                                <TableHead className="w-12">
-                                                    Nº
-                                                </TableHead>
-                                                <TableHead>Paciente</TableHead>
-                                                <TableHead>Examen</TableHead>
-                                                <TableHead>Remitente</TableHead>
-                                                <TableHead>Insumos</TableHead>
-                                                <TableHead className="w-24 text-right">
-                                                    Acciones
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {specimens.map((spec, idx) => (
-                                                <TableRow
-                                                    key={spec.client_id}
-                                                    className="hover:bg-accent/5"
-                                                >
-                                                    <TableCell className="font-semibold">
-                                                        {idx + 1}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="text-sm font-semibold">
-                                                            {spec.customer_name}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="text-xs font-medium text-primary">
-                                                            {
-                                                                spec.specimen_type_examination_name
-                                                            }
-                                                        </div>
-                                                        <div className="mt-0.5 text-[10px] text-muted-foreground">
-                                                            {
-                                                                spec.specimen_type_name
-                                                            }
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {referrers.find(
-                                                                (r) =>
-                                                                    r.id ===
-                                                                    spec.referrer,
-                                                            )?.name || 'N/A'}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            variant={
-                                                                spec.insumos
-                                                                    .length > 0
-                                                                    ? 'secondary'
-                                                                    : 'outline'
-                                                            }
-                                                            className="text-[10px]"
-                                                        >
-                                                            {
-                                                                spec.insumos
-                                                                    .length
-                                                            }{' '}
-                                                            reactivos
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <div className="flex justify-end gap-1.5">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() =>
-                                                                    handleEditNestedSpecimen(
-                                                                        spec,
-                                                                    )
-                                                                }
-                                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                            >
-                                                                <Edit2 className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() =>
-                                                                    handleDeleteNestedSpecimen(
-                                                                        spec.client_id,
-                                                                    )
-                                                                }
-                                                                className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                                            >
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </div>
-                                                    </TableCell>
+                                <div className="space-y-3">
+                                    <div className="overflow-hidden rounded-xl border bg-card">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/40">
+                                                    <TableHead className="w-12">
+                                                        Nº
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Paciente
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Examen
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Remitente
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Insumos
+                                                    </TableHead>
+                                                    <TableHead className="w-24 text-right">
+                                                        Acciones
+                                                    </TableHead>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {specimens.map((spec, idx) => (
+                                                    <TableRow
+                                                        key={spec.client_id}
+                                                        className="hover:bg-accent/5"
+                                                    >
+                                                        <TableCell className="font-semibold">
+                                                            {idx + 1}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <span className="text-sm font-semibold">
+                                                                    {
+                                                                        spec.customer_name
+                                                                    }
+                                                                </span>
+                                                                {estimatedCodes[
+                                                                    spec
+                                                                        .client_id
+                                                                ] && (
+                                                                    <span className="inline-flex items-center rounded-md border border-sky-100 bg-sky-50 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-400">
+                                                                        *
+                                                                        {
+                                                                            estimatedCodes[
+                                                                                spec
+                                                                                    .client_id
+                                                                            ]
+                                                                        }
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="text-xs font-medium text-primary">
+                                                                {
+                                                                    spec.specimen_type_examination_name
+                                                                }
+                                                            </div>
+                                                            <div className="mt-0.5 text-[10px] text-muted-foreground">
+                                                                {
+                                                                    spec.specimen_type_name
+                                                                }
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {referrers.find(
+                                                                    (r) =>
+                                                                        r.id ===
+                                                                        spec.referrer,
+                                                                )?.name ||
+                                                                    'N/A'}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge
+                                                                variant={
+                                                                    spec.insumos
+                                                                        .length >
+                                                                    0
+                                                                        ? 'secondary'
+                                                                        : 'outline'
+                                                                }
+                                                                className="text-[10px]"
+                                                            >
+                                                                {
+                                                                    spec.insumos
+                                                                        .length
+                                                                }{' '}
+                                                                reactivos
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <div className="flex justify-end gap-1.5">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() =>
+                                                                        handleEditNestedSpecimen(
+                                                                            spec,
+                                                                        )
+                                                                    }
+                                                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                                >
+                                                                    <Edit2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() =>
+                                                                        handleDeleteNestedSpecimen(
+                                                                            spec.client_id,
+                                                                        )
+                                                                    }
+                                                                    className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+
+                                    <div className="text-sky-850 flex items-start gap-2.5 rounded-lg border border-sky-100 bg-sky-50/50 px-3 py-2 text-xs dark:border-sky-950/40 dark:bg-sky-950/15 dark:text-sky-300">
+                                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
+                                        <span>
+                                            <strong>
+                                                * Código de la muestra:
+                                            </strong>{' '}
+                                            El código real de la muestra se
+                                            generará en la base de datos hasta
+                                            que el grupo sea creado.
+                                        </span>
+                                    </div>
                                 </div>
                             )}
 

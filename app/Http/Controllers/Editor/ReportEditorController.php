@@ -158,6 +158,12 @@ class ReportEditorController extends Controller
             'invoiceRelation.transferBank',
         ]);
 
+        $pathologistRoleId = \App\Models\Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
+        $pathologists = [];
+        if ($pathologistRoleId) {
+            $pathologists = \App\Models\User::where('active', true)->where('role_id', $pathologistRoleId)->get();
+        }
+
         return Inertia::render('specimens/report-editor', [
             'specimen' => $specimen,
             'report' => $specimen->report,
@@ -167,6 +173,7 @@ class ReportEditorController extends Controller
                     'cursor_color' => '#'.substr(md5(rand()), 0, 6),
                 ],
             ],
+            'pathologists' => $pathologists,
         ]);
     }
 
@@ -340,7 +347,11 @@ class ReportEditorController extends Controller
         $report->macroscopy_html = $this->convertImagesToBase64($report->macroscopy_html);
         $report->microscopy_html = $this->convertImagesToBase64($report->microscopy_html);
 
-        $htmlContent = view('pdf.report.body', compact('specimen', 'report', 'customer', 'examination', 'referrer'))->render();
+        $isMicroscopyVisible = in_array($specimen->status, ['microscopic_review', 'finalized', 'delivered']);
+
+        $pages = \App\Services\ReportPaginator::paginate($specimen, $report, $customer, $referrer, $isMicroscopyVisible);
+
+        $htmlContent = view('pdf.report.body', compact('specimen', 'report', 'customer', 'examination', 'referrer', 'pages'))->render();
 
         $pdfContent = Browsershot::html($htmlContent)
             // ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')

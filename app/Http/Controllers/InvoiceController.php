@@ -40,6 +40,7 @@ class InvoiceController extends Controller
             'specimen.referrerRelation',
             'specimen.priority',
             'creditRelation',
+            'group.specimens.customerRelation',
             'group.specimens.type',
             'group.specimens.examination',
             'group.specimens.category',

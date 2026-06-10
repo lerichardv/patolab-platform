@@ -985,6 +985,85 @@ export default function InvoicesIndex({
                                                         >
                                                             <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                                         </Button>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger
+                                                                asChild
+                                                            >
+                                                                <button
+                                                                    data-slot="button"
+                                                                    className="inline-flex h-5 w-8 items-center justify-center gap-0.5 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+                                                                    title="Editar Muestra"
+                                                                >
+                                                                    <svg
+                                                                        xmlns="http://www.w3.org/2000/svg"
+                                                                        width="24"
+                                                                        height="24"
+                                                                        viewBox="0 0 24 24"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        strokeWidth="2"
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        className="lucide lucide-square-pen h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
+                                                                    >
+                                                                        <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                        <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"></path>
+                                                                    </svg>
+                                                                    <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+                                                                </button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent
+                                                                align="start"
+                                                                className="w-64"
+                                                            >
+                                                                {invoice.group.specimens?.map(
+                                                                    (
+                                                                        specimen: any,
+                                                                    ) => (
+                                                                        <DropdownMenuItem
+                                                                            key={
+                                                                                specimen.id
+                                                                            }
+                                                                            onClick={() => {
+                                                                                const specimenWithInvoice =
+                                                                                    {
+                                                                                        ...specimen,
+                                                                                        invoice_relation:
+                                                                                            {
+                                                                                                ...invoice,
+                                                                                                specimen:
+                                                                                                    undefined,
+                                                                                            },
+                                                                                    };
+                                                                                setSelectedSpecimen(
+                                                                                    specimenWithInvoice,
+                                                                                );
+                                                                                setIsSpecimenSheetOpen(
+                                                                                    true,
+                                                                                );
+                                                                            }}
+                                                                            className="group cursor-pointer"
+                                                                        >
+                                                                            <div className="flex w-full flex-col gap-0.5">
+                                                                                <span className="font-mono text-xs font-semibold text-primary transition-colors group-hover:text-white group-focus:text-white">
+                                                                                    {specimen.sequence_code ||
+                                                                                        'Sin código'}
+                                                                                </span>
+                                                                                <span className="truncate text-[10px] text-muted-foreground transition-colors group-hover:text-white/90 group-focus:text-white/90">
+                                                                                    {specimen
+                                                                                        .customer_relation
+                                                                                        ?.name ||
+                                                                                        invoice
+                                                                                            .customer
+                                                                                            ?.name ||
+                                                                                        'Sin cliente'}
+                                                                                </span>
+                                                                            </div>
+                                                                        </DropdownMenuItem>
+                                                                    ),
+                                                                )}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     </div>
                                                     <span className="text-[10px] text-muted-foreground">
                                                         Muestra Agrupada (

@@ -19,6 +19,7 @@ import {
     Copy,
     Check,
     Layers,
+    UserPlus,
 } from 'lucide-react';
 import { useState } from 'react';
 import HeadingSheet from '@/components/heading-sheet';
@@ -34,6 +35,7 @@ interface Props {
     onEditClick: () => void;
     preventCloseOnOutsideClick?: boolean;
     onEditInvoiceClick?: (invoice: any) => void;
+    onAssignPathologistClick?: () => void;
 }
 
 export default function SpecimenViewSheet({
@@ -43,6 +45,7 @@ export default function SpecimenViewSheet({
     onEditClick,
     preventCloseOnOutsideClick,
     onEditInvoiceClick,
+    onAssignPathologistClick,
 }: Props) {
     if (!specimen) {
         return null;
@@ -632,10 +635,26 @@ export default function SpecimenViewSheet({
                         <div className="space-y-6">
                             {/* Assigned Pathologists */}
                             <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
-                                <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
-                                    <User className="h-5 w-5" /> Patólogos
-                                    Asignados
-                                </h3>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
+                                        <User className="h-5 w-5" /> Patólogos
+                                        Asignados
+                                    </h3>
+                                    {onAssignPathologistClick && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                onOpenChange(false);
+                                                onAssignPathologistClick();
+                                            }}
+                                            className="h-8 gap-1.5 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
+                                        >
+                                            <UserPlus className="h-3.5 w-3.5" />{' '}
+                                            Asignar
+                                        </Button>
+                                    )}
+                                </div>
                                 <Separator />
                                 {specimen.users && specimen.users.length > 0 ? (
                                     <div className="overflow-hidden rounded-lg border border-border/85 bg-muted/5">
@@ -670,11 +689,26 @@ export default function SpecimenViewSheet({
                                         </table>
                                     </div>
                                 ) : (
-                                    <div className="space-y-2 rounded-lg border border-dashed bg-muted/10 px-4 py-6 text-center">
+                                    <div className="space-y-3 rounded-lg border border-dashed bg-muted/10 px-4 py-6 text-center">
                                         <p className="text-xs text-muted-foreground">
                                             No hay patólogos asignados a esta
                                             muestra.
                                         </p>
+                                        {onAssignPathologistClick && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    onOpenChange(false);
+                                                    onAssignPathologistClick();
+                                                }}
+                                                className="mx-auto flex h-8 items-center gap-1.5 border-primary/20 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
+                                            >
+                                                <UserPlus className="h-3.5 w-3.5" />{' '}
+                                                Asignar Patólogo
+                                            </Button>
+                                        )}
                                     </div>
                                 )}
                             </div>

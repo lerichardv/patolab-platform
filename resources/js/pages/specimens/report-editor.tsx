@@ -9,12 +9,7 @@ import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import {
-	useEditor,
-	EditorContent,
-
-	mergeAttributes
-} from '@tiptap/react';
+import { useEditor, EditorContent, mergeAttributes } from '@tiptap/react';
 import type { Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import {
@@ -32,6 +27,7 @@ import {
 	Eye,
 	Save,
 	Loader2,
+	Maximize2,
 	// Toolbar icons
 	Bold,
 	Italic,
@@ -58,6 +54,7 @@ import {
 	Sparkles,
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, Fragment } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import * as Y from 'yjs';
 import {
@@ -73,6 +70,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
+	Sheet,
+	SheetContent,
+	SheetTitle,
+	SheetDescription,
+} from '@/components/ui/sheet';
+import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
@@ -80,8 +83,9 @@ import {
 } from '@/components/ui/tooltip';
 import EditorLayout from '@/layouts/editor-layout';
 import { cn } from '@/lib/utils';
-import SpecimenViewSheet from './specimen-view-sheet';
 import AIGrammarSheet from './ai-grammar-sheet';
+import SpecimenPathologistSheet from './specimen-pathologist-sheet';
+import SpecimenViewSheet from './specimen-view-sheet';
 
 interface Collaborator {
 	name: string;
@@ -154,6 +158,7 @@ interface Props {
 			cursor_color?: string;
 		};
 	};
+	pathologists?: any[];
 }
 
 const editorStyles = `
@@ -215,18 +220,31 @@ const editorStyles = `
   }
 
   /* ── Paragraphs ── */
-  .tiptap p, .preview-content p { margin-bottom: 0.5rem; }
+  .tiptap p { margin-bottom: 0.5rem; }
+  .preview-content p { margin-bottom: 7.5px; line-height: 15px; text-align: justify; font-size: 9.5px; }
 
   /* ── Headings ── */
-  .tiptap h1, .preview-content h1 { font-size: 1.4rem; font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; color: #111827; }
-  .tiptap h2, .preview-content h2 { font-size: 1.2rem; font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.4rem; color: #1f2937; }
-  .tiptap h3, .preview-content h3 { font-size: 1.05rem; font-weight: 600; margin-top: 0.6rem; margin-bottom: 0.3rem; color: #374151; }
-  .tiptap h4, .preview-content h4 { font-size: 0.95rem; font-weight: 600; margin-top: 0.5rem; margin-bottom: 0.25rem; color: #4b5563; }
+  .tiptap h1 { font-size: 1.4rem; font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; color: #111827; }
+  .preview-content h1 { font-size: 16px; font-weight: 700; margin-top: 15px; margin-bottom: 10px; color: #111827; line-height: 20px; }
+  
+  .tiptap h2 { font-size: 1.2rem; font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.4rem; color: #1f2937; }
+  .preview-content h2 { font-size: 14px; font-weight: 600; margin-top: 6px; margin-bottom: 6px; color: #1f2937; line-height: 18px; }
+  
+  .tiptap h3 { font-size: 1.05rem; font-weight: 600; margin-top: 0.6rem; margin-bottom: 0.3rem; color: #374151; }
+  .preview-content h3 { font-size: 12px; font-weight: 600; margin-top: 7.5px; margin-bottom: 7.5px; color: #374151; line-height: 15px; }
+  
+  .tiptap h4 { font-size: 0.95rem; font-weight: 600; margin-top: 0.5rem; margin-bottom: 0.25rem; color: #4b5563; }
+  .preview-content h4 { font-size: 11px; font-weight: 600; margin-top: 5px; margin-bottom: 5px; color: #4b5563; line-height: 15px; }
 
   /* ── Lists ── */
-  .tiptap ul, .preview-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
-  .tiptap ol, .preview-content ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.5rem; }
-  .tiptap li, .preview-content li { margin-bottom: 0.15rem; }
+  .tiptap ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+  .preview-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 7.5px; }
+  
+  .tiptap ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+  .preview-content ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 7.5px; }
+  
+  .tiptap li { margin-bottom: 0.15rem; }
+  .preview-content li { margin-bottom: 0px; line-height: 15px; }
 
   /* ── Inline marks ── */
   .tiptap u, .preview-content u { text-decoration: underline; }
@@ -249,6 +267,12 @@ const editorStyles = `
     font-size: 0.85em;
     font-family: monospace;
   }
+
+  /* ── Alignments ── */
+  .tiptap .align-left, .preview-content .align-left { text-align: left; }
+  .tiptap .align-center, .preview-content .align-center { text-align: center; }
+  .tiptap .align-right, .preview-content .align-right { text-align: right; }
+  .tiptap .align-justify, .preview-content .align-justify { text-align: justify; }
 
   /* ── Images ── */
   .tiptap img, .preview-content img {
@@ -314,19 +338,33 @@ const editorStyles = `
   }
 
   /* ── Tables ── */
-  .tiptap table, .preview-content table {
+  .tiptap table {
     width: 100%;
     border-collapse: collapse;
     margin: 0.5rem 0 0.75rem;
     font-size: 9.5px;
   }
-  .tiptap table th, .tiptap table td,
-  .preview-content table th, .preview-content table td {
+  .preview-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 5px;
+    margin-bottom: 10px;
+  }
+  
+  .tiptap table th, .tiptap table td {
     border: 1px solid #d1d5db;
     padding: 5px 8px;
     text-align: left;
     vertical-align: top;
     position: relative;
+  }
+  .preview-content table th, .preview-content table td {
+    border: 1px solid #d1d5db;
+    padding: 4px 6px;
+    text-align: left;
+    vertical-align: top;
+    font-size: 9.5px;
+    line-height: 15px;
   }
   .tiptap table th, .preview-content table th {
     background-color: #f3f4f6;
@@ -985,10 +1023,15 @@ function EditorToolbar({
 		// Split by double newlines for paragraphs, and replace single newlines with <br />.
 		const htmlContent = correctedText
 			.split(/\n\s*\n/)
-			.map(para => {
+			.map((para) => {
 				const cleanPara = para.trim();
-				if (!cleanPara) return '';
+
+				if (!cleanPara) {
+					return '';
+				}
+
 				const withBreaks = cleanPara.replace(/\n/g, '<br />');
+
 				return `<p>${withBreaks}</p>`;
 			})
 			.filter(Boolean)
@@ -1000,10 +1043,14 @@ function EditorToolbar({
 			const { from, to } = editor.state.selection;
 			const selected = editor.state.doc.textBetween(from, to, '\n');
 			const index = selected.indexOf(originalText);
+
 			if (index !== -1) {
 				const replaceFrom = from + index;
 				const replaceTo = replaceFrom + originalText.length;
-				chain = chain.setTextSelection({ from: replaceFrom, to: replaceTo });
+				chain = chain.setTextSelection({
+					from: replaceFrom,
+					to: replaceTo,
+				});
 			}
 		}
 
@@ -1299,285 +1346,295 @@ function EditorToolbar({
 	return (
 		<ToolbarContext.Provider value={{ isDictating }}>
 			<TooltipProvider delayDuration={400}>
-				<div className="flex flex-wrap items-center gap-0.5 bg-muted/40 p-1.5">
-					{/* History */}
-					<ToolbarBtn
-						onClick={() => editor?.chain().focus().undo().run()}
-						title="Deshacer (Ctrl+Z)"
-						disabled={!editor?.can().undo()}
-					>
-						<Undo2 className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() => editor?.chain().focus().redo().run()}
-						title="Rehacer (Ctrl+Y)"
-						disabled={!editor?.can().redo()}
-					>
-						<Redo2 className="h-3.5 w-3.5" />
-					</ToolbarBtn>
+				<div className="flex w-full flex-col bg-muted/40">
+					<div className="flex w-full flex-wrap items-center gap-0.5 p-1.5">
+						{/* History */}
+						<ToolbarBtn
+							onClick={() => editor?.chain().focus().undo().run()}
+							title="Deshacer (Ctrl+Z)"
+							disabled={!editor?.can().undo()}
+						>
+							<Undo2 className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() => editor?.chain().focus().redo().run()}
+							title="Rehacer (Ctrl+Y)"
+							disabled={!editor?.can().redo()}
+						>
+							<Redo2 className="h-3.5 w-3.5" />
+						</ToolbarBtn>
 
-					<ToolbarDivider />
+						<ToolbarDivider />
 
-					{/* Formats */}
-					<ToolbarBtn
-						onClick={() =>
-							editor?.chain().focus().toggleBold().run()
-						}
-						active={editor?.isActive('bold')}
-						title="Negrita"
-					>
-						<Bold className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() =>
-							editor?.chain().focus().toggleItalic().run()
-						}
-						active={editor?.isActive('italic')}
-						title="Cursiva"
-					>
-						<Italic className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() =>
-							editor?.chain().focus().toggleUnderline().run()
-						}
-						active={editor?.isActive('underline')}
-						title="Subrayado"
-					>
-						<UnderlineIcon className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() =>
-							editor?.chain().focus().toggleStrike().run()
-						}
-						active={editor?.isActive('strike')}
-						title="Tachado"
-					>
-						<Strikethrough className="h-3.5 w-3.5" />
-					</ToolbarBtn>
+						{/* Formats */}
+						<ToolbarBtn
+							onClick={() =>
+								editor?.chain().focus().toggleBold().run()
+							}
+							active={editor?.isActive('bold')}
+							title="Negrita"
+						>
+							<Bold className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() =>
+								editor?.chain().focus().toggleItalic().run()
+							}
+							active={editor?.isActive('italic')}
+							title="Cursiva"
+						>
+							<Italic className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() =>
+								editor?.chain().focus().toggleUnderline().run()
+							}
+							active={editor?.isActive('underline')}
+							title="Subrayado"
+						>
+							<UnderlineIcon className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() =>
+								editor?.chain().focus().toggleStrike().run()
+							}
+							active={editor?.isActive('strike')}
+							title="Tachado"
+						>
+							<Strikethrough className="h-3.5 w-3.5" />
+						</ToolbarBtn>
 
-					<ToolbarDivider />
+						<ToolbarDivider />
 
-					{/* Headings */}
-					<ToolbarBtn
-						onClick={() =>
-							editor
-								?.chain()
-								.focus()
-								.toggleHeading({ level: 1 })
-								.run()
-						}
-						active={editor?.isActive('heading', { level: 1 })}
-						title="Título 1"
-					>
-						<Heading1 className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() =>
-							editor
-								?.chain()
-								.focus()
-								.toggleHeading({ level: 2 })
-								.run()
-						}
-						active={editor?.isActive('heading', { level: 2 })}
-						title="Título 2"
-					>
-						<Heading2 className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() =>
-							editor
-								?.chain()
-								.focus()
-								.toggleHeading({ level: 3 })
-								.run()
-						}
-						active={editor?.isActive('heading', { level: 3 })}
-						title="Título 3"
-					>
-						<Heading3 className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-
-					<ToolbarDivider />
-
-					{/* Alignments */}
-					<ToolbarBtn
-						onClick={() => {
-							if (editor?.isActive('image')) {
-								editor
-									.chain()
-									.focus()
-									.updateAttributes('image', {
-										alignment: 'left',
-									})
-									.run();
-							} else {
+						{/* Headings */}
+						<ToolbarBtn
+							onClick={() =>
 								editor
 									?.chain()
 									.focus()
-									.setTextAlign('left')
-									.run();
+									.toggleHeading({ level: 1 })
+									.run()
 							}
-						}}
-						active={
-							editor?.isActive({ textAlign: 'left' }) ||
-							editor?.isActive('image', { alignment: 'left' })
-						}
-						title="Alinear a la izquierda"
-					>
-						<AlignLeft className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() => {
-							if (editor?.isActive('image')) {
-								editor
-									.chain()
-									.focus()
-									.updateAttributes('image', {
-										alignment: 'center',
-									})
-									.run();
-							} else {
+							active={editor?.isActive('heading', { level: 1 })}
+							title="Título 1"
+						>
+							<Heading1 className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() =>
 								editor
 									?.chain()
 									.focus()
-									.setTextAlign('center')
-									.run();
+									.toggleHeading({ level: 2 })
+									.run()
 							}
-						}}
-						active={
-							editor?.isActive({ textAlign: 'center' }) ||
-							editor?.isActive('image', { alignment: 'center' })
-						}
-						title="Centrar"
-					>
-						<AlignCenter className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() => {
-							if (editor?.isActive('image')) {
-								editor
-									.chain()
-									.focus()
-									.updateAttributes('image', {
-										alignment: 'right',
-									})
-									.run();
-							} else {
+							active={editor?.isActive('heading', { level: 2 })}
+							title="Título 2"
+						>
+							<Heading2 className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() =>
 								editor
 									?.chain()
 									.focus()
-									.setTextAlign('right')
-									.run();
+									.toggleHeading({ level: 3 })
+									.run()
 							}
-						}}
-						active={
-							editor?.isActive({ textAlign: 'right' }) ||
-							editor?.isActive('image', { alignment: 'right' })
-						}
-						title="Alinear a la derecha"
-					>
-						<AlignRight className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() => {
-							if (editor?.isActive('image')) {
-								editor
-									.chain()
-									.focus()
-									.updateAttributes('image', {
-										alignment: 'justify',
-									})
-									.run();
-							} else {
+							active={editor?.isActive('heading', { level: 3 })}
+							title="Título 3"
+						>
+							<Heading3 className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+
+						<ToolbarDivider />
+
+						{/* Alignments */}
+						<ToolbarBtn
+							onClick={() => {
+								if (editor?.isActive('image')) {
+									editor
+										.chain()
+										.focus()
+										.updateAttributes('image', {
+											alignment: 'left',
+										})
+										.run();
+								} else {
+									editor
+										?.chain()
+										.focus()
+										.setTextAlign('left')
+										.run();
+								}
+							}}
+							active={
+								editor?.isActive({ textAlign: 'left' }) ||
+								editor?.isActive('image', { alignment: 'left' })
+							}
+							title="Alinear a la izquierda"
+						>
+							<AlignLeft className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() => {
+								if (editor?.isActive('image')) {
+									editor
+										.chain()
+										.focus()
+										.updateAttributes('image', {
+											alignment: 'center',
+										})
+										.run();
+								} else {
+									editor
+										?.chain()
+										.focus()
+										.setTextAlign('center')
+										.run();
+								}
+							}}
+							active={
+								editor?.isActive({ textAlign: 'center' }) ||
+								editor?.isActive('image', {
+									alignment: 'center',
+								})
+							}
+							title="Centrar"
+						>
+							<AlignCenter className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() => {
+								if (editor?.isActive('image')) {
+									editor
+										.chain()
+										.focus()
+										.updateAttributes('image', {
+											alignment: 'right',
+										})
+										.run();
+								} else {
+									editor
+										?.chain()
+										.focus()
+										.setTextAlign('right')
+										.run();
+								}
+							}}
+							active={
+								editor?.isActive({ textAlign: 'right' }) ||
+								editor?.isActive('image', {
+									alignment: 'right',
+								})
+							}
+							title="Alinear a la derecha"
+						>
+							<AlignRight className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() => {
+								if (editor?.isActive('image')) {
+									editor
+										.chain()
+										.focus()
+										.updateAttributes('image', {
+											alignment: 'justify',
+										})
+										.run();
+								} else {
+									editor
+										?.chain()
+										.focus()
+										.setTextAlign('justify')
+										.run();
+								}
+							}}
+							active={
+								editor?.isActive({ textAlign: 'justify' }) ||
+								editor?.isActive('image', {
+									alignment: 'justify',
+								})
+							}
+							title="Justificar"
+						>
+							<AlignJustify className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+
+						<ToolbarDivider />
+
+						{/* Lists & quote */}
+						<ToolbarBtn
+							onClick={() =>
+								editor?.chain().focus().toggleBulletList().run()
+							}
+							active={editor?.isActive('bulletList')}
+							title="Lista de viñetas"
+						>
+							<List className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() =>
 								editor
 									?.chain()
 									.focus()
-									.setTextAlign('justify')
-									.run();
+									.toggleOrderedList()
+									.run()
 							}
-						}}
-						active={
-							editor?.isActive({ textAlign: 'justify' }) ||
-							editor?.isActive('image', { alignment: 'justify' })
-						}
-						title="Justificar"
-					>
-						<AlignJustify className="h-3.5 w-3.5" />
-					</ToolbarBtn>
+							active={editor?.isActive('orderedList')}
+							title="Lista numerada"
+						>
+							<ListOrdered className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+						<ToolbarBtn
+							onClick={() =>
+								editor?.chain().focus().toggleBlockquote().run()
+							}
+							active={editor?.isActive('blockquote')}
+							title="Cita"
+						>
+							<Quote className="h-3.5 w-3.5" />
+						</ToolbarBtn>
 
-					<ToolbarDivider />
+						<ToolbarDivider />
 
-					{/* Lists & quote */}
-					<ToolbarBtn
-						onClick={() =>
-							editor?.chain().focus().toggleBulletList().run()
-						}
-						active={editor?.isActive('bulletList')}
-						title="Lista de viñetas"
-					>
-						<List className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() =>
-							editor?.chain().focus().toggleOrderedList().run()
-						}
-						active={editor?.isActive('orderedList')}
-						title="Lista numerada"
-					>
-						<ListOrdered className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-					<ToolbarBtn
-						onClick={() =>
-							editor?.chain().focus().toggleBlockquote().run()
-						}
-						active={editor?.isActive('blockquote')}
-						title="Cita"
-					>
-						<Quote className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-
-					<ToolbarDivider />
-
-					{/* Dictation */}
-					<TooltipProvider delayDuration={200}>
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<button
-									type="button"
-									disabled={!field}
-									onMouseDown={(e) => e.preventDefault()}
-									onClick={
-										isDictating
-											? stopDictation
-											: startDictation
-									}
-									className={cn(
-										'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-sm transition-colors',
-										'hover:bg-accent hover:text-accent-foreground',
-										'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40',
-										isDictating
-											? 'animate-pulse bg-red-500 text-white hover:bg-red-600 hover:text-white'
-											: 'bg-transparent text-muted-foreground hover:text-foreground',
-									)}
+						{/* Dictation */}
+						<TooltipProvider delayDuration={200}>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<button
+										type="button"
+										disabled={!field}
+										onMouseDown={(e) => e.preventDefault()}
+										onClick={
+											isDictating
+												? stopDictation
+												: startDictation
+										}
+										className={cn(
+											'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-sm transition-colors',
+											'hover:bg-accent hover:text-accent-foreground',
+											'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40',
+											isDictating
+												? 'animate-pulse bg-red-500 text-white hover:bg-red-600 hover:text-white'
+												: 'bg-transparent text-muted-foreground hover:text-foreground',
+										)}
+									>
+										<Mic className="h-3.5 w-3.5" />
+									</button>
+								</TooltipTrigger>
+								<TooltipContent
+									side="bottom"
+									className="py-1 text-xs"
 								>
-									<Mic className="h-3.5 w-3.5" />
-								</button>
-							</TooltipTrigger>
-							<TooltipContent
-								side="bottom"
-								className="py-1 text-xs"
-							>
-								{isDictating
-									? 'Detener dictado por voz'
-									: 'Dictar por voz (Español)'}
-							</TooltipContent>
-						</Tooltip>
-					</TooltipProvider>
+									{isDictating
+										? 'Detener dictado por voz'
+										: 'Dictar por voz (Español)'}
+								</TooltipContent>
+							</Tooltip>
+						</TooltipProvider>
 
-					{/* AI Grammar Correction */}
-					<div className="flex items-center gap-1 mr-1">
+						{/* AI Grammar Correction */}
 						<ToolbarBtn
 							onClick={handleOpenAISheet}
 							title="Corregir gramática con IA"
@@ -1595,104 +1652,127 @@ function EditorToolbar({
 								)}
 							/>
 						</ToolbarBtn>
-						{hasSelection && (
-							<span className={cn(
-								"text-[10px] font-mono px-1.5 py-0.5 rounded-sm select-none",
-								activeSelectionText.length > 3000
-									? "bg-red-500/10 text-red-600 font-semibold border border-red-500/20"
-									: "bg-indigo-500/10 text-indigo-600 font-medium border border-indigo-500/10"
-							)}>
-								{activeSelectionText.length} carac.
-							</span>
+
+						{/* Insert */}
+						{specimenSequenceCode && (
+							<ToolbarBtn
+								onClick={handleImageUpload}
+								title="Subir imagen"
+							>
+								<ImagePlus className="h-3.5 w-3.5" />
+							</ToolbarBtn>
+						)}
+						<ToolbarBtn
+							onClick={() =>
+								editor
+									?.chain()
+									.focus()
+									.insertTable({
+										rows: 3,
+										cols: 3,
+										withHeaderRow: true,
+									})
+									.run()
+							}
+							title="Insertar tabla 3×3"
+						>
+							<Grid3x3 className="h-3.5 w-3.5" />
+						</ToolbarBtn>
+
+						{/* Table controls – only visible when cursor is inside a table */}
+						{inTable && (
+							<>
+								<ToolbarDivider />
+								<span className="px-1 text-[10px] text-muted-foreground select-none">
+									Tabla:
+								</span>
+								<ToolbarBtn
+									onClick={() =>
+										editor
+											?.chain()
+											.focus()
+											.addColumnAfter()
+											.run()
+									}
+									title="Añadir columna"
+								>
+									<span className="text-[9px] leading-none font-bold">
+										+C
+									</span>
+								</ToolbarBtn>
+								<ToolbarBtn
+									onClick={() =>
+										editor
+											?.chain()
+											.focus()
+											.addRowAfter()
+											.run()
+									}
+									title="Añadir fila"
+								>
+									<span className="text-[9px] leading-none font-bold">
+										+F
+									</span>
+								</ToolbarBtn>
+								<ToolbarBtn
+									onClick={() =>
+										editor
+											?.chain()
+											.focus()
+											.deleteColumn()
+											.run()
+									}
+									title="Eliminar columna"
+								>
+									<span className="text-[9px] leading-none font-bold text-red-500">
+										−C
+									</span>
+								</ToolbarBtn>
+								<ToolbarBtn
+									onClick={() =>
+										editor
+											?.chain()
+											.focus()
+											.deleteRow()
+											.run()
+									}
+									title="Eliminar fila"
+								>
+									<span className="text-[9px] leading-none font-bold text-red-500">
+										−F
+									</span>
+								</ToolbarBtn>
+								<ToolbarBtn
+									onClick={() =>
+										editor
+											?.chain()
+											.focus()
+											.deleteTable()
+											.run()
+									}
+									title="Eliminar tabla"
+								>
+									<Trash2 className="h-3.5 w-3.5 text-red-500" />
+								</ToolbarBtn>
+							</>
 						)}
 					</div>
-
-					{/* Insert */}
-					{specimenSequenceCode && (
-						<ToolbarBtn
-							onClick={handleImageUpload}
-							title="Subir imagen"
-						>
-							<ImagePlus className="h-3.5 w-3.5" />
-						</ToolbarBtn>
-					)}
-					<ToolbarBtn
-						onClick={() =>
-							editor
-								?.chain()
-								.focus()
-								.insertTable({
-									rows: 3,
-									cols: 3,
-									withHeaderRow: true,
-								})
-								.run()
-						}
-						title="Insertar tabla 3×3"
-					>
-						<Grid3x3 className="h-3.5 w-3.5" />
-					</ToolbarBtn>
-
-					{/* Table controls – only visible when cursor is inside a table */}
-					{inTable && (
-						<>
-							<ToolbarDivider />
-							<span className="px-1 text-[10px] text-muted-foreground select-none">
-								Tabla:
+					{hasSelection && (
+						<div className="flex items-center gap-2 border-t border-border/20 px-3 pt-1 pb-2">
+							<span
+								className={cn(
+									'rounded-sm px-1.5 py-0.5 font-mono text-[10px] select-none',
+									activeSelectionText.length > 3000
+										? 'border border-red-500/20 bg-red-500/10 font-semibold text-red-600'
+										: 'border border-indigo-500/10 bg-indigo-500/10 font-medium text-indigo-600',
+								)}
+							>
+								{activeSelectionText.length} caracteres
 							</span>
-							<ToolbarBtn
-								onClick={() =>
-									editor
-										?.chain()
-										.focus()
-										.addColumnAfter()
-										.run()
-								}
-								title="Añadir columna"
-							>
-								<span className="text-[9px] leading-none font-bold">
-									+C
-								</span>
-							</ToolbarBtn>
-							<ToolbarBtn
-								onClick={() =>
-									editor?.chain().focus().addRowAfter().run()
-								}
-								title="Añadir fila"
-							>
-								<span className="text-[9px] leading-none font-bold">
-									+F
-								</span>
-							</ToolbarBtn>
-							<ToolbarBtn
-								onClick={() =>
-									editor?.chain().focus().deleteColumn().run()
-								}
-								title="Eliminar columna"
-							>
-								<span className="text-[9px] leading-none font-bold text-red-500">
-									−C
-								</span>
-							</ToolbarBtn>
-							<ToolbarBtn
-								onClick={() =>
-									editor?.chain().focus().deleteRow().run()
-								}
-								title="Eliminar fila"
-							>
-								<span className="text-[9px] leading-none font-bold text-red-500">
-									−F
-								</span>
-							</ToolbarBtn>
-							<ToolbarBtn
-								onClick={() =>
-									editor?.chain().focus().deleteTable().run()
-								}
-								title="Eliminar tabla"
-							>
-								<Trash2 className="h-3.5 w-3.5 text-red-500" />
-							</ToolbarBtn>
-						</>
+							<span className="text-[10px] text-muted-foreground select-none">
+								máx. 3000 para la corrección de gramática con IA
+							</span>
+						</div>
 					)}
 				</div>
 			</TooltipProvider>
@@ -2047,11 +2127,279 @@ interface MeasuredBlock {
 	| 'section-header'
 	| 'html'
 	| 'page-break'
-	| 'signature';
+	| 'signature'
+	| 'heading'
+	| 'image';
 	height: number;
 	title?: string;
 	html?: string;
 	className?: string;
+}
+
+function estimatePatientCardLines(specimen: Specimen) {
+	const customer = specimen.customer_relation;
+	const referrer = specimen.referrer_relation;
+
+	const customerName = customer?.name || '';
+	const referrerName = referrer?.name || '';
+	const specimenDiagnosis = specimen.diagnosis || '';
+	const referrerNotes = referrer?.notes || '';
+	const anatomicSite = specimen.anatomic_site || '';
+
+	// Left column
+	const left1 = Math.ceil((8 + customerName.length) / 60);
+	const left2 = 1; // age/gender
+	const left3 = Math.ceil((18 + referrerName.length) / 60);
+	const left4 = Math.ceil((21 + specimenDiagnosis.length) / 60);
+	const leftLines = left1 + left2 + left3 + left4;
+
+	// Right column
+	const right1 = Math.ceil((18 + referrerNotes.length) / 50);
+	const right2 = Math.ceil((29 + anatomicSite.length) / 50);
+	const rightLines = right1 + right2 + 2;
+
+	return Math.max(leftLines, rightLines) + 2;
+}
+
+function splitHtmlIntoLines(
+	html: string,
+	maxCharsPerLine: number = 85,
+): string[] {
+	if (!html) {
+		return [];
+	}
+
+	const tokenRegex = /(<\/?[a-zA-Z0-9]+(?:\s+[^>]*)?>|[^<]+)/g;
+	const tokens = html.match(tokenRegex) || [];
+
+	const lines: string[] = [];
+	let currentLineHtml = '';
+	let currentLineLength = 0;
+	const activeTagsStack: string[] = [];
+
+	const closeActiveTags = () => {
+		let closing = '';
+
+		for (let i = activeTagsStack.length - 1; i >= 0; i--) {
+			const tagMatch = activeTagsStack[i].match(/<([a-zA-Z0-9]+)/);
+
+			if (tagMatch) {
+				closing += `</${tagMatch[1]}>`;
+			}
+		}
+
+		return closing;
+	};
+
+	const openActiveTags = () => {
+		return activeTagsStack.join('');
+	};
+
+	for (const token of tokens) {
+		if (token.startsWith('<')) {
+			if (token.startsWith('</')) {
+				activeTagsStack.pop();
+				currentLineHtml += token;
+			} else if (
+				token.endsWith('/>') ||
+				token.toLowerCase() === '<br>' ||
+				token.toLowerCase() === '<br/>'
+			) {
+				if (
+					token.toLowerCase() === '<br>' ||
+					token.toLowerCase() === '<br/>'
+				) {
+					currentLineHtml += closeActiveTags();
+					lines.push(currentLineHtml);
+					currentLineHtml = openActiveTags();
+					currentLineLength = 0;
+				} else {
+					currentLineHtml += token;
+				}
+			} else {
+				activeTagsStack.push(token);
+				currentLineHtml += token;
+			}
+		} else {
+			const words = token.match(/(\s+|\S+)/g) || [];
+
+			for (const word of words) {
+				if (
+					currentLineLength + word.length > maxCharsPerLine &&
+					currentLineLength > 0
+				) {
+					currentLineHtml += closeActiveTags();
+					lines.push(currentLineHtml);
+
+					currentLineHtml = openActiveTags();
+					currentLineLength = 0;
+				}
+
+				currentLineHtml += word;
+				currentLineLength += word.length;
+			}
+		}
+	}
+
+	if (currentLineLength > 0 || currentLineHtml.trim() !== '') {
+		currentLineHtml += closeActiveTags();
+		lines.push(currentLineHtml);
+	}
+
+	return lines;
+}
+
+function getImageLines(blockHtml: string): number {
+	const srcMatch = blockHtml.match(/<img[^>]+src=["\']([^"\']+)["\']/i);
+	const heightMatch = blockHtml.match(/<img[^>]+height=["\'](\d+)["\']/i);
+	const widthMatch = blockHtml.match(/<img[^>]+width=["\'](\d+)["\']/i);
+
+	let height = heightMatch ? parseInt(heightMatch[1], 10) : null;
+	const width = widthMatch ? parseInt(widthMatch[1], 10) : null;
+
+	if (height && width) {
+		if (width > 704) {
+			height = Math.round(height * (704 / width));
+		}
+
+		return Math.ceil(height / 15) + 2;
+	}
+
+	return 12;
+}
+
+function getInnerHtml(html: string, tag: string): string {
+	const regex = new RegExp(`^<${tag}[^>]*>(.*)<\\/${tag}>$`, 'is');
+	const match = html.match(regex);
+
+	return match ? match[1] : html;
+}
+
+function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
+	const tagMatch = blockHtml.match(/^<([a-zA-Z0-9]+)/);
+	const tag = tagMatch ? tagMatch[1].toLowerCase() : 'p';
+
+	if (
+		blockHtml.includes('page-break') ||
+		blockHtml.includes('page-break-after') ||
+		blockHtml.includes('break-after')
+	) {
+		return {
+			type: 'page-break',
+			html: blockHtml,
+			lines: 0,
+		};
+	}
+
+	if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
+		let lines = 2;
+
+		if (tag === 'h1') {
+			lines = 3;
+		} else if (tag === 'h2') {
+			lines = 2.5;
+		}
+
+		return {
+			type: 'heading',
+			tag,
+			html: blockHtml,
+			lines,
+		};
+	}
+
+	if (tag === 'ul' || tag === 'ol') {
+		return {
+			type: 'list',
+			tag,
+			html: blockHtml,
+			lines: 0,
+		};
+	}
+
+	if (tag === 'table') {
+		return {
+			type: 'table',
+			html: blockHtml,
+			lines: 0,
+		};
+	}
+
+	if (
+		tag === 'img' ||
+		(blockHtml.includes('<img') && !blockHtml.includes('<p'))
+	) {
+		return {
+			type: 'image',
+			html: blockHtml,
+			lines: getImageLines(blockHtml),
+		};
+	}
+
+	const classMatch = blockHtml.match(/class=["\']([^"\']+)["\']/i);
+	const className = classMatch ? classMatch[1] : '';
+
+	const plainText = blockHtml.replace(/<[^>]+>/g, '').trim();
+	const lines = Math.max(1, Math.ceil(plainText.length / maxCharsPerLine));
+
+	return {
+		type: 'paragraph',
+		tag,
+		html: blockHtml,
+		className,
+		lines,
+	};
+}
+
+function paginateList(listHtml: string) {
+	const tag = listHtml.startsWith('<ol') ? 'ol' : 'ul';
+	const itemRegex = /<li[^>]*>(.*?)<\/li>/gis;
+	const items: string[] = [];
+	let match;
+
+	while ((match = itemRegex.exec(listHtml)) !== null) {
+		items.push(match[0]);
+	}
+
+	return { tag, items };
+}
+
+function paginateTable(tableHtml: string) {
+	const trRegex = /<tr[^>]*>(.*?)<\/tr>/gis;
+	const rows: { html: string; maxCellTextLen: number }[] = [];
+	let match;
+	let headerHtml = '';
+	let colCount = 1;
+
+	while ((match = trRegex.exec(tableHtml)) !== null) {
+		const trHtml = match[0];
+		const isHeader = trHtml.includes('<th') || trHtml.includes('thead');
+
+		if (isHeader) {
+			headerHtml += trHtml;
+			const thCount = (trHtml.match(/<th/gi) || []).length;
+			colCount = Math.max(colCount, thCount);
+		} else {
+			const tdCount = (trHtml.match(/<td/gi) || []).length;
+			colCount = Math.max(colCount, tdCount);
+
+			const tdRegex = /<td[^>]*>(.*?)<\/td>/gis;
+			let tdMatch;
+			let maxCellTextLen = 0;
+
+			while ((tdMatch = tdRegex.exec(trHtml)) !== null) {
+				const cellText = tdMatch[1].replace(/<[^>]+>/g, '').trim();
+				maxCellTextLen = Math.max(maxCellTextLen, cellText.length);
+			}
+
+			rows.push({
+				html: trHtml,
+				maxCellTextLen,
+			});
+		}
+	}
+
+	return { headerHtml, rows, colCount };
 }
 
 function parseHtmlToBlocks(html: string): string[] {
@@ -2091,7 +2439,7 @@ function parseHtmlToBlocks(html: string): string[] {
 
 function PatientMetadataCard({ specimen }: { specimen: Specimen }) {
 	return (
-		<div className="mb-4 grid shrink-0 grid-cols-2 gap-4 rounded border border-blue-200 bg-blue-50/50 p-3 text-[9px]">
+		<div className="mb-4 grid shrink-0 grid-cols-2 gap-4 rounded border border-blue-200 bg-blue-50/50 p-3 text-[9.5px] leading-[15px]">
 			<div className="space-y-1">
 				<p>
 					<strong className="font-semibold text-blue-900">
@@ -2151,7 +2499,7 @@ function PatientMetadataCard({ specimen }: { specimen: Specimen }) {
 
 function SectionHeader({ title }: { title: string }) {
 	return (
-		<div className="mb-1.5 shrink-0 border-b border-gray-100 pb-1 text-[9.5px] font-bold text-gray-900 uppercase">
+		<div className="mt-[10px] mb-[5px] h-[15px] shrink-0 text-[11px] leading-[15px] font-bold text-black uppercase">
 			{title}
 		</div>
 	);
@@ -2161,7 +2509,6 @@ function SignatureBlock({
 	pathologistName,
 	pathologistTitle,
 	reportDate,
-	isLastPage = false,
 }: {
 	pathologistName: string;
 	pathologistTitle: string;
@@ -2169,24 +2516,25 @@ function SignatureBlock({
 	isLastPage?: boolean;
 }) {
 	return (
-		<div
-			className={cn('shrink-0 pt-6 text-center', isLastPage && 'mt-auto')}
-		>
-			<div className="mx-auto mb-1 w-[180px] border-t border-gray-400" />
-			<div className="text-[9px] font-bold text-gray-800 uppercase">
+		<div className="mt-[15px] h-[75px] shrink-0 text-center leading-[15px]">
+			<div className="mx-auto mb-[5px] w-[220px] border-t-[1.5px] border-gray-600" />
+			<div className="text-[10px] font-bold text-gray-800 uppercase">
 				{pathologistName}
 			</div>
-			<div className="text-[7.5px] font-medium tracking-wide text-gray-500 uppercase">
+			<div className="text-[8.5px] font-medium text-gray-500 uppercase">
 				{pathologistTitle}
 			</div>
-			<div className="mt-2 text-[8px] font-bold text-gray-600">
+			<div className="mt-[5px] text-[9px] font-bold text-gray-600">
 				FECHA:{' '}
 				{reportDate
-					? new Date(reportDate).toLocaleDateString('es-HN', {
-						day: '2-digit',
-						month: '2-digit',
-						year: '2-digit',
-					})
+					? new Date(reportDate + 'T00:00:00').toLocaleDateString(
+						'es-HN',
+						{
+							day: '2-digit',
+							month: '2-digit',
+							year: '2-digit',
+						},
+					)
 					: new Date().toLocaleDateString('es-HN', {
 						day: '2-digit',
 						month: '2-digit',
@@ -2197,8 +2545,106 @@ function SignatureBlock({
 	);
 }
 
-export default function ReportWorkspace({ specimen, report, auth }: Props) {
+function ShadowRoot({
+	children,
+	className,
+	style,
+}: {
+	children: React.ReactNode;
+	className?: string;
+	style?: React.CSSProperties;
+}) {
+	const containerRef = useRef<HTMLDivElement>(null);
+	const [shadowRoot, setShadowRoot] = useState<ShadowRoot | null>(null);
+
+	useEffect(() => {
+		if (containerRef.current) {
+			let root = containerRef.current.shadowRoot;
+
+			if (!root) {
+				root = containerRef.current.attachShadow({ mode: 'open' });
+			}
+
+			let styleContainer = root.querySelector('#shadow-style-container');
+
+			if (!styleContainer) {
+				styleContainer = document.createElement('div');
+				styleContainer.id = 'shadow-style-container';
+				(styleContainer as HTMLDivElement).style.display = 'none';
+				root.appendChild(styleContainer);
+			}
+
+			const copyStyles = () => {
+				if (!styleContainer) {
+					return;
+				}
+
+				styleContainer.innerHTML = '';
+
+				const links = document.querySelectorAll(
+					'link[rel="stylesheet"]',
+				);
+				links.forEach((link) => {
+					styleContainer.appendChild(link.cloneNode(true));
+				});
+
+				const styles = document.querySelectorAll('style');
+				styles.forEach((style) => {
+					styleContainer.appendChild(style.cloneNode(true));
+				});
+			};
+
+			copyStyles();
+
+			const observer = new MutationObserver((mutations) => {
+				let shouldUpdate = false;
+
+				for (const mutation of mutations) {
+					for (const node of Array.from(mutation.addedNodes)) {
+						if (
+							node.nodeName === 'STYLE' ||
+							(node.nodeName === 'LINK' &&
+								(node as HTMLLinkElement).rel === 'stylesheet')
+						) {
+							shouldUpdate = true;
+							break;
+						}
+					}
+
+					if (shouldUpdate) {
+						break;
+					}
+				}
+
+				if (shouldUpdate) {
+					copyStyles();
+				}
+			});
+
+			observer.observe(document.head, { childList: true, subtree: true });
+			setShadowRoot(root);
+
+			return () => {
+				observer.disconnect();
+			};
+		}
+	}, []);
+
+	return (
+		<div ref={containerRef} className={className} style={style}>
+			{shadowRoot && createPortal(children, shadowRoot)}
+		</div>
+	);
+}
+
+export default function ReportWorkspace({
+	specimen,
+	report,
+	auth,
+	pathologists = [],
+}: Props) {
 	const [isLoading, setIsLoading] = useState(true);
+	const [isAssignSheetOpen, setIsAssignSheetOpen] = useState(false);
 
 	useEffect(() => {
 		const timer = setTimeout(() => {
@@ -2225,9 +2671,14 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	const updateAISheetOpen = (open: boolean) => {
 		setIsAISheetOpen(open);
 		isAISheetOpenRef.current = open;
+
 		if (!open) {
 			setTimeout(() => {
-				if (!isAISheetOpenRef.current && activeEditorRef.current && !activeEditorRef.current.isFocused) {
+				if (
+					!isAISheetOpenRef.current &&
+					activeEditorRef.current &&
+					!activeEditorRef.current.isFocused
+				) {
 					setActiveEditor(null);
 					setActiveField(null);
 				}
@@ -2256,6 +2707,7 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 			if (isAISheetOpenRef.current) {
 				return;
 			}
+
 			setActiveEditor(null);
 			setActiveField(null);
 		}, 200);
@@ -2277,13 +2729,13 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	);
 	const [macroscopyUsers, setMacroscopyUsers] = useState<Collaborator[]>([]);
 
-	// Derived visibility flags — declared early so they can be used in layout hooks below
 	const isMicroscopyVisible = [
 		'microscopic_review',
 		'finalized',
 		'delivered',
 	].includes(specimen.status);
 	const isFinished = ['finalized', 'delivered'].includes(specimen.status);
+	const [sessionEditingEnabled, setSessionEditingEnabled] = useState(false);
 	const [microscopyUsers, setMicroscopyUsers] = useState<Collaborator[]>([]);
 	const [diagnosisUsers, setDiagnosisUsers] = useState<Collaborator[]>([]);
 
@@ -2299,7 +2751,6 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	);
 
 	const [pages, setPages] = useState<MeasuredBlock[][]>([]);
-	const hiddenContainerRef = useRef<HTMLDivElement>(null);
 	const useIsomorphicLayoutEffect =
 		typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
 
@@ -2309,98 +2760,492 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	const dialogPreviewContainerRef = useRef<HTMLDivElement>(null);
 
 	const calculateLayout = () => {
-		if (!hiddenContainerRef.current) {
-			return;
-		}
+		const maxLinesPerPage = 48;
+		const maxCharsPerLine = 85;
+		const signatureLines = 5;
 
-		const children = Array.from(hiddenContainerRef.current.children);
-		const computedPageBlocks: MeasuredBlock[] = [];
-		let headerHeight = 125;
-		let footerHeight = 65;
+		const patientCardLines = estimatePatientCardLines(specimen);
 
-		children.forEach((child, index) => {
-			const type = child.getAttribute('data-block-type') || 'html';
-			const height = child.getBoundingClientRect().height;
+		const blocks: any[] = [];
 
-			if (type === 'header-measure') {
-				headerHeight = height;
-			} else if (type === 'footer-measure') {
-				footerHeight = height;
-			} else {
-				const blockType = type as MeasuredBlock['type'];
-
-				if (blockType === 'patient-card') {
-					computedPageBlocks.push({
-						id: `patient-card-${index}`,
-						type: blockType,
-						height,
-					});
-				} else if (blockType === 'section-header') {
-					const title = child.getAttribute('data-block-title') || '';
-					computedPageBlocks.push({
-						id: `section-header-${index}`,
-						type: blockType,
-						height,
-						title,
-					});
-				} else if (blockType === 'html') {
-					const html = child.innerHTML;
-					const className = child.className || '';
-					computedPageBlocks.push({
-						id: `html-${index}`,
-						type: blockType,
-						height,
-						html,
-						className,
-					});
-				} else if (blockType === 'page-break') {
-					computedPageBlocks.push({
-						id: `page-break-${index}`,
-						type: blockType,
-						height: 0,
-					});
-				} else if (blockType === 'signature') {
-					computedPageBlocks.push({
-						id: `signature-${index}`,
-						type: blockType,
-						height,
-					});
-				}
-			}
+		// 1. Patient card block
+		blocks.push({
+			type: 'patient-card',
+			lines: patientCardLines,
+			id: 'patient-card',
 		});
 
-		const maxContentHeight = 1035 - 96 - headerHeight - footerHeight;
+		// 2. Diagnosis
+		const diagHtml = diagnosisHtml || specimen.diagnosis || '';
+
+		if (diagHtml) {
+			blocks.push({
+				type: 'section-header',
+				title: 'Diagnóstico',
+				lines: 2,
+				id: 'diag-header',
+			});
+			const diagBlocks = parseHtmlToBlocks(diagHtml);
+			diagBlocks.forEach((bHtml, idx) => {
+				const b = classifyBlock(bHtml, maxCharsPerLine);
+				b.id = `diag-block-${idx}`;
+				blocks.push(b);
+			});
+		}
+
+		// 3. Macroscopy
+		const macroHtml =
+			macroscopyHtml || '<i>Pendiente de revisión macroscópica.</i>';
+		blocks.push({
+			type: 'section-header',
+			title: 'Descripción Macroscópica',
+			lines: 2,
+			id: 'macro-header',
+		});
+		const macroBlocks = parseHtmlToBlocks(macroHtml);
+		macroBlocks.forEach((bHtml, idx) => {
+			const b = classifyBlock(bHtml, maxCharsPerLine);
+			b.id = `macro-block-${idx}`;
+			blocks.push(b);
+		});
+
+		// 4. Microscopy
+		if (isMicroscopyVisible) {
+			const microHtml =
+				microscopyHtml || '<i>Pendiente de revisión microscópica.</i>';
+			blocks.push({
+				type: 'section-header',
+				title: 'Descripción Microscópica',
+				lines: 2,
+				id: 'micro-header',
+			});
+			const microBlocks = parseHtmlToBlocks(microHtml);
+			microBlocks.forEach((bHtml, idx) => {
+				const b = classifyBlock(bHtml, maxCharsPerLine);
+				b.id = `micro-block-${idx}`;
+				blocks.push(b);
+			});
+		}
 
 		const computedPages: MeasuredBlock[][] = [];
 		let currentPage: MeasuredBlock[] = [];
-		let currentHeight = 0;
+		let currentLines = 0.0;
+		let pageIndex = 0;
 
-		computedPageBlocks.forEach((block) => {
+		for (let bIndex = 0; bIndex < blocks.length; bIndex++) {
+			const block = blocks[bIndex];
+			let maxLinesForPage =
+				pageIndex === 0
+					? maxLinesPerPage - patientCardLines
+					: maxLinesPerPage;
+
+			if (block.type === 'patient-card') {
+				currentPage.push(block);
+				currentLines += block.lines;
+				continue;
+			}
+
+			if (block.type === 'section-header') {
+				if (currentLines + block.lines > maxLinesForPage) {
+					computedPages.push(currentPage);
+					currentPage = [];
+					currentLines = 0.0;
+					pageIndex++;
+					maxLinesForPage = maxLinesPerPage;
+				}
+
+				currentPage.push(block);
+				currentLines += block.lines;
+				continue;
+			}
+
 			if (block.type === 'page-break') {
 				if (currentPage.length > 0) {
 					computedPages.push(currentPage);
 					currentPage = [];
-					currentHeight = 0;
+					currentLines = 0.0;
+					pageIndex++;
 				}
 
-				return;
+				continue;
 			}
 
-			if (
-				currentPage.length > 0 &&
-				currentHeight + block.height > maxContentHeight
-			) {
-				computedPages.push(currentPage);
-				currentPage = [block];
-				currentHeight = block.height;
-			} else {
+			if (block.type === 'heading') {
+				const headingCost = block.lines;
+				let nextBlockStartsNewPage = false;
+
+				// Keep with Next constraint
+				if (bIndex + 1 < blocks.length) {
+					const nextBlock = blocks[bIndex + 1];
+					let minNextLines = 2.0;
+
+					if (nextBlock.type === 'image') {
+						minNextLines = nextBlock.lines;
+					} else if (nextBlock.type === 'heading') {
+						minNextLines = nextBlock.lines;
+					}
+
+					if (
+						currentLines + headingCost + minNextLines >
+						maxLinesForPage
+					) {
+						nextBlockStartsNewPage = true;
+					}
+				}
+
+				if (
+					currentLines + headingCost > maxLinesForPage ||
+					nextBlockStartsNewPage
+				) {
+					if (currentPage.length > 0) {
+						computedPages.push(currentPage);
+						currentPage = [];
+						currentLines = 0.0;
+						pageIndex++;
+						maxLinesForPage = maxLinesPerPage;
+					}
+				}
+
 				currentPage.push(block);
-				currentHeight += block.height;
+				currentLines += headingCost;
+				continue;
 			}
-		});
+
+			if (block.type === 'image') {
+				if (currentLines + block.lines > maxLinesForPage) {
+					computedPages.push(currentPage);
+					currentPage = [];
+					currentLines = 0.0;
+					pageIndex++;
+					maxLinesForPage = maxLinesPerPage;
+				}
+
+				currentPage.push(block);
+				currentLines += block.lines;
+				continue;
+			}
+
+			if (block.type === 'paragraph') {
+				const paraInnerHtml = getInnerHtml(block.html, block.tag);
+				const lines = splitHtmlIntoLines(
+					paraInnerHtml,
+					maxCharsPerLine,
+				);
+
+				let i = 0;
+
+				while (i < lines.length) {
+					maxLinesForPage =
+						pageIndex === 0
+							? maxLinesPerPage - patientCardLines
+							: maxLinesPerPage;
+					const remaining = maxLinesForPage - currentLines;
+
+					if (remaining <= 0.5) {
+						computedPages.push(currentPage);
+						currentPage = [];
+						currentLines = 0.0;
+						pageIndex++;
+						continue;
+					}
+
+					const linesToFit = Math.min(
+						Math.floor(remaining),
+						lines.length - i,
+					);
+
+					if (linesToFit <= 0) {
+						computedPages.push(currentPage);
+						currentPage = [];
+						currentLines = 0.0;
+						pageIndex++;
+						continue;
+					}
+
+					const slice = lines.slice(i, i + linesToFit);
+
+					const isLastSlice = i + linesToFit >= lines.length;
+					const classAttr = block.className || 'section-content';
+					const style = isLastSlice
+						? ''
+						: 'style="margin-bottom: 0px;"';
+
+					const sliceHtml = `<${block.tag} class="${classAttr}" ${style}>${slice.join('')}</${block.tag}>`;
+					const blockCost = linesToFit + (isLastSlice ? 0.5 : 0.0);
+
+					currentPage.push({
+						id: `${block.id}-slice-${i}`,
+						type: 'html',
+						html: sliceHtml,
+						height: blockCost * 15,
+					});
+
+					currentLines += blockCost;
+					i += linesToFit;
+				}
+
+				continue;
+			}
+
+			if (block.type === 'list') {
+				const listData = paginateList(block.html);
+				const listItems = listData.items;
+				const tag = listData.tag;
+
+				let i = 0;
+				let olStartIndex = 1;
+
+				while (i < listItems.length) {
+					maxLinesForPage =
+						pageIndex === 0
+							? maxLinesPerPage - patientCardLines
+							: maxLinesPerPage;
+					const remaining = maxLinesForPage - currentLines;
+
+					if (remaining <= 1.0) {
+						computedPages.push(currentPage);
+						currentPage = [];
+						currentLines = 0.0;
+						pageIndex++;
+						continue;
+					}
+
+					const itemHtml = listItems[i];
+					const itemPlainText = itemHtml
+						.replace(/<[^>]+>/g, '')
+						.trim();
+					const itemTextLines = Math.max(
+						1,
+						Math.ceil(itemPlainText.length / (maxCharsPerLine - 5)),
+					);
+
+					if (itemTextLines > remaining) {
+						if (currentLines === 0) {
+							const startAttr =
+								tag === 'ol' && olStartIndex > 1
+									? ` start="${olStartIndex}"`
+									: '';
+							currentPage.push({
+								id: `${block.id}-item-${i}`,
+								type: 'html',
+								html: `<${tag} class="section-content"${startAttr}>${itemHtml}</${tag}>`,
+								height: (itemTextLines + 0.5) * 15,
+							});
+							currentLines += itemTextLines + 0.5;
+							i++;
+							olStartIndex++;
+						} else {
+							computedPages.push(currentPage);
+							currentPage = [];
+							currentLines = 0.0;
+							pageIndex++;
+						}
+					} else {
+						const itemsToFit: string[] = [];
+						let accumulatedTextLines = 0;
+
+						while (i < listItems.length) {
+							const nextItemHtml = listItems[i];
+							const nextItemPlainText = nextItemHtml
+								.replace(/<[^>]+>/g, '')
+								.trim();
+							const nextItemLines = Math.max(
+								1,
+								Math.ceil(
+									nextItemPlainText.length /
+									(maxCharsPerLine - 5),
+								),
+							);
+
+							const isLastOfAll = i === listItems.length - 1;
+							const spacingOverhead = isLastOfAll ? 0.5 : 0.0;
+
+							if (
+								accumulatedTextLines +
+								nextItemLines +
+								spacingOverhead >
+								remaining
+							) {
+								break;
+							}
+
+							itemsToFit.push(nextItemHtml);
+							accumulatedTextLines += nextItemLines;
+							i++;
+						}
+
+						if (itemsToFit.length > 0) {
+							const isLastOfAll = i >= listItems.length;
+							const cost =
+								accumulatedTextLines +
+								(isLastOfAll ? 0.5 : 0.0);
+
+							const startAttr =
+								tag === 'ol' && olStartIndex > 1
+									? ` start="${olStartIndex}"`
+									: '';
+							currentPage.push({
+								id: `${block.id}-items-${i}`,
+								type: 'html',
+								html: `<${tag} class="section-content"${startAttr}>${itemsToFit.join('')}</${tag}>`,
+								height: cost * 15,
+							});
+							currentLines += cost;
+							olStartIndex += itemsToFit.length;
+						} else {
+							computedPages.push(currentPage);
+							currentPage = [];
+							currentLines = 0.0;
+							pageIndex++;
+						}
+					}
+				}
+
+				continue;
+			}
+
+			if (block.type === 'table') {
+				const tableData = paginateTable(block.html);
+				const headerHtml = tableData.headerHtml;
+				const rows = tableData.rows;
+				const colCount = tableData.colCount;
+
+				let i = 0;
+
+				while (i < rows.length) {
+					maxLinesForPage =
+						pageIndex === 0
+							? maxLinesPerPage - patientCardLines
+							: maxLinesPerPage;
+					const remaining = maxLinesForPage - currentLines;
+
+					if (remaining <= 5) {
+						computedPages.push(currentPage);
+						currentPage = [];
+						currentLines = 0.0;
+						pageIndex++;
+						continue;
+					}
+
+					const headerLines = headerHtml === '' ? 0 : 2;
+					const remainingForRows = remaining - headerLines;
+
+					const rowsToFit: string[] = [];
+					let accumulatedTextLines = 0;
+
+					while (i < rows.length) {
+						const row = rows[i];
+						const charsPerCell = Math.floor(
+							maxCharsPerLine / colCount,
+						);
+						const rowLines =
+							Math.max(
+								1,
+								Math.ceil(row.maxCellTextLen / charsPerCell),
+							) + 1;
+
+						const isLastRow = i === rows.length - 1;
+						const tableSpacing = isLastRow ? 1.0 : 0.0;
+
+						if (
+							accumulatedTextLines + rowLines + tableSpacing >
+							remainingForRows
+						) {
+							if (rowsToFit.length === 0 && currentLines === 0) {
+								rowsToFit.push(row.html);
+								accumulatedTextLines += rowLines;
+								i++;
+							}
+
+							break;
+						}
+
+						rowsToFit.push(row.html);
+						accumulatedTextLines += rowLines;
+						i++;
+					}
+
+					if (rowsToFit.length > 0) {
+						const isLastRow = i >= rows.length;
+						const cost =
+							accumulatedTextLines +
+							headerLines +
+							(isLastRow ? 1.0 : 0.0);
+
+						const classMatch = block.html.match(
+							/class=["\']([^"\']+)["\']/i,
+						);
+						const tableClass = classMatch
+							? classMatch[1]
+							: 'section-content';
+
+						let tableWrapperHtml = `<table class="${tableClass}">`;
+
+						if (headerHtml) {
+							tableWrapperHtml += `<thead>${headerHtml}</thead>`;
+						}
+
+						tableWrapperHtml += `<tbody>${rowsToFit.join('')}</tbody></table>`;
+
+						currentPage.push({
+							id: `${block.id}-table-slice-${i}`,
+							type: 'html',
+							html: tableWrapperHtml,
+							height: cost * 15,
+						});
+						currentLines += cost;
+					} else {
+						computedPages.push(currentPage);
+						currentPage = [];
+						currentLines = 0.0;
+						pageIndex++;
+					}
+				}
+
+				continue;
+			}
+		}
 
 		if (currentPage.length > 0) {
 			computedPages.push(currentPage);
+		}
+
+		if (computedPages.length === 0) {
+			computedPages.push([
+				{
+					id: 'patient-card',
+					type: 'patient-card',
+					height: patientCardLines * 15,
+				},
+			]);
+		}
+
+		const lastPageIndex = computedPages.length - 1;
+		let lastPageLines = 0.0;
+		computedPages[lastPageIndex].forEach((b) => {
+			const blockLines = (b as any).lines || Math.ceil(b.height / 15);
+			lastPageLines += blockLines;
+		});
+
+		const maxLinesForLastPage =
+			lastPageIndex === 0
+				? maxLinesPerPage - patientCardLines
+				: maxLinesPerPage;
+
+		if (lastPageLines + signatureLines > maxLinesForLastPage) {
+			computedPages.push([
+				{
+					id: 'signature',
+					type: 'signature',
+					height: signatureLines * 15,
+				},
+			]);
+		} else {
+			computedPages[lastPageIndex].push({
+				id: 'signature',
+				type: 'signature',
+				height: signatureLines * 15,
+			});
 		}
 
 		setPages(computedPages);
@@ -2417,24 +3262,6 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 		isMicroscopyVisible,
 		isLoading,
 	]);
-
-	useEffect(() => {
-		const container = hiddenContainerRef.current;
-
-		if (!container) {
-			return;
-		}
-
-		const handleLoad = () => {
-			calculateLayout();
-		};
-
-		container.addEventListener('load', handleLoad, true);
-
-		return () => {
-			container.removeEventListener('load', handleLoad, true);
-		};
-	}, [isLoading]);
 
 	// Detect typing activity and trigger autosave feedback
 	useEffect(() => {
@@ -2667,10 +3494,15 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 
 		const ytext = dDoc.getText('content');
 		const handleYjsChange = () => {
-			const val = ytext.toString();
+			const val = ytext.toString().trim();
 
-			if (val && val !== reportDateRef.current) {
-				setReportDate(val.split('T')[0]);
+			if (val) {
+				const match = val.match(/\d{4}-\d{2}-\d{2}/);
+				const dateVal = match ? match[0] : val.split('T')[0];
+
+				if (dateVal && dateVal !== reportDateRef.current) {
+					setReportDate(dateVal);
+				}
 			}
 		};
 		ytext.observe(handleYjsChange);
@@ -2843,6 +3675,12 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	const [zoomScale, setZoomScale] = useState(1);
 	const [zoomMode, setZoomMode] = useState<'fit' | 'manual'>('fit');
 	const containerRef = useRef<HTMLDivElement>(null);
+	const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+	const [fullscreenZoomScale, setFullscreenZoomScale] = useState(1);
+	const [fullscreenZoomMode, setFullscreenZoomMode] = useState<
+		'fit' | 'manual'
+	>('fit');
+	const fullscreenContainerRef = useRef<HTMLDivElement>(null);
 	const [isSpecimenSheetOpen, setIsSpecimenSheetOpen] = useState(false);
 
 	useEffect(() => {
@@ -2869,10 +3707,36 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	}, [zoomMode, isLoading]);
 
 	useEffect(() => {
+		if (
+			!fullscreenContainerRef.current ||
+			fullscreenZoomMode !== 'fit' ||
+			!isFullscreenOpen
+		) {
+			return;
+		}
+
+		const handleResize = () => {
+			const parent = fullscreenContainerRef.current;
+
+			if (parent) {
+				const parentWidth = parent.clientWidth;
+				const scale = (parentWidth - 48) / 800;
+				setFullscreenZoomScale(Math.min(scale, 1.5));
+			}
+		};
+
+		handleResize();
+		const observer = new ResizeObserver(handleResize);
+		observer.observe(fullscreenContainerRef.current);
+
+		return () => observer.disconnect();
+	}, [fullscreenZoomMode, isFullscreenOpen, isLoading]);
+
+	useEffect(() => {
 		if (report) {
-			setReportDate(
-				report.report_date ? report.report_date.split('T')[0] : '',
-			);
+			const rawDate = report.report_date || '';
+			const match = rawDate.match(/\d{4}-\d{2}-\d{2}/);
+			setReportDate(match ? match[0] : rawDate.split('T')[0] || '');
 			setMacroscopyHtml(report.macroscopy_html || '');
 			setMicroscopyHtml(report.microscopy_html || '');
 			setDiagnosisHtml(report.diagnosis_html || '');
@@ -2898,14 +3762,24 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 	};
 
 	const handleUpdateDate = (dateVal: string) => {
-		setReportDate(dateVal);
+		if (!dateVal) {
+			return;
+		}
+
+		const match = dateVal.match(/\d{4}-\d{2}-\d{2}/);
+		const sanitized = match ? match[0] : dateVal;
+
+		setReportDate(sanitized);
 
 		if (dateDoc) {
 			const ytext = dateDoc.getText('content');
-			dateDoc.transact(() => {
-				ytext.delete(0, ytext.length);
-				ytext.insert(0, dateVal);
-			});
+
+			if (ytext.toString().trim() !== sanitized) {
+				dateDoc.transact(() => {
+					ytext.delete(0, ytext.length);
+					ytext.insert(0, sanitized);
+				});
+			}
 		}
 	};
 
@@ -3008,15 +3882,17 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 		);
 	}
 
-	const isMacroscopyEditable = [
-		'macroscopic_review',
-		'processing',
-		'microscopic_review',
-	].includes(specimen.status);
-	const isMicroscopyEditable = specimen.status === 'microscopic_review';
-	const isDiagnosisEditable = !['finalized', 'delivered'].includes(
-		specimen.status,
-	);
+	const isMacroscopyEditable =
+		['macroscopic_review', 'processing', 'microscopic_review'].includes(
+			specimen.status,
+		) ||
+		(isFinished && sessionEditingEnabled);
+	const isMicroscopyEditable =
+		specimen.status === 'microscopic_review' ||
+		(isFinished && sessionEditingEnabled);
+	const isDiagnosisEditable =
+		!['finalized', 'delivered'].includes(specimen.status) ||
+		(isFinished && sessionEditingEnabled);
 
 	// Pathologist information logic
 	const pathologist = specimen.users?.[0];
@@ -3034,14 +3910,14 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 		const totalNumPages = pages.length > 0 ? pages.length : 1;
 
 		return (
-			<div
-				className="relative mb-6 flex h-[1035px] w-[800px] shrink-0 origin-top-left flex-col overflow-hidden border bg-white p-12 text-left font-sans text-slate-800 shadow-2xl select-none"
+			<ShadowRoot
+				className="relative mb-6 flex h-[1056px] w-[816px] shrink-0 origin-top-left flex-col overflow-hidden border bg-white px-[56px] py-[45px] text-left font-sans text-slate-800 shadow-2xl select-none"
 				style={{
 					aspectRatio: '8.5/11',
 				}}
 			>
 				{/* Header preview */}
-				<div className="mb-4 shrink-0 border-b-2 border-slate-800 pb-3">
+				<div className="mb-[15px] shrink-0 border-b-2 border-slate-800 pb-3">
 					<div className="flex items-start justify-between">
 						<div>
 							<img
@@ -3080,13 +3956,13 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 							</div>
 						</div>
 					</div>
-					<h3 className="mt-3 text-center text-xs font-bold tracking-wider text-slate-800 uppercase">
-						Informe de Anatomía Patológica
+					<h3 className="mt-3 text-center text-md font-bold text-slate-800 uppercase">
+						Informe de Muestra {specimen.sequence_code}
 					</h3>
 				</div>
 
 				{/* Page Content */}
-				<div className="flex flex-1 flex-col gap-0 overflow-hidden text-left">
+				<div className="flex h-[720px] max-h-[720px] flex-col gap-0 overflow-hidden text-left">
 					{pageBlocks.map((block) => {
 						if (block.type === 'patient-card') {
 							return (
@@ -3113,16 +3989,22 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 									pathologistName={pathologistName}
 									pathologistTitle={pathologistTitle}
 									reportDate={reportDate}
-									isLastPage={true}
 								/>
 							);
 						}
 
-						if (block.type === 'html') {
+						if (
+							block.type === 'html' ||
+							block.type === 'heading' ||
+							block.type === 'image'
+						) {
 							return (
 								<div
 									key={block.id}
-									className={cn(block.className, 'shrink-0')}
+									className={cn(
+										block.className || 'section-content',
+										'preview-content shrink-0',
+									)}
 									dangerouslySetInnerHTML={{
 										__html: block.html || '',
 									}}
@@ -3135,7 +4017,7 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 				</div>
 
 				{/* Footer preview */}
-				<div className="mt-4 shrink-0 border-t border-slate-800 pt-3">
+				<div className="absolute right-[56px] bottom-[45px] left-[56px] h-[76px] border-t border-slate-800 pt-3">
 					<div className="mb-1 text-center text-[7.5px] font-semibold text-gray-700">
 						Este reporte contiene información médica confidencial.
 						Consulte a su médico para adecuada interpretación del
@@ -3165,7 +4047,7 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 						Página {pageNum} de {totalNumPages}
 					</div>
 				</div>
-			</div>
+			</ShadowRoot>
 		);
 	};
 
@@ -3273,6 +4155,56 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 							</div>
 						</div>
 						<div className="flex items-center gap-2">
+							{isFinished && !sessionEditingEnabled && (
+								<AlertDialog>
+									<AlertDialogTrigger asChild>
+										<Button
+											variant="outline"
+											size="sm"
+											className="cursor-pointer border-amber-500/50 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400"
+										>
+											Activar edición
+										</Button>
+									</AlertDialogTrigger>
+									<AlertDialogContent>
+										<AlertDialogHeader>
+											<AlertDialogTitle>
+												¿Activar edición?
+											</AlertDialogTitle>
+											<AlertDialogDescription>
+												Esta acción permitirá modificar
+												el diagnóstico, la macroscopía y
+												la microscopía de este reporte
+												finalizado únicamente durante
+												esta sesión.
+											</AlertDialogDescription>
+										</AlertDialogHeader>
+										<AlertDialogFooter>
+											<AlertDialogCancel className="cursor-pointer">
+												Cancelar
+											</AlertDialogCancel>
+											<AlertDialogAction
+												onClick={() => {
+													setSessionEditingEnabled(
+														true,
+													);
+													toast.success(
+														'Edición activada para esta sesión',
+													);
+												}}
+												className="cursor-pointer bg-amber-600 text-white hover:bg-amber-700"
+											>
+												Activar
+											</AlertDialogAction>
+										</AlertDialogFooter>
+									</AlertDialogContent>
+								</AlertDialog>
+							)}
+							{isFinished && sessionEditingEnabled && (
+								<span className="animate-pulse rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-amber-600 uppercase dark:text-amber-400">
+									Edición Activa
+								</span>
+							)}
 							<span className="text-xs text-muted-foreground">
 								Fase actual:
 							</span>
@@ -3459,10 +4391,13 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 									type="date"
 									id="report-date"
 									value={reportDate}
+									disabled={
+										isFinished && !sessionEditingEnabled
+									}
 									onChange={(e) =>
 										handleUpdateDate(e.target.value)
 									}
-									className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden"
+									className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
 								/>
 							</div>
 						</div>
@@ -3987,6 +4922,17 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 								>
 									Ajustar
 								</button>
+								<div className="mx-1 h-3.5 w-px bg-border/80" />
+								<button
+									type="button"
+									onClick={() => {
+										setIsFullscreenOpen(true);
+									}}
+									className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+									title="Pantalla Completa"
+								>
+									<Maximize2 className="h-3.5 w-3.5" />
+								</button>
 							</div>
 
 							{/* Floating Download Button */}
@@ -4045,158 +4991,124 @@ export default function ReportWorkspace({ specimen, report, auth }: Props) {
 						`/specimens?specimen=${specimen.sequence_code || specimen.id}&action=edit`,
 					);
 				}}
+				onAssignPathologistClick={() => setIsAssignSheetOpen(true)}
 			/>
 
-			{/* Hidden container for layout measurement */}
-			<div
-				ref={hiddenContainerRef}
-				className="pointer-events-none absolute opacity-0"
-				style={{
-					width: '704px', // 800 - 96px padding
-					top: '-9999px',
-					left: '-9999px',
-					fontFamily: "'Outfit', 'Helvetica Neue', Arial, sans-serif",
-					fontSize: '10.5px',
-					lineHeight: '1.45',
-					color: '#1f2937',
-				}}
-			>
-				{/* 1. Header (for measurement) */}
-				<div
-					data-block-type="header-measure"
-					className="mb-4 border-b-2 border-slate-800 pb-3"
+			<SpecimenPathologistSheet
+				specimen={specimen}
+				open={isAssignSheetOpen}
+				onOpenChange={setIsAssignSheetOpen}
+				pathologists={pathologists}
+			/>
+
+			<Sheet open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
+				<SheetContent
+					side="bottom"
+					className="mx-auto flex h-[96vh] w-[98vw] max-w-none flex-col justify-start overflow-hidden rounded-t-2xl border-t bg-slate-200 p-0 dark:bg-slate-950/20 [&>button]:top-4 [&>button]:right-6 [&>button]:h-8 [&>button]:w-8 [&>button]:rounded-full [&>button]:border [&>button]:bg-background/80 [&>button]:shadow-xs [&>button]:backdrop-blur-xs"
 				>
-					<div className="flex items-start justify-between">
-						<div>
-							<img
-								className="mb-1 max-h-[52px] w-auto"
-								src="/images/patolab-logo-horizontal.png"
-								alt="Logo PatoLab"
-							/>
-							<span className="mt-0.5 block text-[8px] text-gray-600 italic">
-								Calidad Diagnóstica a su Servicio
-							</span>
+					<div className="flex items-center justify-between border-b bg-background px-6 py-3 shadow-xs">
+						<div className="flex items-center gap-2">
+							<FileText className="h-5 w-5 text-primary" />
+							<div>
+								<SheetTitle className="text-sm font-semibold">
+									Vista Completa de Reporte
+								</SheetTitle>
+								<SheetDescription className="text-[10px] text-muted-foreground">
+									Paciente: {specimen.customer_relation.name}{' '}
+									| Código: {specimen.sequence_code}
+								</SheetDescription>
+							</div>
 						</div>
-						<div className="text-right">
-							<div className="rounded border border-slate-300 bg-slate-100 px-2.5 py-1 font-mono text-[9.5px] font-bold text-slate-800">
-								Biopsia N° {specimen.sequence_code}
+
+						{/* Zoom Controls inside Fullscreen Sheet */}
+						<div className="mr-12 flex items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-2.5 py-1 text-xs shadow-sm backdrop-blur-md dark:bg-slate-900/80">
+							<button
+								type="button"
+								onClick={() => {
+									setFullscreenZoomMode('manual');
+									setFullscreenZoomScale((prev) =>
+										Math.max(0.3, prev - 0.1),
+									);
+								}}
+								className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+								title="Zoom Out"
+							>
+								-
+							</button>
+							<span className="min-w-[36px] px-1 text-center font-mono font-semibold text-foreground">
+								{Math.round(fullscreenZoomScale * 100)}%
+							</span>
+							<button
+								type="button"
+								onClick={() => {
+									setFullscreenZoomMode('manual');
+									setFullscreenZoomScale((prev) =>
+										Math.min(2.0, prev + 0.1),
+									);
+								}}
+								className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+								title="Zoom In"
+							>
+								+
+							</button>
+							<div className="mx-1 h-3.5 w-px bg-border/80" />
+							<button
+								type="button"
+								onClick={() => {
+									setFullscreenZoomMode('fit');
+
+									if (fullscreenContainerRef.current) {
+										const scale =
+											(fullscreenContainerRef.current
+												.clientWidth -
+												48) /
+											800;
+										setFullscreenZoomScale(
+											Math.min(scale, 1.5),
+										);
+									}
+								}}
+								className={cn(
+									'cursor-pointer rounded-full px-2.5 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+									fullscreenZoomMode === 'fit' &&
+									'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
+								)}
+							>
+								Ajustar
+							</button>
+						</div>
+					</div>
+
+					{/* Scrollable Preview Pane inside Sheet */}
+					<div
+						ref={fullscreenContainerRef}
+						className="flex flex-1 justify-center overflow-x-auto overflow-y-auto bg-slate-200 p-6 dark:bg-slate-950/20"
+					>
+						<div
+							style={{
+								height: `${(1035 * totalPages + 24 * (totalPages - 1)) * fullscreenZoomScale}px`,
+								width: `${800 * fullscreenZoomScale}px`,
+								position: 'relative',
+							}}
+						>
+							<div
+								className="shrink-0 origin-top-left"
+								style={{
+									transform: `scale(${fullscreenZoomScale})`,
+								}}
+							>
+								{Array.from({ length: totalPages }).map(
+									(_, i) => (
+										<Fragment key={i}>
+											{renderPreviewPage(i + 1)}
+										</Fragment>
+									),
+								)}
 							</div>
 						</div>
 					</div>
-					<h3 className="mt-3 text-center text-xs font-bold tracking-wider text-slate-800 uppercase">
-						Informe de Anatomía Patológica
-					</h3>
-				</div>
-
-				{/* 2. Footer (for measurement) */}
-				<div
-					data-block-type="footer-measure"
-					className="mt-4 border-t border-slate-800 pt-3"
-				>
-					<div className="mb-1 text-center text-[7.5px] font-semibold text-gray-700">
-						Este reporte contiene información médica confidencial.
-					</div>
-					<table className="w-full table-fixed border-none text-[7.5px] text-gray-500">
-						<tbody>
-							<tr className="border-none">
-								<td className="w-1/4 border-none p-0 text-left align-middle">
-									✉ info@PatoLab.org
-								</td>
-							</tr>
-						</tbody>
-					</table>
-					<div className="mt-2 text-[7.5px] font-bold text-gray-600">
-						Página 1 de 1
-					</div>
-				</div>
-
-				{/* 3. Patient Metadata Card */}
-				<div data-block-type="patient-card">
-					<PatientMetadataCard specimen={specimen} />
-				</div>
-
-				{/* 4. Diagnosis Header & Content */}
-				{(diagnosisHtml || specimen.diagnosis) && (
-					<>
-						<div
-							data-block-type="section-header"
-							data-block-title="Diagnóstico"
-						>
-							<SectionHeader title="Diagnóstico" />
-						</div>
-						{parseHtmlToBlocks(
-							diagnosisHtml || specimen.diagnosis || '',
-						).map((html, idx) => (
-							<div
-								key={`diag-html-${idx}`}
-								data-block-type="html"
-								className="preview-content text-[9.5px] leading-relaxed text-gray-800"
-								dangerouslySetInnerHTML={{ __html: html }}
-							/>
-						))}
-					</>
-				)}
-
-				{/* 5. Macroscopy Header & Content */}
-				<div
-					data-block-type="section-header"
-					data-block-title="Descripción Macroscópica"
-				>
-					<SectionHeader title="Descripción Macroscópica" />
-				</div>
-				{parseHtmlToBlocks(
-					macroscopyHtml ||
-					'<i>Pendiente de revisión macroscópica.</i>',
-				).map((html, idx) => (
-					<div
-						key={`macro-html-${idx}`}
-						data-block-type="html"
-						className="preview-content text-[9px] leading-relaxed text-gray-800"
-						dangerouslySetInnerHTML={{ __html: html }}
-					/>
-				))}
-
-				{/* 6. Page Break */}
-				{isMicroscopyVisible && (
-					<div
-						data-block-type="page-break"
-						style={{ height: '0px' }}
-					/>
-				)}
-
-				{/* 7. Microscopy Header & Content */}
-				{isMicroscopyVisible && (
-					<>
-						<div
-							data-block-type="section-header"
-							data-block-title="Descripción Microscópica"
-						>
-							<SectionHeader title="Descripción Microscópica" />
-						</div>
-						{parseHtmlToBlocks(
-							microscopyHtml ||
-							'<i>Pendiente de revisión microscópica.</i>',
-						).map((html, idx) => (
-							<div
-								key={`micro-html-${idx}`}
-								data-block-type="html"
-								className="preview-content text-[9px] leading-relaxed text-gray-800"
-								dangerouslySetInnerHTML={{ __html: html }}
-							/>
-						))}
-					</>
-				)}
-
-				{/* 8. Pathologist Signature Block */}
-				<div data-block-type="signature">
-					<SignatureBlock
-						pathologistName={pathologistName}
-						pathologistTitle={pathologistTitle}
-						reportDate={reportDate}
-						isLastPage={false}
-					/>
-				</div>
-			</div>
+				</SheetContent>
+			</Sheet>
 		</EditorLayout>
 	);
 }

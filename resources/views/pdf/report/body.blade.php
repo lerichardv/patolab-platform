@@ -14,35 +14,65 @@
  
         @page {
             size: 215.9mm 279.4mm;
-            margin: 45mm 15mm 30mm 15mm;
+            margin: 0;
         }
 
         body {
             font-family: 'Outfit', 'Helvetica Neue', Arial, sans-serif;
             font-size: 10.5px;
             color: #1f2937;
-            line-height: 1.45;
+            line-height: 15px;
+            background-color: #ffffff;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact;
+        }
+
+        /* Explicit Page Container for high-fidelity paginated reports */
+        .report-page {
+            width: 215.9mm;
+            height: 279.4mm;
+            padding: 12mm 15mm 12mm 15mm;
+            position: relative;
+            box-sizing: border-box;
+            page-break-after: always;
+            overflow: hidden;
             background-color: #ffffff;
         }
 
-        /* Header styling (fixed top) */
+        .report-page:last-child {
+            page-break-after: avoid;
+        }
+
+        /* Content height budget (48 lines max at 15px/line = 720px) */
+        .page-content {
+            width: 100%;
+            height: 720px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        /* Header styling (normal flow inside page) */
         header.report-header {
-            position: fixed;
-            top: 5mm;
-            left: 15mm;
-            right: 15mm;
-            height: 35mm;
+            width: 100%;
+            height: 132px;
+            margin-bottom: 15px;
         }
 
         .header-table {
             width: 100%;
-            border-collapse: collapse;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
             margin-bottom: 2px;
         }
 
         .header-logo-cell {
-            width: 60%;
-            vertical-align: top;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
 
         .header-logo-img {
@@ -58,9 +88,9 @@
         }
 
         .header-code-cell {
-            width: 40%;
-            text-align: right;
-            vertical-align: top;
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-start;
         }
 
         .specimen-badge {
@@ -77,12 +107,13 @@
 
         .report-title {
             text-align: center;
-            font-size: 12px;
+            font-size: 16px;
             font-weight: 700;
             color: #000000;
             margin-top: 2px;
             margin-bottom: 3px;
             letter-spacing: 0.5px;
+			padding-bottom: 12px;
         }
 
         .header-divider {
@@ -92,13 +123,13 @@
             margin-top: 2px;
         }
 
-        /* Footer styling (fixed bottom) */
+        /* Footer styling (absolute at the bottom of page box) */
         footer.report-footer {
-            position: fixed;
-            bottom: 5mm;
+            position: absolute;
+            bottom: 12mm;
             left: 15mm;
             right: 15mm;
-            height: 20mm;
+            height: 76px;
         }
 
         .footer-divider {
@@ -143,10 +174,6 @@
             color: #4b5563;
         }
 
-        .page-num-counter::after {
-            content: "Página " counter(page) " de " counter(pages);
-        }
-
         /* Patient Metadata Card */
         .patient-card {
             width: 100%;
@@ -154,14 +181,15 @@
             border-radius: 6px;
             background-color: #eff6ff;
             margin-bottom: 15px;
-            padding: 8px 12px;
+            padding: 10px 14px;
             border-collapse: collapse;
         }
 
         .patient-card td {
-            padding: 3px 6px;
+            padding: 5px 8px;
             vertical-align: top;
             font-size: 9.5px;
+            line-height: 15px;
         }
 
         .patient-card strong {
@@ -169,100 +197,139 @@
             font-weight: 600;
         }
 
-        /* Report Sections styling */
-        .section-container {
-            margin-bottom: 12px;
-        }
-
+        /* Section titles */
         .section-header-title {
             font-size: 11px;
             font-weight: 700;
             color: #000000;
+            margin-top: 10px;
             margin-bottom: 5px;
             text-transform: uppercase;
+            line-height: 15px;
+            height: 15px;
         }
 
+        /* Content Styling */
         .section-content {
-            font-size: 10px;
+            font-size: 9.5px;
             color: #1f2937;
             text-align: justify;
-            margin-bottom: 10px;
-            line-height: 1.5;
+            margin-bottom: 7.5px; /* 0.5 lines */
+            line-height: 15px;
         }
 
         .section-content p {
-            margin-bottom: 0.5rem;
+            margin-bottom: 7.5px;
             text-align: justify;
+            line-height: 15px;
         }
 
         .section-content ul {
             list-style-type: disc;
             padding-left: 1.5rem;
-            margin-bottom: 0.5rem;
+            margin-bottom: 7.5px;
         }
 
         .section-content ol {
             list-style-type: decimal;
             padding-left: 1.5rem;
-            margin-bottom: 0.5rem;
+            margin-bottom: 7.5px;
+        }
+
+        .section-content li {
+            margin-bottom: 0px;
+            line-height: 15px;
         }
 
         .section-content h1 {
-            font-size: 1.4rem;
+            font-size: 16px;
             font-weight: 700;
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
+            margin-top: 15px;
+            margin-bottom: 10px;
             color: #111827;
+            line-height: 20px;
         }
 
         .section-content h2 {
-            font-size: 1.2rem;
+            font-size: 14px;
             font-weight: 600;
-            margin-top: 0.75rem;
-            margin-bottom: 0.4rem;
+            margin-top: 6px;
+            margin-bottom: 6px;
             color: #1f2937;
+            line-height: 18px;
         }
 
         .section-content h3 {
-            font-size: 1.1rem;
+            font-size: 12px;
             font-weight: 600;
-            margin-top: 0.6rem;
-            margin-bottom: 0.3rem;
+            margin-top: 7.5px;
+            margin-bottom: 7.5px;
             color: #374151;
+            line-height: 15px;
         }
 
         .section-content h4 {
-            font-size: 1rem;
+            font-size: 11px;
             font-weight: 600;
-            margin-top: 0.5rem;
-            margin-bottom: 0.3rem;
+            margin-top: 5px;
+            margin-bottom: 5px;
             color: #4b5563;
-        }
-
-        .section-content h5 {
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-top: 0.5rem;
-            margin-bottom: 0.3rem;
-            color: #6b7280;
+            line-height: 15px;
         }
 
         .section-content u {
             text-decoration: underline;
         }
 
+        .section-content s, .section-content del {
+            text-decoration: line-through;
+        }
+
+        .section-content blockquote {
+            border-left: 3px solid #d1d5db;
+            padding-left: 1rem;
+            color: #6b7280;
+            font-style: italic;
+            margin: 5px 0;
+        }
+
+        .section-content code {
+            background: #f3f4f6;
+            border-radius: 3px;
+            padding: 0.1em 0.3em;
+            font-size: 0.85em;
+            font-family: monospace;
+        }
+
+        .section-content .align-left {
+            text-align: left;
+        }
+
+        .section-content .align-center {
+            text-align: center;
+        }
+
+        .section-content .align-right {
+            text-align: right;
+        }
+
+        .section-content .align-justify {
+            text-align: justify;
+        }
+
         .section-content table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 0.5rem;
-            margin-bottom: 0.75rem;
+            margin-top: 5px;
+            margin-bottom: 10px;
         }
 
         .section-content table th, .section-content table td {
             border: 1px solid #d1d5db;
-            padding: 6px 8px;
+            padding: 4px 6px;
             font-size: 9.5px;
             text-align: left;
+            line-height: 15px;
         }
 
         .section-content table th {
@@ -274,12 +341,12 @@
             max-width: 100%;
             height: auto;
             border-radius: 4px;
-            margin-top: 0.5rem;
-            margin-bottom: 0.5rem;
+            margin-top: 5px;
+            margin-bottom: 5px;
             display: block;
         }
 
-        /* ── Image Alignment for PDF ── */
+        /* ── Image Alignment ── */
         .section-content img[style*="text-align: center"],
         .section-content img.align-center {
             margin-left: auto;
@@ -301,15 +368,11 @@
             display: block;
         }
 
-        /* Prevent heading-only breaks */
-        .section-container {
-            page-break-inside: avoid;
-        }
-
+        /* Pathologist Signature Block */
         .signature-block-container {
-            page-break-inside: avoid;
-            margin-top: 35px;
+            margin-top: 15px;
             text-align: center;
+            line-height: 15px;
         }
 
         .signature-line {
@@ -336,80 +399,62 @@
             font-size: 9px;
             font-weight: 600;
             color: #374151;
-            margin-top: 10px;
-        }
-
-        .page-break {
-            page-break-after: always;
-            break-after: page;
+            margin-top: 5px;
         }
     </style>
 </head>
 <body>
- 
-    @include('pdf.report.header')
- 
-    <!-- Patient Metadata Card (only on Page 1) -->
-    <table class="patient-card">
-        <tr>
-            <td style="width: 55%; border-right: 1px solid #bfdbfe;">
-                <strong>Nombre:</strong> {{ $customer->name ?? 'N/A' }}<br>
-                <strong>Edad:</strong> {{ $customer->age ?? 'N/A' }} años &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ $customer->gender === 'M' || $customer->gender === 'masculino' || $customer->gender === 'Masculino' ? 'M' : 'F' }}<br>
-                <strong>Médico Remitente:</strong> {{ $referrer->name ?? 'N/A' }}<br>
-                <strong>Diagnóstico Clínico:</strong> {{ $specimen->diagnosis ?? 'N/A' }}
-            </td>
-            <td style="width: 45%; padding-left: 12px;">
-                <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? 'HDV' }}<br>
-                <strong>Sitio Preciso de la Muestra:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}<br>
-                <strong>Fecha de la Toma:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }}<br>
-                <strong>Fecha de Recibo:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }}
-            </td>
-        </tr>
-    </table>
- 
-    <!-- Clinical Diagnosis / Main Diagnosis Section -->
-    @if(!empty($report->diagnosis_html) || !empty($specimen->diagnosis))
-    <div class="section-container">
-        <div class="section-header-title">DIAGNÓSTICO</div>
-        <div class="section-content">
-            {!! !empty($report->diagnosis_html) ? $report->diagnosis_html : $specimen->diagnosis !!}
+
+    @foreach($pages as $index => $pageBlocks)
+        <div class="report-page">
+            
+            @include('pdf.report.header')
+
+            <div class="page-content">
+                @foreach($pageBlocks as $block)
+                    @if($block['type'] === 'patient-card')
+                        <table class="patient-card">
+                            <tr>
+                                <td style="width: 55%;">
+                                    <strong>Nombre:</strong> {{ $customer->name ?? 'N/A' }}<br>
+                                    <strong>Edad:</strong> {{ $customer->age ?? 'N/A' }} años &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ $customer->gender === 'M' || $customer->gender === 'masculino' || $customer->gender === 'Masculino' ? 'M' : 'F' }}<br>
+                                    <strong>Médico Remitente:</strong> {{ $referrer->name ?? 'N/A' }}<br>
+                                    <strong>Diagnóstico Clínico:</strong> {{ $specimen->diagnosis ?? 'N/A' }}
+                                </td>
+                                <td style="width: 45%; padding-left: 12px;">
+                                    <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? 'HDV' }}<br>
+                                    <strong>Sitio Preciso de la Muestra:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}<br>
+                                    <strong>Fecha de la Toma:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }}<br>
+                                    <strong>Fecha de Recibo:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }}
+                                </td>
+                            </tr>
+                        </table>
+                    @elseif($block['type'] === 'section-header')
+                        <div class="section-header-title">{{ $block['title'] }}</div>
+                    @elseif($block['type'] === 'html' || $block['type'] === 'paragraph' || $block['type'] === 'list' || $block['type'] === 'table' || $block['type'] === 'image' || $block['type'] === 'heading')
+                        <div class="{!! $block['class'] ?? 'section-content' !!}">
+                            {!! $block['html'] !!}
+                        </div>
+                    @elseif($block['type'] === 'signature')
+                        <div class="signature-block-container">
+                            <div class="signature-line"></div>
+                            @php
+                                $pathologist = $specimen->users->first();
+                                $pathologistName = $pathologist ? $pathologist->name : 'DRA. ESTEFANY LAGOS';
+                                $pathologistTitle = $pathologist ? ($pathologist->role ? $pathologist->role->name : 'PATOLOGÍA ONCOLÓGICA') : 'PATOLOGÍA ONCOLÓGICA';
+                            @endphp
+                            <div class="pathologist-name">{{ $pathologistName }}</div>
+                            <div class="pathologist-title">{{ $pathologistTitle }}</div>
+                            <div class="date-signature">FECHA: {{ $report->report_date ? \Carbon\Carbon::parse($report->report_date)->format('d/m/y') : now()->format('d/m/y') }}</div>
+                        </div>
+                    @endif
+                @endforeach
+            </div>
+
+            @include('pdf.report.footer', ['pageNum' => $index + 1, 'totalPages' => count($pages)])
+
         </div>
-    </div>
-    @endif
- 
-    <!-- Macroscopy Section -->
-    <div class="section-container">
-        <div class="section-header-title">DESCRIPCIÓN MACROSCÓPICA</div>
-        <div class="section-content">
-            {!! !empty($report->macroscopy_html) ? $report->macroscopy_html : '<i>Pendiente de revisión macroscópica.</i>' !!}
-        </div>
-    </div>
- 
-    <!-- Microscopy Section -->
-    @if($specimen->status === 'microscopic_review' || $specimen->status === 'finalized' || $specimen->status === 'delivered')
-    <div class="page-break"></div>
-    <div class="section-container">
-        <div class="section-header-title">DESCRIPCIÓN MICROSCÓPICA</div>
-        <div class="section-content">
-            {!! !empty($report->microscopy_html) ? $report->microscopy_html : '<i>Pendiente de revisión microscópica.</i>' !!}
-        </div>
-    </div>
-    @endif
- 
-    <!-- Pathologist Signature Block -->
-    <div class="signature-block-container">
-        <div class="signature-line"></div>
-        @php
-            $pathologist = $specimen->users->first();
-            $pathologistName = $pathologist ? $pathologist->name : 'DRA. ESTEFANY LAGOS';
-            $pathologistTitle = $pathologist ? ($pathologist->role ? $pathologist->role->name : 'PATOLOGÍA ONCOLÓGICA') : 'PATOLOGÍA ONCOLÓGICA';
-        @endphp
-        <div class="pathologist-name">{{ $pathologistName }}</div>
-        <div class="pathologist-title">{{ $pathologistTitle }}</div>
-        <div class="date-signature">FECHA: {{ $report->report_date ? \Carbon\Carbon::parse($report->report_date)->format('d/m/y') : now()->format('d/m/y') }}</div>
-    </div>
- 
-    @include('pdf.report.footer')
- 
+    @endforeach
+
 </body>
 </html>

@@ -1764,6 +1764,11 @@ export default function SpecimensIndex({
                     setSelectedInvoice(invoice);
                     setIsInvoiceSheetOpen(true);
                 }}
+                onAssignPathologistClick={() => {
+                    if (selectedSpecimenForView) {
+                        handleAssignClick(selectedSpecimenForView);
+                    }
+                }}
             />
 
             <InvoiceSheet
