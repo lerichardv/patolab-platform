@@ -32,7 +32,7 @@ class DatabaseSeeder extends Seeder
             SpecimenCategorySeeder::class,
             CustomerSeeder::class,
             BanksSeeder::class,
-            SpecimenSeeder::class,
+            // SpecimenSeeder::class,
         ]);
 
         $adminRole = Role::where('slug', 'admin')->first();
