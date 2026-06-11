@@ -29,7 +29,13 @@ interface Props {
     overlayClassName?: string;
 }
 
-function RentalForm({ rental, onSuccess }: { rental?: Rental; onSuccess: () => void }) {
+function RentalForm({
+    rental,
+    onSuccess,
+}: {
+    rental?: Rental;
+    onSuccess: () => void;
+}) {
     const { data, setData, post, put, processing, errors, reset } = useForm({
         name: rental?.name || '',
         description: rental?.description || '',
@@ -92,11 +98,21 @@ function RentalForm({ rental, onSuccess }: { rental?: Rental; onSuccess: () => v
     );
 }
 
-export default function RentalSheet({ rental, open, onOpenChange, onSuccess, className, overlayClassName }: Props) {
+export default function RentalSheet({
+    rental,
+    open,
+    onOpenChange,
+    onSuccess,
+    className,
+    overlayClassName,
+}: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
-                className={cn("w-full overflow-y-auto sm:max-w-[540px]", className)}
+                className={cn(
+                    'w-full overflow-y-auto sm:max-w-[540px]',
+                    className,
+                )}
                 overlayClassName={overlayClassName}
             >
                 <HeadingSheet

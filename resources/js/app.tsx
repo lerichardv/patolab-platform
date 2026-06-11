@@ -8,80 +8,80 @@ import SettingsLayout from '@/layouts/settings/layout';
 
 // Silence noisy warnings from browser extensions (e.g., MetaMask)
 if (typeof window !== 'undefined') {
-	const filterWarning = (msg: string) => {
-		return (
-			msg.includes('MaxListenersExceededWarning') ||
-			msg.includes('ObjectMultiplex') ||
-			msg.includes('orphaned data for stream') ||
-			msg.includes('malformed chunk')
-		);
-	};
+    const filterWarning = (msg: string) => {
+        return (
+            msg.includes('MaxListenersExceededWarning') ||
+            msg.includes('ObjectMultiplex') ||
+            msg.includes('orphaned data for stream') ||
+            msg.includes('malformed chunk')
+        );
+    };
 
-	const originalWarn = console.warn;
-	console.warn = (...args) => {
-		const msg = args
-			.map((arg) =>
-				typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
-			)
-			.join(' ');
+    const originalWarn = console.warn;
+    console.warn = (...args) => {
+        const msg = args
+            .map((arg) =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
+            )
+            .join(' ');
 
-		if (filterWarning(msg)) {
-			return;
-		}
+        if (filterWarning(msg)) {
+            return;
+        }
 
-		originalWarn(...args);
-	};
+        originalWarn(...args);
+    };
 
-	const originalError = console.error;
-	console.error = (...args) => {
-		const msg = args
-			.map((arg) =>
-				typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
-			)
-			.join(' ');
+    const originalError = console.error;
+    console.error = (...args) => {
+        const msg = args
+            .map((arg) =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
+            )
+            .join(' ');
 
-		if (filterWarning(msg)) {
-			return;
-		}
+        if (filterWarning(msg)) {
+            return;
+        }
 
-		originalError(...args);
-	};
+        originalError(...args);
+    };
 }
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 createInertiaApp({
-	title: (title) => (title ? `${title} - ${appName}` : appName),
-	layout: (name) => {
-		switch (true) {
-			case name === 'welcome':
-			case name === 'specimens/public-progress':
-			case name === 'specimens/public-group-progress':
-			case name === 'specimens/report-editor':
-			case name.startsWith('errors/'):
-				return null;
-			case name.startsWith('auth/'):
-				return AuthLayout;
-			case name.startsWith('settings/'):
-				return [AppLayout, SettingsLayout];
-			default:
-				return AppLayout;
-		}
-	},
-	strictMode: true,
-	withApp(app) {
-		return (
-			<>
-				<TooltipProvider delayDuration={0}>
-					{app}
-					<Toaster />
-				</TooltipProvider>
-			</>
-		);
-	},
-	progress: {
-		color: '#1A3A8A',
-	},
+    title: (title) => (title ? `${title} - ${appName}` : appName),
+    layout: (name) => {
+        switch (true) {
+            case name === 'welcome':
+            case name === 'specimens/public-progress':
+            case name === 'specimens/public-group-progress':
+            case name === 'specimens/report-editor':
+            case name.startsWith('errors/'):
+                return null;
+            case name.startsWith('auth/'):
+                return AuthLayout;
+            case name.startsWith('settings/'):
+                return [AppLayout, SettingsLayout];
+            default:
+                return AppLayout;
+        }
+    },
+    strictMode: true,
+    withApp(app) {
+        return (
+            <>
+                <TooltipProvider delayDuration={0}>
+                    {app}
+                    <Toaster />
+                </TooltipProvider>
+            </>
+        );
+    },
+    progress: {
+        color: '#1A3A8A',
+    },
 });
 
 // This will set light / dark mode on load...

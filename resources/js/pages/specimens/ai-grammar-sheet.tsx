@@ -95,18 +95,18 @@ export default function AIGrammarSheet({
         setCorrectionError(null);
 
         try {
-            const response = await fetch(
-                'http://127.0.0.1:1234/api/fix-grammar',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        text: textToCorrect,
-                    }),
+            const serverUrl =
+                import.meta.env.VITE_COLLABORATION_SERVER_URL ||
+                'http://127.0.0.1:1234';
+            const response = await fetch(`${serverUrl}/api/fix-grammar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
                 },
-            );
+                body: JSON.stringify({
+                    text: textToCorrect,
+                }),
+            });
 
             if (!response.ok) {
                 throw new Error('Error al procesar el texto.');

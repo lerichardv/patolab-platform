@@ -26,11 +26,20 @@ interface Props {
     overlayClassName?: string;
 }
 
-export default function CustomerSheet({ customer, open, onOpenChange, className, overlayClassName }: Props) {
+export default function CustomerSheet({
+    customer,
+    open,
+    onOpenChange,
+    className,
+    overlayClassName,
+}: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
-                className={cn("w-full overflow-y-auto sm:max-w-[540px]", className)}
+                className={cn(
+                    'w-full overflow-y-auto sm:max-w-[540px]',
+                    className,
+                )}
                 overlayClassName={overlayClassName}
             >
                 <HeadingSheet

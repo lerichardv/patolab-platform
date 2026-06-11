@@ -69,3 +69,29 @@ To test model accuracy, thread performance, and Spanish language compatibility d
 * **`-f ~/Downloads/whisper-test.wav`**: Specifies the input 16kHz mono WAV file.
 * **`-l es`**: Locks language detection to Spanish to improve transcription speed and accuracy.
 * **`-nt`**: Disables timestamp printing in the text output.
+
+---
+
+## AI Grammar Correction & Llama.cpp
+
+The collaboration server uses a local `llama.cpp` compiled environment to run grammar and spelling correction on medical reports via the `/api/fix-grammar` endpoint.
+
+### Default Environment Variables
+* **LLAMA_PATH**: Directory of your compiled `llama.cpp` build (default: `/opt/homebrew/var/www/llama.cpp`).
+* **LLAMA_MODEL**: Path to the Instruct model (default: `${LLAMA_PATH}/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf`).
+* **LLAMA_EXECUTABLE**: Path to the compiled CLI utility (default: `${LLAMA_PATH}/build/bin/llama-cli`).
+
+### Command Line Verification
+To test the deterministic single-shot grammar correction utility directly via your `llama.cpp` installation, execute the following command:
+
+```bash
+./build/bin/llama-completion -m models/Llama-3.2-3B-Instruct-Q4_K_M.gguf -p "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nEres un corrector gramatical experto en informes médicos. Corrige la ortografía y la gramática en español del texto provisto. Devuelve ÚNICAMENTE el texto completamente corregido.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nejemplo de ttexto con erores<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n" --chat-template llama3 --predict 3000 --threads 1 --temp 0.01 --repeat-penalty 1.3 --no-display-prompt
+```
+
+* **`-m models/Llama-3.2-3B-Instruct-Q4_K_M.gguf`**: Specifies the quantized 3B Instruct model weights.
+* **`-p "<prompt>"`**: The formatted ChatML prompt containing system constraints and target user text.
+* **`--predict 3000`**: Restricts the maximum completion length (matching the 3000 characters limit).
+* **`--threads 1`**: Pins CPU allocation to a single thread to optimize server resource utilization.
+* **`--temp 0.01`**: Forces deterministic greedy token parsing.
+* **`--no-display-prompt`**: Silences echoing of the input prompt in the stdout stream.
+
