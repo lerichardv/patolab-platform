@@ -357,13 +357,13 @@ class ReportEditorController extends Controller
         $htmlContent = view('pdf.report.body', compact('specimen', 'report', 'customer', 'examination', 'referrer', 'pages'))->render();
 
         $pdfContent = Browsershot::html($htmlContent)
-            // ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
-            // ->addChromiumArguments([
-            //     'disable-crash-reporter',
-            //     'disable-dev-shm-usage',
-            //     'no-sandbox',
-            // ])
-            // ->noSandbox()
+            ->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
+            ->addChromiumArguments([
+                'disable-crash-reporter',
+                'disable-dev-shm-usage',
+                'no-sandbox',
+            ])
+            ->noSandbox()
             ->paperWidth('215.9mm')
             ->paperHeight('279.4mm')
             ->margins(0, 0, 0, 0)

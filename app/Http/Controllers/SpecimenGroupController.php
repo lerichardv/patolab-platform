@@ -379,7 +379,7 @@ class SpecimenGroupController extends Controller
             $pdfPath = 'invoices/'.$filename;
 
             $pdfContent = Browsershot::html($htmlContent)
-                ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
+                ->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
                 ->addChromiumArguments([
                     'disable-crash-reporter',
                     'disable-dev-shm-usage',
