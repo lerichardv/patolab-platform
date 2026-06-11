@@ -784,8 +784,10 @@ export default function SpecimenGroupSheet({
 
         specimens.forEach((spec) => {
             const typeId = parseInt(spec.specimen_type);
+
             if (isNaN(typeId)) {
                 map[spec.client_id] = '';
+
                 return;
             }
 
@@ -797,6 +799,7 @@ export default function SpecimenGroupSheet({
 
             if (!seq) {
                 map[spec.client_id] = '';
+
                 return;
             }
 

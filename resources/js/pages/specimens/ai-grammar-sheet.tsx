@@ -1,4 +1,7 @@
+import { Sparkles, Eye, FileText, Loader2, Check } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import {
     Sheet,
     SheetContent,
@@ -7,11 +10,8 @@ import {
     SheetTitle,
     SheetFooter,
 } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Eye, FileText, Loader2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 interface AIGrammarSheetProps {
     open: boolean;
@@ -76,12 +76,14 @@ export default function AIGrammarSheet({
     useEffect(() => {
         if (open) {
             let text = selectedText || '';
+
             if (text.length > 3000) {
                 text = text.slice(0, 3000);
                 toast.warning(
                     'El texto seleccionado supera el límite. Se han recortado los primeros 3000 caracteres.',
                 );
             }
+
             setOriginalText(text);
             setTempCorrectedText('');
             setIsCorrecting(false);
@@ -225,6 +227,7 @@ export default function AIGrammarSheet({
                                                     </span>
                                                 );
                                             }
+
                                             if (part.type === 'removed') {
                                                 return (
                                                     <span
@@ -235,6 +238,7 @@ export default function AIGrammarSheet({
                                                     </span>
                                                 );
                                             }
+
                                             return (
                                                 <span key={index}>
                                                     {part.text}

@@ -54,6 +54,7 @@
         "@tailwindcss/vite": "^4.1.11",
         "@tiptap/extension-collaboration": "^3.25.0",
         "@tiptap/extension-collaboration-cursor": "^3.0.0",
+        "@tiptap/extension-highlight": "^3.25.0",
         "@tiptap/extension-image": "^3.25.0",
         "@tiptap/extension-table": "^3.25.0",
         "@tiptap/extension-table-cell": "^3.25.0",

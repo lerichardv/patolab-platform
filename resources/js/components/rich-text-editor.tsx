@@ -26,6 +26,8 @@ import {
     Undo2,
     Redo2,
     Trash2,
+    Highlighter,
+    X,
 } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
@@ -35,6 +37,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import Highlight from '@tiptap/extension-highlight';
 import { cn } from '@/lib/utils';
 
 export const editorStyles = `
@@ -58,6 +62,13 @@ export const editorStyles = `
   /* ── Inline marks ── */
   .tiptap u, .preview-content u { text-decoration: underline; }
   .tiptap s, .preview-content s { text-decoration: line-through; }
+
+  .tiptap mark, .preview-content mark {
+    background-color: #fef08a;
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
 
   /* ── Blockquote ── */
   .tiptap blockquote, .preview-content blockquote {
@@ -559,6 +570,24 @@ const CustomImage = Image.extend({
     },
 });
 
+const HIGHLIGHT_COLORS = [
+    { name: 'Amarillo', color: '#ffff00' },
+    { name: 'Verde brillante', color: '#00ff00' },
+    { name: 'Turquesa', color: '#00ffff' },
+    { name: 'Rosa', color: '#ff00ff' },
+    { name: 'Azul', color: '#0000ff' },
+    { name: 'Rojo', color: '#ff0000' },
+    { name: 'Azul oscuro', color: '#000080' },
+    { name: 'Teal', color: '#008080' },
+    { name: 'Verde oscuro', color: '#008000' },
+    { name: 'Morado', color: '#800080' },
+    { name: 'Rojo oscuro', color: '#800000' },
+    { name: 'Verde oliva', color: '#808000' },
+    { name: 'Gris oscuro', color: '#808080' },
+    { name: 'Gris claro', color: '#c0c0c0' },
+    { name: 'Negro', color: '#000000' },
+];
+
 const sharedExtensions = [
     CustomImage.configure({
         allowBase64: false,
@@ -568,6 +597,7 @@ const sharedExtensions = [
         },
     }),
     TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
+    Highlight.configure({ multicolor: true }),
 ];
 
 function ToolbarDivider() {
@@ -732,6 +762,48 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
                 >
                     <Strikethrough className="h-3.5 w-3.5" />
                 </ToolbarBtn>
+
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <button
+                            type="button"
+                            disabled={!editor}
+                            className={cn(
+                                'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-sm transition-colors',
+                                'hover:bg-accent hover:text-accent-foreground',
+                                'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40',
+                                editor?.isActive('highlight') && 'bg-accent text-accent-foreground',
+                            )}
+                            title="Color de resaltado de texto"
+                        >
+                            <Highlighter className="h-3.5 w-3.5" />
+                        </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48 p-2" align="start">
+                        <div className="grid grid-cols-5 gap-1">
+                            {HIGHLIGHT_COLORS.map(({ name, color }) => (
+                                <button
+                                    key={color}
+                                    type="button"
+                                    onClick={() => editor?.chain().focus().toggleHighlight({ color }).run()}
+                                    className="h-6 w-6 rounded border border-border cursor-pointer transition-transform hover:scale-110 focus:outline-hidden"
+                                    style={{ backgroundColor: color }}
+                                    title={name}
+                                />
+                            ))}
+                        </div>
+                        <div className="mt-2 border-t pt-2">
+                            <button
+                                type="button"
+                                onClick={() => editor?.chain().focus().unsetHighlight().run()}
+                                className="w-full flex items-center justify-center gap-1 rounded border border-input bg-background px-2 h-7 text-xs font-medium cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                            >
+                                <X className="h-3 w-3" />
+                                Sin color
+                            </button>
+                        </div>
+                    </PopoverContent>
+                </Popover>
 
                 <ToolbarDivider />
 

@@ -16,6 +16,7 @@
 		"@hocuspocus/provider": "^4.1.0",
 		"@hocuspocus/server": "^4.1.0",
 		"@hocuspocus/transformer": "^4.1.0",
+		"@tiptap/extension-highlight": "^3.26.0",
 		"@tiptap/extension-image": "^3.26.0",
 		"@tiptap/extension-table": "^3.26.0",
 		"@tiptap/extension-table-cell": "^3.26.0",

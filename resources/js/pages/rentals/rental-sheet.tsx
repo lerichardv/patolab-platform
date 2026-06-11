@@ -127,6 +127,7 @@ export default function RentalSheet({
                     rental={rental || undefined}
                     onSuccess={() => {
                         onOpenChange(false);
+
                         if (onSuccess) {
                             onSuccess();
                         }

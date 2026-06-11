@@ -323,16 +323,19 @@ export default function RentalsIndex({
                                 }}
                                 onChange={(range) => {
                                     const newFilters = { ...filters };
+
                                     if (range.from) {
                                         newFilters.date_from = range.from;
                                     } else {
                                         delete newFilters.date_from;
                                     }
+
                                     if (range.to) {
                                         newFilters.date_to = range.to;
                                     } else {
                                         delete newFilters.date_to;
                                     }
+
                                     router.get(rentalsIndex().url, newFilters, {
                                         preserveState: true,
                                         replace: true,

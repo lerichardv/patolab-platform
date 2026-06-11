@@ -285,6 +285,13 @@
             text-decoration: line-through;
         }
 
+        .section-content mark {
+            background-color: #fef08a;
+            color: inherit;
+            border-radius: 0.53mm;
+            padding: 0mm 0.53mm;
+        }
+
         .section-content blockquote {
             border-left: 0.79mm solid #d1d5db;
             padding-left: 4.23mm;

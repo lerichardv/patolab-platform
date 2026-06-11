@@ -1,4 +1,5 @@
-import { exec, spawn } from 'node:child_process';
+/* global process, Buffer */
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { createServer } from 'node:http';
 import os from 'node:os';
@@ -11,6 +12,7 @@ import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
 import { generateJSON, generateHTML } from '@tiptap/html';
 import StarterKit from '@tiptap/starter-kit';
+import Highlight from '@tiptap/extension-highlight';
 import cors from 'cors';
 import crossws from 'crossws/adapters/node';
 import express from 'express';
@@ -136,6 +138,7 @@ const extensions = [
 		table: { resizable: true },
 	}),
 	TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
+	Highlight.configure({ multicolor: true }),
 ];
 
 const webhookUrl = process.env.WEBHOOK_URL || 'http://127.0.0.1:8000/api/collaboration';
@@ -333,9 +336,26 @@ const customWebhookExtension = {
 			}
 
 			entry.timeout = setTimeout(async () => {
-				const docsToSave = new Map(entry.documents);
-				entry.documents.clear();
-				pendingSaves.delete(reportId);
+				let docsToSave;
+
+				try {
+					if (pendingSaves.has(reportId)) {
+						const currentEntry = pendingSaves.get(reportId);
+
+						if (currentEntry) {
+							docsToSave = new Map(currentEntry.documents);
+							currentEntry.documents.clear();
+						}
+					}
+				} catch (err) {
+					console.error(`[pendingSaves] Error preparing documents to save for report ${reportId}:`, err);
+				} finally {
+					pendingSaves.delete(reportId);
+				}
+
+				if (!docsToSave || docsToSave.size === 0) {
+					return;
+				}
 
 				updateSaveStatus(data.instance, reportId, 'saving');
 
@@ -350,13 +370,21 @@ const customWebhookExtension = {
 					}
 				}
 
-				if (hasError) {
-					updateSaveStatus(data.instance, reportId, 'idle');
-				} else {
-					updateSaveStatus(data.instance, reportId, 'saved');
-					setTimeout(() => {
+				try {
+					if (hasError) {
 						updateSaveStatus(data.instance, reportId, 'idle');
-					}, 1300);
+					} else {
+						updateSaveStatus(data.instance, reportId, 'saved');
+						setTimeout(() => {
+							try {
+								updateSaveStatus(data.instance, reportId, 'idle');
+							} catch (err) {
+								console.error(`Error resetting save status for report ${reportId}:`, err);
+							}
+						}, 1300);
+					}
+				} catch (err) {
+					console.error(`Error updating save status for report ${reportId}:`, err);
 				}
 			}, 1000);
 		} else {
@@ -401,6 +429,7 @@ const WHISPER_EXECUTABLE = path.join(WHISPER_DIR, 'build/bin/whisper-cli');
 
 const LLAMA_DIR = process.env.LLAMA_PATH || '/opt/homebrew/var/www/llama.cpp';
 const LLAMA_MODEL = path.join(LLAMA_DIR, 'models/Llama-3.2-3B-Instruct-Q4_K_M.gguf');
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const LLAMA_EXECUTABLE = path.join(LLAMA_DIR, 'build/bin/llama-cli');
 
 app.post('/api/dictate-chunk', upload.single('audio'), (req, res) => {
@@ -412,42 +441,127 @@ app.post('/api/dictate-chunk', upload.single('audio'), (req, res) => {
 	const inputPath = req.file.path;
 	const outputPath = `${inputPath}.wav`;
 
-	// 1. Convert incoming browser Opus stream to uncompressed 16kHz PCM WAV format
-	const ffmpegCmd = `ffmpeg -y -i "${inputPath}" -c:a pcm_s16le -ar 16000 -ac 1 "${outputPath}"`;
+	let ffmpegProcess = null;
+	let whisperProcess = null;
+	let responseSent = false;
 
-	exec(ffmpegCmd, (ffmpegErr) => {
-		// Clean up raw upload from disk storage
-		fs.unlink(inputPath, () => { });
+	const cleanupFiles = () => {
+		fs.unlink(inputPath, () => {});
+		fs.unlink(outputPath, () => {});
+	};
 
-		if (ffmpegErr) {
-			console.error('[FFmpeg Error]:', ffmpegErr);
+	const terminateProcesses = () => {
+		if (ffmpegProcess && ffmpegProcess.exitCode === null) {
+			console.log('[Dictate] Killing running ffmpeg process due to abort/error');
+			ffmpegProcess.kill('SIGKILL');
+		}
+
+		if (whisperProcess && whisperProcess.exitCode === null) {
+			console.log('[Dictate] Killing running whisper process due to abort/error');
+			whisperProcess.kill('SIGKILL');
+		}
+	};
+
+	// Listen to client disconnect
+	req.on('close', () => {
+		if (!responseSent) {
+			console.log('[Dictate] Client connection closed prematurely. Terminating processes.');
+			responseSent = true;
+			terminateProcesses();
+			cleanupFiles();
+		}
+	});
+
+	// 1. Convert incoming browser Opus stream to uncompressed 16kHz PCM WAV format using spawn
+	ffmpegProcess = spawn('ffmpeg', [
+		'-y',
+		'-i', inputPath,
+		'-c:a', 'pcm_s16le',
+		'-ar', '16000',
+		'-ac', '1',
+		outputPath
+	], {
+		stdio: ['ignore', 'ignore', 'pipe'] // Pipe stderr to catch errors, ignore stdout
+	});
+
+	let ffmpegStderr = '';
+	ffmpegProcess.stderr.on('data', (chunk) => {
+		if (ffmpegStderr.length < 50000) {
+			ffmpegStderr += chunk.toString();
+		}
+	});
+
+	ffmpegProcess.on('error', (err) => {
+		console.error('[Dictate] ffmpeg spawn error:', err);
+
+		if (!responseSent) {
+			responseSent = true;
+			terminateProcesses();
+			cleanupFiles();
+			res.status(500).json({ error: 'Failed to start audio conversion' });
+		}
+	});
+
+	ffmpegProcess.on('close', (code) => {
+		ffmpegProcess = null;
+
+		if (responseSent) {
+			cleanupFiles();
+
+			return;
+		}
+
+		if (code !== 0) {
+			console.error('[FFmpeg Error]: Exit code', code, ffmpegStderr);
+			responseSent = true;
+			cleanupFiles();
 
 			return res.status(500).json({ error: 'Audio upscaling process failed' });
 		}
 
 		// 2. Execute whisper-cli to extract text tokens instantly
-		const whisperProcess = spawn(WHISPER_EXECUTABLE, [
+		whisperProcess = spawn(WHISPER_EXECUTABLE, [
 			'-m', WHISPER_MODEL,
 			'-f', outputPath,
 			'-nt',
 			'-t', '4',   // Allocates 4 CPU threads (great for your local Mac setup)
 			'-l', 'es'   // Hard-locks Spanish to speed up language detection execution
-		]);
+		], {
+			stdio: ['ignore', 'pipe', 'ignore'] // stdout needed for text, stderr ignored
+		});
 
 		let textResult = '';
 		whisperProcess.stdout.on('data', (data) => {
-			textResult += data.toString();
-		});
-		whisperProcess.stderr.on('data', (data) => {
-			// Whisper prints processing info to stderr, which is fine to ignore or print in debug
+			if (!responseSent) {
+				textResult += data.toString();
+			}
 		});
 
-		whisperProcess.on('close', (code) => {
-			// Delete processed WAV file immediately
-			fs.unlink(outputPath, () => { });
+		whisperProcess.on('error', (err) => {
+			console.error('[Dictate] Whisper spawn error:', err);
 
-			if (code !== 0) {
-				console.error(`[Whisper Error] Process exited with code ${code}`);
+			if (!responseSent) {
+				responseSent = true;
+				terminateProcesses();
+				cleanupFiles();
+				res.status(500).json({ error: 'Failed to start Whisper process' });
+			}
+		});
+
+		whisperProcess.on('close', (whisperCode) => {
+			whisperProcess = null;
+
+			if (responseSent) {
+				cleanupFiles();
+
+				return;
+			}
+
+			responseSent = true;
+			cleanupFiles();
+
+			if (whisperCode !== 0) {
+				console.error(`[Whisper Error] Process exited with code ${whisperCode}`);
 
 				return res.status(500).json({ error: 'Whisper binary failure execution' });
 			}
@@ -499,7 +613,10 @@ app.post('/api/dictate-chunk', upload.single('audio'), (req, res) => {
 								}
 
 								if (textNode) {
-									textNode.insert(textNode.length, ` ${cleanText}`);
+									const oldLength = textNode.length;
+									const insertText = oldLength > 0 ? ` ${cleanText}` : cleanText;
+									textNode.insert(oldLength, insertText);
+									textNode.format(oldLength, insertText.length, { highlight: { color: '#DBEDEE' } });
 									inserted = true;
 								}
 							}
@@ -509,6 +626,7 @@ app.post('/api/dictate-chunk', upload.single('audio'), (req, res) => {
 							const paragraph = new Y.XmlElement('paragraph');
 							const textNode = new Y.XmlText();
 							textNode.insert(0, cleanText);
+							textNode.format(0, cleanText.length, { highlight: { color: '#DBEDEE' } });
 							paragraph.insert(0, [textNode]);
 							xmlFragment.insert(xmlFragment.length, [paragraph]);
 						}
@@ -563,12 +681,15 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 	let initialResponseSent = false;
 
 	const maxRuntime = setTimeout(() => {
-		console.log('[Llama.cpp Watchdog] Llama timeout reached (15s). Halting execution...');
+		console.log('[Llama.cpp Watchdog] Llama timeout reached. Halting execution...');
 		terminateAndSendResult();
 	}, 60000);
 
 	const terminateAndSendResult = () => {
-		if (initialResponseSent) return;
+		if (initialResponseSent) {
+return;
+}
+
 		initialResponseSent = true;
 
 		clearTimeout(maxRuntime);
@@ -581,8 +702,10 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 		let correctedText = modelOutput;
 
 		const structuralTags = ['<|eot_id|>', '<|end_of_text|>', '█', '▄▄', 'available commands:', '>'];
+
 		for (const tag of structuralTags) {
 			const index = correctedText.indexOf(tag);
+
 			if (index !== -1) {
 				correctedText = correctedText.substring(0, index);
 			}
@@ -596,15 +719,21 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 
 		if (reportId && docName) {
 			const targetRoom = `report-${reportId}-${docName}`;
-			const activeDoc = hocuspocus.documents.get(targetRoom);
 
-			if (activeDoc && correctedText.length > 0) {
-				activeDoc.transact(() => {
-					const ytext = activeDoc.getText('content');
-					ytext.delete(0, ytext.length);
-					ytext.insert(0, correctedText);
-				});
-				return res.json({ success: true, text: correctedText, injected: true });
+			try {
+				const activeDoc = hocuspocus.documents.get(targetRoom);
+
+				if (activeDoc && correctedText.length > 0) {
+					activeDoc.transact(() => {
+						const ytext = activeDoc.getText('content');
+						ytext.delete(0, ytext.length);
+						ytext.insert(0, correctedText);
+					});
+
+					return res.json({ success: true, text: correctedText, injected: true });
+				}
+			} catch (err) {
+				console.error(`[Llama.cpp] Error updating Yjs document:`, err);
 			}
 		}
 
@@ -612,8 +741,11 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 	};
 
 	res.on('close', () => {
-		if (!res.writableEnded) {
+		if (!initialResponseSent) {
+			console.log('[Llama.cpp] Client request closed/aborted. Terminating llama process.');
+			initialResponseSent = true;
 			clearTimeout(maxRuntime);
+
 			if (llamaProcess && llamaProcess.exitCode === null) {
 				llamaProcess.kill('SIGKILL');
 			}
@@ -621,6 +753,10 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 	});
 
 	llamaProcess.stdout.on('data', (chunk) => {
+		if (initialResponseSent) {
+return;
+}
+
 		const dataString = chunk.toString();
 
 		// Ignore the terminal greeting strings completely to keep our buffer uncontaminated
@@ -633,11 +769,13 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 		// 1. Precise stop sequence validation
 		if (dataString.includes('<|eot_id|>') || dataString.includes('<|end_of_text|>')) {
 			terminateAndSendResult();
+
 			return;
 		}
 
 		// 2. Sliding evaluation window
 		fallbackTextWindow += dataString;
+
 		if (fallbackTextWindow.length > 300) {
 			fallbackTextWindow = fallbackTextWindow.slice(-300);
 		}
@@ -653,12 +791,14 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 			if (consecutiveNewlines >= 4) {
 				console.log('[Llama.cpp Watchdog] Infinite newline loop intercepted.');
 				terminateAndSendResult();
+
 				return;
 			}
 		}
 
 		// 4. Repetition Filter Layer
 		const words = fallbackTextWindow.toLowerCase().replace(/[\r\n]/g, ' ').split(/\s+/).filter(Boolean);
+
 		if (words.length >= 12) {
 			const lastNWords = words.slice(-12);
 			const uniqueWords = new Set(lastNWords);
@@ -666,30 +806,58 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 			if (uniqueWords.size <= 2) {
 				console.log('[Llama.cpp Watchdog] Phrase repetition loop detected.');
 				terminateAndSendResult();
+
 				return;
 			}
 
 			let alternatingPatternMatch = true;
+
 			for (let i = 0; i < lastNWords.length - 2; i++) {
 				if (lastNWords[i] !== lastNWords[i + 2]) {
 					alternatingPatternMatch = false;
 					break;
 				}
 			}
+
 			if (alternatingPatternMatch) {
 				console.log('[Llama.cpp Watchdog] Alternating sequence loop detected.');
 				terminateAndSendResult();
+
 				return;
 			}
 		}
 	});
 
 	llamaProcess.stderr.on('data', (data) => {
+		if (initialResponseSent) {
+return;
+}
+
 		errorOutput += data.toString();
+	});
+
+	llamaProcess.on('error', (err) => {
+		console.error('[Llama.cpp] process error:', err);
+
+		if (!initialResponseSent) {
+			initialResponseSent = true;
+			clearTimeout(maxRuntime);
+
+			if (llamaProcess && llamaProcess.exitCode === null) {
+				llamaProcess.kill('SIGKILL');
+			}
+
+			res.status(500).json({ error: 'Llama process error occurred' });
+		}
 	});
 
 	llamaProcess.on('close', (code) => {
 		clearTimeout(maxRuntime);
+
+		if (code !== 0 && errorOutput) {
+			console.error(`[Llama.cpp] process exited with code ${code}. Stderr:`, errorOutput);
+		}
+
 		if (!initialResponseSent) {
 			terminateAndSendResult();
 		}

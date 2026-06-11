@@ -29,7 +29,6 @@ import {
     CommandList,
 } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
     Popover,
@@ -45,6 +44,7 @@ import {
 } from '@/components/ui/select';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import CustomerSheet from '../customers/customer-sheet';
 import RentalSheet from './rental-sheet';
@@ -374,6 +374,7 @@ export default function RentalPaymentSheet({
     // This is the taxable portion.
     const rentalSubtotalVal = useMemo(() => {
         const base = parseFloat(baseAmount) || 0;
+
         return Math.max(0, base - finalDiscountVal);
     }, [baseAmount, finalDiscountVal]);
 
@@ -415,7 +416,10 @@ export default function RentalPaymentSheet({
     ]);
 
     const selectedCustomer = useMemo(() => {
-        if (!data.customer_id) return null;
+        if (!data.customer_id) {
+            return null;
+        }
+
         return (
             customers.find((c) => c.id.toString() === data.customer_id) || null
         );

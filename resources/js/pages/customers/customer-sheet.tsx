@@ -1,7 +1,7 @@
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import CustomerForm from './customer-form';
 import { cn } from '@/lib/utils';
+import CustomerForm from './customer-form';
 
 interface Customer {
     id?: number;
