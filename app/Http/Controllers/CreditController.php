@@ -426,6 +426,8 @@ class CreditController extends Controller
 
             $pdfContent = Browsershot::html($htmlContent)
                 ->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
+                ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
+                ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
                 ->addChromiumArguments([
                     'disable-crash-reporter',
                     'disable-dev-shm-usage',
