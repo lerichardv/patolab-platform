@@ -447,8 +447,8 @@ app.post('/api/dictate-chunk', upload.single('audio'), (req, res) => {
 	let responseSent = false;
 
 	const cleanupFiles = () => {
-		fs.unlink(inputPath, () => {});
-		fs.unlink(outputPath, () => {});
+		fs.unlink(inputPath, () => { });
+		fs.unlink(outputPath, () => { });
 	};
 
 	const terminateProcesses = () => {
@@ -525,7 +525,7 @@ app.post('/api/dictate-chunk', upload.single('audio'), (req, res) => {
 			'-m', WHISPER_MODEL,
 			'-f', outputPath,
 			'-nt',
-			'-t', '1',   // Allocates 1 CPU thread
+			'-t', '2',   // Allocates 1 CPU thread
 			'-l', 'es'   // Hard-locks Spanish to speed up language detection execution
 		], {
 			stdio: ['ignore', 'pipe', 'ignore'] // stdout needed for text, stderr ignored
@@ -688,8 +688,8 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 
 	const terminateAndSendResult = () => {
 		if (initialResponseSent) {
-return;
-}
+			return;
+		}
 
 		initialResponseSent = true;
 
@@ -755,8 +755,8 @@ return;
 
 	llamaProcess.stdout.on('data', (chunk) => {
 		if (initialResponseSent) {
-return;
-}
+			return;
+		}
 
 		const dataString = chunk.toString();
 
@@ -831,8 +831,8 @@ return;
 
 	llamaProcess.stderr.on('data', (data) => {
 		if (initialResponseSent) {
-return;
-}
+			return;
+		}
 
 		errorOutput += data.toString();
 	});
