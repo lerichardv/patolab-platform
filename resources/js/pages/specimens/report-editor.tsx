@@ -92,6 +92,7 @@ import {
 import EditorLayout from '@/layouts/editor-layout';
 import { cn } from '@/lib/utils';
 import AIGrammarSheet from './ai-grammar-sheet';
+import AIDictationSheet from './ai-dictation-sheet';
 import SpecimenPathologistSheet from './specimen-pathologist-sheet';
 import SpecimenViewSheet from './specimen-view-sheet';
 
@@ -1063,6 +1064,8 @@ function EditorToolbar({
 	isSheetOpen: propsIsSheetOpen,
 	onSheetOpenChange: propsOnSheetOpenChange,
 	onPopoverOpenChange,
+	isDictationSheetOpen,
+	onDictationSheetOpenChange,
 }: {
 	editor: Editor | null;
 	specimenSequenceCode?: string;
@@ -1072,9 +1075,12 @@ function EditorToolbar({
 	isSheetOpen: boolean;
 	onSheetOpenChange: (open: boolean) => void;
 	onPopoverOpenChange?: (open: boolean) => void;
+	isDictationSheetOpen: boolean;
+	onDictationSheetOpenChange: (open: boolean) => void;
 }) {
 	const isSheetOpen = propsIsSheetOpen;
 	const setIsSheetOpen = propsOnSheetOpenChange;
+	const setIsDictationSheetOpen = onDictationSheetOpenChange;
 
 	// Force update on editor transactions so button active states update reactively
 	const [, setTick] = useState(0);
@@ -1096,15 +1102,13 @@ function EditorToolbar({
 		};
 	}, [editor]);
 
-	const [isDictating, setIsDictating] = useState(false);
-	const [isFinalizing, setIsFinalizing] = useState(false);
+	const isDictating = isDictationSheetOpen;
 
 	useEffect(() => {
 		onDictationChange?.(isDictating);
 	}, [isDictating, onDictationChange]);
 	const [selectedText, setSelectedText] = useState('');
 	const hasReplacedRef = useRef(false);
-	const activeRequestsRef = useRef(0);
 
 	const activeSelectionText = editor
 		? editor.state.doc.textBetween(
@@ -1190,293 +1194,13 @@ function EditorToolbar({
 		}
 	};
 
-	const mediaStreamRef = useRef<MediaStream | null>(null);
-	const activeRecorderRef = useRef<MediaRecorder | null>(null);
-	const isRecordingRef = useRef(false);
-	const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-	const startDictation = async () => {
-		setIsDictating(true);
-		editor?.commands.focus('end');
-
-		if (editor) {
-			dictationStartPosRef.current = editor.state.doc.content.size;
-		}
-
-		editor?.setOptions({
-			dictationCursor: {
-				isDictating: true,
-			},
-		} as any);
-		editor?.view.dom.classList.add('is-dictating');
-		toast.success('Dictado por voz activado. Empiece a hablar...', {
-			id: 'dictation-toast',
-		});
-
-		try {
-			if (navigator.permissions && navigator.permissions.query) {
-				try {
-					const permissionStatus = await navigator.permissions.query({
-						name: 'microphone' as PermissionName,
-					});
-
-					if (permissionStatus.state === 'denied') {
-						toast.error(
-							'Acceso al micrófono denegado. Habilítelo en la barra de direcciones o configuración de su navegador.',
-							{ id: 'dictation-toast' },
-						);
-						setIsDictating(false);
-						editor?.setOptions({
-							dictationCursor: {
-								isDictating: false,
-							},
-						} as any);
-						editor?.view.dom.classList.remove('is-dictating');
-
-						return;
-					}
-				} catch (e) {
-					console.warn(
-						'Error querying microphone permission status:',
-						e,
-					);
-				}
-			}
-
-			const stream = await navigator.mediaDevices.getUserMedia({
-				audio: true,
-			});
-
-			mediaStreamRef.current = stream;
-			isRecordingRef.current = true;
-
-			recordNextChunk();
-		} catch (err: any) {
-			console.error(
-				'Microphone access denied or unsupported browser:',
-				err,
-			);
-			setIsDictating(false);
-			editor?.setOptions({
-				dictationCursor: {
-					isDictating: false,
-				},
-			} as any);
-			editor?.view.dom.classList.remove('is-dictating');
-
-			if (
-				err.name === 'NotAllowedError' ||
-				err.name === 'PermissionDeniedError'
-			) {
-				toast.error(
-					'Acceso al micrófono denegado. Habilite el micrófono en los permisos de su navegador para poder dictar.',
-					{ id: 'dictation-toast' },
-				);
-			} else {
-				toast.error(
-					'No se pudo acceder al micrófono. Verifique los permisos del navegador.',
-					{ id: 'dictation-toast' },
-				);
-			}
-		}
-	};
-
-	const recordNextChunk = () => {
-		if (!isRecordingRef.current || !mediaStreamRef.current) {
+	const handleInsertDictation = (text: string) => {
+		if (!editor || !text) {
 			return;
 		}
-
-		const options = { mimeType: 'audio/webm;codecs=opus' };
-		let recorder: MediaRecorder;
-
-		try {
-			recorder = new MediaRecorder(mediaStreamRef.current, options);
-		} catch (e) {
-			console.warn(
-				'audio/webm;codecs=opus not supported, falling back to default encoder',
-			);
-			recorder = new MediaRecorder(mediaStreamRef.current);
-		}
-
-		activeRecorderRef.current = recorder;
-
-		recorder.ondataavailable = async (event) => {
-			if (event.data && event.data.size > 0) {
-				sendAudioChunk(event.data);
-			}
-		};
-
-		recorder.onstop = () => {
-			if (isRecordingRef.current) {
-				recordNextChunk();
-			}
-		};
-
-		recorder.start();
-
-		timeoutRef.current = setTimeout(() => {
-			if (recorder.state !== 'inactive') {
-				recorder.stop();
-			}
-		}, 2000);
+		editor.chain().focus().insertContent(text).run();
+		toast.success('El texto dictado fue insertado con éxito.');
 	};
-
-	const finalizeDictationSelection = () => {
-		if (!editor) {
-			return;
-		}
-
-		const runRemoval = () => {
-			if (!editor) {
-				return;
-			}
-
-			const startPos = dictationStartPosRef.current;
-			const endPos = editor.state.doc.content.size;
-
-			if (startPos !== null) {
-				const fromPos = Math.max(0, startPos - 2);
-
-				if (fromPos < endPos) {
-					editor
-						.chain()
-						.focus()
-						.setTextSelection({ from: fromPos, to: endPos })
-						.unsetHighlight()
-						.run();
-				}
-			}
-		};
-
-		// Defer selection and unset highlight slightly to ensure ProseMirror has fully processed
-		// any incoming Yjs updates from the final transcription request.
-		setTimeout(runRemoval, 300);
-
-		// Turn off dictation cursor options on the client after processing
-		setTimeout(() => {
-			if (editor) {
-				editor.setOptions({
-					dictationCursor: {
-						isDictating: false,
-					},
-				} as any);
-				editor.view.dom.classList.remove('is-dictating');
-			}
-
-			dictationStartPosRef.current = null;
-
-			// Show the toast and end the finalizing state
-			toast.info('Dictado por voz finalizado.', {
-				id: 'dictation-toast',
-			});
-			setIsFinalizing(false);
-			setIsDictating(false);
-		}, 350);
-	};
-
-	const stopDictation = () => {
-		isRecordingRef.current = false;
-		setIsFinalizing(true);
-
-		if (timeoutRef.current) {
-			clearTimeout(timeoutRef.current);
-			timeoutRef.current = null;
-		}
-
-		if (
-			activeRecorderRef.current &&
-			activeRecorderRef.current.state !== 'inactive'
-		) {
-			activeRecorderRef.current.stop();
-		}
-
-		activeRecorderRef.current = null;
-
-		if (mediaStreamRef.current) {
-			mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-			mediaStreamRef.current = null;
-		}
-
-		if (activeRequestsRef.current === 0) {
-			finalizeDictationSelection();
-		}
-	};
-
-	const sendAudioChunk = async (audioBlob: Blob) => {
-		if (!field) {
-			return;
-		}
-
-		activeRequestsRef.current += 1;
-
-		const formData = new FormData();
-		formData.append('audio', audioBlob);
-		formData.append('reportId', String(reportId));
-		formData.append('docName', field);
-
-		try {
-			const res = await fetch(
-				`${COLLABORATION_SERVER_URL}/api/dictate-chunk`,
-				{
-					method: 'POST',
-					body: formData,
-				},
-			);
-
-			if (!res.ok) {
-				console.error(
-					'Server error processing audio chunk status:',
-					res.status,
-				);
-			} else {
-				setTimeout(() => {
-					editor?.commands.focus('end');
-				}, 100);
-			}
-		} catch (err) {
-			console.error('Network error sending audio payload:', err);
-		} finally {
-			activeRequestsRef.current -= 1;
-
-			if (!isRecordingRef.current && activeRequestsRef.current === 0) {
-				finalizeDictationSelection();
-			}
-		}
-	};
-
-	useEffect(() => {
-		return () => {
-			isRecordingRef.current = false;
-			setIsDictating(false);
-			setIsFinalizing(false);
-
-			if (editor) {
-				editor.setOptions({
-					dictationCursor: {
-						isDictating: false,
-					},
-				} as any);
-				editor.view.dom.classList.remove('is-dictating');
-			}
-
-			if (timeoutRef.current) {
-				clearTimeout(timeoutRef.current);
-			}
-
-			if (
-				activeRecorderRef.current &&
-				activeRecorderRef.current.state !== 'inactive'
-			) {
-				activeRecorderRef.current.stop();
-			}
-
-			if (mediaStreamRef.current) {
-				mediaStreamRef.current
-					.getTracks()
-					.forEach((track) => track.stop());
-			}
-		};
-	}, [editor, field]);
 
 	const handleImageUpload = () => {
 		const input = document.createElement('input');
@@ -1847,36 +1571,24 @@ function EditorToolbar({
 								<TooltipTrigger asChild>
 									<button
 										type="button"
-										disabled={!field || isFinalizing}
+										disabled={!field}
 										onMouseDown={(e) => e.preventDefault()}
-										onClick={
-											isDictating
-												? stopDictation
-												: startDictation
-										}
+										onClick={() => setIsDictationSheetOpen(true)}
 										className={cn(
 											'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-sm transition-colors',
 											'hover:bg-accent hover:text-accent-foreground',
 											'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40',
-											isDictating && !isFinalizing
-												? 'animate-pulse bg-red-500 text-white hover:bg-red-600 hover:text-white'
-												: 'bg-transparent text-muted-foreground hover:text-foreground',
+											'bg-transparent text-muted-foreground hover:text-foreground',
 										)}
 									>
-										{isFinalizing ? (
-											<Loader2 className="h-3.5 w-3.5 animate-spin" />
-										) : (
-											<Mic className="h-3.5 w-3.5" />
-										)}
+										<Mic className="h-3.5 w-3.5" />
 									</button>
 								</TooltipTrigger>
 								<TooltipContent
 									side="bottom"
 									className="py-1 text-xs"
 								>
-									{isDictating
-										? 'Detener dictado por voz'
-										: 'Dictar por voz (Español)'}
+									Dictar por voz con IA
 								</TooltipContent>
 							</Tooltip>
 						</TooltipProvider>
@@ -2029,6 +1741,12 @@ function EditorToolbar({
 				onOpenChange={handleOpenChange}
 				selectedText={selectedText}
 				onReplace={handleReplace}
+			/>
+
+			<AIDictationSheet
+				open={isDictationSheetOpen}
+				onOpenChange={setIsDictationSheetOpen}
+				onInsert={handleInsertDictation}
 			/>
 		</ToolbarContext.Provider>
 	);
@@ -3009,6 +2727,28 @@ export default function ReportWorkspace({
 			setTimeout(() => {
 				if (
 					!isAISheetOpenRef.current &&
+					!isDictationSheetOpenRef.current &&
+					activeEditorRef.current &&
+					!activeEditorRef.current.isFocused
+				) {
+					setActiveEditor(null);
+					setActiveField(null);
+				}
+			}, 100);
+		}
+	};
+
+	const [isDictationSheetOpen, setIsDictationSheetOpen] = useState(false);
+	const isDictationSheetOpenRef = useRef(false);
+	const updateDictationSheetOpen = (open: boolean) => {
+		setIsDictationSheetOpen(open);
+		isDictationSheetOpenRef.current = open;
+
+		if (!open) {
+			setTimeout(() => {
+				if (
+					!isDictationSheetOpenRef.current &&
+					!isAISheetOpenRef.current &&
 					activeEditorRef.current &&
 					!activeEditorRef.current.isFocused
 				) {
@@ -3028,6 +2768,7 @@ export default function ReportWorkspace({
 				if (
 					!isPopoverOpenRef.current &&
 					!isAISheetOpenRef.current &&
+					!isDictationSheetOpenRef.current &&
 					activeEditorRef.current &&
 					!activeEditorRef.current.isFocused
 				) {
@@ -3056,7 +2797,7 @@ export default function ReportWorkspace({
 		}
 
 		focusTimeoutRef.current = setTimeout(() => {
-			if (isAISheetOpenRef.current || isPopoverOpenRef.current) {
+			if (isAISheetOpenRef.current || isPopoverOpenRef.current || isDictationSheetOpenRef.current) {
 				return;
 			}
 
@@ -4785,6 +4526,8 @@ export default function ReportWorkspace({
 										isSheetOpen={isAISheetOpen}
 										onSheetOpenChange={updateAISheetOpen}
 										onPopoverOpenChange={updatePopoverOpen}
+										isDictationSheetOpen={isDictationSheetOpen}
+										onDictationSheetOpenChange={updateDictationSheetOpen}
 									/>
 								</div>
 

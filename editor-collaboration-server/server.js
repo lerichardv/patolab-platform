@@ -423,225 +423,59 @@ if (!fs.existsSync(uploadDir)) {
 
 const upload = multer({ dest: uploadDir });
 
-// Environment variable configuration for paths
-const WHISPER_DIR = process.env.WHISPER_PATH || '/opt/homebrew/var/www/whisper.cpp';
-const WHISPER_MODEL = path.join(WHISPER_DIR, 'models/ggml-medium.bin');
-const WHISPER_EXECUTABLE = path.join(WHISPER_DIR, 'build/bin/whisper-cli');
-
-const LLAMA_DIR = process.env.LLAMA_PATH || '/opt/homebrew/var/www/llama.cpp';
-const LLAMA_MODEL = path.join(LLAMA_DIR, 'models/Llama-3.2-3B-Instruct-Q4_K_M.gguf');
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const LLAMA_EXECUTABLE = path.join(LLAMA_DIR, 'build/bin/llama-cli');
-
-app.post('/api/dictate-chunk', upload.single('audio'), (req, res) => {
+app.post('/api/dictate-chunk', upload.single('audio'), async (req, res) => {
 	if (!req.file) {
-		return res.status(400).json({ error: 'Missing audio payload slice' });
+		return res.status(400).json({ error: 'No se recibió ningún archivo de audio.' });
 	}
 
-	const { reportId, docName } = req.body;
 	const inputPath = req.file.path;
-	const outputPath = `${inputPath}.wav`;
 
-	let ffmpegProcess = null;
-	let whisperProcess = null;
-	let responseSent = false;
+	try {
+		console.log('[Grok Dictate] Sending audio file to Grok STT API:', inputPath);
 
-	const cleanupFiles = () => {
-		fs.unlink(inputPath, () => { });
-		fs.unlink(outputPath, () => { });
-	};
+		const fileBuffer = fs.readFileSync(inputPath);
+		const fileBlob = new Blob([fileBuffer]);
 
-	const terminateProcesses = () => {
-		if (ffmpegProcess && ffmpegProcess.exitCode === null) {
-			console.log('[Dictate] Killing running ffmpeg process due to abort/error');
-			ffmpegProcess.kill('SIGKILL');
-		}
+		const formData = new FormData();
+		formData.append("format", "true");
+		formData.append("language", "es");
+		formData.append("keyterm", "biopsia, macroscopía, microscopía, diagnóstico");
+		formData.append("file", fileBlob, req.file.originalname || "audio.webm");
 
-		if (whisperProcess && whisperProcess.exitCode === null) {
-			console.log('[Dictate] Killing running whisper process due to abort/error');
-			whisperProcess.kill('SIGKILL');
-		}
-	};
-
-	// Listen to client disconnect
-	req.on('close', () => {
-		if (!responseSent) {
-			console.log('[Dictate] Client connection closed prematurely. Terminating processes.');
-			responseSent = true;
-			terminateProcesses();
-			cleanupFiles();
-		}
-	});
-
-	// 1. Convert incoming browser Opus stream to uncompressed 16kHz PCM WAV format using spawn
-	ffmpegProcess = spawn('ffmpeg', [
-		'-y',
-		'-i', inputPath,
-		'-c:a', 'pcm_s16le',
-		'-ar', '16000',
-		'-ac', '1',
-		outputPath
-	], {
-		stdio: ['ignore', 'ignore', 'pipe'] // Pipe stderr to catch errors, ignore stdout
-	});
-
-	let ffmpegStderr = '';
-	ffmpegProcess.stderr.on('data', (chunk) => {
-		if (ffmpegStderr.length < 50000) {
-			ffmpegStderr += chunk.toString();
-		}
-	});
-
-	ffmpegProcess.on('error', (err) => {
-		console.error('[Dictate] ffmpeg spawn error:', err);
-
-		if (!responseSent) {
-			responseSent = true;
-			terminateProcesses();
-			cleanupFiles();
-			res.status(500).json({ error: 'Failed to start audio conversion' });
-		}
-	});
-
-	ffmpegProcess.on('close', (code) => {
-		ffmpegProcess = null;
-
-		if (responseSent) {
-			cleanupFiles();
-
-			return;
-		}
-
-		if (code !== 0) {
-			console.error('[FFmpeg Error]: Exit code', code, ffmpegStderr);
-			responseSent = true;
-			cleanupFiles();
-
-			return res.status(500).json({ error: 'Audio upscaling process failed' });
-		}
-
-		// 2. Execute whisper-cli to extract text tokens instantly
-		whisperProcess = spawn(WHISPER_EXECUTABLE, [
-			'-m', WHISPER_MODEL,
-			'-f', outputPath,
-			'-nt',
-			'-t', '2',   // Allocates 1 CPU thread
-			'-l', 'es'   // Hard-locks Spanish to speed up language detection execution
-		], {
-			stdio: ['ignore', 'pipe', 'ignore'] // stdout needed for text, stderr ignored
+		const response = await fetch("https://api.x.ai/v1/stt", {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${process.env.GROK_API_KEY}`,
+			},
+			body: formData,
 		});
 
-		let textResult = '';
-		whisperProcess.stdout.on('data', (data) => {
-			if (!responseSent) {
-				textResult += data.toString();
-			}
+		if (!response.ok) {
+			const errText = await response.text();
+			throw new Error(`STT error ${response.status}: ${errText}`);
+		}
+
+		const result = await response.json();
+		const cleanText = (result.text || '').trim();
+
+		console.log('[Grok Dictate] Transcribed text:', cleanText);
+
+		// Clean up files
+		fs.unlink(inputPath, () => {});
+
+		return res.json({ success: true, text: cleanText });
+	} catch (error) {
+		console.error('Error en Grok Dictado:', error);
+		// Clean up files
+		fs.unlink(inputPath, () => {});
+		return res.status(500).json({
+			error: 'Error procesando la transcripción de audio.',
+			details: error.message
 		});
-
-		whisperProcess.on('error', (err) => {
-			console.error('[Dictate] Whisper spawn error:', err);
-
-			if (!responseSent) {
-				responseSent = true;
-				terminateProcesses();
-				cleanupFiles();
-				res.status(500).json({ error: 'Failed to start Whisper process' });
-			}
-		});
-
-		whisperProcess.on('close', (whisperCode) => {
-			whisperProcess = null;
-
-			if (responseSent) {
-				cleanupFiles();
-
-				return;
-			}
-
-			responseSent = true;
-			cleanupFiles();
-
-			if (whisperCode !== 0) {
-				console.error(`[Whisper Error] Process exited with code ${whisperCode}`);
-
-				return res.status(500).json({ error: 'Whisper binary failure execution' });
-			}
-
-			// Strip bracketed/parenthesized tags like [MÚSICA], (risas), [BLANK_AUDIO]
-			const cleanText = textResult
-				.replace(/\[[^\]]*\]/g, '')
-				.replace(/\([^)]*\)/g, '')
-				.replace(/\s+/g, ' ')
-				.trim();
-
-			// 3. Hallucination Guard: Stop empty loops from writing junk artifacts when user remains quiet
-			const lowerText = cleanText.toLowerCase();
-			const isHallucination = cleanText.length <= 1 ||
-				lowerText.includes('subtítulos') ||
-				lowerText.includes('subtítulo') ||
-				lowerText.includes('gracias por') ||
-				lowerText.includes('suscríbete') ||
-				lowerText.includes('suscribete') ||
-				lowerText.includes('suscribirse') ||
-				lowerText.includes('canal') ||
-				lowerText.includes('subscribe');
-
-			if (!isHallucination) {
-				// Matches the dynamic document string schema: report-15-microscopy
-				const targetRoom = `report-${reportId}-${docName}`;
-
-				// 4. Access the active Hocuspocus shared room document pool
-				const activeDoc = hocuspocus.documents.get(targetRoom);
-
-				if (activeDoc) {
-					activeDoc.transact(() => {
-						const xmlFragment = activeDoc.getXmlFragment('content');
-						let inserted = false;
-
-						if (xmlFragment.length > 0) {
-							const lastChild = xmlFragment.get(xmlFragment.length - 1);
-
-							if (lastChild instanceof Y.XmlElement && lastChild.nodeName === 'paragraph') {
-								let textNode = null;
-
-								for (let i = lastChild.length - 1; i >= 0; i--) {
-									const c = lastChild.get(i);
-
-									if (c instanceof Y.XmlText) {
-										textNode = c;
-										break;
-									}
-								}
-
-								if (textNode) {
-									const oldLength = textNode.length;
-									const insertText = oldLength > 0 ? ` ${cleanText}` : cleanText;
-									textNode.insert(oldLength, insertText);
-									textNode.format(oldLength, insertText.length, { highlight: { color: '#DBEDEE' } });
-									inserted = true;
-								}
-							}
-						}
-
-						if (!inserted) {
-							const paragraph = new Y.XmlElement('paragraph');
-							const textNode = new Y.XmlText();
-							textNode.insert(0, cleanText);
-							textNode.format(0, cleanText.length, { highlight: { color: '#DBEDEE' } });
-							paragraph.insert(0, [textNode]);
-							xmlFragment.insert(xmlFragment.length, [paragraph]);
-						}
-					});
-				}
-			}
-
-			// Always respond instantly to prevent pipeline starvation loops
-			res.json({ success: true });
-		});
-	});
+	}
 });
 
-app.post('/api/fix-grammar', express.json(), (req, res) => {
+app.post('/api/fix-grammar', express.json(), async (req, res) => {
 	const { text, reportId, docName } = req.body;
 
 	if (!text || text.trim() === '') {
@@ -652,71 +486,37 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 		return res.status(400).json({ error: 'El texto no debe superar los 3000 caracteres.' });
 	}
 
-	const systemPrompt = "Eres un corrector gramatical experto en informes médicos. Corrige la ortografía y la gramática en español del texto provisto. Conserva y respeta la estructura original de párrafos y saltos de línea. Devuelve ÚNICAMENTE el texto completamente corregido, manteniendo los mismos saltos de línea y párrafos que el texto original. No agregues introducciones, no expliques los cambios, no uses viñetas ni bloques de código. Tu respuesta debe ser exclusivamente el texto corregido. Respond with ONLY the corrected text. Do not add explanations. Keep the original paragraphs and line breaks. End immediately after the correction.";
+	try {
+		console.log('[Grok Grammar] Sending request to Grok API...');
 
-	// We format using standard chatml blocks, but notice we point llama-cli to process it as a raw execution payload
-	const formattedPrompt = `<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n${systemPrompt}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n${text}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n`;
+		const response = await fetch("https://api.x.ai/v1/chat/completions", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${process.env.GROK_API_KEY}`,
+			},
+			body: JSON.stringify({
+				model: "grok-4.3",
+				messages: [
+					{
+						role: "system",
+						content: "Eres un corrector gramatical experto en informes médicos y patológicos. Corrige la ortografía, puntuación y coherencia técnica en español. Mantén estrictamente el vocabulario médico original y la estructura de párrafos y saltos de línea del texto original. Devuelve ÚNICAMENTE el texto completamente corregido, manteniendo los mismos saltos de línea y párrafos. No agregues introducciones, no expliques los cambios, no uses viñetas ni bloques de código. Tu respuesta debe ser exclusivamente el texto corregido."
+					},
+					{ role: "user", content: text }
+				],
+				temperature: 0.1
+			})
+		});
 
-	console.log('[Llama.cpp] Launching strict single-shot completion pipeline...');
-
-	// Switch this path back to the core llama-cli binary if it was changed
-	const BINDING_EXECUTABLE = path.join(LLAMA_DIR, 'build/bin/llama-completion');
-
-	const llamaProcess = spawn(BINDING_EXECUTABLE, [
-		'-m', LLAMA_MODEL,
-		'-p', formattedPrompt,
-		'--chat-template', 'llama3',
-		'--predict', '3000',                // Strict limit for completion length
-		'--threads', '1',                   // Pin CPU context
-		'--temp', '0.01',                   // Deterministic greedy parsing
-		'--repeat-penalty', '1.3',
-		'--no-display-prompt'               // Completely silences the prompt echo
-	], {
-		stdio: ['ignore', 'pipe', 'pipe']
-	});
-
-	let modelOutput = '';
-	let errorOutput = '';
-	let consecutiveNewlines = 0;
-	let fallbackTextWindow = '';
-	let initialResponseSent = false;
-
-	const maxRuntime = setTimeout(() => {
-		console.log('[Llama.cpp Watchdog] Llama timeout reached. Halting execution...');
-		terminateAndSendResult();
-	}, 60000);
-
-	const terminateAndSendResult = () => {
-		if (initialResponseSent) {
-			return;
+		if (!response.ok) {
+			const errText = await response.text();
+			throw new Error(`Grok grammar correction error ${response.status}: ${errText}`);
 		}
 
-		initialResponseSent = true;
+		const resData = await response.json();
+		const correctedText = resData.choices[0].message.content.trim();
 
-		clearTimeout(maxRuntime);
-
-		if (llamaProcess && llamaProcess.exitCode === null) {
-			llamaProcess.kill('SIGKILL');
-		}
-
-		// Clean out prompt artifacts if any spilled through to stdout
-		let correctedText = modelOutput;
-
-		const structuralTags = ['<|eot_id|>', '<|end_of_text|>', '█', '▄▄', 'available commands:', '>'];
-
-		for (const tag of structuralTags) {
-			const index = correctedText.indexOf(tag);
-
-			if (index !== -1) {
-				correctedText = correctedText.substring(0, index);
-			}
-		}
-
-		// Final sanity strip to remove terminal metric blocks like "[ Prompt: ... ]"
-		correctedText = correctedText.replace(/\[\s*Prompt:[\s\S]*?\]/gi, '');
-		correctedText = correctedText.trim();
-
-		console.log(`[Llama.cpp] Pipeline complete. Clean Output: "${correctedText}"`);
+		console.log('[Grok Grammar] Corrected text successfully.');
 
 		if (reportId && docName) {
 			const targetRoom = `report-${reportId}-${docName}`;
@@ -734,135 +534,15 @@ app.post('/api/fix-grammar', express.json(), (req, res) => {
 					return res.json({ success: true, text: correctedText, injected: true });
 				}
 			} catch (err) {
-				console.error(`[Llama.cpp] Error updating Yjs document:`, err);
+				console.error(`[Grok Grammar] Error updating Yjs document:`, err);
 			}
 		}
 
 		return res.json({ success: true, text: correctedText, injected: false });
-	};
-
-	res.on('close', () => {
-		if (!initialResponseSent) {
-			console.log('[Llama.cpp] Client request closed/aborted. Terminating llama process.');
-			initialResponseSent = true;
-			clearTimeout(maxRuntime);
-
-			if (llamaProcess && llamaProcess.exitCode === null) {
-				llamaProcess.kill('SIGKILL');
-			}
-		}
-	});
-
-	llamaProcess.stdout.on('data', (chunk) => {
-		if (initialResponseSent) {
-			return;
-		}
-
-		const dataString = chunk.toString();
-
-		// Ignore the terminal greeting strings completely to keep our buffer uncontaminated
-		if (dataString.includes('available commands:') || dataString.includes('██') || dataString.includes('build      :')) {
-			return;
-		}
-
-		modelOutput += dataString;
-
-		// 1. Precise stop sequence validation
-		if (dataString.includes('<|eot_id|>') || dataString.includes('<|end_of_text|>')) {
-			terminateAndSendResult();
-
-			return;
-		}
-
-		// 2. Sliding evaluation window
-		fallbackTextWindow += dataString;
-
-		if (fallbackTextWindow.length > 300) {
-			fallbackTextWindow = fallbackTextWindow.slice(-300);
-		}
-
-		// 3. Newline Guard
-		for (let i = 0; i < dataString.length; i++) {
-			if (dataString[i] === '\n') {
-				consecutiveNewlines++;
-			} else if (dataString[i].trim() !== '') {
-				consecutiveNewlines = 0;
-			}
-
-			if (consecutiveNewlines >= 4) {
-				console.log('[Llama.cpp Watchdog] Infinite newline loop intercepted.');
-				terminateAndSendResult();
-
-				return;
-			}
-		}
-
-		// 4. Repetition Filter Layer
-		const words = fallbackTextWindow.toLowerCase().replace(/[\r\n]/g, ' ').split(/\s+/).filter(Boolean);
-
-		if (words.length >= 12) {
-			const lastNWords = words.slice(-12);
-			const uniqueWords = new Set(lastNWords);
-
-			if (uniqueWords.size <= 2) {
-				console.log('[Llama.cpp Watchdog] Phrase repetition loop detected.');
-				terminateAndSendResult();
-
-				return;
-			}
-
-			let alternatingPatternMatch = true;
-
-			for (let i = 0; i < lastNWords.length - 2; i++) {
-				if (lastNWords[i] !== lastNWords[i + 2]) {
-					alternatingPatternMatch = false;
-					break;
-				}
-			}
-
-			if (alternatingPatternMatch) {
-				console.log('[Llama.cpp Watchdog] Alternating sequence loop detected.');
-				terminateAndSendResult();
-
-				return;
-			}
-		}
-	});
-
-	llamaProcess.stderr.on('data', (data) => {
-		if (initialResponseSent) {
-			return;
-		}
-
-		errorOutput += data.toString();
-	});
-
-	llamaProcess.on('error', (err) => {
-		console.error('[Llama.cpp] process error:', err);
-
-		if (!initialResponseSent) {
-			initialResponseSent = true;
-			clearTimeout(maxRuntime);
-
-			if (llamaProcess && llamaProcess.exitCode === null) {
-				llamaProcess.kill('SIGKILL');
-			}
-
-			res.status(500).json({ error: 'Llama process error occurred' });
-		}
-	});
-
-	llamaProcess.on('close', (code) => {
-		clearTimeout(maxRuntime);
-
-		if (code !== 0 && errorOutput) {
-			console.error(`[Llama.cpp] process exited with code ${code}. Stderr:`, errorOutput);
-		}
-
-		if (!initialResponseSent) {
-			terminateAndSendResult();
-		}
-	});
+	} catch (error) {
+		console.error('Error en Grok Corrector:', error);
+		return res.status(500).json({ error: 'Error en el servidor de optimización de texto', details: error.message });
+	}
 });
 
 app.get('/health', (req, res) => {
