@@ -1,4 +1,5 @@
 import { ResizableNodeView } from '@tiptap/core';
+import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
@@ -32,13 +33,16 @@ import {
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import {
+    Popover,
+    PopoverTrigger,
+    PopoverContent,
+} from '@/components/ui/popover';
+import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import Highlight from '@tiptap/extension-highlight';
 import { cn } from '@/lib/utils';
 
 export const editorStyles = `
@@ -772,7 +776,8 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
                                 'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-sm transition-colors',
                                 'hover:bg-accent hover:text-accent-foreground',
                                 'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40',
-                                editor?.isActive('highlight') && 'bg-accent text-accent-foreground',
+                                editor?.isActive('highlight') &&
+                                    'bg-accent text-accent-foreground',
                             )}
                             title="Color de resaltado de texto"
                         >
@@ -785,8 +790,14 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
                                 <button
                                     key={color}
                                     type="button"
-                                    onClick={() => editor?.chain().focus().toggleHighlight({ color }).run()}
-                                    className="h-6 w-6 rounded border border-border cursor-pointer transition-transform hover:scale-110 focus:outline-hidden"
+                                    onClick={() =>
+                                        editor
+                                            ?.chain()
+                                            .focus()
+                                            .toggleHighlight({ color })
+                                            .run()
+                                    }
+                                    className="h-6 w-6 cursor-pointer rounded border border-border transition-transform hover:scale-110 focus:outline-hidden"
                                     style={{ backgroundColor: color }}
                                     title={name}
                                 />
@@ -795,8 +806,14 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
                         <div className="mt-2 border-t pt-2">
                             <button
                                 type="button"
-                                onClick={() => editor?.chain().focus().unsetHighlight().run()}
-                                className="w-full flex items-center justify-center gap-1 rounded border border-input bg-background px-2 h-7 text-xs font-medium cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                                onClick={() =>
+                                    editor
+                                        ?.chain()
+                                        .focus()
+                                        .unsetHighlight()
+                                        .run()
+                                }
+                                className="flex h-7 w-full cursor-pointer items-center justify-center gap-1 rounded border border-input bg-background px-2 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
                             >
                                 <X className="h-3 w-3" />
                                 Sin color

@@ -15,6 +15,8 @@ interface Credit {
     amount_paid: string | number;
     amount_remaining: string | number;
     customer?: Customer;
+    last_payment_date?: string | null;
+    reminder_interval_in_seconds?: number;
 }
 
 interface Props {

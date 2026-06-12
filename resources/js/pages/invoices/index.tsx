@@ -764,6 +764,9 @@ export default function InvoicesIndex({
                                     <SelectItem value="rental">
                                         Alquileres
                                     </SelectItem>
+                                    <SelectItem value="credit payment">
+                                        Pagos de Crédito
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -890,7 +893,7 @@ export default function InvoicesIndex({
                                 <TableHead className="min-w-[220px]">
                                     {renderSortHeader(
                                         'specimen_code',
-                                        'Muestra / Alquiler',
+                                        'Tipo de pago',
                                     )}
                                 </TableHead>
                                 <TableHead className="min-w-[180px]">
@@ -1131,6 +1134,40 @@ export default function InvoicesIndex({
                                                         Alquiler
                                                     </span>
                                                 </div>
+                                            ) : invoice.invoice_type ===
+                                              'credit payment' ? (
+                                                <div className="flex max-w-[220px] flex-col gap-1 text-xs">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-max rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                                            Crédito #
+                                                            {
+                                                                invoice.credit_payment_id
+                                                            }
+                                                        </span>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-5 w-5 hover:bg-muted"
+                                                            onClick={() =>
+                                                                router.get(
+                                                                    '/credits',
+                                                                    {
+                                                                        search: String(
+                                                                            invoice.credit_payment_id ||
+                                                                                '',
+                                                                        ),
+                                                                    },
+                                                                )
+                                                            }
+                                                            title="Ver Crédito"
+                                                        >
+                                                            <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                        </Button>
+                                                    </div>
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        Pago de Crédito
+                                                    </span>
+                                                </div>
                                             ) : invoice.specimen ? (
                                                 <div className="flex max-w-[220px] flex-col gap-1 text-xs">
                                                     {invoice.specimen
@@ -1291,33 +1328,36 @@ export default function InvoicesIndex({
                                                                       )}
                                                                   </span>
                                                               </div>
-                                                              <div className="mt-0.5 flex items-center justify-between gap-1 border-t pt-1.5 text-[10px] text-muted-foreground">
-                                                                  <span className="font-mono">
-                                                                      Crédito:{' '}
-                                                                      {
-                                                                          invoice.credit_payment_id
-                                                                      }
-                                                                  </span>
-                                                                  <Button
-                                                                      variant="ghost"
-                                                                      size="icon"
-                                                                      className="h-5 w-5 hover:bg-muted"
-                                                                      onClick={() =>
-                                                                          router.get(
-                                                                              '/credits',
-                                                                              {
-                                                                                  search: String(
-                                                                                      invoice.credit_payment_id ||
-                                                                                          '',
-                                                                                  ),
-                                                                              },
-                                                                          )
-                                                                      }
-                                                                      title="Ver Crédito"
-                                                                  >
-                                                                      <Eye className="h-3 w-3" />
-                                                                  </Button>
-                                                              </div>
+                                                              {invoice.invoice_type !==
+                                                                  'credit payment' && (
+                                                                  <div className="mt-0.5 flex items-center justify-between gap-1 border-t pt-1.5 text-[10px] text-muted-foreground">
+                                                                      <span className="font-mono">
+                                                                          Crédito:{' '}
+                                                                          {
+                                                                              invoice.credit_payment_id
+                                                                          }
+                                                                      </span>
+                                                                      <Button
+                                                                          variant="ghost"
+                                                                          size="icon"
+                                                                          className="h-5 w-5 hover:bg-muted"
+                                                                          onClick={() =>
+                                                                              router.get(
+                                                                                  '/credits',
+                                                                                  {
+                                                                                      search: String(
+                                                                                          invoice.credit_payment_id ||
+                                                                                              '',
+                                                                                      ),
+                                                                                  },
+                                                                              )
+                                                                          }
+                                                                          title="Ver Crédito"
+                                                                      >
+                                                                          <Eye className="h-3 w-3" />
+                                                                      </Button>
+                                                                  </div>
+                                                              )}
                                                           </div>
                                                       );
                                                   })()

@@ -395,11 +395,15 @@ class CreditController extends Controller
                 'total_paid' => $amountPaid,
                 'proof_of_payment' => $proofOfPaymentPath,
                 'invoice_file' => '',
+                'invoice_type' => 'credit payment',
             ]);
 
             // Update credit values
-            $credit->increment('amount_paid', $amountPaid);
-            $credit->decrement('amount_remaining', $amountPaid);
+            $credit->update([
+                'amount_paid' => $credit->amount_paid + $amountPaid,
+                'amount_remaining' => $credit->amount_remaining - $amountPaid,
+                'last_payment_date' => now(),
+            ]);
             $credit->refresh();
 
             // Update original invoice total_paid
@@ -424,12 +428,16 @@ class CreditController extends Controller
             $filename = 'credit_invoice_'.$invoice->id.'_'.time().'.pdf';
             $pdfPath = 'invoices/'.$filename;
 
-            $pdfContent = Browsershot::html($htmlContent)
-                ->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
-                ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
-                ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
-                ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'))
-                ->addChromiumArguments([
+            $browsershot = Browsershot::html($htmlContent);
+
+            if (app()->environment('production')) {
+                $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
+                    ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
+                    ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
+                    ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
+            }
+
+            $pdfContent = $browsershot->addChromiumArguments([
                     'disable-crash-reporter',
                     'disable-dev-shm-usage',
                     'no-sandbox',
@@ -592,5 +600,17 @@ class CreditController extends Controller
         }
 
         return '';
+    }
+
+    public function update(Request $request, Credit $credit)
+    {
+        $validated = $request->validate([
+            'reminder_interval_in_days' => 'required|integer|min:1',
+        ]);
+
+        $credit->reminder_interval = \Carbon\CarbonInterval::days((int) $validated['reminder_interval_in_days']);
+        $credit->save();
+
+        return redirect()->back()->with('success', 'Configuración de recordatorio de crédito actualizada con éxito.');
     }
 }

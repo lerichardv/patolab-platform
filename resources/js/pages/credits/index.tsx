@@ -14,6 +14,7 @@ import {
     Download,
     ChevronDown,
     Layers,
+    Edit,
 } from 'lucide-react';
 import * as React from 'react';
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -69,6 +70,7 @@ import {
 import { cn } from '@/lib/utils';
 import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
+import CreditEditSheet from './credit-edit-sheet';
 import CreditSheet from './credit-sheet';
 
 interface Customer {
@@ -100,6 +102,8 @@ interface Invoice {
     invoice_file: string;
     created_at: string;
     specimen?: Specimen;
+    invoice_type?: string | null;
+    credit_payment_id?: number | null;
 }
 
 interface Credit {
@@ -116,6 +120,8 @@ interface Credit {
     group_id?: number | null;
     specimen?: Specimen;
     group?: any;
+    last_payment_date?: string | null;
+    reminder_interval_in_seconds?: number;
 }
 
 interface Props {
@@ -241,6 +247,9 @@ export default function CreditsIndex({
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [selectedCredit, setSelectedCredit] = useState<Credit | null>(null);
+    const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
+    const [selectedCreditForEdit, setSelectedCreditForEdit] =
+        useState<Credit | null>(null);
     const [search, setSearch] = useState(filters.search || '');
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
@@ -327,6 +336,11 @@ export default function CreditsIndex({
     const handlePayClick = (credit: Credit) => {
         setSelectedCredit(credit);
         setIsSheetOpen(true);
+    };
+
+    const handleEditClick = (credit: Credit) => {
+        setSelectedCreditForEdit(credit);
+        setIsEditSheetOpen(true);
     };
 
     const handleExport = (format: 'csv' | 'xlsx') => {
@@ -700,6 +714,9 @@ export default function CreditsIndex({
                                 <TableHead className="min-w-[150px]">
                                     Fecha Creación
                                 </TableHead>
+                                <TableHead className="min-w-[150px]">
+                                    Último Pago
+                                </TableHead>
                                 <TableHead className="min-w-[130px]">
                                     Estado
                                 </TableHead>
@@ -707,7 +724,7 @@ export default function CreditsIndex({
                                     Facturas Asoc.
                                 </TableHead>
                                 <TableHead
-                                    className={`z-10 w-[100px] min-w-[100px] border-l border-border bg-card text-right before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:sticky md:right-0 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
+                                    className={`z-10 w-[130px] min-w-[130px] border-l border-border bg-card text-right before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:sticky md:right-0 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
                                 >
                                     Acciones
                                 </TableHead>
@@ -928,6 +945,30 @@ export default function CreditsIndex({
                                                     'dd/MM/yyyy h:mm a',
                                                 )}
                                             </TableCell>
+                                            <TableCell className="min-w-[150px] text-xs">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-medium text-foreground">
+                                                        {credit.last_payment_date
+                                                            ? format(
+                                                                  new Date(
+                                                                      credit.last_payment_date,
+                                                                  ),
+                                                                  'dd/MM/yyyy h:mm a',
+                                                              )
+                                                            : 'N/A'}
+                                                    </span>
+                                                    {credit.reminder_interval_in_seconds && (
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            Recordatorio: Cada{' '}
+                                                            {Math.round(
+                                                                credit.reminder_interval_in_seconds /
+                                                                    86400,
+                                                            )}{' '}
+                                                            días
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
                                             <TableCell className="min-w-[130px]">
                                                 {getStatusBadge(credit)}
                                             </TableCell>
@@ -989,9 +1030,9 @@ export default function CreditsIndex({
                                                 </div>
                                             </TableCell>
                                             <TableCell
-                                                className={`z-10 text-right md:sticky md:right-0 ${stickyBgClass} w-[100px] min-w-[100px] border-l border-border transition-colors before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
+                                                className={`z-10 text-right md:sticky md:right-0 ${stickyBgClass} w-[130px] min-w-[130px] border-l border-border transition-colors before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
                                             >
-                                                <div className="flex justify-end gap-2">
+                                                <div className="flex items-center justify-end gap-2">
                                                     {remainingVal > 0 && (
                                                         <Button
                                                             variant="outline"
@@ -1007,6 +1048,19 @@ export default function CreditsIndex({
                                                             Pagar
                                                         </Button>
                                                     )}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() =>
+                                                            handleEditClick(
+                                                                credit,
+                                                            )
+                                                        }
+                                                        className="h-8 w-8 hover:bg-muted"
+                                                        title="Editar Crédito"
+                                                    >
+                                                        <Edit className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                                                    </Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -1041,6 +1095,12 @@ export default function CreditsIndex({
                 credit={selectedCredit}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
+            />
+
+            <CreditEditSheet
+                credit={selectedCreditForEdit}
+                open={isEditSheetOpen}
+                onOpenChange={setIsEditSheetOpen}
             />
 
             <SpecimenGroupViewSheet

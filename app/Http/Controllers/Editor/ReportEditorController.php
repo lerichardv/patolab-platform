@@ -356,12 +356,16 @@ class ReportEditorController extends Controller
 
         $htmlContent = view('pdf.report.body', compact('specimen', 'report', 'customer', 'examination', 'referrer', 'pages'))->render();
 
-        $pdfContent = Browsershot::html($htmlContent)
-            ->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
-            ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
-            ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
-            ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'))
-            ->addChromiumArguments([
+        $browsershot = Browsershot::html($htmlContent);
+
+        if (app()->environment('production')) {
+            $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
+                ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
+                ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
+                ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
+        }
+
+        $pdfContent = $browsershot->addChromiumArguments([
                 'disable-crash-reporter',
                 'disable-dev-shm-usage',
                 'no-sandbox',

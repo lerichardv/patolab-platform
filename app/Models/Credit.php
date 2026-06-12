@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Carbon\CarbonInterval;
+
 class Credit extends Model
 {
     use Auditable;
@@ -21,6 +24,8 @@ class Credit extends Model
         'specimen_id',
         'is_group',
         'group_id',
+        'last_payment_date',
+        'reminder_interval_in_seconds',
     ];
 
     protected $casts = [
@@ -30,7 +35,20 @@ class Credit extends Model
         'is_group' => 'boolean',
         'specimen_id' => 'integer',
         'group_id' => 'integer',
+        'last_payment_date' => 'datetime',
+        'reminder_interval_in_seconds' => 'integer',
     ];
+
+    /**
+     * Intercept the attribute to work with CarbonInterval directly.
+     */
+    protected function reminderInterval(): Attribute
+    {
+        return Attribute::make(
+            get: fn (mixed $value, array $attributes) => CarbonInterval::seconds($attributes['reminder_interval_in_seconds'] ?? 604800),
+            set: fn (CarbonInterval $value) => ['reminder_interval_in_seconds' => $value->totalSeconds],
+        );
+    }
 
     public function customer(): BelongsTo
     {

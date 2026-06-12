@@ -125,7 +125,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');
     Route::resource('invoices', InvoiceController::class)->only(['index', 'update']);
     Route::get('credits/export', [CreditController::class, 'export'])->name('credits.export');
-    Route::resource('credits', CreditController::class)->only(['index']);
+    Route::resource('credits', CreditController::class)->only(['index', 'update']);
     Route::post('credits/{credit}/pay', [CreditController::class, 'pay'])->name('credits.pay');
 
     Route::resource('rentals', RentalController::class)->only(['index', 'store', 'update']);

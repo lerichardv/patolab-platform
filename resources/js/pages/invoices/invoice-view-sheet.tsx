@@ -369,79 +369,83 @@ export default function InvoiceViewSheet({
                             )}
 
                             {/* Credit Account Status */}
-                            {invoice.payment_type === 'credit' && credit && (
-                                <div className="space-y-4 rounded-lg border border-yellow-500/30 bg-card bg-yellow-500/[0.02] p-5 text-card-foreground shadow-sm">
-                                    <h3 className="flex items-center gap-2 text-lg font-semibold text-yellow-600 dark:text-yellow-400">
-                                        <Coins className="h-5 w-5" /> Estado de
-                                        Cuenta de Crédito
-                                    </h3>
-                                    <Separator />
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-3 gap-2 text-center">
-                                            <div className="rounded bg-muted/40 p-2">
-                                                <span className="text-[10px] text-muted-foreground uppercase">
-                                                    Crédito
-                                                </span>
-                                                <p className="text-sm font-semibold text-foreground">
-                                                    L.{' '}
-                                                    {parseFloat(
-                                                        credit.credit_amount,
-                                                    ).toFixed(2)}
-                                                </p>
-                                            </div>
-                                            <div className="rounded bg-green-500/10 p-2">
-                                                <span className="text-[10px] text-green-600 uppercase dark:text-green-400">
-                                                    Pagado
-                                                </span>
-                                                <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-                                                    L.{' '}
-                                                    {parseFloat(
-                                                        credit.amount_paid,
-                                                    ).toFixed(2)}
-                                                </p>
-                                            </div>
-                                            <div className="rounded bg-red-500/10 p-2">
-                                                <span className="text-[10px] text-red-600 uppercase dark:text-red-400">
-                                                    Pendiente
-                                                </span>
-                                                <p className="text-sm font-semibold text-red-600 dark:text-red-400">
-                                                    L.{' '}
-                                                    {parseFloat(
-                                                        credit.amount_remaining,
-                                                    ).toFixed(2)}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {/* Visual Bar */}
-                                        <div className="space-y-1">
-                                            <div className="flex justify-between text-xs text-muted-foreground">
-                                                <span>Progreso de Pago</span>
-                                                <span>
-                                                    {(
-                                                        (parseFloat(
+                            {(invoice.payment_type === 'credit' ||
+                                invoice.invoice_type === 'credit payment') &&
+                                credit && (
+                                    <div className="space-y-4 rounded-lg border border-yellow-500/30 bg-card bg-yellow-500/[0.02] p-5 text-card-foreground shadow-sm">
+                                        <h3 className="flex items-center gap-2 text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                                            <Coins className="h-5 w-5" /> Estado
+                                            de Cuenta de Crédito
+                                        </h3>
+                                        <Separator />
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-3 gap-2 text-center">
+                                                <div className="rounded bg-muted/40 p-2">
+                                                    <span className="text-[10px] text-muted-foreground uppercase">
+                                                        Crédito
+                                                    </span>
+                                                    <p className="text-sm font-semibold text-foreground">
+                                                        L.{' '}
+                                                        {parseFloat(
+                                                            credit.credit_amount,
+                                                        ).toFixed(2)}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded bg-green-500/10 p-2">
+                                                    <span className="text-[10px] text-green-600 uppercase dark:text-green-400">
+                                                        Pagado
+                                                    </span>
+                                                    <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                                                        L.{' '}
+                                                        {parseFloat(
                                                             credit.amount_paid,
-                                                        ) /
-                                                            parseFloat(
-                                                                credit.credit_amount,
-                                                            )) *
-                                                        100
-                                                    ).toFixed(0)}
-                                                    %
-                                                </span>
+                                                        ).toFixed(2)}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded bg-red-500/10 p-2">
+                                                    <span className="text-[10px] text-red-600 uppercase dark:text-red-400">
+                                                        Pendiente
+                                                    </span>
+                                                    <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                                                        L.{' '}
+                                                        {parseFloat(
+                                                            credit.amount_remaining,
+                                                        ).toFixed(2)}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                                                <div
-                                                    className="h-full bg-green-500 transition-all duration-300"
-                                                    style={{
-                                                        width: `${Math.min(100, Math.max(0, (parseFloat(credit.amount_paid) / parseFloat(credit.credit_amount)) * 100))}%`,
-                                                    }}
-                                                />
+
+                                            {/* Visual Bar */}
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between text-xs text-muted-foreground">
+                                                    <span>
+                                                        Progreso de Pago
+                                                    </span>
+                                                    <span>
+                                                        {(
+                                                            (parseFloat(
+                                                                credit.amount_paid,
+                                                            ) /
+                                                                parseFloat(
+                                                                    credit.credit_amount,
+                                                                )) *
+                                                            100
+                                                        ).toFixed(0)}
+                                                        %
+                                                    </span>
+                                                </div>
+                                                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                                                    <div
+                                                        className="h-full bg-green-500 transition-all duration-300"
+                                                        style={{
+                                                            width: `${Math.min(100, Math.max(0, (parseFloat(credit.amount_paid) / parseFloat(credit.credit_amount)) * 100))}%`,
+                                                        }}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
                             {/* Documents Block */}
                             <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">

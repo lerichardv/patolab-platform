@@ -40,6 +40,8 @@ interface Credit {
     amount_paid: string | number;
     amount_remaining: string | number;
     customer?: Customer;
+    last_payment_date?: string | null;
+    reminder_interval_in_seconds?: number;
 }
 
 interface Props {
@@ -56,6 +58,7 @@ export default function CreditForm({ credit, onSuccess }: Props) {
         amount_paid: remainingVal.toFixed(2),
         payment_type: 'cash',
         proof_of_payment: null as File | null,
+        invoice_type: 'credit payment',
     });
 
     const submit: FormEventHandler = (e) => {
