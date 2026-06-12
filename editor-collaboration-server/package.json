@@ -27,6 +27,7 @@
 		"@tiptap/starter-kit": "^3.26.0",
 		"cors": "^2.8.6",
 		"crossws": "^0.4.5",
+		"dotenv": "^17.4.2",
 		"express": "^5.2.1",
 		"happy-dom": "^20.10.1",
 		"multer": "^2.1.1",

@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 Object.defineProperty(globalThis, '__ $YJS$ __', {
 	get() {
  return false; 
@@ -7,3 +9,4 @@ Object.defineProperty(globalThis, '__ $YJS$ __', {
 });
 
 import('./server.js');
+
