@@ -524,7 +524,7 @@ app.post('/api/dictate-chunk', upload.single('audio'), (req, res) => {
 			'-m', WHISPER_MODEL,
 			'-f', outputPath,
 			'-nt',
-			'-t', '4',   // Allocates 4 CPU threads (great for your local Mac setup)
+			'-t', '1',   // Allocates 1 CPU thread
 			'-l', 'es'   // Hard-locks Spanish to speed up language detection execution
 		], {
 			stdio: ['ignore', 'pipe', 'ignore'] // stdout needed for text, stderr ignored
