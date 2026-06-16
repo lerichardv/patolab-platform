@@ -23,6 +23,7 @@ use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Spatie\Browsershot\Browsershot;
+use Illuminate\Support\Facades\Gate;
 
 class InvoiceController extends Controller
 {
@@ -31,6 +32,7 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('invoices.view');
         $query = Invoice::with([
             'customer',
             'caiRange',
@@ -210,6 +212,7 @@ class InvoiceController extends Controller
 
     public function export(Request $request)
     {
+        Gate::authorize('invoices.view');
         $query = Invoice::with([
             'customer',
             'specimen.type',
@@ -408,6 +411,7 @@ class InvoiceController extends Controller
 
     public function update(Request $request, Invoice $invoice)
     {
+        Gate::authorize('invoices.manage');
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',

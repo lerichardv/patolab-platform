@@ -6,6 +6,7 @@ use App\Models\CaiRange;
 use App\Models\Location;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class CaiRangeController extends Controller
 {
@@ -14,6 +15,7 @@ class CaiRangeController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('cai_ranges.view');
         // Check and update active CAI ranges that have expired or been exhausted
         $activeRanges = CaiRange::where('status', 'active')->get();
         foreach ($activeRanges as $range) {
@@ -65,6 +67,7 @@ class CaiRangeController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('cai_ranges.create');
         $validated = $request->validate([
             'location_id' => 'required|exists:locations,id',
             'cai' => 'required|string|max:100',
@@ -93,6 +96,7 @@ class CaiRangeController extends Controller
      */
     public function update(Request $request, CaiRange $caiRange)
     {
+        Gate::authorize('cai_ranges.edit');
         $validated = $request->validate([
             'location_id' => 'required|exists:locations,id',
             'cai' => 'required|string|max:100',
@@ -121,6 +125,7 @@ class CaiRangeController extends Controller
      */
     public function destroy(CaiRange $caiRange)
     {
+        Gate::authorize('cai_ranges.delete');
         $caiRange->delete();
 
         return redirect()->back();

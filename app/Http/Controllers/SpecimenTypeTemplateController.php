@@ -15,7 +15,7 @@ class SpecimenTypeTemplateController extends Controller
 {
     public function index(Request $request)
     {
-        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_type_templates.view');
         $query = SpecimenTypeTemplate::query()->with('specimenType')->orderBy('created_at', 'desc');
 
         if ($request->has('search')) {
@@ -47,7 +47,7 @@ class SpecimenTypeTemplateController extends Controller
 
     public function store(Request $request)
     {
-        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_type_templates.create');
         $validated = $request->validate([
             'specimen_type_id' => 'required|exists:specimen_type,id|unique:specimen_type_templates,specimen_type_id',
             'diagnosis_html' => 'nullable|string',
@@ -62,7 +62,7 @@ class SpecimenTypeTemplateController extends Controller
 
     public function update(Request $request, SpecimenTypeTemplate $specimenTypeTemplate)
     {
-        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_type_templates.edit');
         $validated = $request->validate([
             'specimen_type_id' => 'required|exists:specimen_type,id|unique:specimen_type_templates,specimen_type_id,'.$specimenTypeTemplate->id,
             'diagnosis_html' => 'nullable|string',
@@ -77,7 +77,7 @@ class SpecimenTypeTemplateController extends Controller
 
     public function destroy(SpecimenTypeTemplate $specimenTypeTemplate)
     {
-        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_type_templates.delete');
         $specimenTypeTemplate->delete();
 
         return redirect()->back();
@@ -85,7 +85,9 @@ class SpecimenTypeTemplateController extends Controller
 
     public function uploadImage(Request $request)
     {
-        Gate::authorize('specimens.manage');
+        if (! Gate::allows('specimen_type_templates.create') && ! Gate::allows('specimen_type_templates.edit')) {
+            abort(403);
+        }
         $request->validate([
             'image' => 'required|image|max:10240', // 10 MB max
         ]);

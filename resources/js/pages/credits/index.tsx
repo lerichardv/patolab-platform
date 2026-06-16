@@ -243,7 +243,8 @@ export default function CreditsIndex({
     specimenTypes,
     groups,
 }: Props) {
-    const { flash } = usePage<any>().props;
+    const { auth, flash } = usePage<any>().props;
+    const canManage = auth.permissions?.includes('credits.manage');
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [selectedCredit, setSelectedCredit] = useState<Credit | null>(null);
@@ -723,11 +724,13 @@ export default function CreditsIndex({
                                 <TableHead className="min-w-[180px]">
                                     Facturas Asoc.
                                 </TableHead>
-                                <TableHead
-                                    className={`z-10 w-[130px] min-w-[130px] border-l border-border bg-card text-right before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:sticky md:right-0 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
-                                >
-                                    Acciones
-                                </TableHead>
+                                {canManage && (
+                                    <TableHead
+                                        className={`z-10 w-[130px] min-w-[130px] border-l border-border bg-card text-right before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:sticky md:right-0 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
+                                    >
+                                        Acciones
+                                    </TableHead>
+                                )}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1029,40 +1032,42 @@ export default function CreditsIndex({
                                                     )}
                                                 </div>
                                             </TableCell>
-                                            <TableCell
-                                                className={`z-10 text-right md:sticky md:right-0 ${stickyBgClass} w-[130px] min-w-[130px] border-l border-border transition-colors before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
-                                            >
-                                                <div className="flex items-center justify-end gap-2">
-                                                    {remainingVal > 0 && (
+                                            {canManage && (
+                                                <TableCell
+                                                    className={`z-10 text-right md:sticky md:right-0 ${stickyBgClass} w-[130px] min-w-[130px] border-l border-border transition-colors before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
+                                                >
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {remainingVal > 0 && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    handlePayClick(
+                                                                        credit,
+                                                                    )
+                                                                }
+                                                                className="h-8 gap-1.5 border-primary text-primary hover:bg-primary/5"
+                                                            >
+                                                                <CreditCard className="h-3.5 w-3.5" />{' '}
+                                                                Pagar
+                                                            </Button>
+                                                        )}
                                                         <Button
-                                                            variant="outline"
-                                                            size="sm"
+                                                            variant="ghost"
+                                                            size="icon"
                                                             onClick={() =>
-                                                                handlePayClick(
+                                                                handleEditClick(
                                                                     credit,
                                                                 )
                                                             }
-                                                            className="h-8 gap-1.5 border-primary text-primary hover:bg-primary/5"
+                                                            className="h-8 w-8 hover:bg-muted"
+                                                            title="Editar Crédito"
                                                         >
-                                                            <CreditCard className="h-3.5 w-3.5" />{' '}
-                                                            Pagar
+                                                            <Edit className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                                                         </Button>
-                                                    )}
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() =>
-                                                            handleEditClick(
-                                                                credit,
-                                                            )
-                                                        }
-                                                        className="h-8 w-8 hover:bg-muted"
-                                                        title="Editar Crédito"
-                                                    >
-                                                        <Edit className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
+                                                    </div>
+                                                </TableCell>
+                                            )}
                                         </TableRow>
                                     );
                                 })

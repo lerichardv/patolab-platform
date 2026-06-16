@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
 import { Edit2, Plus, Search, UserRound, Trash2 } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
@@ -76,6 +76,11 @@ export default function ReferrersIndex({
     referrerTypes,
     filters,
 }: Props) {
+    const { auth } = usePage<any>().props;
+    const canCreate = auth.permissions?.includes('referrers.create');
+    const canEdit = auth.permissions?.includes('referrers.edit');
+    const canDelete = auth.permissions?.includes('referrers.delete');
+
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedReferrer, setSelectedReferrer] = useState<Referrer | null>(
@@ -155,14 +160,17 @@ export default function ReferrersIndex({
                             muestras.
                         </p>
                     </div>
-                    <div className="flex gap-2">
-                        <Button
-                            onClick={handleCreate}
-                            className="h-10 w-full px-5 text-sm md:w-auto"
-                        >
-                            <Plus className="mr-2 h-4 w-4" /> Nuevo Remitente
-                        </Button>
-                    </div>
+                    {canCreate && (
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={handleCreate}
+                                className="h-10 w-full px-5 text-sm md:w-auto"
+                            >
+                                <Plus className="mr-2 h-4 w-4" /> Nuevo
+                                Remitente
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
@@ -207,7 +215,7 @@ export default function ReferrersIndex({
                                 <TableHead>Contacto</TableHead>
                                 <TableHead>Fecha Creación</TableHead>
                                 <TableHead className="text-right">
-                                    Acciones
+                                    {(canEdit || canDelete) && 'Acciones'}
                                 </TableHead>
                             </TableRow>
                         </TableHeader>
@@ -241,29 +249,37 @@ export default function ReferrersIndex({
                                             ).toLocaleDateString('es-ES')}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() =>
-                                                        handleEdit(referrer)
-                                                    }
-                                                >
-                                                    <Edit2 className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-destructive"
-                                                    onClick={() =>
-                                                        handleDeleteClick(
-                                                            referrer,
-                                                        )
-                                                    }
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                            {(canEdit || canDelete) && (
+                                                <div className="flex justify-end gap-2">
+                                                    {canEdit && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                handleEdit(
+                                                                    referrer,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-destructive"
+                                                            onClick={() =>
+                                                                handleDeleteClick(
+                                                                    referrer,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))

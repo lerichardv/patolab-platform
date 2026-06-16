@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import debounce from 'lodash/debounce';
 import {
@@ -99,6 +99,11 @@ export default function CaiRangesIndex({
     locations,
     filters,
 }: Props) {
+    const { auth } = usePage<any>().props;
+    const canCreate = auth.permissions?.includes('cai_ranges.create');
+    const canEdit = auth.permissions?.includes('cai_ranges.edit');
+    const canDelete = auth.permissions?.includes('cai_ranges.delete');
+
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedCaiRange, setSelectedCaiRange] = useState<CaiRange | null>(
@@ -231,14 +236,16 @@ export default function CaiRangesIndex({
                             CAI para facturación.
                         </p>
                     </div>
-                    <div>
-                        <Button
-                            onClick={handleCreate}
-                            className="h-10 w-full px-5 text-sm md:w-auto"
-                        >
-                            <Plus className="mr-2 h-4 w-4" /> Nuevo Rango
-                        </Button>
-                    </div>
+                    {canCreate && (
+                        <div>
+                            <Button
+                                onClick={handleCreate}
+                                className="h-10 w-full px-5 text-sm md:w-auto"
+                            >
+                                <Plus className="mr-2 h-4 w-4" /> Nuevo Rango
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -280,7 +287,7 @@ export default function CaiRangesIndex({
                                 <TableHead>Fecha Límite</TableHead>
                                 <TableHead>Estado</TableHead>
                                 <TableHead className="text-right">
-                                    Acciones
+                                    {(canEdit || canDelete) && 'Acciones'}
                                 </TableHead>
                             </TableRow>
                         </TableHeader>
@@ -414,29 +421,37 @@ export default function CaiRangesIndex({
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() =>
-                                                            handleEdit(caiRange)
-                                                        }
-                                                    >
-                                                        <Edit2 className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="text-destructive"
-                                                        onClick={() =>
-                                                            handleDeleteClick(
-                                                                caiRange,
-                                                            )
-                                                        }
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
+                                                {(canEdit || canDelete) && (
+                                                    <div className="flex justify-end gap-2">
+                                                        {canEdit && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() =>
+                                                                    handleEdit(
+                                                                        caiRange,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Edit2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                        {canDelete && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="text-destructive"
+                                                                onClick={() =>
+                                                                    handleDeleteClick(
+                                                                        caiRange,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     );

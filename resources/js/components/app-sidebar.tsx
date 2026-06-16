@@ -70,6 +70,7 @@ const mainNavItems: NavItem[] = [
         title: 'Facturación',
         href: invoicesIndex(),
         icon: Receipt,
+        permission: 'invoices.view',
     },
     {
         title: 'Tablero de Muestras',
@@ -86,6 +87,7 @@ const mainNavItems: NavItem[] = [
         title: 'Alquileres',
         href: rentalsIndex(),
         icon: Tag,
+        permission: 'rentals.view',
     },
 ];
 
@@ -99,21 +101,25 @@ const adminNavItems: NavItem[] = [
                 title: 'Gestionar Inventario',
                 href: inventoriesIndex(),
                 icon: ClipboardList,
+                permission: 'inventory.view',
             },
             {
                 title: 'Productos',
                 href: productsIndex(),
                 icon: Package,
+                permission: 'products.view',
             },
             {
                 title: 'Almacenes',
                 href: storagesIndex(),
                 icon: Warehouse,
+                permission: 'storages.view',
             },
             {
                 title: 'Historial de Movimientos',
                 href: inventoryMovementsIndex(),
                 icon: History,
+                permission: 'inventory.movements.view',
             },
         ],
     },
@@ -132,27 +138,31 @@ const adminNavItems: NavItem[] = [
                 title: 'Muestras',
                 href: '#',
                 icon: Microscope,
-                permission: 'specimens.manage',
                 items: [
                     {
                         title: 'Tipos de Muestras',
                         href: specimenTypesIndex(),
+                        permission: 'specimen_types.view',
                     },
                     {
                         title: 'Tipos de análisis',
                         href: specimenTypeExaminationsIndex(),
+                        permission: 'specimen_type_examinations.view',
                     },
                     {
                         title: 'Categorías',
                         href: specimenCategoriesIndex(),
+                        permission: 'specimen_categories.view',
                     },
                     {
                         title: 'Secuencias',
                         href: sequencesIndex(),
+                        permission: 'sequences.view',
                     },
                     {
                         title: 'Plantillas',
                         href: specimenTypeTemplatesIndex(),
+                        permission: 'specimen_type_templates.view',
                     },
                 ],
             },
@@ -164,10 +174,12 @@ const adminNavItems: NavItem[] = [
                     {
                         title: 'Gestionar Remitentes',
                         href: referrersIndex(),
+                        permission: 'referrers.view',
                     },
                     {
                         title: 'Tipos de Remitentes',
                         href: referrerTypesIndex(),
+                        permission: 'referrer_types.view',
                     },
                 ],
             },
@@ -175,6 +187,7 @@ const adminNavItems: NavItem[] = [
                 title: 'Sucursales',
                 href: locationsIndex(),
                 icon: MapPin,
+                permission: 'locations.view',
             },
             {
                 title: 'Contabilidad',
@@ -184,10 +197,12 @@ const adminNavItems: NavItem[] = [
                     {
                         title: 'Rangos de Facturación',
                         href: caiRangesIndex(),
+                        permission: 'cai_ranges.view',
                     },
                     {
                         title: 'Créditos',
                         href: creditsIndex(),
+                        permission: ['credits.view', 'credits.manage'],
                     },
                 ],
             },
@@ -207,6 +222,7 @@ const adminNavItems: NavItem[] = [
                 title: 'Ajustes del Sistema',
                 href: settingsSystemIndex(),
                 icon: Settings,
+                permission: 'settings.view',
             },
         ],
     },
@@ -214,22 +230,39 @@ const adminNavItems: NavItem[] = [
 
 const footerNavItems: NavItem[] = [];
 
-function filterNavItems(items: NavItem[], userPermissions: string[] = []): NavItem[] {
+function filterNavItems(
+    items: NavItem[],
+    userPermissions: string[] = [],
+): NavItem[] {
     return items
         .map((item) => {
             const newItem = { ...item };
+
             if (newItem.items) {
                 newItem.items = filterNavItems(newItem.items, userPermissions);
             }
+
             return newItem;
         })
         .filter((item) => {
-            if (item.permission && !userPermissions.includes(item.permission)) {
-                return false;
+            if (item.permission) {
+                const requiredPermissions = Array.isArray(item.permission)
+                    ? item.permission
+                    : [item.permission];
+
+                if (
+                    !requiredPermissions.some((perm) =>
+                        userPermissions.includes(perm),
+                    )
+                ) {
+                    return false;
+                }
             }
+
             if (item.items && item.items.length === 0 && item.href === '#') {
                 return false;
             }
+
             return true;
         });
 }

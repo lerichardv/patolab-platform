@@ -136,9 +136,20 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Alquileres',
+        description: 'Gestión de alquileres de equipos, espacios o servicios.',
+        slugs: {
+            view: 'rentals.view',
+            create: 'rentals.create',
+            edit: 'rentals.edit',
+            delete: 'rentals.delete',
+        },
+    },
+    {
         label: 'Configuración del Sistema',
         description: 'Parámetros generales de la plataforma y del laboratorio.',
         slugs: {
+            view: 'settings.view',
             edit: 'settings.edit',
             manage: 'settings.manage',
         },
@@ -147,6 +158,7 @@ const permissionRows: PermissionRow[] = [
         label: 'Productos de Inventario',
         description: 'Catálogo de reactivos, insumos y materiales.',
         slugs: {
+            view: 'products.view',
             create: 'products.create',
             edit: 'products.edit',
             delete: 'products.delete',
@@ -156,13 +168,14 @@ const permissionRows: PermissionRow[] = [
         label: 'Inventario (Carga y Abastecimiento)',
         description: 'Ingresos, egresos y control de stock de insumos.',
         slugs: {
+            view: 'inventory.view',
             create: 'inventory.add',
             manage: 'inventory.manage',
         },
     },
     {
         label: 'Movimientos de Inventario',
-        description: 'Kárdex e historial de transacciones de almacén.',
+        description: 'Historial de transacciones de almacén.',
         slugs: {
             view: 'inventory.movements.view',
         },
@@ -171,6 +184,7 @@ const permissionRows: PermissionRow[] = [
         label: 'Almacenes (Bodegas)',
         description: 'Registro y asignación física de productos.',
         slugs: {
+            view: 'storages.view',
             create: 'storages.create',
             edit: 'storages.edit',
             delete: 'storages.delete',
@@ -180,15 +194,28 @@ const permissionRows: PermissionRow[] = [
         label: 'Tipos de Muestra',
         description: 'Configuración de tipos de tejidos y fluidos admitidos.',
         slugs: {
+            view: 'specimen_types.view',
             create: 'specimen_types.create',
             edit: 'specimen_types.edit',
             delete: 'specimen_types.delete',
         },
     },
     {
+        label: 'Plantillas de Muestra',
+        description:
+            'Plantillas prediseñadas para diagnósticos rápidos de muestras.',
+        slugs: {
+            view: 'specimen_type_templates.view',
+            create: 'specimen_type_templates.create',
+            edit: 'specimen_type_templates.edit',
+            delete: 'specimen_type_templates.delete',
+        },
+    },
+    {
         label: 'Análisis y Exámenes',
         description: 'Configuración de pruebas médicas específicas.',
         slugs: {
+            view: 'specimen_type_examinations.view',
             create: 'specimen_type_examinations.create',
             edit: 'specimen_type_examinations.edit',
             delete: 'specimen_type_examinations.delete',
@@ -198,6 +225,7 @@ const permissionRows: PermissionRow[] = [
         label: 'Categorías de Muestra',
         description: 'Clasificaciones y agrupaciones para muestras.',
         slugs: {
+            view: 'specimen_categories.view',
             create: 'specimen_categories.create',
             edit: 'specimen_categories.edit',
             delete: 'specimen_categories.delete',
@@ -207,6 +235,7 @@ const permissionRows: PermissionRow[] = [
         label: 'Secuencias y Numeración',
         description: 'Rangos de correlativos y folios internos.',
         slugs: {
+            view: 'sequences.view',
             create: 'sequences.create',
             edit: 'sequences.edit',
             delete: 'sequences.delete',
@@ -216,6 +245,7 @@ const permissionRows: PermissionRow[] = [
         label: 'Remitentes (Médicos/Clínicas)',
         description: 'Médicos referentes y orígenes de muestras.',
         slugs: {
+            view: 'referrers.view',
             create: 'referrers.create',
             edit: 'referrers.edit',
             delete: 'referrers.delete',
@@ -226,6 +256,7 @@ const permissionRows: PermissionRow[] = [
         description:
             'Clasificación de orígenes (ej. Hospital, Consulta Privada).',
         slugs: {
+            view: 'referrer_types.view',
             create: 'referrer_types.create',
             edit: 'referrer_types.edit',
             delete: 'referrer_types.delete',
@@ -235,6 +266,7 @@ const permissionRows: PermissionRow[] = [
         label: 'Sucursales / Laboratorios',
         description: 'Sedes y ubicaciones de recolección de Patolab.',
         slugs: {
+            view: 'locations.view',
             create: 'locations.create',
             edit: 'locations.edit',
             delete: 'locations.delete',
@@ -244,6 +276,7 @@ const permissionRows: PermissionRow[] = [
         label: 'Rangos de Facturación (SAR/CAI)',
         description: 'Autorizaciones tributarias y límites de facturas.',
         slugs: {
+            view: 'cai_ranges.view',
             create: 'cai_ranges.create',
             edit: 'cai_ranges.edit',
             delete: 'cai_ranges.delete',
@@ -254,6 +287,7 @@ const permissionRows: PermissionRow[] = [
         description: 'Visualización de comprobantes fiscales generados.',
         slugs: {
             view: 'invoices.view',
+            manage: 'invoices.manage',
         },
     },
     {
@@ -468,7 +502,8 @@ export default function RolesIndex({
                                         }
                                         className="flex-1 sm:flex-none"
                                     >
-                                        <Edit2 className="mr-2 h-4 w-4" /> Renombrar
+                                        <Edit2 className="mr-2 h-4 w-4" />{' '}
+                                        Renombrar
                                     </Button>
                                 )}
                                 {auth.permissions?.includes('roles.delete') && (
@@ -481,7 +516,8 @@ export default function RolesIndex({
                                         }
                                         className="flex-1 sm:flex-none"
                                     >
-                                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                        <Trash2 className="mr-2 h-4 w-4" />{' '}
+                                        Eliminar
                                     </Button>
                                 )}
                             </div>
@@ -566,8 +602,11 @@ export default function RolesIndex({
                                                                                     )
                                                                                 }
                                                                                 disabled={
-                                                                                    selectedRole.id === 1 ||
-                                                                                    !auth.permissions?.includes('roles.edit')
+                                                                                    selectedRole.id ===
+                                                                                        1 ||
+                                                                                    !auth.permissions?.includes(
+                                                                                        'roles.edit',
+                                                                                    )
                                                                                 }
                                                                             />
                                                                         </div>

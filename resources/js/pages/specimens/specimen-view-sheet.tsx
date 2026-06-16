@@ -1,3 +1,4 @@
+import { usePage } from '@inertiajs/react';
 import { format, add, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -22,7 +23,6 @@ import {
     UserPlus,
 } from 'lucide-react';
 import { useState } from 'react';
-import { usePage } from '@inertiajs/react';
 import HeadingSheet from '@/components/heading-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,7 @@ export default function SpecimenViewSheet({
     onAssignPathologistClick,
 }: Props) {
     const { auth } = usePage<any>().props;
+
     if (!specimen) {
         return null;
     }
@@ -262,19 +263,23 @@ export default function SpecimenViewSheet({
                             />
                         </div>
                         <div className="flex w-full justify-center gap-2 sm:w-auto sm:justify-start">
-                            {invoice && onEditInvoiceClick && auth.permissions?.includes('specimens.edit') && (
-                                <Button
-                                    onClick={() => {
-                                        onOpenChange(false);
-                                        onEditInvoiceClick(invoice);
-                                    }}
-                                    variant="outline"
-                                    className="flex items-center gap-2"
-                                >
-                                    <CreditCard className="h-4 w-4" /> Editar
-                                    Factura
-                                </Button>
-                            )}
+                            {invoice &&
+                                onEditInvoiceClick &&
+                                auth.permissions?.includes(
+                                    'specimens.edit',
+                                ) && (
+                                    <Button
+                                        onClick={() => {
+                                            onOpenChange(false);
+                                            onEditInvoiceClick(invoice);
+                                        }}
+                                        variant="outline"
+                                        className="flex items-center gap-2"
+                                    >
+                                        <CreditCard className="h-4 w-4" />{' '}
+                                        Editar Factura
+                                    </Button>
+                                )}
                             {auth.permissions?.includes('specimens.edit') && (
                                 <Button
                                     onClick={onEditClick}
@@ -644,20 +649,23 @@ export default function SpecimenViewSheet({
                                         <User className="h-5 w-5" /> Patólogos
                                         Asignados
                                     </h3>
-                                    {onAssignPathologistClick && auth.permissions?.includes('specimens.manage') && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                                onOpenChange(false);
-                                                onAssignPathologistClick();
-                                            }}
-                                            className="h-8 gap-1.5 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
-                                        >
-                                            <UserPlus className="h-3.5 w-3.5" />{' '}
-                                            Asignar
-                                        </Button>
-                                    )}
+                                    {onAssignPathologistClick &&
+                                        auth.permissions?.includes(
+                                            'specimens.manage',
+                                        ) && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    onOpenChange(false);
+                                                    onAssignPathologistClick();
+                                                }}
+                                                className="h-8 gap-1.5 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
+                                            >
+                                                <UserPlus className="h-3.5 w-3.5" />{' '}
+                                                Asignar
+                                            </Button>
+                                        )}
                                 </div>
                                 <Separator />
                                 {specimen.users && specimen.users.length > 0 ? (
@@ -698,21 +706,24 @@ export default function SpecimenViewSheet({
                                             No hay patólogos asignados a esta
                                             muestra.
                                         </p>
-                                        {onAssignPathologistClick && auth.permissions?.includes('specimens.manage') && (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    onOpenChange(false);
-                                                    onAssignPathologistClick();
-                                                }}
-                                                className="mx-auto flex h-8 items-center gap-1.5 border-primary/20 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
-                                            >
-                                                <UserPlus className="h-3.5 w-3.5" />{' '}
-                                                Asignar Patólogo
-                                            </Button>
-                                        )}
+                                        {onAssignPathologistClick &&
+                                            auth.permissions?.includes(
+                                                'specimens.manage',
+                                            ) && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        onOpenChange(false);
+                                                        onAssignPathologistClick();
+                                                    }}
+                                                    className="mx-auto flex h-8 items-center gap-1.5 border-primary/20 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
+                                                >
+                                                    <UserPlus className="h-3.5 w-3.5" />{' '}
+                                                    Asignar Patólogo
+                                                </Button>
+                                            )}
                                     </div>
                                 )}
                             </div>

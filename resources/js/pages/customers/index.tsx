@@ -311,7 +311,9 @@ export default function CustomersIndex({ customers, filters }: Props) {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
-                                                {auth.permissions?.includes('patients.edit') && (
+                                                {auth.permissions?.includes(
+                                                    'patients.edit',
+                                                ) && (
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
@@ -322,7 +324,9 @@ export default function CustomersIndex({ customers, filters }: Props) {
                                                         <Edit2 className="h-4 w-4" />
                                                     </Button>
                                                 )}
-                                                {auth.permissions?.includes('patients.delete') && (
+                                                {auth.permissions?.includes(
+                                                    'patients.delete',
+                                                ) && (
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"

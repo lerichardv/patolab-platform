@@ -1066,7 +1066,10 @@ export default function SpecimensIndex({
                                         <ChevronDown className="h-4 w-4 opacity-50" />
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="w-56"
+                                >
                                     <DropdownMenuItem
                                         onClick={handleCreate}
                                         className="group cursor-pointer"
@@ -1075,7 +1078,9 @@ export default function SpecimensIndex({
                                         <span>Muestra Individual</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                        onClick={() => setIsGroupSheetOpen(true)}
+                                        onClick={() =>
+                                            setIsGroupSheetOpen(true)
+                                        }
                                         className="group cursor-pointer"
                                     >
                                         <Layers className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
@@ -1172,13 +1177,21 @@ export default function SpecimensIndex({
                                 )}
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                                {(auth.permissions?.includes('specimens.edit') ||
-                                    auth.permissions?.includes('specimens.manage') ||
-                                    auth.permissions?.includes('specimens.delete')) && (
+                                {(auth.permissions?.includes(
+                                    'specimens.edit',
+                                ) ||
+                                    auth.permissions?.includes(
+                                        'specimens.manage',
+                                    ) ||
+                                    auth.permissions?.includes(
+                                        'specimens.delete',
+                                    )) && (
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button
-                                                disabled={selectedIds.length === 0}
+                                                disabled={
+                                                    selectedIds.length === 0
+                                                }
                                                 className="flex h-8 w-full items-center gap-2 px-3 text-xs sm:w-auto sm:px-4"
                                             >
                                                 <Layers className="h-4 w-4" />{' '}
@@ -1196,11 +1209,15 @@ export default function SpecimensIndex({
                                             <DropdownMenuSeparator />
 
                                             {/* Cambiar Estado Submenu */}
-                                            {auth.permissions?.includes('specimens.edit') && (
+                                            {auth.permissions?.includes(
+                                                'specimens.edit',
+                                            ) && (
                                                 <DropdownMenuSub>
                                                     <DropdownMenuSubTrigger>
                                                         <Tag className="mr-2 h-4 w-4" />
-                                                        <span>Cambiar Estado</span>
+                                                        <span>
+                                                            Cambiar Estado
+                                                        </span>
                                                     </DropdownMenuSubTrigger>
                                                     <DropdownMenuSubContent>
                                                         <DropdownMenuItem
@@ -1271,11 +1288,15 @@ export default function SpecimensIndex({
                                             )}
 
                                             {/* Cambiar Prioridad Submenu */}
-                                            {auth.permissions?.includes('specimens.edit') && (
+                                            {auth.permissions?.includes(
+                                                'specimens.edit',
+                                            ) && (
                                                 <DropdownMenuSub>
                                                     <DropdownMenuSubTrigger>
                                                         <CalendarClock className="mr-2 h-4 w-4" />
-                                                        <span>Cambiar Prioridad</span>
+                                                        <span>
+                                                            Cambiar Prioridad
+                                                        </span>
                                                     </DropdownMenuSubTrigger>
                                                     <DropdownMenuSubContent>
                                                         {priorities.map((p) => (
@@ -1295,31 +1316,47 @@ export default function SpecimensIndex({
                                             )}
 
                                             {/* Asignar Patólogo in Bulk */}
-                                            {auth.permissions?.includes('specimens.manage') && (
+                                            {auth.permissions?.includes(
+                                                'specimens.manage',
+                                            ) && (
                                                 <DropdownMenuItem
                                                     onClick={() =>
-                                                        setIsBulkAssignSheetOpen(true)
+                                                        setIsBulkAssignSheetOpen(
+                                                            true,
+                                                        )
                                                     }
                                                 >
                                                     <UserPlus className="mr-2 h-4 w-4" />
-                                                    <span>Asignar Patólogo</span>
+                                                    <span>
+                                                        Asignar Patólogo
+                                                    </span>
                                                 </DropdownMenuItem>
                                             )}
 
-                                            {auth.permissions?.includes('specimens.delete') && (
+                                            {auth.permissions?.includes(
+                                                'specimens.delete',
+                                            ) && (
                                                 <>
-                                                    {(auth.permissions?.includes('specimens.edit') ||
-                                                        auth.permissions?.includes('specimens.manage')) && (
+                                                    {(auth.permissions?.includes(
+                                                        'specimens.edit',
+                                                    ) ||
+                                                        auth.permissions?.includes(
+                                                            'specimens.manage',
+                                                        )) && (
                                                         <DropdownMenuSeparator />
                                                     )}
                                                     <DropdownMenuItem
                                                         variant="destructive"
                                                         onClick={() =>
-                                                            setIsBulkDeleteDialogOpen(true)
+                                                            setIsBulkDeleteDialogOpen(
+                                                                true,
+                                                            )
                                                         }
                                                     >
                                                         <Trash2 className="mr-2 h-4 w-4" />
-                                                        <span>Desactivar Muestras</span>
+                                                        <span>
+                                                            Desactivar Muestras
+                                                        </span>
                                                     </DropdownMenuItem>
                                                 </>
                                             )}
@@ -1423,7 +1460,11 @@ export default function SpecimensIndex({
                                                                     index={
                                                                         index
                                                                     }
-                                                                    isDragDisabled={!auth.permissions?.includes('specimens.edit')}
+                                                                    isDragDisabled={
+                                                                        !auth.permissions?.includes(
+                                                                            'specimens.edit',
+                                                                        )
+                                                                    }
                                                                 >
                                                                     {(
                                                                         provided,
@@ -1530,7 +1571,9 @@ export default function SpecimensIndex({
                                                                                                 e.stopPropagation()
                                                                                             }
                                                                                         >
-                                                                                            {auth.permissions?.includes('specimens.manage') && (
+                                                                                            {auth.permissions?.includes(
+                                                                                                'specimens.manage',
+                                                                                            ) && (
                                                                                                 <Button
                                                                                                     variant="ghost"
                                                                                                     size="icon"
@@ -1561,8 +1604,12 @@ export default function SpecimensIndex({
                                                                                                     </span>
                                                                                                 </Button>
                                                                                             )}
-                                                                                            {(auth.permissions?.includes('specimens.edit') ||
-                                                                                                auth.permissions?.includes('specimens.delete')) && (
+                                                                                            {(auth.permissions?.includes(
+                                                                                                'specimens.edit',
+                                                                                            ) ||
+                                                                                                auth.permissions?.includes(
+                                                                                                    'specimens.delete',
+                                                                                                )) && (
                                                                                                 <DropdownMenu>
                                                                                                     <DropdownMenuTrigger
                                                                                                         asChild
@@ -1582,7 +1629,9 @@ export default function SpecimensIndex({
                                                                                                             e.stopPropagation()
                                                                                                         }
                                                                                                     >
-                                                                                                        {auth.permissions?.includes('specimens.edit') && (
+                                                                                                        {auth.permissions?.includes(
+                                                                                                            'specimens.edit',
+                                                                                                        ) && (
                                                                                                             <DropdownMenuItem
                                                                                                                 onClick={(
                                                                                                                     e,
@@ -1599,7 +1648,9 @@ export default function SpecimensIndex({
                                                                                                                 </span>
                                                                                                             </DropdownMenuItem>
                                                                                                         )}
-                                                                                                        {auth.permissions?.includes('specimens.delete') && (
+                                                                                                        {auth.permissions?.includes(
+                                                                                                            'specimens.delete',
+                                                                                                        ) && (
                                                                                                             <DropdownMenuItem
                                                                                                                 variant="destructive"
                                                                                                                 onClick={(

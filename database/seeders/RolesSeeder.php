@@ -50,7 +50,7 @@ class RolesSeeder extends Seeder
             'products.edit',
             'products.delete',
             'inventory.add',
-            'inventory.replenish',
+            'inventory.manage',
             'storages.create',
             'storages.edit',
             'storages.delete',

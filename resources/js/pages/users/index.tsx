@@ -210,7 +210,9 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                                         <TableCell className="text-right">
                                             {user.id !== auth.user.id ? (
                                                 <div className="flex justify-end gap-2">
-                                                    {auth.permissions?.includes('users.edit') && (
+                                                    {auth.permissions?.includes(
+                                                        'users.edit',
+                                                    ) && (
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
@@ -221,7 +223,9 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                                                             <Edit2 className="h-4 w-4" />
                                                         </Button>
                                                     )}
-                                                    {auth.permissions?.includes('users.delete') && (
+                                                    {auth.permissions?.includes(
+                                                        'users.delete',
+                                                    ) && (
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"

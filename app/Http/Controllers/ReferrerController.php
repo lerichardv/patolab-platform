@@ -6,11 +6,13 @@ use App\Models\Referrer;
 use App\Models\ReferrerType;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class ReferrerController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('referrers.view');
         $query = Referrer::query()->with('type')->where('active', true)->orderBy('created_at', 'desc');
 
         if ($request->has('search')) {
@@ -35,6 +37,7 @@ class ReferrerController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('referrers.create');
         $request->validate([
             'name' => 'required|string|max:255',
             'referrer_type' => 'required|exists:referrer_types,id',
@@ -51,6 +54,7 @@ class ReferrerController extends Controller
 
     public function update(Request $request, Referrer $referrer)
     {
+        Gate::authorize('referrers.edit');
         $request->validate([
             'name' => 'required|string|max:255',
             'referrer_type' => 'required|exists:referrer_types,id',
@@ -67,6 +71,7 @@ class ReferrerController extends Controller
 
     public function destroy(Referrer $referrer)
     {
+        Gate::authorize('referrers.delete');
         $referrer->update(['active' => false]);
 
         return redirect()->back();

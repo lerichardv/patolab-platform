@@ -114,7 +114,11 @@ export default function RentalsIndex({
     allRentals = [],
 }: Props) {
     const { props } = usePage() as any;
+    const auth = props.auth || {};
     const flash = props.flash || {};
+
+    const canCreate = auth.permissions?.includes('rentals.create');
+    const canEdit = auth.permissions?.includes('rentals.edit');
 
     const [isRentalSheetOpen, setIsRentalSheetOpen] = useState(false);
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
@@ -281,21 +285,25 @@ export default function RentalsIndex({
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={handleCreateRental}
-                            className="h-10 gap-2 border-primary text-primary hover:bg-primary/5"
-                        >
-                            <Plus className="h-4 w-4" />
-                            <span>Nuevo Alquiler</span>
-                        </Button>
-                        <Button
-                            onClick={handleGeneralPay}
-                            className="h-10 gap-2"
-                        >
-                            <Receipt className="h-4 w-4" />
-                            <span>Registrar Pago</span>
-                        </Button>
+                        {canCreate && (
+                            <Button
+                                variant="outline"
+                                onClick={handleCreateRental}
+                                className="h-10 gap-2 border-primary text-primary hover:bg-primary/5"
+                            >
+                                <Plus className="h-4 w-4" />
+                                <span>Nuevo Alquiler</span>
+                            </Button>
+                        )}
+                        {canEdit && (
+                            <Button
+                                onClick={handleGeneralPay}
+                                className="h-10 gap-2"
+                            >
+                                <Receipt className="h-4 w-4" />
+                                <span>Registrar Pago</span>
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -477,11 +485,13 @@ export default function RentalsIndex({
                                 <TableHead className="min-w-[150px]">
                                     {renderSortHeader('date', 'Fecha Registro')}
                                 </TableHead>
-                                <TableHead
-                                    className={`z-10 w-[160px] min-w-[160px] border-l border-border bg-card text-right before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:sticky md:right-0 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
-                                >
-                                    Acciones
-                                </TableHead>
+                                {canEdit && (
+                                    <TableHead
+                                        className={`z-10 w-[160px] min-w-[160px] border-l border-border bg-card text-right before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:sticky md:right-0 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
+                                    >
+                                        Acciones
+                                    </TableHead>
+                                )}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -560,44 +570,46 @@ export default function RentalsIndex({
                                                       )
                                                     : 'N/A'}
                                             </TableCell>
-                                            <TableCell
-                                                className={`z-10 text-right md:sticky md:right-0 ${stickyBgClass} w-[160px] min-w-[160px] border-l border-border transition-colors before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
-                                            >
-                                                <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            handlePayRental(
-                                                                rentalItem,
-                                                            )
-                                                        }
-                                                        className="h-8 gap-1.5 border-primary text-primary hover:bg-primary/5"
-                                                    >
-                                                        <Receipt className="h-3.5 w-3.5" />
-                                                        <span>Pagar</span>
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() =>
-                                                            handleEditRental(
-                                                                rentalItem,
-                                                            )
-                                                        }
-                                                        title="Editar Alquiler"
-                                                    >
-                                                        <Edit className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
+                                            {canEdit && (
+                                                <TableCell
+                                                    className={`z-10 text-right md:sticky md:right-0 ${stickyBgClass} w-[160px] min-w-[160px] border-l border-border transition-colors before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
+                                                >
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                handlePayRental(
+                                                                    rentalItem,
+                                                                )
+                                                            }
+                                                            className="h-8 gap-1.5 border-primary text-primary hover:bg-primary/5"
+                                                        >
+                                                            <Receipt className="h-3.5 w-3.5" />
+                                                            <span>Pagar</span>
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                handleEditRental(
+                                                                    rentalItem,
+                                                                )
+                                                            }
+                                                            title="Editar Alquiler"
+                                                        >
+                                                            <Edit className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            )}
                                         </TableRow>
                                     );
                                 })
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={6}
+                                        colSpan={canEdit ? 6 : 5}
                                         className="h-24 text-center text-muted-foreground"
                                     >
                                         No se encontraron registros de

@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
 import {
     ClipboardList,
@@ -102,6 +102,10 @@ export default function InventoriesIndex({
     existingInventories,
     filters,
 }: Props) {
+    const { auth } = usePage<any>().props;
+    const canAdd = auth.permissions?.includes('inventory.add');
+    const canManage = auth.permissions?.includes('inventory.manage');
+
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isAbastecerOpen, setIsAbastecerOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -183,21 +187,25 @@ export default function InventoriesIndex({
                         </p>
                     </div>
                     <div className="flex flex-col gap-2 md:flex-row">
-                        <Button
-                            variant="secondary"
-                            onClick={handleCreate}
-                            className="h-10 w-full px-5 text-sm md:w-auto"
-                        >
-                            <Plus className="mr-2 h-4 w-4" /> Agregar producto
-                            al inventario
-                        </Button>
-                        <Button
-                            onClick={handleAbastecer}
-                            className="h-10 w-full px-5 text-sm md:w-auto"
-                        >
-                            <PackageSearch className="mr-2 h-4 w-4" /> Abastecer
-                            existente
-                        </Button>
+                        {canAdd && (
+                            <Button
+                                variant="secondary"
+                                onClick={handleCreate}
+                                className="h-10 w-full px-5 text-sm md:w-auto"
+                            >
+                                <Plus className="mr-2 h-4 w-4" /> Agregar
+                                producto al inventario
+                            </Button>
+                        )}
+                        {canManage && (
+                            <Button
+                                onClick={handleAbastecer}
+                                className="h-10 w-full px-5 text-sm md:w-auto"
+                            >
+                                <PackageSearch className="mr-2 h-4 w-4" />{' '}
+                                Abastecer existente
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -321,27 +329,31 @@ export default function InventoriesIndex({
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() =>
-                                                        handleEdit(item)
-                                                    }
-                                                >
-                                                    <Edit2 className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-destructive"
-                                                    onClick={() =>
-                                                        handleDeleteClick(item)
-                                                    }
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                            {canManage && (
+                                                <div className="flex justify-end gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() =>
+                                                            handleEdit(item)
+                                                        }
+                                                    >
+                                                        <Edit2 className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="text-destructive"
+                                                        onClick={() =>
+                                                            handleDeleteClick(
+                                                                item,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))

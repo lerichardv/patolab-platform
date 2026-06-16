@@ -19,7 +19,7 @@ class SequenceController extends Controller
      */
     public function index(Request $request): Response
     {
-        Gate::authorize('specimens.manage');
+        Gate::authorize('sequences.view');
         $query = Sequence::query()
             ->with(['location', 'specimenTypeRelation'])
             ->where('active', true);
@@ -55,7 +55,6 @@ class SequenceController extends Controller
      */
     public function store(Request $request)
     {
-        Gate::authorize('specimens.manage');
         Gate::authorize('sequences.create');
         $validated = $request->validate([
             'location_id' => 'required|exists:locations,id',
@@ -85,7 +84,6 @@ class SequenceController extends Controller
      */
     public function update(Request $request, Sequence $sequence)
     {
-        Gate::authorize('specimens.manage');
         Gate::authorize('sequences.edit');
         $validated = $request->validate([
             'location_id' => 'required|exists:locations,id',
@@ -117,7 +115,6 @@ class SequenceController extends Controller
      */
     public function destroy(Sequence $sequence)
     {
-        Gate::authorize('specimens.manage');
         Gate::authorize('sequences.delete');
         $sequence->update(['active' => false]);
 

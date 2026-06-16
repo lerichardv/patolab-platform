@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 use Spatie\Browsershot\Browsershot;
 
 class RentalController extends Controller
@@ -26,12 +27,14 @@ class RentalController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('rentals.view');
+
         $query = Rental::with(['invoices' => function ($q) {
             $q->where('invoice_type', 'rental')
               ->with('customer')
               ->orderBy('created_at', 'desc');
         }]);
-
+        
         if ($request->filled('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
@@ -100,6 +103,8 @@ class RentalController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('rentals.create');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:255',
@@ -118,6 +123,8 @@ class RentalController extends Controller
      */
     public function update(Request $request, Rental $rental)
     {
+        Gate::authorize('rentals.edit');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:255',
@@ -133,6 +140,7 @@ class RentalController extends Controller
      */
     public function pay(Request $request)
     {
+        Gate::authorize('rentals.edit');
         $validated = $request->validate([
             'rental_id' => 'required|integer|exists:rentals,id',
             'customer_id' => 'required_if:payment_type,credit|nullable|exists:customers,id',

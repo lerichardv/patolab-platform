@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { Settings, Percent, Save } from 'lucide-react';
 import type { FormEventHandler } from 'react';
 import { toast } from 'sonner';
@@ -23,6 +23,9 @@ interface Props {
 }
 
 export default function SystemSettingsIndex({ settings }: Props) {
+    const { auth } = usePage<any>().props;
+    const canEdit = auth.permissions?.includes('settings.edit');
+
     const { data, setData, put, processing, errors } = useForm({
         third_age_discount: settings.third_age_discount || '30',
         fourth_age_discount: settings.fourth_age_discount || '40',
@@ -30,6 +33,11 @@ export default function SystemSettingsIndex({ settings }: Props) {
 
     const handleSubmit: FormEventHandler = (e) => {
         e.preventDefault();
+
+        if (!canEdit) {
+            return;
+        }
+
         put(updateSettings().url, {
             onSuccess: () => {
                 toast.success('Ajustes del sistema actualizados correctamente');
@@ -92,6 +100,7 @@ export default function SystemSettingsIndex({ settings }: Props) {
                                             max="100"
                                             step="any"
                                             value={data.third_age_discount}
+                                            disabled={!canEdit}
                                             onChange={(e) =>
                                                 setData(
                                                     'third_age_discount',
@@ -129,6 +138,7 @@ export default function SystemSettingsIndex({ settings }: Props) {
                                             max="100"
                                             step="any"
                                             value={data.fourth_age_discount}
+                                            disabled={!canEdit}
                                             onChange={(e) =>
                                                 setData(
                                                     'fourth_age_discount',
@@ -154,16 +164,20 @@ export default function SystemSettingsIndex({ settings }: Props) {
                         </CardContent>
                     </Card>
 
-                    <div className="flex justify-end pt-2">
-                        <Button
-                            type="submit"
-                            disabled={processing}
-                            className="flex h-10 w-full items-center gap-2 px-5 text-sm md:w-auto"
-                        >
-                            <Save className="mr-2 h-4 w-4" />
-                            {processing ? 'Guardando...' : 'Guardar Cambios'}
-                        </Button>
-                    </div>
+                    {canEdit && (
+                        <div className="flex justify-end pt-2">
+                            <Button
+                                type="submit"
+                                disabled={processing}
+                                className="flex h-10 w-full items-center gap-2 px-5 text-sm md:w-auto"
+                            >
+                                <Save className="mr-2 h-4 w-4" />
+                                {processing
+                                    ? 'Guardando...'
+                                    : 'Guardar Cambios'}
+                            </Button>
+                        </div>
+                    )}
                 </form>
             </div>
         </>

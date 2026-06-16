@@ -68,8 +68,8 @@ export default function CreditEditSheet({ credit, open, onOpenChange }: Props) {
         e.preventDefault();
 
         if (!credit) {
-return;
-}
+            return;
+        }
 
         const days = parseInt(data.reminder_interval_in_days);
 

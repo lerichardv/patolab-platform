@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\InventoryMovement;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class InventoryMovementController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('inventory.movements.view');
+
         $query = InventoryMovement::query()
             ->with(['user'])
             ->latest();

@@ -19,11 +19,13 @@ use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Spatie\Browsershot\Browsershot;
+use Illuminate\Support\Facades\Gate;
 
 class CreditController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('credits.view');
         $query = Credit::with([
             'customer',
             'invoices.specimen.type',
@@ -119,6 +121,7 @@ class CreditController extends Controller
 
     public function export(Request $request)
     {
+        Gate::authorize('credits.view');
         $query = Credit::with([
             'customer',
             'invoices.specimen.type',
@@ -311,6 +314,7 @@ class CreditController extends Controller
 
     public function pay(Request $request, Credit $credit)
     {
+        Gate::authorize('credits.manage');
         $validated = $request->validate([
             'amount_paid' => [
                 'required',
@@ -604,6 +608,7 @@ class CreditController extends Controller
 
     public function update(Request $request, Credit $credit)
     {
+        Gate::authorize('credits.manage');
         $validated = $request->validate([
             'reminder_interval_in_days' => 'required|integer|min:1',
         ]);

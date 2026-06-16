@@ -12,7 +12,7 @@ class SpecimenTypeController extends Controller
 {
     public function index(Request $request)
     {
-        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_types.view');
         $query = SpecimenType::query()->with('prices')->where('active', true)->orderBy('created_at', 'desc');
 
         if ($request->has('search')) {
@@ -33,7 +33,6 @@ class SpecimenTypeController extends Controller
 
     public function store(Request $request)
     {
-        Gate::authorize('specimens.manage');
         Gate::authorize('specimen_types.create');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -60,7 +59,6 @@ class SpecimenTypeController extends Controller
 
     public function update(Request $request, SpecimenType $specimenType)
     {
-        Gate::authorize('specimens.manage');
         Gate::authorize('specimen_types.edit');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -99,7 +97,6 @@ class SpecimenTypeController extends Controller
 
     public function destroy(SpecimenType $specimenType)
     {
-        Gate::authorize('specimens.manage');
         Gate::authorize('specimen_types.delete');
         $specimenType->update(['active' => false]);
 

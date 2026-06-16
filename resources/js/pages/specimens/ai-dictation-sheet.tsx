@@ -1,4 +1,12 @@
-import { Mic, Square, Loader2, Check, RefreshCw, X, AlertCircle } from 'lucide-react';
+import {
+    Mic,
+    Square,
+    Loader2,
+    Check,
+    RefreshCw,
+    X,
+    AlertCircle,
+} from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -70,12 +78,14 @@ export default function AIDictationSheet({
             const timer = setTimeout(() => {
                 setStatus('transcribing');
             }, 2500);
+
             return () => clearTimeout(timer);
         }
     }, [status]);
 
     useEffect(() => {
         let interval: NodeJS.Timeout;
+
         if (status === 'sending') {
             let index = 0;
             setLoaderText(SENDING_TEXTS[0]);
@@ -91,17 +101,25 @@ export default function AIDictationSheet({
                 setLoaderText(TRANSCRIBING_TEXTS[index]);
             }, 1800);
         }
+
         return () => clearInterval(interval);
     }, [status]);
 
     const cleanupRecordingResources = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        if (
+            mediaRecorderRef.current &&
+            mediaRecorderRef.current.state !== 'inactive'
+        ) {
             mediaRecorderRef.current.onstop = null;
             mediaRecorderRef.current.stop();
-            mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+            mediaRecorderRef.current.stream
+                .getTracks()
+                .forEach((track) => track.stop());
         }
+
         mediaRecorderRef.current = null;
         isRecordingRef.current = false;
+
         if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
@@ -110,7 +128,9 @@ export default function AIDictationSheet({
 
     const startRecording = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+            });
             const options = { mimeType: 'audio/webm;codecs=opus' };
             let recorder: MediaRecorder;
 
@@ -128,7 +148,9 @@ export default function AIDictationSheet({
             };
 
             recorder.onstop = () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType });
+                const audioBlob = new Blob(audioChunksRef.current, {
+                    type: recorder.mimeType,
+                });
                 sendAudioToBackend(audioBlob);
                 stream.getTracks().forEach((track) => track.stop());
             };
@@ -146,18 +168,25 @@ export default function AIDictationSheet({
             toast.success('Grabación iniciada. Empiece a hablar...');
         } catch (err) {
             console.error('Failed to get microphone permissions:', err);
-            toast.error('No se pudo acceder al micrófono. Verifique los permisos del navegador.');
+            toast.error(
+                'No se pudo acceder al micrófono. Verifique los permisos del navegador.',
+            );
         }
     };
 
     const stopRecording = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        if (
+            mediaRecorderRef.current &&
+            mediaRecorderRef.current.state !== 'inactive'
+        ) {
             mediaRecorderRef.current.stop();
         }
+
         if (timerRef.current) {
             clearInterval(timerRef.current);
             timerRef.current = null;
         }
+
         isRecordingRef.current = false;
     };
 
@@ -186,15 +215,23 @@ export default function AIDictationSheet({
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error || errData.details || 'Error al transcribir el audio.');
+
+                throw new Error(
+                    errData.error ||
+                        errData.details ||
+                        'Error al transcribir el audio.',
+                );
             }
 
             const data = await response.json();
+
             if (data.success && data.text) {
                 setTranscription(data.text);
                 setStatus('success');
             } else {
-                throw new Error(data.error || 'Respuesta vacía o inválida del servidor.');
+                throw new Error(
+                    data.error || 'Respuesta vacía o inválida del servidor.',
+                );
             }
         } catch (err: any) {
             setError(err.message || 'Error de red o del modelo.');
@@ -205,6 +242,7 @@ export default function AIDictationSheet({
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
+
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
@@ -223,7 +261,9 @@ export default function AIDictationSheet({
                         Dictado por Voz
                     </SheetTitle>
                     <SheetDescription className="text-sm text-muted-foreground">
-                        Grabe su voz para transcribir descripciones médicas con Inteligencia Artificial. Revise y edite antes de insertar.
+                        Grabe su voz para transcribir descripciones médicas con
+                        Inteligencia Artificial. Revise y edite antes de
+                        insertar.
                     </SheetDescription>
                 </SheetHeader>
 
@@ -247,8 +287,10 @@ export default function AIDictationSheet({
                                 <p className="text-sm font-semibold text-foreground">
                                     Presione el botón para iniciar grabación
                                 </p>
-                                <p className="text-xs text-muted-foreground max-w-sm">
-                                    Asegúrese de estar en un ambiente silencioso y usar un vocabulario claro para mejores resultados de transcripción médica.
+                                <p className="max-w-sm text-xs text-muted-foreground">
+                                    Asegúrese de estar en un ambiente silencioso
+                                    y usar un vocabulario claro para mejores
+                                    resultados de transcripción médica.
                                 </p>
                             </div>
                         </div>
@@ -266,10 +308,10 @@ export default function AIDictationSheet({
                             </div>
 
                             <div className="space-y-2">
-                                <span className="text-2xl font-mono font-bold tracking-wider text-foreground">
+                                <span className="font-mono text-2xl font-bold tracking-wider text-foreground">
                                     {formatTime(recordingTime)}
                                 </span>
-                                <p className="text-xs font-semibold text-emerald-500 uppercase tracking-widest animate-pulse">
+                                <p className="animate-pulse text-xs font-semibold tracking-widest text-emerald-500 uppercase">
                                     Grabando audio...
                                 </p>
                             </div>
@@ -278,9 +320,9 @@ export default function AIDictationSheet({
                                 <Button
                                     type="button"
                                     onClick={stopRecording}
-                                    className="bg-red-500 text-white hover:bg-red-600 font-semibold"
+                                    className="bg-red-500 font-semibold text-white hover:bg-red-600"
                                 >
-                                    <Square className="h-4 w-4 mr-2" />
+                                    <Square className="mr-2 h-4 w-4" />
                                     Detener y Transcribir
                                 </Button>
                                 <Button
@@ -289,7 +331,7 @@ export default function AIDictationSheet({
                                     onClick={cancelRecording}
                                     className="font-semibold"
                                 >
-                                    <X className="h-4 w-4 mr-2" />
+                                    <X className="mr-2 h-4 w-4" />
                                     Cancelar
                                 </Button>
                             </div>
@@ -303,7 +345,7 @@ export default function AIDictationSheet({
                                 <p className="text-sm font-semibold text-foreground">
                                     Procesando transcripción
                                 </p>
-                                <p className="text-xs text-muted-foreground max-w-sm italic">
+                                <p className="max-w-sm text-xs text-muted-foreground italic">
                                     "{loaderText}"
                                 </p>
                             </div>
@@ -318,11 +360,14 @@ export default function AIDictationSheet({
                             <Textarea
                                 className="text-md min-h-[200px] w-full resize-none leading-relaxed"
                                 value={transcription}
-                                onChange={(e) => setTranscription(e.target.value)}
+                                onChange={(e) =>
+                                    setTranscription(e.target.value)
+                                }
                                 placeholder="La transcripción de su dictado aparecerá aquí..."
                             />
                             <p className="text-[10px] text-muted-foreground italic">
-                                * Puede editar el texto libremente antes de insertarlo en el reporte.
+                                * Puede editar el texto libremente antes de
+                                insertarlo en el reporte.
                             </p>
                         </div>
                     )}
@@ -336,7 +381,7 @@ export default function AIDictationSheet({
                                 <p className="text-sm font-semibold text-foreground">
                                     Error de Transcripción
                                 </p>
-                                <p className="text-xs text-red-500 max-w-md bg-destructive/5 border border-destructive/10 p-3 rounded-lg">
+                                <p className="max-w-md rounded-lg border border-destructive/10 bg-destructive/5 p-3 text-xs text-red-500">
                                     {error}
                                 </p>
                             </div>
@@ -345,7 +390,7 @@ export default function AIDictationSheet({
                                 onClick={() => setStatus('idle')}
                                 className="font-semibold"
                             >
-                                <RefreshCw className="h-4 w-4 mr-2" />
+                                <RefreshCw className="mr-2 h-4 w-4" />
                                 Intentar de nuevo
                             </Button>
                         </div>
@@ -363,7 +408,7 @@ export default function AIDictationSheet({
                                 }}
                                 className="w-full font-semibold sm:flex-1"
                             >
-                                <Check className="h-4 w-4 mr-2" />
+                                <Check className="mr-2 h-4 w-4" />
                                 Aplicar dictado
                             </Button>
                             <Button
@@ -372,7 +417,7 @@ export default function AIDictationSheet({
                                 onClick={() => setStatus('idle')}
                                 className="w-full font-semibold sm:flex-1"
                             >
-                                <RefreshCw className="h-4 w-4 mr-2" />
+                                <RefreshCw className="mr-2 h-4 w-4" />
                                 Grabar de nuevo
                             </Button>
                         </>
@@ -383,7 +428,11 @@ export default function AIDictationSheet({
                             variant="outline"
                             onClick={() => onOpenChange(false)}
                             className="w-full font-semibold"
-                            disabled={status === 'recording' || status === 'sending' || status === 'transcribing'}
+                            disabled={
+                                status === 'recording' ||
+                                status === 'sending' ||
+                                status === 'transcribing'
+                            }
                         >
                             Cerrar
                         </Button>

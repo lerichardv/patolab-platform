@@ -10,11 +10,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class InventoryController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('inventory.view');
+
         $query = Inventory::query()
             ->with(['storageRelation', 'productRelation'])
             ->where('active', true);
@@ -44,6 +47,8 @@ class InventoryController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('inventory.add');
+
         $validated = $request->validate([
             'storage' => 'required|exists:storage,id',
             'items' => 'required|array|min:1',
@@ -94,6 +99,8 @@ class InventoryController extends Controller
 
     public function update(Request $request, Inventory $inventory)
     {
+        Gate::authorize('inventory.manage');
+
         $validated = $request->validate([
             'storage' => 'required|exists:storage,id',
             'product' => 'required|exists:products,id',
@@ -110,6 +117,8 @@ class InventoryController extends Controller
 
     public function abastecer(Request $request)
     {
+        Gate::authorize('inventory.manage');
+
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.inventory_id' => 'required|exists:inventory,id',
@@ -138,6 +147,8 @@ class InventoryController extends Controller
 
     public function destroy(Inventory $inventory)
     {
+        Gate::authorize('inventory.manage');
+
         $before = $inventory->quantity;
         $inventory->update(['active' => false]);
 

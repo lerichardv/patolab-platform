@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Storage;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class StorageController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('storages.view');
+
         $query = Storage::query()->where('active', true);
 
         if ($request->has('search')) {
@@ -31,6 +34,8 @@ class StorageController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('storages.create');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'location' => 'required|string|max:255',
@@ -44,6 +49,8 @@ class StorageController extends Controller
 
     public function update(Request $request, Storage $storage)
     {
+        Gate::authorize('storages.edit');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'location' => 'required|string|max:255',
@@ -57,6 +64,8 @@ class StorageController extends Controller
 
     public function destroy(Storage $storage)
     {
+        Gate::authorize('storages.delete');
+
         $storage->update(['active' => false]);
 
         return redirect()->back();

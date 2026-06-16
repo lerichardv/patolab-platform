@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
 import { Edit2, MapPin, Plus, Search, Trash2 } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
@@ -59,6 +59,11 @@ interface Props {
 }
 
 export default function LocationsIndex({ locations, filters }: Props) {
+    const { auth } = usePage<any>().props;
+    const canCreate = auth.permissions?.includes('locations.create');
+    const canEdit = auth.permissions?.includes('locations.edit');
+    const canDelete = auth.permissions?.includes('locations.delete');
+
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(
@@ -135,14 +140,16 @@ export default function LocationsIndex({ locations, filters }: Props) {
                             laboratorios.
                         </p>
                     </div>
-                    <div className="flex gap-2">
-                        <Button
-                            onClick={handleCreate}
-                            className="h-10 w-full px-5 text-sm md:w-auto"
-                        >
-                            <Plus className="mr-2 h-4 w-4" /> Nueva Sucursal
-                        </Button>
-                    </div>
+                    {canCreate && (
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={handleCreate}
+                                className="h-10 w-full px-5 text-sm md:w-auto"
+                            >
+                                <Plus className="mr-2 h-4 w-4" /> Nueva Sucursal
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex max-w-sm items-center gap-2">
@@ -166,7 +173,7 @@ export default function LocationsIndex({ locations, filters }: Props) {
                                 <TableHead>Contacto</TableHead>
                                 <TableHead>Dirección</TableHead>
                                 <TableHead className="text-right">
-                                    Acciones
+                                    {(canEdit || canDelete) && 'Acciones'}
                                 </TableHead>
                             </TableRow>
                         </TableHeader>
@@ -202,29 +209,37 @@ export default function LocationsIndex({ locations, filters }: Props) {
                                             </p>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() =>
-                                                        handleEdit(location)
-                                                    }
-                                                >
-                                                    <Edit2 className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-destructive"
-                                                    onClick={() =>
-                                                        handleDeleteClick(
-                                                            location,
-                                                        )
-                                                    }
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                            {(canEdit || canDelete) && (
+                                                <div className="flex justify-end gap-2">
+                                                    {canEdit && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                handleEdit(
+                                                                    location,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-destructive"
+                                                            onClick={() =>
+                                                                handleDeleteClick(
+                                                                    location,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))

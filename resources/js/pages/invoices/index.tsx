@@ -261,7 +261,12 @@ export default function InvoicesIndex({
     groups,
 }: Props) {
     const { props } = usePage() as any;
+    const { auth } = props;
     const flash = props.flash || {};
+    const canCreateSpecimen = auth.permissions?.includes('specimens.create');
+    const canViewSpecimen = auth.permissions?.includes('specimens.view');
+    const canEditSpecimen = auth.permissions?.includes('specimens.edit');
+    const canManageInvoices = auth.permissions?.includes('invoices.manage');
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
@@ -551,32 +556,39 @@ export default function InvoicesIndex({
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button className="h-10 gap-2">
-                                    <Plus className="h-4 w-4" />
-                                    <span>Nueva Muestra</span>
-                                    <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        setSelectedSpecimen(null);
-                                        setIsSpecimenSheetOpen(true);
-                                    }}
+                        {canCreateSpecimen && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button className="h-10 gap-2">
+                                        <Plus className="h-4 w-4" />
+                                        <span>Nueva Muestra</span>
+                                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="w-56"
                                 >
-                                    <Microscope className="mr-2 h-4 w-4 text-muted-foreground" />
-                                    <span>Muestra Individual</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() => setIsGroupSheetOpen(true)}
-                                >
-                                    <Layers className="mr-2 h-4 w-4 text-muted-foreground" />
-                                    <span>Grupo de Muestras</span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                                    <DropdownMenuItem
+                                        onClick={() => {
+                                            setSelectedSpecimen(null);
+                                            setIsSpecimenSheetOpen(true);
+                                        }}
+                                    >
+                                        <Microscope className="mr-2 h-4 w-4 text-muted-foreground" />
+                                        <span>Muestra Individual</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setIsGroupSheetOpen(true)
+                                        }
+                                    >
+                                        <Layers className="mr-2 h-4 w-4 text-muted-foreground" />
+                                        <span>Grupo de Muestras</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                     </div>
                 </div>
 
@@ -1391,18 +1403,20 @@ export default function InvoicesIndex({
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() =>
-                                                        handleEditDetails(
-                                                            invoice,
-                                                        )
-                                                    }
-                                                    title="Editar Factura"
-                                                >
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
+                                                {canManageInvoices && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() =>
+                                                            handleEditDetails(
+                                                                invoice,
+                                                            )
+                                                        }
+                                                        title="Editar Factura"
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>

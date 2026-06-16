@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
 import { Edit2, FileSpreadsheet, Plus, Search, Trash2 } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
@@ -74,6 +74,15 @@ export default function TemplatesIndex({
     specimenTypes,
     filters,
 }: Props) {
+    const { auth } = usePage<any>().props;
+    const canCreate = auth.permissions?.includes(
+        'specimen_type_templates.create',
+    );
+    const canEdit = auth.permissions?.includes('specimen_type_templates.edit');
+    const canDelete = auth.permissions?.includes(
+        'specimen_type_templates.delete',
+    );
+
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
@@ -168,14 +177,17 @@ export default function TemplatesIndex({
                             reportes de muestras.
                         </p>
                     </div>
-                    <div className="flex gap-2">
-                        <Button
-                            onClick={handleCreate}
-                            className="h-10 w-full cursor-pointer px-5 text-sm md:w-auto"
-                        >
-                            <Plus className="mr-2 h-4 w-4" /> Nueva Plantilla
-                        </Button>
-                    </div>
+                    {canCreate && (
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={handleCreate}
+                                className="h-10 w-full cursor-pointer px-5 text-sm md:w-auto"
+                            >
+                                <Plus className="mr-2 h-4 w-4" /> Nueva
+                                Plantilla
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -199,7 +211,7 @@ export default function TemplatesIndex({
                                 <TableHead>Macroscopía</TableHead>
                                 <TableHead>Microscopía</TableHead>
                                 <TableHead className="text-right">
-                                    Acciones
+                                    {(canEdit || canDelete) && 'Acciones'}
                                 </TableHead>
                             </TableRow>
                         </TableHeader>
@@ -225,30 +237,38 @@ export default function TemplatesIndex({
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="cursor-pointer"
-                                                    onClick={() =>
-                                                        handleEdit(template)
-                                                    }
-                                                >
-                                                    <Edit2 className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="cursor-pointer text-destructive"
-                                                    onClick={() =>
-                                                        handleDeleteClick(
-                                                            template,
-                                                        )
-                                                    }
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                            {(canEdit || canDelete) && (
+                                                <div className="flex justify-end gap-2">
+                                                    {canEdit && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="cursor-pointer"
+                                                            onClick={() =>
+                                                                handleEdit(
+                                                                    template,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="cursor-pointer text-destructive"
+                                                            onClick={() =>
+                                                                handleDeleteClick(
+                                                                    template,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))

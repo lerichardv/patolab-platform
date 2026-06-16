@@ -6,11 +6,14 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class ProductController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('products.view');
+
         $query = Product::query()->with('prices')->where('active', true);
 
         if ($request->has('search')) {
@@ -36,6 +39,8 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('products.create');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -78,6 +83,8 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
+        Gate::authorize('products.edit');
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -123,6 +130,8 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
+        Gate::authorize('products.delete');
+
         $product->update(['active' => false]);
 
         return redirect()->back();

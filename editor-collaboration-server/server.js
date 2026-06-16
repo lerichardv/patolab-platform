@@ -452,6 +452,7 @@ app.post('/api/dictate-chunk', upload.single('audio'), async (req, res) => {
 
 		if (!response.ok) {
 			const errText = await response.text();
+
 			throw new Error(`STT error ${response.status}: ${errText}`);
 		}
 
@@ -468,6 +469,7 @@ app.post('/api/dictate-chunk', upload.single('audio'), async (req, res) => {
 		console.error('Error en Grok Dictado:', error);
 		// Clean up files
 		fs.unlink(inputPath, () => {});
+
 		return res.status(500).json({
 			error: 'Error procesando la transcripción de audio.',
 			details: error.message
@@ -510,6 +512,7 @@ app.post('/api/fix-grammar', express.json(), async (req, res) => {
 
 		if (!response.ok) {
 			const errText = await response.text();
+
 			throw new Error(`Grok grammar correction error ${response.status}: ${errText}`);
 		}
 
@@ -541,6 +544,7 @@ app.post('/api/fix-grammar', express.json(), async (req, res) => {
 		return res.json({ success: true, text: correctedText, injected: false });
 	} catch (error) {
 		console.error('Error en Grok Corrector:', error);
+
 		return res.status(500).json({ error: 'Error en el servidor de optimización de texto', details: error.message });
 	}
 });
