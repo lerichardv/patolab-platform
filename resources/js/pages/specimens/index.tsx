@@ -247,6 +247,7 @@ export default function SpecimensIndex({
     banks,
 }: Props) {
     const { props } = usePage() as any;
+    const auth = props.auth || {};
     const flash = props.flash || {};
     const isMobile = useIsMobile();
 
@@ -1056,31 +1057,33 @@ export default function SpecimensIndex({
                             onChange={setDateRange}
                         />
 
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button className="h-10 w-full gap-2 px-5 text-sm md:w-auto">
-                                    <Plus className="h-4 w-4" />
-                                    <span>Nueva Muestra</span>
-                                    <ChevronDown className="h-4 w-4 opacity-50" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuItem
-                                    onClick={handleCreate}
-                                    className="group cursor-pointer"
-                                >
-                                    <Microscope className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
-                                    <span>Muestra Individual</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() => setIsGroupSheetOpen(true)}
-                                    className="group cursor-pointer"
-                                >
-                                    <Layers className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
-                                    <span>Grupo de Muestras</span>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        {auth.permissions?.includes('specimens.create') && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button className="h-10 w-full gap-2 px-5 text-sm md:w-auto">
+                                        <Plus className="h-4 w-4" />
+                                        <span>Nueva Muestra</span>
+                                        <ChevronDown className="h-4 w-4 opacity-50" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuItem
+                                        onClick={handleCreate}
+                                        className="group cursor-pointer"
+                                    >
+                                        <Microscope className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                        <span>Muestra Individual</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() => setIsGroupSheetOpen(true)}
+                                        className="group cursor-pointer"
+                                    >
+                                        <Layers className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                        <span>Grupo de Muestras</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                     </div>
                 </div>
 
@@ -1169,143 +1172,160 @@ export default function SpecimensIndex({
                                 )}
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            disabled={selectedIds.length === 0}
-                                            className="flex h-8 w-full items-center gap-2 px-3 text-xs sm:w-auto sm:px-4"
+                                {(auth.permissions?.includes('specimens.edit') ||
+                                    auth.permissions?.includes('specimens.manage') ||
+                                    auth.permissions?.includes('specimens.delete')) && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                disabled={selectedIds.length === 0}
+                                                className="flex h-8 w-full items-center gap-2 px-3 text-xs sm:w-auto sm:px-4"
+                                            >
+                                                <Layers className="h-4 w-4" />{' '}
+                                                Acciones en Bulk{' '}
+                                                <ChevronDown className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="end"
+                                            className="w-56"
                                         >
-                                            <Layers className="h-4 w-4" />{' '}
-                                            Acciones en Bulk{' '}
-                                            <ChevronDown className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="w-56"
-                                    >
-                                        <DropdownMenuLabel>
-                                            Acciones en Lote
-                                        </DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
+                                            <DropdownMenuLabel>
+                                                Acciones en Lote
+                                            </DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
 
-                                        {/* Cambiar Estado Submenu */}
-                                        <DropdownMenuSub>
-                                            <DropdownMenuSubTrigger>
-                                                <Tag className="mr-2 h-4 w-4" />
-                                                <span>Cambiar Estado</span>
-                                            </DropdownMenuSubTrigger>
-                                            <DropdownMenuSubContent>
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        handleBulkChangeStatus(
-                                                            'received',
-                                                        )
-                                                    }
-                                                >
-                                                    Recibida
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        handleBulkChangeStatus(
-                                                            'macroscopic_review',
-                                                        )
-                                                    }
-                                                >
-                                                    Rev. Macroscópica
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        handleBulkChangeStatus(
-                                                            'processing',
-                                                        )
-                                                    }
-                                                >
-                                                    En Proceso
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        handleBulkChangeStatus(
-                                                            'microscopic_review',
-                                                        )
-                                                    }
-                                                >
-                                                    Rev. Microscópica
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        handleBulkChangeStatus(
-                                                            'finalized',
-                                                        )
-                                                    }
-                                                >
-                                                    Finalizada
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        handleBulkChangeStatus(
-                                                            'delivered',
-                                                        )
-                                                    }
-                                                >
-                                                    Entregada
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={() =>
-                                                        handleBulkChangeStatus(
-                                                            'cancelled',
-                                                        )
-                                                    }
-                                                >
-                                                    Cancelada
-                                                </DropdownMenuItem>
-                                            </DropdownMenuSubContent>
-                                        </DropdownMenuSub>
+                                            {/* Cambiar Estado Submenu */}
+                                            {auth.permissions?.includes('specimens.edit') && (
+                                                <DropdownMenuSub>
+                                                    <DropdownMenuSubTrigger>
+                                                        <Tag className="mr-2 h-4 w-4" />
+                                                        <span>Cambiar Estado</span>
+                                                    </DropdownMenuSubTrigger>
+                                                    <DropdownMenuSubContent>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkChangeStatus(
+                                                                    'received',
+                                                                )
+                                                            }
+                                                        >
+                                                            Recibida
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkChangeStatus(
+                                                                    'macroscopic_review',
+                                                                )
+                                                            }
+                                                        >
+                                                            Rev. Macroscópica
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkChangeStatus(
+                                                                    'processing',
+                                                                )
+                                                            }
+                                                        >
+                                                            En Proceso
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkChangeStatus(
+                                                                    'microscopic_review',
+                                                                )
+                                                            }
+                                                        >
+                                                            Rev. Microscópica
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkChangeStatus(
+                                                                    'finalized',
+                                                                )
+                                                            }
+                                                        >
+                                                            Finalizada
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkChangeStatus(
+                                                                    'delivered',
+                                                                )
+                                                            }
+                                                        >
+                                                            Entregada
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkChangeStatus(
+                                                                    'cancelled',
+                                                                )
+                                                            }
+                                                        >
+                                                            Cancelada
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuSubContent>
+                                                </DropdownMenuSub>
+                                            )}
 
-                                        {/* Cambiar Prioridad Submenu */}
-                                        <DropdownMenuSub>
-                                            <DropdownMenuSubTrigger>
-                                                <CalendarClock className="mr-2 h-4 w-4" />
-                                                <span>Cambiar Prioridad</span>
-                                            </DropdownMenuSubTrigger>
-                                            <DropdownMenuSubContent>
-                                                {priorities.map((p) => (
+                                            {/* Cambiar Prioridad Submenu */}
+                                            {auth.permissions?.includes('specimens.edit') && (
+                                                <DropdownMenuSub>
+                                                    <DropdownMenuSubTrigger>
+                                                        <CalendarClock className="mr-2 h-4 w-4" />
+                                                        <span>Cambiar Prioridad</span>
+                                                    </DropdownMenuSubTrigger>
+                                                    <DropdownMenuSubContent>
+                                                        {priorities.map((p) => (
+                                                            <DropdownMenuItem
+                                                                key={p.id}
+                                                                onClick={() =>
+                                                                    handleBulkChangePriority(
+                                                                        p.id,
+                                                                    )
+                                                                }
+                                                            >
+                                                                {p.name}
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                    </DropdownMenuSubContent>
+                                                </DropdownMenuSub>
+                                            )}
+
+                                            {/* Asignar Patólogo in Bulk */}
+                                            {auth.permissions?.includes('specimens.manage') && (
+                                                <DropdownMenuItem
+                                                    onClick={() =>
+                                                        setIsBulkAssignSheetOpen(true)
+                                                    }
+                                                >
+                                                    <UserPlus className="mr-2 h-4 w-4" />
+                                                    <span>Asignar Patólogo</span>
+                                                </DropdownMenuItem>
+                                            )}
+
+                                            {auth.permissions?.includes('specimens.delete') && (
+                                                <>
+                                                    {(auth.permissions?.includes('specimens.edit') ||
+                                                        auth.permissions?.includes('specimens.manage')) && (
+                                                        <DropdownMenuSeparator />
+                                                    )}
                                                     <DropdownMenuItem
-                                                        key={p.id}
+                                                        variant="destructive"
                                                         onClick={() =>
-                                                            handleBulkChangePriority(
-                                                                p.id,
-                                                            )
+                                                            setIsBulkDeleteDialogOpen(true)
                                                         }
                                                     >
-                                                        {p.name}
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        <span>Desactivar Muestras</span>
                                                     </DropdownMenuItem>
-                                                ))}
-                                            </DropdownMenuSubContent>
-                                        </DropdownMenuSub>
-
-                                        {/* Asignar Patólogo in Bulk */}
-                                        <DropdownMenuItem
-                                            onClick={() =>
-                                                setIsBulkAssignSheetOpen(true)
-                                            }
-                                        >
-                                            <UserPlus className="mr-2 h-4 w-4" />
-                                            <span>Asignar Patólogo</span>
-                                        </DropdownMenuItem>
-
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                            variant="destructive"
-                                            onClick={() =>
-                                                setIsBulkDeleteDialogOpen(true)
-                                            }
-                                        >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            <span>Desactivar Muestras</span>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                                </>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1403,6 +1423,7 @@ export default function SpecimensIndex({
                                                                     index={
                                                                         index
                                                                     }
+                                                                    isDragDisabled={!auth.permissions?.includes('specimens.edit')}
                                                                 >
                                                                     {(
                                                                         provided,
@@ -1509,87 +1530,96 @@ export default function SpecimensIndex({
                                                                                                 e.stopPropagation()
                                                                                             }
                                                                                         >
-                                                                                            <Button
-                                                                                                variant="ghost"
-                                                                                                size="icon"
-                                                                                                className="relative h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                                                                onClick={() =>
-                                                                                                    handleAssignClick(
-                                                                                                        specimen,
-                                                                                                    )
-                                                                                                }
-                                                                                                title="Asignar Patólogo"
-                                                                                            >
-                                                                                                <UserPlus className="h-4 w-4" />
-                                                                                                <span
-                                                                                                    className={`absolute right-0 bottom-0 flex h-3 w-3 items-center justify-center rounded-full text-[7px] font-extrabold ring-1 ring-background ${
-                                                                                                        (specimen
+                                                                                            {auth.permissions?.includes('specimens.manage') && (
+                                                                                                <Button
+                                                                                                    variant="ghost"
+                                                                                                    size="icon"
+                                                                                                    className="relative h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                                                                    onClick={() =>
+                                                                                                        handleAssignClick(
+                                                                                                            specimen,
+                                                                                                        )
+                                                                                                    }
+                                                                                                    title="Asignar Patólogo"
+                                                                                                >
+                                                                                                    <UserPlus className="h-4 w-4" />
+                                                                                                    <span
+                                                                                                        className={`absolute right-0 bottom-0 flex h-3 w-3 items-center justify-center rounded-full text-[7px] font-extrabold ring-1 ring-background ${
+                                                                                                            (specimen
+                                                                                                                .users
+                                                                                                                ?.length ||
+                                                                                                                0) >
+                                                                                                            0
+                                                                                                                ? 'bg-sky-500 text-white'
+                                                                                                                : 'bg-slate-300 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                                                                                                        }`}
+                                                                                                    >
+                                                                                                        {specimen
                                                                                                             .users
                                                                                                             ?.length ||
-                                                                                                            0) >
-                                                                                                        0
-                                                                                                            ? 'bg-sky-500 text-white'
-                                                                                                            : 'bg-slate-300 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                                                                                                    }`}
-                                                                                                >
-                                                                                                    {specimen
-                                                                                                        .users
-                                                                                                        ?.length ||
-                                                                                                        0}
-                                                                                                </span>
-                                                                                            </Button>
-                                                                                            <DropdownMenu>
-                                                                                                <DropdownMenuTrigger
-                                                                                                    asChild
-                                                                                                >
-                                                                                                    <button
-                                                                                                        className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                                                                        title="Acciones"
+                                                                                                            0}
+                                                                                                    </span>
+                                                                                                </Button>
+                                                                                            )}
+                                                                                            {(auth.permissions?.includes('specimens.edit') ||
+                                                                                                auth.permissions?.includes('specimens.delete')) && (
+                                                                                                <DropdownMenu>
+                                                                                                    <DropdownMenuTrigger
+                                                                                                        asChild
                                                                                                     >
-                                                                                                        <MoreVertical className="h-4 w-4" />
-                                                                                                    </button>
-                                                                                                </DropdownMenuTrigger>
-                                                                                                <DropdownMenuContent
-                                                                                                    align="end"
-                                                                                                    onClick={(
-                                                                                                        e,
-                                                                                                    ) =>
-                                                                                                        e.stopPropagation()
-                                                                                                    }
-                                                                                                >
-                                                                                                    <DropdownMenuItem
+                                                                                                        <button
+                                                                                                            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                                                            title="Acciones"
+                                                                                                        >
+                                                                                                            <MoreVertical className="h-4 w-4" />
+                                                                                                        </button>
+                                                                                                    </DropdownMenuTrigger>
+                                                                                                    <DropdownMenuContent
+                                                                                                        align="end"
                                                                                                         onClick={(
                                                                                                             e,
-                                                                                                        ) => {
-                                                                                                            e.stopPropagation();
-                                                                                                            handleEdit(
-                                                                                                                specimen,
-                                                                                                            );
-                                                                                                        }}
+                                                                                                        ) =>
+                                                                                                            e.stopPropagation()
+                                                                                                        }
                                                                                                     >
-                                                                                                        <Edit2 className="mr-2 h-4 w-4" />
-                                                                                                        <span>
-                                                                                                            Editar
-                                                                                                        </span>
-                                                                                                    </DropdownMenuItem>
-                                                                                                    <DropdownMenuItem
-                                                                                                        variant="destructive"
-                                                                                                        onClick={(
-                                                                                                            e,
-                                                                                                        ) => {
-                                                                                                            e.stopPropagation();
-                                                                                                            handleDeleteClick(
-                                                                                                                specimen,
-                                                                                                            );
-                                                                                                        }}
-                                                                                                    >
-                                                                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                                                                        <span>
-                                                                                                            Eliminar
-                                                                                                        </span>
-                                                                                                    </DropdownMenuItem>
-                                                                                                </DropdownMenuContent>
-                                                                                            </DropdownMenu>
+                                                                                                        {auth.permissions?.includes('specimens.edit') && (
+                                                                                                            <DropdownMenuItem
+                                                                                                                onClick={(
+                                                                                                                    e,
+                                                                                                                ) => {
+                                                                                                                    e.stopPropagation();
+                                                                                                                    handleEdit(
+                                                                                                                        specimen,
+                                                                                                                    );
+                                                                                                                }}
+                                                                                                            >
+                                                                                                                <Edit2 className="mr-2 h-4 w-4" />
+                                                                                                                <span>
+                                                                                                                    Editar
+                                                                                                                </span>
+                                                                                                            </DropdownMenuItem>
+                                                                                                        )}
+                                                                                                        {auth.permissions?.includes('specimens.delete') && (
+                                                                                                            <DropdownMenuItem
+                                                                                                                variant="destructive"
+                                                                                                                onClick={(
+                                                                                                                    e,
+                                                                                                                ) => {
+                                                                                                                    e.stopPropagation();
+                                                                                                                    handleDeleteClick(
+                                                                                                                        specimen,
+                                                                                                                    );
+                                                                                                                }}
+                                                                                                            >
+                                                                                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                                                                                <span>
+                                                                                                                    Eliminar
+                                                                                                                </span>
+                                                                                                            </DropdownMenuItem>
+                                                                                                        )}
+                                                                                                    </DropdownMenuContent>
+                                                                                                </DropdownMenu>
+                                                                                            )}
                                                                                         </div>
                                                                                     </div>
                                                                                     <div className="text-xs text-muted-foreground">

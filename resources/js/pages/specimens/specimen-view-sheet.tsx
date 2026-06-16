@@ -22,6 +22,7 @@ import {
     UserPlus,
 } from 'lucide-react';
 import { useState } from 'react';
+import { usePage } from '@inertiajs/react';
 import HeadingSheet from '@/components/heading-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ export default function SpecimenViewSheet({
     onEditInvoiceClick,
     onAssignPathologistClick,
 }: Props) {
+    const { auth } = usePage<any>().props;
     if (!specimen) {
         return null;
     }
@@ -260,7 +262,7 @@ export default function SpecimenViewSheet({
                             />
                         </div>
                         <div className="flex w-full justify-center gap-2 sm:w-auto sm:justify-start">
-                            {invoice && onEditInvoiceClick && (
+                            {invoice && onEditInvoiceClick && auth.permissions?.includes('specimens.edit') && (
                                 <Button
                                     onClick={() => {
                                         onOpenChange(false);
@@ -273,12 +275,14 @@ export default function SpecimenViewSheet({
                                     Factura
                                 </Button>
                             )}
-                            <Button
-                                onClick={onEditClick}
-                                className="flex items-center gap-2"
-                            >
-                                <Edit className="h-4 w-4" /> Editar Muestra
-                            </Button>
+                            {auth.permissions?.includes('specimens.edit') && (
+                                <Button
+                                    onClick={onEditClick}
+                                    className="flex items-center gap-2"
+                                >
+                                    <Edit className="h-4 w-4" /> Editar Muestra
+                                </Button>
+                            )}
                         </div>
                     </div>
 
@@ -640,7 +644,7 @@ export default function SpecimenViewSheet({
                                         <User className="h-5 w-5" /> Patólogos
                                         Asignados
                                     </h3>
-                                    {onAssignPathologistClick && (
+                                    {onAssignPathologistClick && auth.permissions?.includes('specimens.manage') && (
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -694,7 +698,7 @@ export default function SpecimenViewSheet({
                                             No hay patólogos asignados a esta
                                             muestra.
                                         </p>
-                                        {onAssignPathologistClick && (
+                                        {onAssignPathologistClick && auth.permissions?.includes('specimens.manage') && (
                                             <Button
                                                 type="button"
                                                 variant="outline"

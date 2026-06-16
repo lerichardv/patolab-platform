@@ -6,10 +6,13 @@ use App\Models\Customer;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
+use Illuminate\Support\Facades\Gate;
+
 class CustomerController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('patients.view');
         $query = Customer::with(['department', 'municipality'])->where('active', true);
 
         if ($request->has('search')) {
@@ -59,6 +62,7 @@ class CustomerController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('patients.create');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'id_number' => 'required|string|unique:customers,id_number',
@@ -80,6 +84,7 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer)
     {
+        Gate::authorize('patients.edit');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'id_number' => 'required|string|unique:customers,id_number,'.$customer->id,
@@ -101,6 +106,7 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer)
     {
+        Gate::authorize('patients.delete');
         $customer->update(['active' => false]);
 
         return redirect()->back();
@@ -108,6 +114,7 @@ class CustomerController extends Controller
 
     public function export(Request $request)
     {
+        Gate::authorize('patients.view');
         $query = Customer::with(['department', 'municipality'])->where('active', true);
 
         if ($request->has('search')) {

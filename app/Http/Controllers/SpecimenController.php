@@ -34,10 +34,13 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Spatie\Browsershot\Browsershot;
 
+use Illuminate\Support\Facades\Gate;
+
 class SpecimenController extends Controller
 {
     public function index()
     {
+        Gate::authorize('specimens.view');
         $priorities = Priority::orderBy('order', 'desc')->get();
 
         $priorities->load(['specimens' => function ($q) {
@@ -107,6 +110,7 @@ class SpecimenController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('specimens.create');
         $validated = $request->validate([
             'customer' => 'required|exists:customers,id',
             'specimen_type' => 'required|exists:specimen_type,id',
@@ -498,6 +502,7 @@ class SpecimenController extends Controller
 
     public function update(Request $request, Specimen $specimen)
     {
+        Gate::authorize('specimens.edit');
         $validated = $request->validate([
             'customer' => 'required|exists:customers,id',
             'specimen_type' => 'required|exists:specimen_type,id',
@@ -563,6 +568,7 @@ class SpecimenController extends Controller
 
     public function updateOrder(Request $request)
     {
+        Gate::authorize('specimens.edit');
         $validated = $request->validate([
             'items' => 'required|array',
             'items.*.id' => 'required|integer|exists:specimen,id',
@@ -593,6 +599,7 @@ class SpecimenController extends Controller
 
     public function destroy(Specimen $specimen)
     {
+        Gate::authorize('specimens.delete');
         $specimen->update(['active' => false]);
 
         return redirect()->back();
@@ -703,6 +710,7 @@ class SpecimenController extends Controller
 
     public function assignUser(Request $request, Specimen $specimen)
     {
+        Gate::authorize('specimens.manage');
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
         ]);
@@ -716,6 +724,7 @@ class SpecimenController extends Controller
 
     public function unassignUser(Request $request, Specimen $specimen)
     {
+        Gate::authorize('specimens.manage');
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
         ]);
@@ -737,6 +746,14 @@ class SpecimenController extends Controller
         $ids = $validated['ids'];
         $action = $validated['action'];
         $value = $validated['value'] ?? null;
+
+        if (in_array($action, ['change_status', 'change_priority'])) {
+            Gate::authorize('specimens.edit');
+        } elseif (in_array($action, ['assign_pathologist', 'unassign_pathologist'])) {
+            Gate::authorize('specimens.manage');
+        } elseif ($action === 'delete') {
+            Gate::authorize('specimens.delete');
+        }
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($ids, $action, $value) {
             if ($action === 'change_status') {

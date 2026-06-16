@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
 import {
     Edit2,
@@ -93,6 +93,7 @@ interface Props {
 }
 
 export default function CustomersIndex({ customers, filters }: Props) {
+    const { auth } = usePage<any>().props;
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
@@ -169,25 +170,29 @@ export default function CustomersIndex({ customers, filters }: Props) {
                         </p>
                     </div>
                     <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={() =>
-                                window.open(
-                                    exportCustomers({ query: filters }).url,
-                                    '_blank',
-                                )
-                            }
-                            className="h-10 w-full px-5 text-sm md:w-auto"
-                        >
-                            <FileSpreadsheet className="mr-2 h-4 w-4" />{' '}
-                            Exportar
-                        </Button>
-                        <Button
-                            onClick={handleCreate}
-                            className="h-10 w-full px-5 text-sm md:w-auto"
-                        >
-                            <Plus className="mr-2 h-4 w-4" /> Nuevo Cliente
-                        </Button>
+                        {auth.permissions?.includes('patients.view') && (
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    window.open(
+                                        exportCustomers({ query: filters }).url,
+                                        '_blank',
+                                    )
+                                }
+                                className="h-10 w-full px-5 text-sm md:w-auto"
+                            >
+                                <FileSpreadsheet className="mr-2 h-4 w-4" />{' '}
+                                Exportar
+                            </Button>
+                        )}
+                        {auth.permissions?.includes('patients.create') && (
+                            <Button
+                                onClick={handleCreate}
+                                className="h-10 w-full px-5 text-sm md:w-auto"
+                            >
+                                <Plus className="mr-2 h-4 w-4" /> Nuevo Cliente
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -306,27 +311,31 @@ export default function CustomersIndex({ customers, filters }: Props) {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() =>
-                                                        handleEdit(customer)
-                                                    }
-                                                >
-                                                    <Edit2 className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-destructive"
-                                                    onClick={() =>
-                                                        handleDeleteClick(
-                                                            customer,
-                                                        )
-                                                    }
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                {auth.permissions?.includes('patients.edit') && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() =>
+                                                            handleEdit(customer)
+                                                        }
+                                                    >
+                                                        <Edit2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                {auth.permissions?.includes('patients.delete') && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="text-destructive"
+                                                        onClick={() =>
+                                                            handleDeleteClick(
+                                                                customer,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>

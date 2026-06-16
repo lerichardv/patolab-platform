@@ -1,4 +1,4 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ShieldCheck, Plus, Edit2, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -272,6 +272,7 @@ export default function RolesIndex({
     selectedRole,
     permissions,
 }: Props) {
+    const { auth } = usePage<any>().props;
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -414,12 +415,14 @@ export default function RolesIndex({
                             y permisos correspondientes.
                         </p>
                     </div>
-                    <Button
-                        onClick={() => setIsCreateOpen(true)}
-                        className="h-10 w-full px-5 text-sm md:w-auto"
-                    >
-                        <Plus className="mr-2 h-4 w-4" /> Nuevo Rol
-                    </Button>
+                    {auth.permissions?.includes('roles.create') && (
+                        <Button
+                            onClick={() => setIsCreateOpen(true)}
+                            className="h-10 w-full px-5 text-sm md:w-auto"
+                        >
+                            <Plus className="mr-2 h-4 w-4" /> Nuevo Rol
+                        </Button>
+                    )}
                 </div>
 
                 <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
@@ -455,28 +458,32 @@ export default function RolesIndex({
 
                         {selectedRole && (
                             <div className="flex w-full gap-2 sm:w-auto">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setIsEditOpen(true)}
-                                    disabled={
-                                        selectedRole.id === 1 ||
-                                        selectedRole.id === 2
-                                    }
-                                    className="flex-1 sm:flex-none"
-                                >
-                                    <Edit2 className="mr-2 h-4 w-4" /> Renombrar
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    onClick={() => setIsDeleteOpen(true)}
-                                    disabled={
-                                        selectedRole.id === 1 ||
-                                        selectedRole.id === 2
-                                    }
-                                    className="flex-1 sm:flex-none"
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                                </Button>
+                                {auth.permissions?.includes('roles.edit') && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setIsEditOpen(true)}
+                                        disabled={
+                                            selectedRole.id === 1 ||
+                                            selectedRole.id === 2
+                                        }
+                                        className="flex-1 sm:flex-none"
+                                    >
+                                        <Edit2 className="mr-2 h-4 w-4" /> Renombrar
+                                    </Button>
+                                )}
+                                {auth.permissions?.includes('roles.delete') && (
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => setIsDeleteOpen(true)}
+                                        disabled={
+                                            selectedRole.id === 1 ||
+                                            selectedRole.id === 2
+                                        }
+                                        className="flex-1 sm:flex-none"
+                                    >
+                                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                    </Button>
+                                )}
                             </div>
                         )}
                     </div>
@@ -559,8 +566,8 @@ export default function RolesIndex({
                                                                                     )
                                                                                 }
                                                                                 disabled={
-                                                                                    selectedRole.id ===
-                                                                                    1
+                                                                                    selectedRole.id === 1 ||
+                                                                                    !auth.permissions?.includes('roles.edit')
                                                                                 }
                                                                             />
                                                                         </div>

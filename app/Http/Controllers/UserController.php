@@ -8,10 +8,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
+use Illuminate\Support\Facades\Gate;
+
 class UserController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('users.view');
         $query = User::query()->where('active', true)->with('role');
 
         if ($request->has('search')) {
@@ -34,6 +37,7 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('users.create');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -54,6 +58,7 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        Gate::authorize('users.edit');
         // Don't allow editing self through this controller
         if ($user->id === auth()->id()) {
             return redirect()->back()->withErrors(['error' => 'No puedes editar tu propio usuario desde aquí. Usa los ajustes de perfil.']);
@@ -83,6 +88,7 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
+        Gate::authorize('users.delete');
         // Don't allow deleting self
         if ($user->id === auth()->id()) {
             return redirect()->back()->withErrors(['error' => 'No puedes desactivar tu propio usuario.']);

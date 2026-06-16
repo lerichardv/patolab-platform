@@ -7,10 +7,13 @@ use App\Models\SpecimenTypeExamination;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
+use Illuminate\Support\Facades\Gate;
+
 class SpecimenTypeExaminationController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('specimens.manage');
         $query = SpecimenTypeExamination::query()->with('type')->where('active', true)->orderBy('created_at', 'desc');
 
         if ($request->has('search')) {
@@ -36,6 +39,8 @@ class SpecimenTypeExaminationController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_type_examinations.create');
         $validated = $request->validate([
             'specimen_type' => 'required|exists:specimen_type,id',
             'name' => 'required|string|max:255',
@@ -49,6 +54,8 @@ class SpecimenTypeExaminationController extends Controller
 
     public function update(Request $request, SpecimenTypeExamination $specimenTypeExamination)
     {
+        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_type_examinations.edit');
         $validated = $request->validate([
             'specimen_type' => 'required|exists:specimen_type,id',
             'name' => 'required|string|max:255',
@@ -62,6 +69,8 @@ class SpecimenTypeExaminationController extends Controller
 
     public function destroy(SpecimenTypeExamination $specimenTypeExamination)
     {
+        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_type_examinations.delete');
         $specimenTypeExamination->update(['active' => false]);
 
         return redirect()->back();

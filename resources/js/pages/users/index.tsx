@@ -143,12 +143,14 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                             plataforma.
                         </p>
                     </div>
-                    <Button
-                        onClick={handleCreate}
-                        className="h-10 w-full px-5 text-sm md:w-auto"
-                    >
-                        <Plus className="mr-2 h-4 w-4" /> Nuevo Usuario
-                    </Button>
+                    {auth.permissions?.includes('users.create') && (
+                        <Button
+                            onClick={handleCreate}
+                            className="h-10 w-full px-5 text-sm md:w-auto"
+                        >
+                            <Plus className="mr-2 h-4 w-4" /> Nuevo Usuario
+                        </Button>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -208,27 +210,31 @@ export default function UsersIndex({ users, roles, filters }: Props) {
                                         <TableCell className="text-right">
                                             {user.id !== auth.user.id ? (
                                                 <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() =>
-                                                            handleEdit(user)
-                                                        }
-                                                    >
-                                                        <Edit2 className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="text-destructive"
-                                                        onClick={() =>
-                                                            handleDeleteClick(
-                                                                user,
-                                                            )
-                                                        }
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    {auth.permissions?.includes('users.edit') && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                handleEdit(user)
+                                                            }
+                                                        >
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    {auth.permissions?.includes('users.delete') && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-destructive"
+                                                            onClick={() =>
+                                                                handleDeleteClick(
+                                                                    user,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <span className="pr-2 text-xs text-muted-foreground italic">

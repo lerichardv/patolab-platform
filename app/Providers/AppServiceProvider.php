@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
+use Illuminate\Support\Facades\Gate;
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -32,6 +34,16 @@ class AppServiceProvider extends ServiceProvider
             'product' => Product::class,
             'specimen type' => SpecimenType::class,
         ]);
+
+        Gate::before(function ($user, $ability) {
+            if ($user->role) {
+                if ($user->role->slug === 'admin') {
+                    return true;
+                }
+                return $user->role->permissions()->where('slug', $ability)->exists() ? true : false;
+            }
+            return false;
+        });
     }
 
     /**

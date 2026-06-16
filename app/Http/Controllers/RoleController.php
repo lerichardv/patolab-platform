@@ -8,10 +8,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
+use Illuminate\Support\Facades\Gate;
+
 class RoleController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('roles.view');
         $roles = Role::orderBy('name')->get();
         $permissions = Permission::all();
 
@@ -28,6 +31,7 @@ class RoleController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('roles.create');
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:roles,name',
         ]);
@@ -42,6 +46,7 @@ class RoleController extends Controller
 
     public function update(Request $request, Role $role)
     {
+        Gate::authorize('roles.edit');
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:roles,name,'.$role->id,
             'permission_ids' => 'nullable|array',
@@ -68,6 +73,7 @@ class RoleController extends Controller
 
     public function destroy(Role $role)
     {
+        Gate::authorize('roles.delete');
         if (in_array($role->id, [1, 2])) {
             return redirect()->back()->withErrors(['error' => 'No se pueden eliminar los roles principales del sistema.']);
         }

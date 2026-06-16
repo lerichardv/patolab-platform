@@ -6,10 +6,13 @@ use App\Models\SpecimenCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
+use Illuminate\Support\Facades\Gate;
+
 class SpecimenCategoryController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('specimens.manage');
         $query = SpecimenCategory::query()->where('active', true)->orderBy('created_at', 'desc');
 
         if ($request->has('search')) {
@@ -30,6 +33,8 @@ class SpecimenCategoryController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_categories.create');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'unit' => 'required|in:minutes,hours,days,weeks',
@@ -43,6 +48,8 @@ class SpecimenCategoryController extends Controller
 
     public function update(Request $request, SpecimenCategory $specimenCategory)
     {
+        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_categories.edit');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'unit' => 'required|in:minutes,hours,days,weeks',
@@ -56,6 +63,8 @@ class SpecimenCategoryController extends Controller
 
     public function destroy(SpecimenCategory $specimenCategory)
     {
+        Gate::authorize('specimens.manage');
+        Gate::authorize('specimen_categories.delete');
         $specimenCategory->update(['active' => false]);
 
         return redirect()->back();

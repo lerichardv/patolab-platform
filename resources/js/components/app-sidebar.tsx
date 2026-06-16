@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     Beaker,
     BookOpen,
@@ -75,6 +75,7 @@ const mainNavItems: NavItem[] = [
         title: 'Tablero de Muestras',
         href: specimensIndex(),
         icon: Microscope,
+        permission: 'specimens.view',
     },
     {
         title: 'Mis Asignaciones',
@@ -125,11 +126,13 @@ const adminNavItems: NavItem[] = [
                 title: 'Clientes',
                 href: customersIndex(),
                 icon: Contact,
+                permission: 'patients.view',
             },
             {
                 title: 'Muestras',
                 href: '#',
                 icon: Microscope,
+                permission: 'specimens.manage',
                 items: [
                     {
                         title: 'Tipos de Muestras',
@@ -192,11 +195,13 @@ const adminNavItems: NavItem[] = [
                 title: 'Usuarios del sistema',
                 href: usersIndex(),
                 icon: Users,
+                permission: 'users.view',
             },
             {
                 title: 'Roles y Permisos',
                 href: rolesIndex(),
                 icon: ShieldCheck,
+                permission: 'roles.view',
             },
             {
                 title: 'Ajustes del Sistema',
@@ -209,6 +214,26 @@ const adminNavItems: NavItem[] = [
 
 const footerNavItems: NavItem[] = [];
 
+function filterNavItems(items: NavItem[], userPermissions: string[] = []): NavItem[] {
+    return items
+        .map((item) => {
+            const newItem = { ...item };
+            if (newItem.items) {
+                newItem.items = filterNavItems(newItem.items, userPermissions);
+            }
+            return newItem;
+        })
+        .filter((item) => {
+            if (item.permission && !userPermissions.includes(item.permission)) {
+                return false;
+            }
+            if (item.items && item.items.length === 0 && item.href === '#') {
+                return false;
+            }
+            return true;
+        });
+}
+
 export function AppSidebar({
     collapsible = 'icon',
     variant = 'inset',
@@ -217,6 +242,11 @@ export function AppSidebar({
     variant?: 'sidebar' | 'floating' | 'inset';
 } = {}) {
     const { isMobile, setOpenMobile } = useSidebar();
+    const { auth } = usePage<any>().props;
+    const userPermissions = auth?.permissions || [];
+
+    const filteredMain = filterNavItems(mainNavItems, userPermissions);
+    const filteredAdmin = filterNavItems(adminNavItems, userPermissions);
 
     const handleLogoClick = () => {
         if (isMobile) {
@@ -243,8 +273,8 @@ export function AppSidebar({
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} label="Operaciones" />
-                <NavMain items={adminNavItems} label="Gestión" />
+                <NavMain items={filteredMain} label="Operaciones" />
+                <NavMain items={filteredAdmin} label="Gestión" />
             </SidebarContent>
 
             <SidebarFooter>
