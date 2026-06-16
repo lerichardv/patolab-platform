@@ -6,6 +6,7 @@ use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Invoice extends Model
@@ -116,5 +117,13 @@ class Invoice extends Model
     public function specimenGroup(): HasOne
     {
         return $this->hasOne(SpecimenGroup::class, 'invoice_id');
+    }
+
+    /**
+     * Get the individual specimen records associated with this invoice.
+     */
+    public function creditInvoiceSpecimens(): HasMany
+    {
+        return $this->hasMany(CreditInvoiceSpecimen::class, 'invoice_id');
     }
 }

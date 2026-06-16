@@ -5,10 +5,11 @@ import debounce from 'lodash/debounce';
 import {
     Search,
     Receipt,
+    CreditCard,
     Plus,
     FileText,
     ExternalLink,
-    Edit,
+    Edit2,
     Tag,
     Check,
     ChevronsUpDown,
@@ -583,9 +584,9 @@ export default function RentalsIndex({
                                                                     rentalItem,
                                                                 )
                                                             }
-                                                            className="h-8 gap-1.5 border-primary text-primary hover:bg-primary/5"
+                                                            className="h-8 gap-1.5 bg-accent text-white hover:bg-accent/50"
                                                         >
-                                                            <Receipt className="h-3.5 w-3.5" />
+                                                            <CreditCard className="h-3.5 w-3.5" />
                                                             <span>Pagar</span>
                                                         </Button>
                                                         <Button
@@ -597,8 +598,9 @@ export default function RentalsIndex({
                                                                 )
                                                             }
                                                             title="Editar Alquiler"
+                                                            className="h-8 w-8"
                                                         >
-                                                            <Edit className="h-4 w-4" />
+                                                            <Edit2 className="h-4 w-4" />
                                                         </Button>
                                                     </div>
                                                 </TableCell>

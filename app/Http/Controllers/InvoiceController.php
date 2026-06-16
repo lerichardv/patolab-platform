@@ -18,12 +18,12 @@ use App\Models\SpecimenGroup;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Spatie\Browsershot\Browsershot;
-use Illuminate\Support\Facades\Gate;
 
 class InvoiceController extends Controller
 {
@@ -479,10 +479,10 @@ class InvoiceController extends Controller
                 }
 
                 $pdfContent = $browsershot->addChromiumArguments([
-                        'disable-crash-reporter',
-                        'disable-dev-shm-usage',
-                        'no-sandbox',
-                    ])
+                    'disable-crash-reporter',
+                    'disable-dev-shm-usage',
+                    'no-sandbox',
+                ])
                     ->noSandbox()
                     ->margins(10, 10, 10, 10)
                     ->format('A4')

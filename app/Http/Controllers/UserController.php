@@ -5,10 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
-
-use Illuminate\Support\Facades\Gate;
 
 class UserController extends Controller
 {

@@ -5,9 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-
 use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
 
 class SpecimenTypeExaminationController extends Controller
 {

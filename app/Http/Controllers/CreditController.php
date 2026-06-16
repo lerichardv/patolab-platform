@@ -3,23 +3,27 @@
 namespace App\Http\Controllers;
 
 use App\Models\CaiRange;
+use App\Models\Bank;
 use App\Models\Credit;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Location;
+use App\Models\Specimen;
 use App\Models\SpecimenGroup;
 use App\Models\SpecimenType;
+use Carbon\CarbonInterval;
 use Illuminate\Http\File;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Spatie\Browsershot\Browsershot;
-use Illuminate\Support\Facades\Gate;
 
 class CreditController extends Controller
 {
@@ -42,6 +46,9 @@ class CreditController extends Controller
             'group.specimens.category',
             'group.specimens.referrerRelation',
             'group.specimens.priority',
+            'creditInvoiceSpecimens.specimen.customerRelation',
+            'creditInvoiceSpecimens.specimen.type',
+            'creditInvoiceSpecimens.specimen.examination',
         ]);
 
         // Filter by search query (Customer name, Customer ID/RTN, sequence code, or Credit ID)
@@ -116,6 +123,7 @@ class CreditController extends Controller
             'customers' => $customers,
             'specimenTypes' => $specimenTypes,
             'groups' => SpecimenGroup::orderBy('name', 'asc')->get(),
+            'banks' => Bank::orderBy('name', 'asc')->get(),
         ]);
     }
 
@@ -138,6 +146,9 @@ class CreditController extends Controller
             'group.specimens.category',
             'group.specimens.referrerRelation',
             'group.specimens.priority',
+            'creditInvoiceSpecimens.specimen.customerRelation',
+            'creditInvoiceSpecimens.specimen.type',
+            'creditInvoiceSpecimens.specimen.examination',
         ]);
 
         // Filter by search query (Customer name, Customer ID/RTN, sequence code, or Credit ID)
@@ -327,6 +338,17 @@ class CreditController extends Controller
                 },
             ],
             'payment_type' => 'required|in:cash,credit card,bank transfer,check',
+            'payment_method_date' => 'nullable|date',
+            'cash_value' => 'nullable|numeric|min:0',
+            'check_number' => 'nullable|string|max:100',
+            'check_value' => 'nullable|numeric|min:0',
+            'card_last_4' => 'nullable|digits:4',
+            'card_value_charged' => 'nullable|numeric|min:0',
+            'card_expiration' => 'nullable|string|max:10',
+            'card_authorization_code' => 'nullable|string|max:100',
+            'transfer_bank_id' => 'nullable|exists:banks,id',
+            'transfer_value' => 'nullable|numeric|min:0',
+            'transfer_authorization_code' => 'nullable|string|max:100',
             'proof_of_payment' => [
                 $request->input('payment_type') === 'cash' ? 'nullable' : 'required',
                 'file',
@@ -347,7 +369,24 @@ class CreditController extends Controller
                     }
                 },
             ],
+            'specimen_ids' => $credit->is_group ? 'required|array|min:1' : 'nullable|array',
+            'specimen_ids.*' => 'exists:specimen,id',
         ]);
+
+        if ($credit->is_group) {
+            $specimenIds = $validated['specimen_ids'];
+            $dbSpecimensCount = DB::table('credit_invoice_specimens')
+                ->where('credit_id', $credit->id)
+                ->whereIn('specimen_id', $specimenIds)
+                ->where('is_paid', 0)
+                ->count();
+
+            if ($dbSpecimensCount !== count($specimenIds)) {
+                throw ValidationException::withMessages([
+                    'specimen_ids' => ['Uno o más especímenes seleccionados no son válidos o ya han sido pagados.'],
+                ]);
+            }
+        }
 
         $invoice = null;
 
@@ -377,14 +416,35 @@ class CreditController extends Controller
 
             $amountPaid = (float) $validated['amount_paid'];
 
+            if ($credit->is_group) {
+                DB::table('credit_invoice_specimens')
+                    ->where('credit_id', $credit->id)
+                    ->whereIn('specimen_id', $validated['specimen_ids'])
+                    ->update([
+                        'is_paid' => 1,
+                        'updated_at' => now(),
+                    ]);
+            }
+
             // Create payment invoice
             $invoice = Invoice::create([
                 'full_invoice_number' => $fullInvoiceNumber,
                 'invoice_number' => $invoiceNumber,
                 'cai_range_id' => $caiRange->id,
                 'customer_id' => $credit->customer_id,
-                'specimen_id' => $originalInvoice->specimen_id,
+                'specimen_id' => $credit->is_group ? null : $originalInvoice->specimen_id,
                 'payment_type' => $validated['payment_type'],
+                'payment_method_date' => $request->input('payment_method_date'),
+                'cash_value' => $request->input('cash_value'),
+                'check_number' => $request->input('check_number'),
+                'check_value' => $request->input('check_value'),
+                'card_last_4' => $request->input('card_last_4'),
+                'card_value_charged' => $request->input('card_value_charged'),
+                'card_expiration' => $request->input('card_expiration'),
+                'card_authorization_code' => $request->input('card_authorization_code'),
+                'transfer_bank_id' => $request->input('transfer_bank_id') ?: null,
+                'transfer_value' => $request->input('transfer_value'),
+                'transfer_authorization_code' => $request->input('transfer_authorization_code'),
                 'credit_payment_id' => $credit->id,
                 'amount' => $amountPaid,
                 'discount' => 0.00,
@@ -400,6 +460,8 @@ class CreditController extends Controller
                 'proof_of_payment' => $proofOfPaymentPath,
                 'invoice_file' => '',
                 'invoice_type' => 'credit payment',
+                'is_group' => $credit->is_group ? true : false,
+                'group_id' => $credit->is_group ? $credit->group_id : null,
             ]);
 
             // Update credit values
@@ -426,8 +488,16 @@ class CreditController extends Controller
             $customer = Customer::findOrFail($credit->customer_id);
             $location = Location::findOrFail($caiRange->location_id);
 
+            // Fetch the specimens being paid in this transaction for the PDF
+            $paidSpecimens = [];
+            if ($credit->is_group) {
+                $paidSpecimens = Specimen::whereIn('id', $validated['specimen_ids'])
+                    ->with(['type', 'examination'])
+                    ->get();
+            }
+
             // Render Blade for Credit Payment PDF
-            $htmlContent = view('pdf.credit_payment_invoice', compact('invoice', 'caiRange', 'customer', 'location', 'totalWords', 'credit', 'originalInvoice'))->render();
+            $htmlContent = view('pdf.credit_payment_invoice', compact('invoice', 'caiRange', 'customer', 'location', 'totalWords', 'credit', 'originalInvoice', 'paidSpecimens'))->render();
 
             $filename = 'credit_invoice_'.$invoice->id.'_'.time().'.pdf';
             $pdfPath = 'invoices/'.$filename;
@@ -442,10 +512,10 @@ class CreditController extends Controller
             }
 
             $pdfContent = $browsershot->addChromiumArguments([
-                    'disable-crash-reporter',
-                    'disable-dev-shm-usage',
-                    'no-sandbox',
-                ])
+                'disable-crash-reporter',
+                'disable-dev-shm-usage',
+                'no-sandbox',
+            ])
                 ->noSandbox()
                 ->margins(10, 10, 10, 10)
                 ->format('A4')
@@ -613,7 +683,7 @@ class CreditController extends Controller
             'reminder_interval_in_days' => 'required|integer|min:1',
         ]);
 
-        $credit->reminder_interval = \Carbon\CarbonInterval::days((int) $validated['reminder_interval_in_days']);
+        $credit->reminder_interval = CarbonInterval::days((int) $validated['reminder_interval_in_days']);
         $credit->save();
 
         return redirect()->back()->with('success', 'Configuración de recordatorio de crédito actualizada con éxito.');

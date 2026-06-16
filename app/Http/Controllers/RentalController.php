@@ -13,11 +13,11 @@ use Illuminate\Http\File;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Gate;
 use Spatie\Browsershot\Browsershot;
 
 class RentalController extends Controller
@@ -31,10 +31,10 @@ class RentalController extends Controller
 
         $query = Rental::with(['invoices' => function ($q) {
             $q->where('invoice_type', 'rental')
-              ->with('customer')
-              ->orderBy('created_at', 'desc');
+                ->with('customer')
+                ->orderBy('created_at', 'desc');
         }]);
-        
+
         if ($request->filled('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
@@ -42,7 +42,7 @@ class RentalController extends Controller
                     ->orWhere('description', 'like', "%{$search}%")
                     ->orWhereHas('invoices', function ($iq) use ($search) {
                         $iq->where('invoice_type', 'rental')
-                           ->where('full_invoice_number', 'like', "%{$search}%");
+                            ->where('full_invoice_number', 'like', "%{$search}%");
                     });
             });
         }
@@ -51,7 +51,7 @@ class RentalController extends Controller
         if ($request->filled('customer_id') && $request->get('customer_id') !== 'all') {
             $query->whereHas('invoices', function ($q) use ($request) {
                 $q->where('invoice_type', 'rental')
-                  ->where('customer_id', $request->get('customer_id'));
+                    ->where('customer_id', $request->get('customer_id'));
             });
         }
 
@@ -244,7 +244,7 @@ class RentalController extends Controller
 
             // Invoice subtotal is rental subtotal plus custom amount (net amount before tax)
             $subtotal = $rentalSubtotal + $customAmountVal;
-            
+
             // Total invoice amount is subtotal plus calculated tax
             $total = $subtotal + $isv15;
 
@@ -320,7 +320,7 @@ class RentalController extends Controller
 
             // PDF Generation
             $totalWords = $this->numberToSpanishWords($invoice->total);
-            if (!empty($validated['customer_id'])) {
+            if (! empty($validated['customer_id'])) {
                 $customer = Customer::findOrFail($validated['customer_id']);
             } else {
                 $customer = new Customer([
@@ -347,10 +347,10 @@ class RentalController extends Controller
             }
 
             $pdfContent = $browsershot->addChromiumArguments([
-                    'disable-crash-reporter',
-                    'disable-dev-shm-usage',
-                    'no-sandbox',
-                ])
+                'disable-crash-reporter',
+                'disable-dev-shm-usage',
+                'no-sandbox',
+            ])
                 ->noSandbox()
                 ->margins(10, 10, 10, 10)
                 ->format('A4')

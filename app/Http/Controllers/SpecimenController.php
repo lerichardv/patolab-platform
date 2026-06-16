@@ -27,14 +27,13 @@ use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Spatie\Browsershot\Browsershot;
-
-use Illuminate\Support\Facades\Gate;
 
 class SpecimenController extends Controller
 {
@@ -438,10 +437,10 @@ class SpecimenController extends Controller
             }
 
             $pdfContent = $browsershot->addChromiumArguments([
-                    'disable-crash-reporter',
-                    'disable-dev-shm-usage',
-                    'no-sandbox',
-                ])
+                'disable-crash-reporter',
+                'disable-dev-shm-usage',
+                'no-sandbox',
+            ])
                 ->noSandbox()
                 ->margins(10, 10, 10, 10)
                 ->format('A4')

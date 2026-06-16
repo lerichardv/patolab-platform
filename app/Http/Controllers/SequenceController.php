@@ -6,11 +6,10 @@ use App\Models\Location;
 use App\Models\Sequence;
 use App\Models\SpecimenType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
-
-use Illuminate\Support\Facades\Gate;
 
 class SequenceController extends Controller
 {

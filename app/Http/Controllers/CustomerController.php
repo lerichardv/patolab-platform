@@ -4,9 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-
 use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
 
 class CustomerController extends Controller
 {

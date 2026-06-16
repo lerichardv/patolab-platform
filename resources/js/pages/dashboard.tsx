@@ -8,12 +8,22 @@ import {
     Package,
     Calendar,
     Eye,
+    Tag,
+    ShieldCheck,
+    MapPin,
+    Settings,
 } from 'lucide-react';
 import { useState } from 'react';
+import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
 import { index as customersIndex } from '@/actions/App/Http/Controllers/CustomerController';
 import { index as inventoriesIndex } from '@/actions/App/Http/Controllers/InventoryController';
 import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
+import { index as locationsIndex } from '@/actions/App/Http/Controllers/LocationController';
+import { index as rentalsIndex } from '@/actions/App/Http/Controllers/RentalController';
+import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
+import { index as settingsSystemIndex } from '@/actions/App/Http/Controllers/SettingController';
 import { index as specimensIndex } from '@/actions/App/Http/Controllers/SpecimenController';
+import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -94,6 +104,166 @@ export default function Dashboard({
     const formattedDate =
         currentDate.charAt(0).toUpperCase() + currentDate.slice(1);
 
+    const userPermissions = auth?.permissions || [];
+
+    const hasPermission = (perm: string | string[]) => {
+        const perms = Array.isArray(perm) ? perm : [perm];
+
+        return perms.some((p) => userPermissions.includes(p));
+    };
+
+    interface DashboardAction {
+        title: string;
+        href: any;
+        icon: any;
+        description: string;
+        permission: string | string[];
+        bgIcon: string;
+        hoverBorder: string;
+        hoverText: string;
+    }
+
+    const primaryActions: DashboardAction[] = [
+        {
+            title: 'Registrar Muestra',
+            href: specimensIndex(),
+            icon: Microscope,
+            description:
+                'Crea una nueva muestra de paciente y genera su orden de facturación.',
+            permission: 'specimens.view',
+            bgIcon: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
+            hoverBorder: 'hover:border-blue-500/30',
+            hoverText:
+                'group-hover:text-blue-600 dark:group-hover:text-blue-400',
+        },
+        {
+            title: 'Pacientes y Clientes',
+            href: customersIndex(),
+            icon: Users,
+            description:
+                'Administra y registra nuevos clientes y sus expedientes en el sistema.',
+            permission: 'patients.view',
+            bgIcon: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400',
+            hoverBorder: 'hover:border-indigo-500/30',
+            hoverText:
+                'group-hover:text-indigo-600 dark:group-hover:text-indigo-400',
+        },
+        {
+            title: 'Facturación y Cobros',
+            href: invoicesIndex(),
+            icon: Receipt,
+            description:
+                'Consulta las facturas emitidas, los comprobantes de pago y cuentas por cobrar.',
+            permission: 'invoices.view',
+            bgIcon: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
+            hoverBorder: 'hover:border-emerald-500/30',
+            hoverText:
+                'group-hover:text-emerald-600 dark:group-hover:text-emerald-400',
+        },
+        {
+            title: 'Control de Inventario',
+            href: inventoriesIndex(),
+            icon: Package,
+            description:
+                'Monitorea el stock disponible, reabastece productos y revisa movimientos.',
+            permission: 'inventory.view',
+            bgIcon: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
+            hoverBorder: 'hover:border-amber-500/30',
+            hoverText:
+                'group-hover:text-amber-600 dark:group-hover:text-amber-400',
+        },
+    ];
+
+    const fallbackActions: DashboardAction[] = [
+        {
+            title: 'Alquileres',
+            href: rentalsIndex(),
+            icon: Tag,
+            description:
+                'Administra el alquiler de equipos y espacios del laboratorio.',
+            permission: 'rentals.view',
+            bgIcon: 'bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-400',
+            hoverBorder: 'hover:border-rose-500/30',
+            hoverText:
+                'group-hover:text-rose-600 dark:group-hover:text-rose-400',
+        },
+        {
+            title: 'Usuarios del sistema',
+            href: usersIndex(),
+            icon: Users,
+            description: 'Administra los usuarios del sistema y sus perfiles.',
+            permission: 'users.view',
+            bgIcon: 'bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400',
+            hoverBorder: 'hover:border-violet-500/30',
+            hoverText:
+                'group-hover:text-violet-600 dark:group-hover:text-violet-400',
+        },
+        {
+            title: 'Roles y Permisos',
+            href: rolesIndex(),
+            icon: ShieldCheck,
+            description:
+                'Configura los roles y asignación de permisos del sistema.',
+            permission: 'roles.view',
+            bgIcon: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-950 dark:text-cyan-400',
+            hoverBorder: 'hover:border-cyan-500/30',
+            hoverText:
+                'group-hover:text-cyan-600 dark:group-hover:text-cyan-400',
+        },
+        {
+            title: 'Sucursales',
+            href: locationsIndex(),
+            icon: MapPin,
+            description: 'Administra las sucursales y ubicaciones físicas.',
+            permission: 'locations.view',
+            bgIcon: 'bg-teal-50 text-teal-600 dark:bg-teal-950 dark:text-teal-400',
+            hoverBorder: 'hover:border-teal-500/30',
+            hoverText:
+                'group-hover:text-teal-600 dark:group-hover:text-teal-400',
+        },
+        {
+            title: 'Créditos',
+            href: creditsIndex(),
+            icon: Receipt,
+            description: 'Consulta y procesa pagos de créditos de clientes.',
+            permission: ['credits.view', 'credits.manage'],
+            bgIcon: 'bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400',
+            hoverBorder: 'hover:border-orange-500/30',
+            hoverText:
+                'group-hover:text-orange-600 dark:group-hover:text-orange-400',
+        },
+        {
+            title: 'Ajustes del Sistema',
+            href: settingsSystemIndex(),
+            icon: Settings,
+            description: 'Configura los parámetros globales del sistema.',
+            permission: ['settings.view', 'settings.manage'],
+            bgIcon: 'bg-gray-50 text-gray-600 dark:bg-gray-950 dark:text-gray-400',
+            hoverBorder: 'hover:border-gray-500/30',
+            hoverText:
+                'group-hover:text-gray-600 dark:group-hover:text-gray-400',
+        },
+    ];
+
+    let activeActions: DashboardAction[] = primaryActions.filter((action) =>
+        hasPermission(action.permission),
+    );
+
+    if (activeActions.length === 0) {
+        activeActions = fallbackActions.filter((action) =>
+            hasPermission(action.permission),
+        );
+    }
+
+    const showSpecimensCard = hasPermission('specimens.view');
+    const showEarningsCard = hasPermission('invoices.view');
+    const showCustomersCard = hasPermission('patients.view');
+    const visibleCardsCount = [
+        showSpecimensCard,
+        showEarningsCard,
+        showCustomersCard,
+    ].filter(Boolean).length;
+
     return (
         <>
             <Head title="Resumen" />
@@ -120,198 +290,186 @@ export default function Dashboard({
                 </div>
 
                 {/* Metric Cards */}
-                <div className="grid gap-6 md:grid-cols-3">
-                    {/* Specimens Card */}
-                    <Card className="group relative overflow-hidden border-sidebar-border/60 transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <div className="space-y-1">
-                                <span className="text-sm font-medium text-muted-foreground">
-                                    Muestras de la Semana
-                                </span>
-                                <div className="text-3xl font-bold tracking-tight text-foreground">
-                                    {specimensThisWeekCount}
-                                </div>
-                            </div>
-                            <div className="flex size-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 transition-colors duration-300 group-hover:scale-110 group-hover:bg-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400">
-                                <Microscope className="size-6" />
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-xs text-muted-foreground">
-                                Total histórico:{' '}
-                                <span className="font-semibold text-foreground">
-                                    {specimensCount}
-                                </span>
-                            </p>
-                            <div className="mt-4 flex justify-end border-t pt-4">
-                                <Link
-                                    href={specimensIndex().url}
-                                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 transition-all hover:gap-2 hover:underline dark:text-blue-400"
-                                >
-                                    Muestras <ArrowRight className="size-4" />
-                                </Link>
-                            </div>
-                        </CardContent>
-                    </Card>
+                {visibleCardsCount > 0 && (
+                    <div
+                        className={
+                            visibleCardsCount === 3
+                                ? 'grid gap-6 md:grid-cols-3'
+                                : visibleCardsCount === 2
+                                  ? 'grid gap-6 md:grid-cols-2'
+                                  : 'grid gap-6 md:grid-cols-1'
+                        }
+                    >
+                        {/* Specimens Card */}
+                        {showSpecimensCard && (
+                            <Card className="group relative overflow-hidden border-sidebar-border/60 transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <div className="space-y-1">
+                                        <span className="text-sm font-medium text-muted-foreground">
+                                            Muestras de la Semana
+                                        </span>
+                                        <div className="text-3xl font-bold tracking-tight text-foreground">
+                                            {specimensThisWeekCount}
+                                        </div>
+                                    </div>
+                                    <div className="flex size-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 transition-colors duration-300 group-hover:scale-110 group-hover:bg-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400">
+                                        <Microscope className="size-6" />
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">
+                                        Total histórico:{' '}
+                                        <span className="font-semibold text-foreground">
+                                            {specimensCount}
+                                        </span>
+                                    </p>
+                                    <div className="mt-4 flex justify-end border-t pt-4">
+                                        <Link
+                                            href={specimensIndex().url}
+                                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 transition-all hover:gap-2 hover:underline dark:text-blue-400"
+                                        >
+                                            Muestras{' '}
+                                            <ArrowRight className="size-4" />
+                                        </Link>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
-                    {/* Earnings Card */}
-                    <Card className="group relative overflow-hidden border-sidebar-border/60 transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <div className="space-y-1">
-                                <span className="text-sm font-medium text-muted-foreground">
-                                    Ingresos de Hoy
-                                </span>
-                                <div className="text-3xl font-bold tracking-tight text-foreground">
-                                    L.{' '}
-                                    {moneyMadeToday.toLocaleString('es-HN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                    })}
-                                </div>
-                            </div>
-                            <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 transition-colors duration-300 group-hover:scale-110 group-hover:bg-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400">
-                                <Coins className="size-6" />
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-xs text-muted-foreground">
-                                Total recaudado el día de hoy por concepto de
-                                facturas.
-                            </p>
-                            <div className="mt-4 flex justify-end border-t pt-4">
-                                <Link
-                                    href={invoicesIndex()}
-                                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 transition-all hover:gap-2 hover:underline dark:text-emerald-400"
-                                >
-                                    Ver facturas{' '}
-                                    <ArrowRight className="size-4" />
-                                </Link>
-                            </div>
-                        </CardContent>
-                    </Card>
+                        {/* Earnings Card */}
+                        {showEarningsCard && (
+                            <Card className="group relative overflow-hidden border-sidebar-border/60 transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <div className="space-y-1">
+                                        <span className="text-sm font-medium text-muted-foreground">
+                                            Ingresos de Hoy
+                                        </span>
+                                        <div className="text-3xl font-bold tracking-tight text-foreground">
+                                            L.{' '}
+                                            {moneyMadeToday.toLocaleString(
+                                                'es-HN',
+                                                {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                },
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex size-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 transition-colors duration-300 group-hover:scale-110 group-hover:bg-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                        <Coins className="size-6" />
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">
+                                        Total recaudado el día de hoy por
+                                        concepto de facturas.
+                                    </p>
+                                    <div className="mt-4 flex justify-end border-t pt-4">
+                                        <Link
+                                            href={invoicesIndex()}
+                                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 transition-all hover:gap-2 hover:underline dark:text-emerald-400"
+                                        >
+                                            Ver facturas{' '}
+                                            <ArrowRight className="size-4" />
+                                        </Link>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
-                    {/* Customers Card */}
-                    <Card className="group relative overflow-hidden border-sidebar-border/60 transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <div className="space-y-1">
-                                <span className="text-sm font-medium text-muted-foreground">
-                                    Clientes Registrados
-                                </span>
-                                <div className="text-3xl font-bold tracking-tight text-foreground">
-                                    {customersCount}
-                                </div>
-                            </div>
-                            <div className="flex size-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 transition-colors duration-300 group-hover:scale-110 group-hover:bg-indigo-500/20 dark:bg-indigo-500/20 dark:text-indigo-400">
-                                <Users className="size-6" />
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-xs text-muted-foreground">
-                                Total de clientes y pacientes activos en el
-                                sistema.
-                            </p>
-                            <div className="mt-4 flex justify-end border-t pt-4">
-                                <Link
-                                    href={customersIndex()}
-                                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 transition-all hover:gap-2 hover:underline dark:text-indigo-400"
-                                >
-                                    Ver clientes{' '}
-                                    <ArrowRight className="size-4" />
-                                </Link>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                        {/* Customers Card */}
+                        {showCustomersCard && (
+                            <Card className="group relative overflow-hidden border-sidebar-border/60 transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <div className="space-y-1">
+                                        <span className="text-sm font-medium text-muted-foreground">
+                                            Clientes Registrados
+                                        </span>
+                                        <div className="text-3xl font-bold tracking-tight text-foreground">
+                                            {customersCount}
+                                        </div>
+                                    </div>
+                                    <div className="flex size-12 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 transition-colors duration-300 group-hover:scale-110 group-hover:bg-indigo-500/20 dark:bg-indigo-500/20 dark:text-indigo-400">
+                                        <Users className="size-6" />
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground">
+                                        Total de clientes y pacientes activos en
+                                        el sistema.
+                                    </p>
+                                    <div className="mt-4 flex justify-end border-t pt-4">
+                                        <Link
+                                            href={customersIndex()}
+                                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 transition-all hover:gap-2 hover:underline dark:text-indigo-400"
+                                        >
+                                            Ver clientes{' '}
+                                            <ArrowRight className="size-4" />
+                                        </Link>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                )}
 
                 {/* Quick Actions Row */}
-                <div className="flex flex-col gap-4">
-                    <h2 className="px-1 text-lg font-semibold tracking-tight text-foreground">
-                        Acciones Rápidas
-                    </h2>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <Link
-                            href={specimensIndex()}
-                            className="group flex items-start gap-4 rounded-xl border border-sidebar-border/60 bg-card p-4 transition-all hover:border-blue-500/30 hover:shadow-sm"
-                        >
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 transition-transform group-hover:scale-105 dark:bg-blue-950 dark:text-blue-400">
-                                <Microscope className="size-5" />
-                            </div>
-                            <div className="space-y-1">
-                                <h3 className="text-sm font-semibold text-foreground transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                                    Registrar Muestra
-                                </h3>
-                                <p className="text-xs text-muted-foreground">
-                                    Crea una nueva muestra de paciente y genera
-                                    su orden de facturación.
-                                </p>
-                            </div>
-                        </Link>
+                {activeActions.length > 0 && (
+                    <div className="flex flex-col gap-4">
+                        <h2 className="px-1 text-lg font-semibold tracking-tight text-foreground">
+                            Acciones Rápidas
+                        </h2>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            {activeActions.map((action, idx) => {
+                                const IconComponent = action.icon;
 
-                        <Link
-                            href={customersIndex()}
-                            className="group flex items-start gap-4 rounded-xl border border-sidebar-border/60 bg-card p-4 transition-all hover:border-indigo-500/30 hover:shadow-sm"
-                        >
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition-transform group-hover:scale-105 dark:bg-indigo-950 dark:text-indigo-400">
-                                <Users className="size-5" />
-                            </div>
-                            <div className="space-y-1">
-                                <h3 className="text-sm font-semibold text-foreground transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                                    Pacientes y Clientes
-                                </h3>
-                                <p className="text-xs text-muted-foreground">
-                                    Administra y registra nuevos clientes y sus
-                                    expedientes en el sistema.
-                                </p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href={invoicesIndex()}
-                            className="group flex items-start gap-4 rounded-xl border border-sidebar-border/60 bg-card p-4 transition-all hover:border-emerald-500/30 hover:shadow-sm"
-                        >
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition-transform group-hover:scale-105 dark:bg-emerald-950 dark:text-emerald-400">
-                                <Receipt className="size-5" />
-                            </div>
-                            <div className="space-y-1">
-                                <h3 className="text-sm font-semibold text-foreground transition-colors group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
-                                    Facturación y Cobros
-                                </h3>
-                                <p className="text-xs text-muted-foreground">
-                                    Consulta las facturas emitidas, los
-                                    comprobantes de pago y cuentas por cobrar.
-                                </p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href={inventoriesIndex()}
-                            className="group flex items-start gap-4 rounded-xl border border-sidebar-border/60 bg-card p-4 transition-all hover:border-amber-500/30 hover:shadow-sm"
-                        >
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 transition-transform group-hover:scale-105 dark:bg-amber-950 dark:text-amber-400">
-                                <Package className="size-5" />
-                            </div>
-                            <div className="space-y-1">
-                                <h3 className="text-sm font-semibold text-foreground transition-colors group-hover:text-amber-600 dark:group-hover:text-amber-400">
-                                    Control de Inventario
-                                </h3>
-                                <p className="text-xs text-muted-foreground">
-                                    Monitorea el stock disponible, reabastece
-                                    productos y revisa movimientos.
-                                </p>
-                            </div>
-                        </Link>
+                                return (
+                                    <Link
+                                        key={idx}
+                                        href={action.href}
+                                        className={`group flex items-start gap-4 rounded-xl border border-sidebar-border/60 bg-card p-4 transition-all hover:shadow-sm ${action.hoverBorder}`}
+                                    >
+                                        <div
+                                            className={`flex size-10 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-105 ${action.bgIcon}`}
+                                        >
+                                            <IconComponent className="size-5" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h3
+                                                className={`text-sm font-semibold text-foreground transition-colors ${action.hoverText}`}
+                                            >
+                                                {action.title}
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground">
+                                                {action.description}
+                                            </p>
+                                        </div>
+                                    </Link>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Weekly Specimens Chart */}
-                <div className="grid gap-6">
-                    <WeeklySpecimensChart data={specimensWeeklyData} />
-                </div>
+                {hasPermission('specimens.view') && (
+                    <div className="grid gap-6">
+                        <WeeklySpecimensChart
+                            data={specimensWeeklyData}
+                            showEarnings={hasPermission('invoices.view')}
+                        />
+                    </div>
+                )}
 
                 {/* Today's Specimens List */}
-                <div className="grid gap-6">
-                    <TodaySpecimensList specimens={todaySpecimens} />
-                </div>
+                {hasPermission('specimens.view') && (
+                    <div className="grid gap-6">
+                        <TodaySpecimensList
+                            specimens={todaySpecimens}
+                            showInvoices={hasPermission('invoices.view')}
+                        />
+                    </div>
+                )}
             </div>
         </>
     );
@@ -324,7 +482,13 @@ interface ChartDataPoint {
     earnings: number;
 }
 
-function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
+function WeeklySpecimensChart({
+    data = [],
+    showEarnings = true,
+}: {
+    data: ChartDataPoint[];
+    showEarnings?: boolean;
+}) {
     const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
     const paddingLeft = 45;
@@ -388,35 +552,38 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
                     </p>
                 </div>
                 <div className="flex items-center gap-4 text-right">
-                    {activeIndex !== null && points[activeIndex] && (
-                        <div className="hidden animate-in duration-200 fade-in slide-in-from-right-1 sm:block">
-                            <span className="block text-[10px] font-semibold tracking-wider text-blue-600 uppercase dark:text-blue-400">
-                                {points[activeIndex].day}
-                            </span>
-                            <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
-                                L.{' '}
-                                {points[activeIndex].earnings.toLocaleString(
-                                    'es-HN',
-                                    {
+                    {showEarnings &&
+                        activeIndex !== null &&
+                        points[activeIndex] && (
+                            <div className="hidden animate-in duration-200 fade-in slide-in-from-right-1 sm:block">
+                                <span className="block text-[10px] font-semibold tracking-wider text-blue-600 uppercase dark:text-blue-400">
+                                    {points[activeIndex].day}
+                                </span>
+                                <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                                    L.{' '}
+                                    {points[
+                                        activeIndex
+                                    ].earnings.toLocaleString('es-HN', {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    },
-                                )}
+                                    })}
+                                </span>
+                            </div>
+                        )}
+                    {showEarnings && (
+                        <div>
+                            <span className="block text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                Total Facturado
+                            </span>
+                            <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                L.{' '}
+                                {totalWeeklyEarnings.toLocaleString('es-HN', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                })}
                             </span>
                         </div>
                     )}
-                    <div>
-                        <span className="block text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                            Total Facturado
-                        </span>
-                        <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                            L.{' '}
-                            {totalWeeklyEarnings.toLocaleString('es-HN', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                            })}
-                        </span>
-                    </div>
                 </div>
             </CardHeader>
             <CardContent>
@@ -584,11 +751,16 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
                                 }`}
                             >
                                 {p.count}{' '}
-                                {p.count === 1 ? 'muestra' : 'muestras'} • L.{' '}
-                                {p.earnings.toLocaleString('es-HN', {
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0,
-                                })}
+                                {p.count === 1 ? 'muestra' : 'muestras'}
+                                {showEarnings && (
+                                    <>
+                                        {' • L. '}
+                                        {p.earnings.toLocaleString('es-HN', {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 0,
+                                        })}
+                                    </>
+                                )}
                             </text>
                         ))}
 
@@ -637,16 +809,18 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
                                         ? 'muestra'
                                         : 'muestras'}
                                 </div>
-                                <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
-                                    <span className="size-2 rounded-full bg-emerald-500" />
-                                    L.{' '}
-                                    {points[
-                                        activeIndex
-                                    ].earnings.toLocaleString('es-HN', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                    })}
-                                </div>
+                                {showEarnings && (
+                                    <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
+                                        <span className="size-2 rounded-full bg-emerald-500" />
+                                        L.{' '}
+                                        {points[
+                                            activeIndex
+                                        ].earnings.toLocaleString('es-HN', {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -658,8 +832,10 @@ function WeeklySpecimensChart({ data = [] }: { data: ChartDataPoint[] }) {
 
 function TodaySpecimensList({
     specimens = [],
+    showInvoices = true,
 }: {
     specimens: TodaySpecimen[];
+    showInvoices?: boolean;
 }) {
     const totalAmount = specimens.reduce(
         (sum, spec) =>
@@ -732,30 +908,34 @@ function TodaySpecimensList({
                                 {specimens.length}
                             </span>
                         </div>
-                        <div className="rounded-xl border bg-background/50 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
-                            <span className="text-muted-foreground">
-                                Monto Base:{' '}
-                            </span>
-                            <span className="font-mono font-bold text-foreground">
-                                L.{' '}
-                                {totalAmount.toLocaleString('es-HN', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                })}
-                            </span>
-                        </div>
-                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
-                            <span className="text-emerald-600 dark:text-emerald-400">
-                                Total Facturado:{' '}
-                            </span>
-                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                L.{' '}
-                                {totalInvoiced.toLocaleString('es-HN', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                })}
-                            </span>
-                        </div>
+                        {showInvoices && (
+                            <>
+                                <div className="rounded-xl border bg-background/50 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
+                                    <span className="text-muted-foreground">
+                                        Monto Base:{' '}
+                                    </span>
+                                    <span className="font-mono font-bold text-foreground">
+                                        L.{' '}
+                                        {totalAmount.toLocaleString('es-HN', {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        })}
+                                    </span>
+                                </div>
+                                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
+                                    <span className="text-emerald-600 dark:text-emerald-400">
+                                        Total Facturado:{' '}
+                                    </span>
+                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                        L.{' '}
+                                        {totalInvoiced.toLocaleString('es-HN', {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        })}
+                                    </span>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
             </CardHeader>
@@ -791,12 +971,16 @@ function TodaySpecimensList({
                                     <TableHead>Estudio / Tipo</TableHead>
                                     <TableHead>Prioridad</TableHead>
                                     <TableHead>Estado</TableHead>
-                                    <TableHead className="text-right font-semibold">
-                                        Monto Base
-                                    </TableHead>
-                                    <TableHead className="text-right font-semibold">
-                                        Total / Pago
-                                    </TableHead>
+                                    {showInvoices && (
+                                        <>
+                                            <TableHead className="text-right font-semibold">
+                                                Monto Base
+                                            </TableHead>
+                                            <TableHead className="text-right font-semibold">
+                                                Total / Pago
+                                            </TableHead>
+                                        </>
+                                    )}
                                     <TableHead className="w-[90px] pr-6 text-center font-semibold">
                                         Acción
                                     </TableHead>
@@ -906,41 +1090,47 @@ function TodaySpecimensList({
                                                     )}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right font-mono text-sm font-medium text-muted-foreground">
-                                                L. {amountVal.toFixed(2)}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex flex-col items-end">
-                                                    <div className="flex items-center gap-1.5">
-                                                        {hasDiscount && (
-                                                            <span className="font-mono text-[10px] text-muted-foreground line-through">
-                                                                L.{' '}
-                                                                {amountVal.toFixed(
-                                                                    2,
+                                            {showInvoices && (
+                                                <>
+                                                    <TableCell className="text-right font-mono text-sm font-medium text-muted-foreground">
+                                                        L.{' '}
+                                                        {amountVal.toFixed(2)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex flex-col items-end">
+                                                            <div className="flex items-center gap-1.5">
+                                                                {hasDiscount && (
+                                                                    <span className="font-mono text-[10px] text-muted-foreground line-through">
+                                                                        L.{' '}
+                                                                        {amountVal.toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    </span>
                                                                 )}
-                                                            </span>
-                                                        )}
-                                                        <span className="font-mono text-sm font-bold text-foreground">
-                                                            L.{' '}
-                                                            {totalVal.toFixed(
-                                                                2,
+                                                                <span className="font-mono text-sm font-bold text-foreground">
+                                                                    L.{' '}
+                                                                    {totalVal.toFixed(
+                                                                        2,
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                            {specimen
+                                                                .invoice_relation
+                                                                ?.payment_type && (
+                                                                <span className="mt-0.5 text-[10px] text-muted-foreground">
+                                                                    (
+                                                                    {getPaymentTypeLabel(
+                                                                        specimen
+                                                                            .invoice_relation
+                                                                            .payment_type,
+                                                                    )}
+                                                                    )
+                                                                </span>
                                                             )}
-                                                        </span>
-                                                    </div>
-                                                    {specimen.invoice_relation
-                                                        ?.payment_type && (
-                                                        <span className="mt-0.5 text-[10px] text-muted-foreground">
-                                                            (
-                                                            {getPaymentTypeLabel(
-                                                                specimen
-                                                                    .invoice_relation
-                                                                    .payment_type,
-                                                            )}
-                                                            )
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
+                                                        </div>
+                                                    </TableCell>
+                                                </>
+                                            )}
                                             <TableCell className="pr-6 text-center">
                                                 <Link
                                                     href={

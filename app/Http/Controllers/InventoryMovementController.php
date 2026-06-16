@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\InventoryMovement;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
 
 class InventoryMovementController extends Controller
 {

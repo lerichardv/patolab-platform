@@ -8,10 +8,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
-
-use Illuminate\Support\Facades\Gate;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -40,8 +39,10 @@ class AppServiceProvider extends ServiceProvider
                 if ($user->role->slug === 'admin') {
                     return true;
                 }
+
                 return $user->role->permissions()->where('slug', $ability)->exists() ? true : false;
             }
+
             return false;
         });
     }

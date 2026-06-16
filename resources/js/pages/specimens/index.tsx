@@ -980,12 +980,18 @@ export default function SpecimensIndex({
                                         <span className="truncate">
                                             {selectedGroupId === 'all'
                                                 ? 'Todos los grupos'
-                                                : availableGroups.find(
-                                                      (g) =>
-                                                          g.id ===
-                                                          selectedGroupId,
-                                                  )?.name ||
-                                                  'Grupo seleccionado'}
+                                                : (() => {
+                                                      const g =
+                                                          availableGroups.find(
+                                                              (g) =>
+                                                                  g.id ===
+                                                                  selectedGroupId,
+                                                          );
+
+                                                      return g
+                                                          ? `${g.name} (#${g.id})`
+                                                          : 'Grupo seleccionado';
+                                                  })()}
                                         </span>
                                     </div>
                                     <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -1023,7 +1029,7 @@ export default function SpecimensIndex({
                                             {availableGroups.map((group) => (
                                                 <CommandItem
                                                     key={group.id}
-                                                    value={group.name}
+                                                    value={`${group.name} - ${group.id}`}
                                                     onSelect={() => {
                                                         setSelectedGroupId(
                                                             group.id,
@@ -1042,7 +1048,7 @@ export default function SpecimensIndex({
                                                                 : 'opacity-0',
                                                         )}
                                                     />
-                                                    {group.name}
+                                                    {group.name} (#{group.id})
                                                 </CommandItem>
                                             ))}
                                         </CommandGroup>

@@ -1,6 +1,8 @@
 import {
     Microscope,
     CreditCard,
+    CheckCircle2,
+    XCircle,
     ExternalLink,
     Download,
     FileText,
@@ -59,6 +61,16 @@ export default function SpecimenGroupViewSheet({
 
     const invoice = group.invoice;
     const specimens = group.specimens || [];
+
+    // Build a set of paid specimen IDs from the group's credit (if any)
+    const paidSpecimenIds = new Set<number>(
+        (group.credit?.credit_invoice_specimens || [])
+            .filter((s: any) => s.is_paid)
+            .map((s: any) => s.specimen_id),
+    );
+    const hasCreditInfo =
+        group.credit &&
+        (group.credit.credit_invoice_specimens || []).length > 0;
 
     const getPaymentTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
@@ -163,219 +175,251 @@ export default function SpecimenGroupViewSheet({
                                 <Separator />
 
                                 <div className="space-y-4">
-                                    {specimens.map((specimen: any) => (
-                                        <div
-                                            key={specimen.id}
-                                            className="space-y-3 rounded-lg border bg-muted/10 p-4 transition-all hover:bg-muted/20"
-                                        >
-                                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    {specimen.sequence_code && (
-                                                        <span className="rounded border border-primary/20 bg-primary/5 px-2 py-0.5 font-mono text-xs font-bold text-primary">
-                                                            {
-                                                                specimen.sequence_code
-                                                            }
-                                                        </span>
-                                                    )}
-                                                    <span
-                                                        className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-white"
-                                                        style={{
-                                                            backgroundColor:
-                                                                specimen.status_color ||
-                                                                '#cbd5e1',
-                                                        }}
-                                                    >
-                                                        {specimen.status ===
-                                                        'received'
-                                                            ? 'Recibida'
-                                                            : specimen.status ===
-                                                                'macroscopic_review'
-                                                              ? 'Rev. Macroscópica'
-                                                              : specimen.status ===
-                                                                  'processing'
-                                                                ? 'En Proceso'
+                                    {specimens.map((specimen: any) => {
+                                        const isSpecPaid = hasCreditInfo
+                                            ? paidSpecimenIds.has(specimen.id)
+                                            : null;
+
+                                        return (
+                                            <div
+                                                key={specimen.id}
+                                                className={`space-y-3 rounded-lg border p-4 transition-all hover:bg-muted/20 ${
+                                                    isSpecPaid === true
+                                                        ? 'border-emerald-500/20 bg-emerald-500/5 dark:bg-emerald-500/10'
+                                                        : isSpecPaid === false
+                                                          ? 'border-amber-500/15 bg-muted/10'
+                                                          : 'bg-muted/10'
+                                                }`}
+                                            >
+                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        {specimen.sequence_code && (
+                                                            <span className="rounded border border-primary/20 bg-primary/5 px-2 py-0.5 font-mono text-xs font-bold text-primary">
+                                                                {
+                                                                    specimen.sequence_code
+                                                                }
+                                                            </span>
+                                                        )}
+                                                        {isSpecPaid ===
+                                                            true && (
+                                                            <span className="flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                                                                <CheckCircle2 className="h-3 w-3" />
+                                                                Pagado
+                                                            </span>
+                                                        )}
+                                                        {isSpecPaid ===
+                                                            false && (
+                                                            <span className="flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                                                                <XCircle className="h-3 w-3" />
+                                                                Pendiente
+                                                            </span>
+                                                        )}
+                                                        <span
+                                                            className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-white"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    specimen.status_color ||
+                                                                    '#cbd5e1',
+                                                            }}
+                                                        >
+                                                            {specimen.status ===
+                                                            'received'
+                                                                ? 'Recibida'
                                                                 : specimen.status ===
-                                                                    'microscopic_review'
-                                                                  ? 'Rev. Microscópica'
+                                                                    'macroscopic_review'
+                                                                  ? 'Rev. Macroscópica'
                                                                   : specimen.status ===
-                                                                      'finalized'
-                                                                    ? 'Finalizada'
+                                                                      'processing'
+                                                                    ? 'En Proceso'
                                                                     : specimen.status ===
-                                                                        'delivered'
-                                                                      ? 'Entregada'
+                                                                        'microscopic_review'
+                                                                      ? 'Rev. Microscópica'
                                                                       : specimen.status ===
-                                                                          'cancelled'
-                                                                        ? 'Cancelada'
-                                                                        : specimen.status}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <div
-                                                        className="h-2.5 w-2.5 rounded-full"
-                                                        style={{
-                                                            backgroundColor:
+                                                                          'finalized'
+                                                                        ? 'Finalizada'
+                                                                        : specimen.status ===
+                                                                            'delivered'
+                                                                          ? 'Entregada'
+                                                                          : specimen.status ===
+                                                                              'cancelled'
+                                                                            ? 'Cancelada'
+                                                                            : specimen.status}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <div
+                                                            className="h-2.5 w-2.5 rounded-full"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    specimen
+                                                                        .priority
+                                                                        ?.color,
+                                                            }}
+                                                        />
+                                                        <span className="text-xs font-medium text-muted-foreground">
+                                                            {
                                                                 specimen
                                                                     .priority
-                                                                    ?.color,
-                                                        }}
-                                                    />
-                                                    <span className="text-xs font-medium text-muted-foreground">
-                                                        {
-                                                            specimen.priority
-                                                                ?.name
-                                                        }
-                                                    </span>
+                                                                    ?.name
+                                                            }
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
-                                                <div>
-                                                    <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                        Paciente
-                                                    </span>
-                                                    <span className="font-medium text-foreground">
-                                                        {specimen
-                                                            .customer_relation
-                                                            ?.name || 'N/A'}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                        Examen
-                                                    </span>
-                                                    <span className="font-medium text-foreground">
-                                                        {specimen.type?.name} -{' '}
-                                                        {
-                                                            specimen.examination
-                                                                ?.name
-                                                        }
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                        Tiempo / Categoría
-                                                    </span>
-                                                    <span className="font-medium text-foreground">
-                                                        {specimen.category
-                                                            ?.name || 'N/A'}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                        Médico Remitente
-                                                    </span>
-                                                    <span className="font-medium text-foreground">
-                                                        {specimen
-                                                            .referrer_relation
-                                                            ?.name || 'N/A'}
-                                                    </span>
-                                                </div>
-                                                {specimen.anatomic_site && (
-                                                    <div className="sm:col-span-2">
+                                                <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+                                                    <div>
                                                         <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                            Sitio Anatómico
+                                                            Paciente
+                                                        </span>
+                                                        <span className="font-medium text-foreground">
+                                                            {specimen
+                                                                .customer_relation
+                                                                ?.name || 'N/A'}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                            Examen
                                                         </span>
                                                         <span className="font-medium text-foreground">
                                                             {
-                                                                specimen.anatomic_site
+                                                                specimen.type
+                                                                    ?.name
+                                                            }{' '}
+                                                            -{' '}
+                                                            {
+                                                                specimen
+                                                                    .examination
+                                                                    ?.name
                                                             }
                                                         </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                            Tiempo / Categoría
+                                                        </span>
+                                                        <span className="font-medium text-foreground">
+                                                            {specimen.category
+                                                                ?.name || 'N/A'}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                            Médico Remitente
+                                                        </span>
+                                                        <span className="font-medium text-foreground">
+                                                            {specimen
+                                                                .referrer_relation
+                                                                ?.name || 'N/A'}
+                                                        </span>
+                                                    </div>
+                                                    {specimen.anatomic_site && (
+                                                        <div className="sm:col-span-2">
+                                                            <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                                Sitio Anatómico
+                                                            </span>
+                                                            <span className="font-medium text-foreground">
+                                                                {
+                                                                    specimen.anatomic_site
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Specimen public link */}
+                                                {specimen.access_token && (
+                                                    <div className="mt-3 flex flex-col gap-1.5 rounded-md border border-dashed bg-background p-2 text-xs">
+                                                        <span className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+                                                            <ExternalLink className="h-3 w-3 text-primary" />{' '}
+                                                            Enlace Público
+                                                            Individual
+                                                        </span>
+                                                        <div className="flex w-full gap-2">
+                                                            <input
+                                                                type="text"
+                                                                readOnly
+                                                                value={`${window.location.origin}/specimen/${specimen.sequence_code}?token=${specimen.access_token}`}
+                                                                className="flex-1 rounded border bg-muted/30 px-2.5 py-1 font-mono text-[11px] outline-none select-all"
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    copySpecimenPublicLink(
+                                                                        specimen,
+                                                                    )
+                                                                }
+                                                                className="flex h-7 shrink-0 items-center gap-1 px-2.5 text-[11px]"
+                                                            >
+                                                                {copiedSpecimenId ===
+                                                                specimen.id ? (
+                                                                    <>
+                                                                        <Check className="h-3 w-3 text-emerald-500" />{' '}
+                                                                        Copiado
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <Copy className="h-3 w-3" />{' '}
+                                                                        Copiar
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                            <a
+                                                                href={`/specimen/${specimen.sequence_code}?token=${specimen.access_token}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex h-7 items-center justify-center rounded border bg-background px-2.5 text-[11px] hover:bg-accent"
+                                                            >
+                                                                Abrir
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Specimen medical order file */}
+                                                {specimen.medical_order_file && (
+                                                    <div className="mt-3 flex items-center justify-between rounded-md border bg-background p-2 text-xs">
+                                                        <div className="flex min-w-0 items-center gap-2">
+                                                            {isImageFile(
+                                                                specimen.medical_order_file,
+                                                            ) ? (
+                                                                <FileImage className="h-4 w-4 shrink-0 text-blue-500" />
+                                                            ) : (
+                                                                <FileText className="h-4 w-4 shrink-0 text-red-500" />
+                                                            )}
+                                                            <span className="max-w-[240px] truncate font-medium">
+                                                                Orden Médica:{' '}
+                                                                {specimen.medical_order_file
+                                                                    .split('/')
+                                                                    .pop()}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex shrink-0 gap-1.5">
+                                                            <a
+                                                                href={`/storage/${specimen.medical_order_file}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex h-7 items-center justify-center gap-1 rounded-md border bg-background px-2.5 text-[11px] font-medium hover:bg-accent"
+                                                            >
+                                                                <ExternalLink className="h-3 w-3" />{' '}
+                                                                Ver
+                                                            </a>
+                                                            <a
+                                                                href={`/storage/${specimen.medical_order_file}`}
+                                                                download
+                                                                className="inline-flex h-7 items-center justify-center gap-1 rounded-md bg-primary px-2.5 text-[11px] font-medium text-primary-foreground hover:bg-primary/90"
+                                                            >
+                                                                <Download className="h-3 w-3" />{' '}
+                                                                Descargar
+                                                            </a>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
-
-                                            {/* Specimen public link */}
-                                            {specimen.access_token && (
-                                                <div className="mt-3 flex flex-col gap-1.5 rounded-md border border-dashed bg-background p-2 text-xs">
-                                                    <span className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
-                                                        <ExternalLink className="h-3 w-3 text-primary" />{' '}
-                                                        Enlace Público
-                                                        Individual
-                                                    </span>
-                                                    <div className="flex w-full gap-2">
-                                                        <input
-                                                            type="text"
-                                                            readOnly
-                                                            value={`${window.location.origin}/specimen/${specimen.sequence_code}?token=${specimen.access_token}`}
-                                                            className="flex-1 rounded border bg-muted/30 px-2.5 py-1 font-mono text-[11px] outline-none select-all"
-                                                        />
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                copySpecimenPublicLink(
-                                                                    specimen,
-                                                                )
-                                                            }
-                                                            className="flex h-7 shrink-0 items-center gap-1 px-2.5 text-[11px]"
-                                                        >
-                                                            {copiedSpecimenId ===
-                                                            specimen.id ? (
-                                                                <>
-                                                                    <Check className="h-3 w-3 text-emerald-500" />{' '}
-                                                                    Copiado
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Copy className="h-3 w-3" />{' '}
-                                                                    Copiar
-                                                                </>
-                                                            )}
-                                                        </Button>
-                                                        <a
-                                                            href={`/specimen/${specimen.sequence_code}?token=${specimen.access_token}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="inline-flex h-7 items-center justify-center rounded border bg-background px-2.5 text-[11px] hover:bg-accent"
-                                                        >
-                                                            Abrir
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Specimen medical order file */}
-                                            {specimen.medical_order_file && (
-                                                <div className="mt-3 flex items-center justify-between rounded-md border bg-background p-2 text-xs">
-                                                    <div className="flex min-w-0 items-center gap-2">
-                                                        {isImageFile(
-                                                            specimen.medical_order_file,
-                                                        ) ? (
-                                                            <FileImage className="h-4 w-4 shrink-0 text-blue-500" />
-                                                        ) : (
-                                                            <FileText className="h-4 w-4 shrink-0 text-red-500" />
-                                                        )}
-                                                        <span className="max-w-[240px] truncate font-medium">
-                                                            Orden Médica:{' '}
-                                                            {specimen.medical_order_file
-                                                                .split('/')
-                                                                .pop()}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex shrink-0 gap-1.5">
-                                                        <a
-                                                            href={`/storage/${specimen.medical_order_file}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="inline-flex h-7 items-center justify-center gap-1 rounded-md border bg-background px-2.5 text-[11px] font-medium hover:bg-accent"
-                                                        >
-                                                            <ExternalLink className="h-3 w-3" />{' '}
-                                                            Ver
-                                                        </a>
-                                                        <a
-                                                            href={`/storage/${specimen.medical_order_file}`}
-                                                            download
-                                                            className="inline-flex h-7 items-center justify-center gap-1 rounded-md bg-primary px-2.5 text-[11px] font-medium text-primary-foreground hover:bg-primary/90"
-                                                        >
-                                                            <Download className="h-3 w-3" />{' '}
-                                                            Descargar
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>

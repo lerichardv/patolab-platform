@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\CaiRange;
 use App\Models\Location;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
 
 class CaiRangeController extends Controller
 {

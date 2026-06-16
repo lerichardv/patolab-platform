@@ -113,6 +113,9 @@ interface Invoice {
     invoice_file: string | null;
     created_at: string;
     group?: any;
+    age_discount_type?: string | null;
+    age_discount_amount?: string | number | null;
+    isv_15?: string | number | null;
 }
 
 interface Props {
@@ -803,12 +806,18 @@ export default function InvoicesIndex({
                                                 {(filters.group_id || 'all') ===
                                                 'all'
                                                     ? 'Todos los grupos'
-                                                    : groups?.find(
-                                                          (g) =>
-                                                              g.id.toString() ===
-                                                              filters.group_id,
-                                                      )?.name ||
-                                                      'Grupo seleccionado'}
+                                                    : (() => {
+                                                          const g =
+                                                              groups?.find(
+                                                                  (g) =>
+                                                                      g.id.toString() ===
+                                                                      filters.group_id,
+                                                              );
+
+                                                          return g
+                                                              ? `${g.name} (#${g.id})`
+                                                              : 'Grupo seleccionado';
+                                                      })()}
                                             </span>
                                         </div>
                                         <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -851,7 +860,7 @@ export default function InvoicesIndex({
                                                 {groups?.map((group) => (
                                                     <CommandItem
                                                         key={group.id}
-                                                        value={group.name}
+                                                        value={`${group.name} - ${group.id}`}
                                                         onSelect={() => {
                                                             handleFilterChange(
                                                                 'group_id',
@@ -871,7 +880,8 @@ export default function InvoicesIndex({
                                                                     : 'opacity-0',
                                                             )}
                                                         />
-                                                        {group.name}
+                                                        {group.name} (#
+                                                        {group.id})
                                                     </CommandItem>
                                                 ))}
                                             </CommandGroup>
@@ -908,8 +918,20 @@ export default function InvoicesIndex({
                                         'Tipo de pago',
                                     )}
                                 </TableHead>
-                                <TableHead className="min-w-[180px]">
-                                    {renderSortHeader('credit', 'Crédito')}
+                                <TableHead className="min-w-[120px] text-right">
+                                    <div className="flex justify-end">
+                                        Subtotal
+                                    </div>
+                                </TableHead>
+                                <TableHead className="min-w-[150px] text-right">
+                                    <div className="flex justify-end">
+                                        Descuento
+                                    </div>
+                                </TableHead>
+                                <TableHead className="min-w-[120px] text-right">
+                                    <div className="flex justify-end">
+                                        ISV 15%
+                                    </div>
                                 </TableHead>
                                 <TableHead className="min-w-[120px] pr-6 text-right">
                                     <div className="flex justify-end">
@@ -1000,9 +1022,34 @@ export default function InvoicesIndex({
                                             </div>
                                         </TableCell>
                                         <TableCell className="min-w-[150px]">
-                                            {getPaymentBadge(
-                                                invoice.payment_type,
-                                            )}
+                                            <div className="flex items-center gap-1.5">
+                                                {getPaymentBadge(
+                                                    invoice.payment_type,
+                                                )}
+                                                {invoice.payment_type ===
+                                                    'credit' &&
+                                                    invoice.credit_payment_id && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-5 w-5 hover:bg-muted"
+                                                            onClick={() =>
+                                                                router.get(
+                                                                    '/credits',
+                                                                    {
+                                                                        search: String(
+                                                                            invoice.credit_payment_id ||
+                                                                                '',
+                                                                        ),
+                                                                    },
+                                                                )
+                                                            }
+                                                            title="Ver Crédito"
+                                                        >
+                                                            <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                        </Button>
+                                                    )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="min-w-[220px]">
                                             {invoice.group ? (
@@ -1271,109 +1318,45 @@ export default function InvoicesIndex({
                                                 </span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="min-w-[180px]">
-                                            {invoice.credit_payment_id &&
-                                            invoice.credit_relation
-                                                ? (() => {
-                                                      const credit =
-                                                          invoice.credit_relation;
-                                                      const paid = parseFloat(
-                                                          String(
-                                                              credit.amount_paid ||
-                                                                  0,
-                                                          ),
-                                                      );
-                                                      const creditAmount =
-                                                          parseFloat(
-                                                              String(
-                                                                  credit.credit_amount ||
-                                                                      0,
-                                                              ),
-                                                          );
-                                                      const remaining =
-                                                          parseFloat(
-                                                              String(
-                                                                  credit.amount_remaining ||
-                                                                      0,
-                                                              ),
-                                                          );
-                                                      const pct =
-                                                          creditAmount > 0
-                                                              ? (
-                                                                    (paid /
-                                                                        creditAmount) *
-                                                                    100
-                                                                ).toFixed(0)
-                                                              : '0';
-
-                                                      return (
-                                                          <div className="flex min-w-[140px] flex-col gap-1 text-xs">
-                                                              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                                                  <span>
-                                                                      Abonado:{' '}
-                                                                      <strong className="font-mono text-foreground">
-                                                                          L.{' '}
-                                                                          {paid.toFixed(
-                                                                              2,
-                                                                          )}
-                                                                      </strong>
-                                                                  </span>
-                                                                  <span className="font-mono font-bold text-primary">
-                                                                      {pct}%
-                                                                  </span>
-                                                              </div>
-                                                              <div className="h-1.5 w-full overflow-hidden rounded-full border bg-muted">
-                                                                  <div
-                                                                      className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-                                                                      style={{
-                                                                          width: `${Math.min(100, Math.max(0, parseFloat(pct)))}%`,
-                                                                      }}
-                                                                  />
-                                                              </div>
-                                                              <div className="flex items-center justify-between font-mono text-[10px]">
-                                                                  <span
-                                                                      className={`${remaining === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'} font-semibold`}
-                                                                  >
-                                                                      Resta: L.{' '}
-                                                                      {remaining.toFixed(
-                                                                          2,
-                                                                      )}
-                                                                  </span>
-                                                              </div>
-                                                              {invoice.invoice_type !==
-                                                                  'credit payment' && (
-                                                                  <div className="mt-0.5 flex items-center justify-between gap-1 border-t pt-1.5 text-[10px] text-muted-foreground">
-                                                                      <span className="font-mono">
-                                                                          Crédito:{' '}
-                                                                          {
-                                                                              invoice.credit_payment_id
-                                                                          }
-                                                                      </span>
-                                                                      <Button
-                                                                          variant="ghost"
-                                                                          size="icon"
-                                                                          className="h-5 w-5 hover:bg-muted"
-                                                                          onClick={() =>
-                                                                              router.get(
-                                                                                  '/credits',
-                                                                                  {
-                                                                                      search: String(
-                                                                                          invoice.credit_payment_id ||
-                                                                                              '',
-                                                                                      ),
-                                                                                  },
-                                                                              )
-                                                                          }
-                                                                          title="Ver Crédito"
-                                                                      >
-                                                                          <Eye className="h-3 w-3" />
-                                                                      </Button>
-                                                                  </div>
-                                                              )}
-                                                          </div>
-                                                      );
-                                                  })()
-                                                : ''}
+                                        <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
+                                            L.{' '}
+                                            {parseFloat(
+                                                String(invoice.subtotal || 0),
+                                            ).toFixed(2)}
+                                        </TableCell>
+                                        <TableCell className="min-w-[150px] text-right">
+                                            <div className="flex flex-col items-end">
+                                                <span className="font-medium text-muted-foreground">
+                                                    L.{' '}
+                                                    {parseFloat(
+                                                        String(
+                                                            invoice.discount ||
+                                                                0,
+                                                        ),
+                                                    ).toFixed(2)}
+                                                </span>
+                                                {invoice.age_discount_type && (
+                                                    <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                        {invoice.age_discount_type ===
+                                                        'third'
+                                                            ? 'Tercera Edad'
+                                                            : 'Cuarta Edad'}
+                                                        {parseFloat(
+                                                            String(
+                                                                invoice.age_discount_amount ||
+                                                                    0,
+                                                            ),
+                                                        ) > 0 &&
+                                                            ` (-L. ${parseFloat(String(invoice.age_discount_amount)).toFixed(2)})`}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
+                                            L.{' '}
+                                            {parseFloat(
+                                                String(invoice.isv_15 || 0),
+                                            ).toFixed(2)}
                                         </TableCell>
                                         <TableCell className="min-w-[120px] pr-6 text-right font-bold text-primary">
                                             L.{' '}
@@ -1424,7 +1407,7 @@ export default function InvoicesIndex({
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={8}
+                                        colSpan={10}
                                         className="h-24 text-center text-muted-foreground"
                                     >
                                         No se encontraron facturas fiscales

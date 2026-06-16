@@ -290,6 +290,43 @@ class SpecimenGroupController extends Controller
                     'group_id' => $group->id,
                 ]);
 
+                // Map specimen to the credit in credit_invoice_specimens if credit checkout
+                if ($validated['payment_type'] === 'credit') {
+                    $basePrice = (float) $specData['selected_price'];
+                    $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
+                    $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
+                    $disc = $ageDiscount + $additionalDiscount;
+                    $sub = $basePrice - $disc;
+                    if ($sub < 0) {
+                        $sub = 0.00;
+                    }
+
+                    // Greedily mark specimen as paid if covered by initial payment
+                    $isPaid = false;
+                    if ($initialPaymentAmount >= $sub) {
+                        $isPaid = true;
+                        $initialPaymentAmount -= $sub;
+                    }
+
+                    DB::table('credit_invoice_specimens')->insert([
+                        'credit_id' => $creditId,
+                        'invoice_id' => $invoice->id,
+                        'specimen_id' => $specimen->id,
+                        'is_paid' => $isPaid ? 1 : 0,
+                        'amount' => $basePrice,
+                        'discount' => $disc,
+                        'subtotal' => $sub,
+                        'exempt_amount' => 0.00,
+                        'taxable_amount_15' => 0.00,
+                        'taxable_amount_18' => 0.00,
+                        'isv_15' => 0.00,
+                        'isv_18' => 0.00,
+                        'total' => $sub,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
                 // Create Kanban Order record
                 $maxOrder = PrioritySpecimenOrder::where('priority_id', $specData['priority_id'])->max('order') ?? 0;
                 PrioritySpecimenOrder::create([
@@ -388,10 +425,10 @@ class SpecimenGroupController extends Controller
             }
 
             $pdfContent = $browsershot->addChromiumArguments([
-                    'disable-crash-reporter',
-                    'disable-dev-shm-usage',
-                    'no-sandbox',
-                ])
+                'disable-crash-reporter',
+                'disable-dev-shm-usage',
+                'no-sandbox',
+            ])
                 ->noSandbox()
                 ->margins(10, 10, 10, 10)
                 ->format('A4')

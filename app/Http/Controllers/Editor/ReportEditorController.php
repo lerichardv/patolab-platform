@@ -366,10 +366,10 @@ class ReportEditorController extends Controller
         }
 
         $pdfContent = $browsershot->addChromiumArguments([
-                'disable-crash-reporter',
-                'disable-dev-shm-usage',
-                'no-sandbox',
-            ])
+            'disable-crash-reporter',
+            'disable-dev-shm-usage',
+            'no-sandbox',
+        ])
             ->noSandbox()
             ->paperWidth('215.9mm')
             ->paperHeight('279.4mm')

@@ -421,27 +421,56 @@
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>1</td>
-                    <td>
-                        <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">Abono a Crédito Pendiente</div>
-                        <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
-                            @if($originalInvoice && $originalInvoice->specimen && $originalInvoice->specimen->sequence_code)
-                                Muestra: <span style="font-family: monospace; font-weight: bold; color: #1e3a8a; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px;">{{ $originalInvoice->specimen->sequence_code }}</span> &nbsp;|&nbsp;
-                            @endif
-                            Factura de Crédito Original: <strong>{{ $originalInvoice->full_invoice_number }}</strong>
-                        </div>
-                        @if($originalInvoice && $originalInvoice->age_discount_type)
-                            <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
-                                * Factura original con Descuento de {{ $originalInvoice->age_discount_type === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }} (- L. {{ number_format($originalInvoice->age_discount_amount, 2) }})
+                @if($credit->is_group && !empty($paidSpecimens) && count($paidSpecimens) > 0)
+                    @foreach($paidSpecimens as $index => $spec)
+                        @php
+                            $detail = DB::table('credit_invoice_specimens')
+                                ->where('credit_id', $credit->id)
+                                ->where('specimen_id', $spec->id)
+                                ->first();
+                            $specTotal = $detail ? (float)$detail->total : 0.00;
+                        @endphp
+                        <tr>
+                            <td>{{ $index + 1 }}</td>
+                            <td>
+                                <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">Abono a Crédito - Muestra: <span style="font-family: monospace; font-weight: bold; color: #1e3a8a; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px;">{{ $spec->sequence_code }}</span></div>
+                                <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
+                                    Paciente: <strong>{{ $spec->customerRelation->name }}</strong> &nbsp;|&nbsp;
+                                    {{ $spec->type->name }}
+                                    @if($spec->examination)
+                                        - {{ $spec->examination->name }}
+                                    @endif
+                                </div>
+                            </td>
+                            <td>1</td>
+                            <td class="text-right">L. {{ number_format($specTotal, 2) }}</td>
+                            <td class="text-right">L. 0.00</td>
+                            <td class="text-right">L. {{ number_format($specTotal, 2) }}</td>
+                        </tr>
+                    @endforeach
+                @else
+                    <tr>
+                        <td>1</td>
+                        <td>
+                            <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">Abono a Crédito Pendiente</div>
+                            <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
+                                @if($originalInvoice && $originalInvoice->specimen && $originalInvoice->specimen->sequence_code)
+                                    Muestra: <span style="font-family: monospace; font-weight: bold; color: #1e3a8a; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px;">{{ $originalInvoice->specimen->sequence_code }}</span> &nbsp;|&nbsp;
+                                @endif
+                                Factura de Crédito Original: <strong>{{ $originalInvoice->full_invoice_number }}</strong>
                             </div>
-                        @endif
-                    </td>
-                    <td>1</td>
-                    <td class="text-right">L. {{ number_format($invoice->amount, 2) }}</td>
-                    <td class="text-right">L. 0.00</td>
-                    <td class="text-right">L. {{ number_format($invoice->amount, 2) }}</td>
-                </tr>
+                            @if($originalInvoice && $originalInvoice->age_discount_type)
+                                <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
+                                    * Factura original con Descuento de {{ $originalInvoice->age_discount_type === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }} (- L. {{ number_format($originalInvoice->age_discount_amount, 2) }})
+                                </div>
+                            @endif
+                        </td>
+                        <td>1</td>
+                        <td class="text-right">L. {{ number_format($invoice->amount, 2) }}</td>
+                        <td class="text-right">L. 0.00</td>
+                        <td class="text-right">L. {{ number_format($invoice->amount, 2) }}</td>
+                    </tr>
+                @endif
             </tbody>
         </table>
     </div>

@@ -6,10 +6,9 @@ use App\Models\SpecimenType;
 use App\Models\SpecimenTypeTemplate;
 use App\Services\ImageOptimizerService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
-
-use Illuminate\Support\Facades\Gate;
 
 class SpecimenTypeTemplateController extends Controller
 {

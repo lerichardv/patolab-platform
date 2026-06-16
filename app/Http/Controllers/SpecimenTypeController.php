@@ -4,9 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\SpecimenType;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-
 use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
 
 class SpecimenTypeController extends Controller
 {

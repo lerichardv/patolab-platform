@@ -9,8 +9,8 @@ use App\Models\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
 
 class InventoryController extends Controller
 {

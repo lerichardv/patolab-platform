@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Referrer;
 use App\Models\ReferrerType;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Gate;
+use Inertia\Inertia;
 
 class ReferrerController extends Controller
 {

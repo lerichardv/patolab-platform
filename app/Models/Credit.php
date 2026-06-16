@@ -3,13 +3,12 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
+use Carbon\CarbonInterval;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
-use Illuminate\Database\Eloquent\Casts\Attribute;
-use Carbon\CarbonInterval;
 
 class Credit extends Model
 {
@@ -73,5 +72,14 @@ class Credit extends Model
     public function originalInvoice()
     {
         return $this->invoices()->where('payment_type', 'credit')->first();
+    }
+
+    /**
+     * Get the individual specimen records associated with this credit.
+     * Only applies to credits where is_group is true.
+     */
+    public function creditInvoiceSpecimens(): HasMany
+    {
+        return $this->hasMany(CreditInvoiceSpecimen::class, 'credit_id');
     }
 }

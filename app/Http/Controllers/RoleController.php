@@ -5,10 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
-
-use Illuminate\Support\Facades\Gate;
 
 class RoleController extends Controller
 {
