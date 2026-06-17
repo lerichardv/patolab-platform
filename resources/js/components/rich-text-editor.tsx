@@ -511,7 +511,7 @@ const CustomImage = Image.extend({
                         .setNodeSelection(pos)
                         .updateAttributes(this.name, {
                             width,
-                            height,
+                            height: null,
                         })
                         .run();
 

@@ -477,6 +477,34 @@ class ReportPaginator
         preg_match('/^<([a-zA-Z0-9]+)/', $blockHtml, $matches);
         $tag = isset($matches[1]) ? strtolower($matches[1]) : 'p';
 
+        if (str_contains($blockHtml, 'data-type="image-grid"')) {
+            $columns = 2;
+            if (preg_match('/data-columns=["\'](\d+)["\']/i', $blockHtml, $colMatch)) {
+                $columns = (int) $colMatch[1];
+            }
+            if ($columns < 1) {
+                $columns = 2;
+            }
+
+            $imgCount = preg_match_all('/<img/i', $blockHtml, $imgMatches);
+            if ($imgCount === 0) {
+                $imgCount = 1;
+            }
+
+            $rows = (int) ceil($imgCount / $columns);
+            
+            // Available width inside page container (215.9mm - 30mm margins = 185.9mm)
+            $itemWidth = 185.9 / $columns;
+            $itemHeight = $itemWidth * 0.65;
+            $gridHeight = ($rows * $itemHeight) + (($rows - 1) * 3.18) + 5.3;
+
+            return [
+                'type' => 'image',
+                'html' => $blockHtml,
+                'height' => $gridHeight,
+            ];
+        }
+
         if (str_contains($blockHtml, 'page-break') || str_contains($blockHtml, 'page-break-after') || str_contains($blockHtml, 'break-after')) {
             return [
                 'type' => 'page-break',

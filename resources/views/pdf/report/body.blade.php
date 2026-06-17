@@ -375,6 +375,44 @@
             display: block;
         }
 
+        /* ── Image Grid ── */
+        .section-content div[data-type="image-grid"] {
+            display: grid;
+            gap: 3.18mm;
+            margin-top: 2.65mm;
+            margin-bottom: 2.65mm;
+            width: 100%;
+            border: 0.26mm solid #e2e8f0;
+            border-radius: 2.12mm;
+            padding: 2.65mm;
+            background-color: rgba(248, 250, 252, 0.1);
+        }
+
+        .section-content div[data-type="image-grid"][data-columns="1"] {
+            grid-template-columns: repeat(1, 1fr);
+        }
+
+        .section-content div[data-type="image-grid"][data-columns="2"] {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .section-content div[data-type="image-grid"][data-columns="3"] {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .section-content div[data-type="image-grid"][data-columns="4"] {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .section-content div[data-type="image-grid"] img {
+            max-width: 100% !important;
+            height: auto !important;
+            object-fit: cover;
+            border-radius: 1.06mm;
+            margin: 0 auto !important;
+            display: block;
+        }
+
         /* Pathologist Signature Block */
         .signature-block-container {
             margin-top: 3.97mm;

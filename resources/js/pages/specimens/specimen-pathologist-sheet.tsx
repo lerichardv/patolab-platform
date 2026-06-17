@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
 
 interface Props {
     specimen: any | null;
@@ -37,19 +38,21 @@ export default function SpecimenPathologistSheet({
 }: Props) {
     const [selectedPathologistId, setSelectedPathologistId] =
         useState<string>('');
-
-    if (!specimen) {
-        return null;
-    }
+    const [macroscopyAccess, setMacroscopyAccess] = useState<boolean>(true);
+    const [microscopyAccess, setMicroscopyAccess] = useState<boolean>(true);
 
     // Filter pathologists that are NOT already assigned to this specimen
     const assignedUserIds = useMemo(() => {
-        return specimen.users?.map((u: any) => u.id) || [];
-    }, [specimen.users]);
+        return specimen?.users?.map((u: any) => u.id) || [];
+    }, [specimen?.users]);
 
     const availablePathologists = useMemo(() => {
         return pathologists.filter((p) => !assignedUserIds.includes(p.id));
     }, [pathologists, assignedUserIds]);
+
+    if (!specimen) {
+        return null;
+    }
 
     const handleAssign = (userId: string) => {
         if (!userId) {
@@ -58,17 +61,69 @@ export default function SpecimenPathologistSheet({
 
         router.post(
             `/specimens/${specimen.id}/assign-user`,
-            { user_id: userId },
+            {
+                user_id: userId,
+                macroscopy_access: macroscopyAccess,
+                microscopy_access: microscopyAccess,
+            },
             {
                 preserveScroll: true,
                 preserveState: true,
                 onSuccess: () => {
                     toast.success('Patólogo asignado correctamente');
                     setSelectedPathologistId('');
+                    setMacroscopyAccess(true);
+                    setMicroscopyAccess(true);
                 },
                 onError: (errors) => {
                     const message =
                         Object.values(errors)[0] || 'Error al asignar patólogo';
+                    toast.error(message);
+                },
+            },
+        );
+    };
+
+    const handleToggleAccess = (
+        userId: number,
+        field: 'macroscopy' | 'microscopy',
+        checked: boolean,
+    ) => {
+        const targetUser = specimen.users?.find((u: any) => u.id === userId);
+
+        if (!targetUser) {
+            return;
+        }
+
+        const currentMacro =
+            targetUser.pivot?.macroscopy_access !== undefined
+                ? Boolean(targetUser.pivot.macroscopy_access)
+                : false;
+        const currentMicro =
+            targetUser.pivot?.microscopy_access !== undefined
+                ? Boolean(targetUser.pivot.microscopy_access)
+                : false;
+
+        const macro = field === 'macroscopy' ? checked : currentMacro;
+        const micro = field === 'microscopy' ? checked : currentMicro;
+
+        router.post(
+            `/specimens/${specimen.id}/assign-user`,
+            {
+                user_id: userId,
+                macroscopy_access: macro,
+                microscopy_access: micro,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    toast.success('Permisos actualizados correctamente');
+                },
+                onError: (errors) => {
+                    const message =
+                        Object.values(errors)[0] ||
+                        'Error al actualizar permisos';
                     toast.error(message);
                 },
             },
@@ -209,33 +264,78 @@ export default function SpecimenPathologistSheet({
                     </div>
 
                     {/* Adder Dropdown */}
-                    <div className="space-y-2.5">
+                    <div className="space-y-3.5 rounded-lg border border-border/60 bg-muted/20 p-4 shadow-sm">
                         <label className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
                             <UserPlus className="h-4 w-4 text-primary" />{' '}
                             Asignar Nuevo Patólogo
                         </label>
                         {availablePathologists.length > 0 ? (
-                            <Select
-                                value={selectedPathologistId}
-                                onValueChange={(val) => {
-                                    setSelectedPathologistId(val);
-                                    handleAssign(val);
-                                }}
-                            >
-                                <SelectTrigger className="h-11 w-full">
-                                    <SelectValue placeholder="Seleccione un patólogo para agregar a la muestra..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {availablePathologists.map((p) => (
-                                        <SelectItem
-                                            key={p.id}
-                                            value={p.id.toString()}
-                                        >
-                                            {p.name} ({p.email})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <div className="flex flex-col gap-4">
+                                <Select
+                                    value={selectedPathologistId}
+                                    onValueChange={setSelectedPathologistId}
+                                >
+                                    <SelectTrigger className="h-11 w-full bg-background">
+                                        <SelectValue placeholder="Seleccione un patólogo para agregar a la muestra..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availablePathologists.map((p) => (
+                                            <SelectItem
+                                                key={p.id}
+                                                value={p.id.toString()}
+                                            >
+                                                {p.name} ({p.email})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                                        <div className="flex items-center space-x-2">
+                                            <Switch
+                                                id="new-macro-access"
+                                                checked={macroscopyAccess}
+                                                onCheckedChange={
+                                                    setMacroscopyAccess
+                                                }
+                                            />
+                                            <label
+                                                htmlFor="new-macro-access"
+                                                className="cursor-pointer text-sm leading-none font-medium text-muted-foreground transition-colors hover:text-foreground"
+                                            >
+                                                Acceso a Macroscopía
+                                            </label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <Switch
+                                                id="new-micro-access"
+                                                checked={microscopyAccess}
+                                                onCheckedChange={
+                                                    setMicroscopyAccess
+                                                }
+                                            />
+                                            <label
+                                                htmlFor="new-micro-access"
+                                                className="cursor-pointer text-sm leading-none font-medium text-muted-foreground transition-colors hover:text-foreground"
+                                            >
+                                                Acceso a Microscopía
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        type="button"
+                                        onClick={() =>
+                                            handleAssign(selectedPathologistId)
+                                        }
+                                        disabled={!selectedPathologistId}
+                                        className="h-10 px-5 font-semibold"
+                                    >
+                                        Asignar
+                                    </Button>
+                                </div>
+                            </div>
                         ) : (
                             <div className="rounded-md border border-dashed bg-muted/40 p-3.5 text-center text-xs text-muted-foreground">
                                 Todos los patólogos disponibles ya están
@@ -261,6 +361,12 @@ export default function SpecimenPathologistSheet({
                                                 <th className="p-3.5">
                                                     Correo Electrónico
                                                 </th>
+                                                <th className="p-3.5 text-center">
+                                                    Macroscopía
+                                                </th>
+                                                <th className="p-3.5 text-center">
+                                                    Microscopía
+                                                </th>
                                                 <th className="w-20 p-3.5 text-right">
                                                     Acciones
                                                 </th>
@@ -277,6 +383,60 @@ export default function SpecimenPathologistSheet({
                                                     </td>
                                                     <td className="p-3.5 text-muted-foreground">
                                                         {user.email}
+                                                    </td>
+                                                    <td className="p-3.5 text-center">
+                                                        <div className="flex items-center justify-center">
+                                                            <Switch
+                                                                checked={
+                                                                    user.pivot
+                                                                        ?.macroscopy_access !==
+                                                                    undefined
+                                                                        ? Boolean(
+                                                                              user
+                                                                                  .pivot
+                                                                                  .macroscopy_access,
+                                                                          )
+                                                                        : false
+                                                                }
+                                                                onCheckedChange={(
+                                                                    checked,
+                                                                ) =>
+                                                                    handleToggleAccess(
+                                                                        user.id,
+                                                                        'macroscopy',
+                                                                        checked,
+                                                                    )
+                                                                }
+                                                                title="Alternar acceso a macroscopía"
+                                                            />
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-3.5 text-center">
+                                                        <div className="flex items-center justify-center">
+                                                            <Switch
+                                                                checked={
+                                                                    user.pivot
+                                                                        ?.microscopy_access !==
+                                                                    undefined
+                                                                        ? Boolean(
+                                                                              user
+                                                                                  .pivot
+                                                                                  .microscopy_access,
+                                                                          )
+                                                                        : false
+                                                                }
+                                                                onCheckedChange={(
+                                                                    checked,
+                                                                ) =>
+                                                                    handleToggleAccess(
+                                                                        user.id,
+                                                                        'microscopy',
+                                                                        checked,
+                                                                    )
+                                                                }
+                                                                title="Alternar acceso a microscopía"
+                                                            />
+                                                        </div>
                                                     </td>
                                                     <td className="p-3.5 text-right">
                                                         <Button

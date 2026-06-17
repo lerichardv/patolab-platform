@@ -712,10 +712,23 @@ class SpecimenController extends Controller
         Gate::authorize('specimens.manage');
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
+            'macroscopy_access' => 'nullable|boolean',
+            'microscopy_access' => 'nullable|boolean',
         ]);
 
-        if (! $specimen->users()->where('user_id', $validated['user_id'])->exists()) {
-            $specimen->users()->attach($validated['user_id']);
+        $macroscopy = $request->boolean('macroscopy_access', false);
+        $microscopy = $request->boolean('microscopy_access', false);
+
+        if ($specimen->users()->where('user_id', $validated['user_id'])->exists()) {
+            $specimen->users()->updateExistingPivot($validated['user_id'], [
+                'macroscopy_access' => $macroscopy,
+                'microscopy_access' => $microscopy,
+            ]);
+        } else {
+            $specimen->users()->attach($validated['user_id'], [
+                'macroscopy_access' => $macroscopy,
+                'microscopy_access' => $microscopy,
+            ]);
         }
 
         return redirect()->back()->with('success', 'Patólogo asignado con éxito.');
@@ -775,7 +788,10 @@ class SpecimenController extends Controller
                 foreach ($ids as $id) {
                     $specimen = Specimen::find($id);
                     if ($specimen && ! $specimen->users()->where('user_id', $value)->exists()) {
-                        $specimen->users()->attach($value);
+                        $specimen->users()->attach($value, [
+                            'macroscopy_access' => true,
+                            'microscopy_access' => true,
+                        ]);
                     }
                 }
             } elseif ($action === 'unassign_pathologist') {

@@ -172,6 +172,7 @@ class ReportEditorController extends Controller
             'report' => $specimen->report,
             'auth' => [
                 'user' => [
+                    'id' => auth()->user()->id,
                     'name' => auth()->user()->name ?? 'Dr. Specialist',
                     'cursor_color' => '#'.substr(md5(rand()), 0, 6),
                 ],
@@ -217,6 +218,18 @@ class ReportEditorController extends Controller
             'report_date' => 'required|date',
         ]);
 
+        $assignment = DB::table('specimen_user')
+            ->where('specimen_id', $specimen->id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        $hasMacroAccess = $assignment ? (bool) $assignment->macroscopy_access : false;
+        $hasMicroAccess = $assignment ? (bool) $assignment->microscopy_access : false;
+
+        if (!$hasMacroAccess && !$hasMicroAccess) {
+            return redirect()->back()->with('error', 'No tienes permisos de edición para esta muestra.');
+        }
+
         $specimen->load('report');
         if (! $specimen->report) {
             return redirect()->back()->with('error', 'No hay reporte asociado a esta muestra.');
@@ -250,6 +263,18 @@ class ReportEditorController extends Controller
             return response()->json(['error' => 'No hay reporte asociado a esta muestra.'], 404);
         }
 
+        $assignment = DB::table('specimen_user')
+            ->where('specimen_id', $specimen->id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        $hasMacroAccess = $assignment ? (bool) $assignment->macroscopy_access : false;
+        $hasMicroAccess = $assignment ? (bool) $assignment->microscopy_access : false;
+
+        if (!$hasMacroAccess && !$hasMicroAccess) {
+            return response()->json(['error' => 'No tienes permisos de edición para esta muestra.'], 403);
+        }
+
         $updateData = [];
 
         if ($request->has('report_date')) {
@@ -259,20 +284,20 @@ class ReportEditorController extends Controller
             }
         }
 
-        if ($request->has('macroscopy_html')) {
+        if ($request->has('macroscopy_html') && $hasMacroAccess) {
             $updateData['macroscopy_html'] = $request->input('macroscopy_html') ?? '';
         }
-        if ($request->has('microscopy_html')) {
+        if ($request->has('microscopy_html') && $hasMicroAccess) {
             $updateData['microscopy_html'] = $request->input('microscopy_html') ?? '';
         }
         if ($request->has('diagnosis_html')) {
             $updateData['diagnosis_html'] = $request->input('diagnosis_html') ?? '';
         }
 
-        if ($request->filled('yjs_macroscopy_state')) {
+        if ($request->filled('yjs_macroscopy_state') && $hasMacroAccess) {
             $updateData['yjs_macroscopy_state'] = base64_decode($request->input('yjs_macroscopy_state'));
         }
-        if ($request->filled('yjs_microscopy_state')) {
+        if ($request->filled('yjs_microscopy_state') && $hasMicroAccess) {
             $updateData['yjs_microscopy_state'] = base64_decode($request->input('yjs_microscopy_state'));
         }
         if ($request->filled('yjs_diagnosis_state')) {

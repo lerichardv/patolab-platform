@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Hocuspocus } from '@hocuspocus/server';
 import { TiptapTransformer } from '@hocuspocus/transformer';
-import { mergeAttributes } from '@tiptap/core';
+import { mergeAttributes, Node } from '@tiptap/core';
 import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
@@ -126,6 +126,36 @@ const CustomImage = Image.extend({
 	},
 });
 
+const ImageGrid = Node.create({
+	name: 'imageGrid',
+	group: 'block',
+	content: 'image*',
+	defining: true,
+
+	addAttributes() {
+		return {
+			columns: {
+				default: 2,
+				parseHTML: element => {
+					const cols = element.getAttribute('data-columns');
+					return cols ? parseInt(cols, 10) : 2;
+				},
+				renderHTML: attributes => ({
+					'data-columns': attributes.columns,
+				}),
+			},
+		};
+	},
+
+	parseHTML() {
+		return [{ tag: 'div[data-type="image-grid"]' }];
+	},
+
+	renderHTML({ HTMLAttributes }) {
+		return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'image-grid' }), 0];
+	},
+});
+
 const extensions = [
 	StarterKit.configure({ undoRedo: false }),
 	CustomImage.configure({
@@ -140,6 +170,7 @@ const extensions = [
 	}),
 	TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
 	Highlight.configure({ multicolor: true }),
+	ImageGrid,
 ];
 
 const webhookUrl = process.env.WEBHOOK_URL || 'http://127.0.0.1:8000/api/collaboration';

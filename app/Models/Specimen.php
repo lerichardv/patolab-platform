@@ -130,6 +130,8 @@ class Specimen extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'specimen_user', 'specimen_id', 'user_id')
+            ->using(SpecimenUser::class)
+            ->withPivot(['macroscopy_access', 'microscopy_access'])
             ->withTimestamps();
     }
 

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CaiRange;
 use App\Models\Bank;
+use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
 use App\Models\Invoice;

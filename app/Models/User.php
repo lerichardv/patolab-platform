@@ -33,6 +33,8 @@ class User extends Authenticatable
     public function specimens(): BelongsToMany
     {
         return $this->belongsToMany(Specimen::class, 'specimen_user', 'user_id', 'specimen_id')
+            ->using(SpecimenUser::class)
+            ->withPivot(['macroscopy_access', 'microscopy_access'])
             ->withTimestamps();
     }
 

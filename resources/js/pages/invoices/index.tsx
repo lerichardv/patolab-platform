@@ -516,6 +516,39 @@ export default function InvoicesIndex({
         }
     };
 
+    const getInvoiceTypeBadge = (type: string | null | undefined) => {
+        if (type === 'specimen') {
+            return (
+                <Badge
+                    variant="outline"
+                    className="rounded-full border-blue-200 bg-blue-50 px-2.5 py-0.5 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-400"
+                >
+                    Muestra
+                </Badge>
+            );
+        }
+
+        if (type === 'rental') {
+            return (
+                <Badge
+                    variant="outline"
+                    className="rounded-full border-sky-200 bg-sky-50 px-2.5 py-0.5 text-sky-700 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-400"
+                >
+                    Alquiler
+                </Badge>
+            );
+        }
+
+        return (
+            <Badge
+                variant="outline"
+                className="rounded-full border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-400"
+            >
+                Pago de crédito
+            </Badge>
+        );
+    };
+
     return (
         <>
             <Head title="Facturas de Muestras" />
@@ -774,13 +807,13 @@ export default function InvoicesIndex({
                                         Todos los tipos
                                     </SelectItem>
                                     <SelectItem value="specimen">
-                                        Muestras
+                                        Muestra
                                     </SelectItem>
                                     <SelectItem value="rental">
-                                        Alquileres
+                                        Alquiler
                                     </SelectItem>
                                     <SelectItem value="credit payment">
-                                        Pagos de Crédito
+                                        Pago de Crédito
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
@@ -909,14 +942,23 @@ export default function InvoicesIndex({
                                 <TableHead className="min-w-[150px]">
                                     {renderSortHeader(
                                         'payment_method',
-                                        'Método',
+                                        'Método de Pago',
                                     )}
                                 </TableHead>
                                 <TableHead className="min-w-[220px]">
                                     {renderSortHeader(
                                         'specimen_code',
-                                        'Tipo de pago',
+                                        'Tipo de factura',
                                     )}
+                                </TableHead>
+                                <TableHead className="min-w-[220px]">
+                                    {renderSortHeader(
+                                        'specimen_code',
+                                        'Detalle',
+                                    )}
+                                </TableHead>
+                                <TableHead className="min-w-[120px] text-right">
+                                    <div className="flex">Crédito</div>
                                 </TableHead>
                                 <TableHead className="min-w-[120px] text-right">
                                     <div className="flex justify-end">
@@ -1026,217 +1068,72 @@ export default function InvoicesIndex({
                                                 {getPaymentBadge(
                                                     invoice.payment_type,
                                                 )}
-                                                {invoice.payment_type ===
-                                                    'credit' &&
-                                                    invoice.credit_payment_id && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-5 w-5 hover:bg-muted"
-                                                            onClick={() =>
-                                                                router.get(
-                                                                    '/credits',
-                                                                    {
-                                                                        search: String(
-                                                                            invoice.credit_payment_id ||
-                                                                                '',
-                                                                        ),
-                                                                    },
-                                                                )
-                                                            }
-                                                            title="Ver Crédito"
-                                                        >
-                                                            <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                                        </Button>
-                                                    )}
+                                                {/* {invoice.payment_type ===
+													'credit' &&
+													invoice.credit_payment_id && (
+														<Button
+															variant="ghost"
+															size="icon"
+															className="h-5 w-5 hover:bg-muted"
+															onClick={() =>
+																router.get(
+																	'/credits',
+																	{
+																		search: String(
+																			invoice.credit_payment_id ||
+																			'',
+																		),
+																	},
+																)
+															}
+															title="Ver Crédito"
+														>
+															<Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+														</Button>
+													)} */}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="min-w-[200px] pl-5">
+                                            <div className="flex items-center gap-1.5">
+                                                {getInvoiceTypeBadge(
+                                                    invoice.invoice_type,
+                                                )}
+                                                {/* {invoice.invoice_type ===
+													'credit payment' &&
+													invoice.credit_payment_id && (
+														<Button
+															variant="ghost"
+															size="icon"
+															className="h-5 w-5 hover:bg-muted"
+															onClick={() =>
+																router.get(
+																	'/credits',
+																	{
+																		search: String(
+																			invoice.credit_payment_id ||
+																			'',
+																		),
+																	},
+																)
+															}
+															title="Ver Crédito"
+														>
+															<Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+														</Button>
+													)} */}
                                             </div>
                                         </TableCell>
                                         <TableCell className="min-w-[220px]">
-                                            {invoice.group ? (
-                                                <div className="flex max-w-[220px] flex-col gap-1 text-xs">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="w-max rounded border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-purple-600 dark:bg-purple-500/20 dark:text-purple-300">
-                                                            {invoice.group.name}
-                                                        </span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-5 w-5 hover:bg-muted"
-                                                            onClick={() => {
-                                                                setSelectedGroupForView(
-                                                                    {
-                                                                        ...invoice.group,
-                                                                        invoice:
-                                                                            invoice,
-                                                                    },
-                                                                );
-                                                                setIsGroupViewSheetOpen(
-                                                                    true,
-                                                                );
-                                                            }}
-                                                            title="Ver Grupo de Muestras"
-                                                        >
-                                                            <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                                        </Button>
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger
-                                                                asChild
-                                                            >
-                                                                <button
-                                                                    data-slot="button"
-                                                                    className="inline-flex h-5 w-8 items-center justify-center gap-0.5 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-                                                                    title="Editar Muestra"
-                                                                >
-                                                                    <svg
-                                                                        xmlns="http://www.w3.org/2000/svg"
-                                                                        width="24"
-                                                                        height="24"
-                                                                        viewBox="0 0 24 24"
-                                                                        fill="none"
-                                                                        stroke="currentColor"
-                                                                        strokeWidth="2"
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                        className="lucide lucide-square-pen h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
-                                                                    >
-                                                                        <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                                        <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"></path>
-                                                                    </svg>
-                                                                    <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
-                                                                </button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent
-                                                                align="start"
-                                                                className="w-64"
-                                                            >
-                                                                {invoice.group.specimens?.map(
-                                                                    (
-                                                                        specimen: any,
-                                                                    ) => (
-                                                                        <DropdownMenuItem
-                                                                            key={
-                                                                                specimen.id
-                                                                            }
-                                                                            onClick={() => {
-                                                                                const specimenWithInvoice =
-                                                                                    {
-                                                                                        ...specimen,
-                                                                                        invoice_relation:
-                                                                                            {
-                                                                                                ...invoice,
-                                                                                                specimen:
-                                                                                                    undefined,
-                                                                                            },
-                                                                                    };
-                                                                                setSelectedSpecimen(
-                                                                                    specimenWithInvoice,
-                                                                                );
-                                                                                setIsSpecimenSheetOpen(
-                                                                                    true,
-                                                                                );
-                                                                            }}
-                                                                            className="group cursor-pointer"
-                                                                        >
-                                                                            <div className="flex w-full flex-col gap-0.5">
-                                                                                <span className="font-mono text-xs font-semibold text-primary transition-colors group-hover:text-white group-focus:text-white">
-                                                                                    {specimen.sequence_code ||
-                                                                                        'Sin código'}
-                                                                                </span>
-                                                                                <span className="truncate text-[10px] text-muted-foreground transition-colors group-hover:text-white/90 group-focus:text-white/90">
-                                                                                    {specimen
-                                                                                        .customer_relation
-                                                                                        ?.name ||
-                                                                                        invoice
-                                                                                            .customer
-                                                                                            ?.name ||
-                                                                                        'Sin cliente'}
-                                                                                </span>
-                                                                            </div>
-                                                                        </DropdownMenuItem>
-                                                                    ),
-                                                                )}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </div>
-                                                    <span className="text-[10px] text-muted-foreground">
-                                                        Muestra Agrupada (
-                                                        {invoice.group.specimens
-                                                            ?.length || 0}{' '}
-                                                        muestras)
-                                                    </span>
-                                                </div>
-                                            ) : invoice.invoice_type ===
-                                                  'rental' && invoice.rental ? (
-                                                <div className="flex max-w-[220px] flex-col gap-1 text-xs">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="w-max rounded border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
-                                                            {
-                                                                invoice.rental
-                                                                    .name
-                                                            }
-                                                        </span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-5 w-5 hover:bg-muted"
-                                                            onClick={() =>
-                                                                router.visit(
-                                                                    `${rentalsIndex().url}?search=${encodeURIComponent(invoice.rental!.name)}`,
-                                                                )
-                                                            }
-                                                            title="Ver en Alquileres"
-                                                        >
-                                                            <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                                        </Button>
-                                                    </div>
-                                                    <span className="text-[10px] text-muted-foreground">
-                                                        Alquiler
-                                                    </span>
-                                                </div>
-                                            ) : invoice.invoice_type ===
-                                              'credit payment' ? (
-                                                <div className="flex max-w-[220px] flex-col gap-1 text-xs">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="w-max rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
-                                                            Crédito #
-                                                            {
-                                                                invoice.credit_payment_id
-                                                            }
-                                                        </span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-5 w-5 hover:bg-muted"
-                                                            onClick={() =>
-                                                                router.get(
-                                                                    '/credits',
-                                                                    {
-                                                                        search: String(
-                                                                            invoice.credit_payment_id ||
-                                                                                '',
-                                                                        ),
-                                                                    },
-                                                                )
-                                                            }
-                                                            title="Ver Crédito"
-                                                        >
-                                                            <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                                        </Button>
-                                                    </div>
-                                                    <span className="text-[10px] text-muted-foreground">
-                                                        Pago de Crédito
-                                                    </span>
-                                                </div>
-                                            ) : invoice.specimen ? (
-                                                <div className="flex max-w-[220px] flex-col gap-1 text-xs">
-                                                    {invoice.specimen
-                                                        .sequence_code && (
+                                            <div className="flex max-w-[220px] flex-col gap-1.5 text-xs">
+                                                {/* Detalle principal (Grupo, Alquiler o Muestra) */}
+                                                {invoice.group ? (
+                                                    <div className="flex flex-col gap-1">
                                                         <div className="flex items-center gap-1.5">
-                                                            <span className="w-max rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary dark:bg-primary/10">
+                                                            <span className="w-max rounded border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-purple-600 dark:bg-purple-500/20 dark:text-purple-300">
                                                                 {
                                                                     invoice
-                                                                        .specimen
-                                                                        .sequence_code
+                                                                        .group
+                                                                        .name
                                                                 }
                                                             </span>
                                                             <Button
@@ -1244,78 +1141,268 @@ export default function InvoicesIndex({
                                                                 size="icon"
                                                                 className="h-5 w-5 hover:bg-muted"
                                                                 onClick={() => {
-                                                                    const specimenWithInvoice =
+                                                                    setSelectedGroupForView(
                                                                         {
-                                                                            ...invoice.specimen,
-                                                                            invoice_relation:
-                                                                                {
-                                                                                    ...invoice,
-                                                                                    specimen:
-                                                                                        undefined,
-                                                                                },
-                                                                        };
-                                                                    setSelectedSpecimenForView(
-                                                                        specimenWithInvoice,
+                                                                            ...invoice.group,
+                                                                            invoice:
+                                                                                invoice,
+                                                                        },
                                                                     );
-                                                                    setIsSpecimenViewSheetOpen(
+                                                                    setIsGroupViewSheetOpen(
                                                                         true,
                                                                     );
                                                                 }}
-                                                                title="Ver Muestra"
+                                                                title="Ver Grupo de Muestras"
                                                             >
                                                                 <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                                             </Button>
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger
+                                                                    asChild
+                                                                >
+                                                                    <button
+                                                                        data-slot="button"
+                                                                        className="inline-flex h-5 w-8 items-center justify-center gap-0.5 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+                                                                        title="Editar Muestra"
+                                                                    >
+                                                                        <svg
+                                                                            xmlns="http://www.w3.org/2000/svg"
+                                                                            width="24"
+                                                                            height="24"
+                                                                            viewBox="0 0 24 24"
+                                                                            fill="none"
+                                                                            stroke="currentColor"
+                                                                            strokeWidth="2"
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            className="lucide lucide-square-pen h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
+                                                                        >
+                                                                            <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                                            <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"></path>
+                                                                        </svg>
+                                                                        <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+                                                                    </button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent
+                                                                    align="start"
+                                                                    className="w-64"
+                                                                >
+                                                                    {invoice.group.specimens?.map(
+                                                                        (
+                                                                            specimen: any,
+                                                                        ) => (
+                                                                            <DropdownMenuItem
+                                                                                key={
+                                                                                    specimen.id
+                                                                                }
+                                                                                onClick={() => {
+                                                                                    const specimenWithInvoice =
+                                                                                        {
+                                                                                            ...specimen,
+                                                                                            invoice_relation:
+                                                                                                {
+                                                                                                    ...invoice,
+                                                                                                    specimen:
+                                                                                                        undefined,
+                                                                                                },
+                                                                                        };
+                                                                                    setSelectedSpecimen(
+                                                                                        specimenWithInvoice,
+                                                                                    );
+                                                                                    setIsSpecimenSheetOpen(
+                                                                                        true,
+                                                                                    );
+                                                                                }}
+                                                                                className="group cursor-pointer"
+                                                                            >
+                                                                                <div className="flex w-full flex-col gap-0.5">
+                                                                                    <span className="font-mono text-xs font-semibold text-primary transition-colors group-hover:text-white group-focus:text-white">
+                                                                                        {specimen.sequence_code ||
+                                                                                            'Sin código'}
+                                                                                    </span>
+                                                                                    <span className="truncate text-[10px] text-muted-foreground transition-colors group-hover:text-white/90 group-focus:text-white/90">
+                                                                                        {specimen
+                                                                                            .customer_relation
+                                                                                            ?.name ||
+                                                                                            invoice
+                                                                                                .customer
+                                                                                                ?.name ||
+                                                                                            'Sin cliente'}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </DropdownMenuItem>
+                                                                        ),
+                                                                    )}
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            Grupo de Muestras (
+                                                            {invoice.group
+                                                                .specimens
+                                                                ?.length ||
+                                                                0}{' '}
+                                                            muestras)
+                                                        </span>
+                                                    </div>
+                                                ) : invoice.invoice_type ===
+                                                      'rental' &&
+                                                  invoice.rental ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="w-max rounded border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                                                                {
+                                                                    invoice
+                                                                        .rental
+                                                                        .name
+                                                                }
+                                                            </span>
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 className="h-5 w-5 hover:bg-muted"
-                                                                onClick={() => {
-                                                                    const specimenWithInvoice =
-                                                                        {
-                                                                            ...invoice.specimen,
-                                                                            invoice_relation:
-                                                                                {
-                                                                                    ...invoice,
-                                                                                    specimen:
-                                                                                        undefined,
-                                                                                },
-                                                                        };
-                                                                    setSelectedSpecimen(
-                                                                        specimenWithInvoice,
-                                                                    );
-                                                                    setIsSpecimenSheetOpen(
-                                                                        true,
-                                                                    );
-                                                                }}
-                                                                title="Editar Muestra"
+                                                                onClick={() =>
+                                                                    router.visit(
+                                                                        `${rentalsIndex().url}?search=${encodeURIComponent(invoice.rental!.name)}`,
+                                                                    )
+                                                                }
+                                                                title="Ver en Alquileres"
                                                             >
-                                                                <Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                                <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                                             </Button>
                                                         </div>
-                                                    )}
-                                                    <span
-                                                        className="text-[10px] text-muted-foreground"
-                                                        title={
-                                                            invoice.specimen
-                                                                .type?.name
-                                                        }
-                                                    >
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            Alquiler
+                                                        </span>
+                                                    </div>
+                                                ) : invoice.specimen ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        {invoice.specimen
+                                                            .sequence_code && (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="w-max rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary dark:bg-primary/10">
+                                                                    {
+                                                                        invoice
+                                                                            .specimen
+                                                                            .sequence_code
+                                                                    }
+                                                                </span>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-5 w-5 hover:bg-muted"
+                                                                    onClick={() => {
+                                                                        const specimenWithInvoice =
+                                                                            {
+                                                                                ...invoice.specimen,
+                                                                                invoice_relation:
+                                                                                    {
+                                                                                        ...invoice,
+                                                                                        specimen:
+                                                                                            undefined,
+                                                                                    },
+                                                                            };
+                                                                        setSelectedSpecimenForView(
+                                                                            specimenWithInvoice,
+                                                                        );
+                                                                        setIsSpecimenViewSheetOpen(
+                                                                            true,
+                                                                        );
+                                                                    }}
+                                                                    title="Ver Muestra"
+                                                                >
+                                                                    <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-5 w-5 hover:bg-muted"
+                                                                    onClick={() => {
+                                                                        const specimenWithInvoice =
+                                                                            {
+                                                                                ...invoice.specimen,
+                                                                                invoice_relation:
+                                                                                    {
+                                                                                        ...invoice,
+                                                                                        specimen:
+                                                                                            undefined,
+                                                                                    },
+                                                                            };
+                                                                        setSelectedSpecimen(
+                                                                            specimenWithInvoice,
+                                                                        );
+                                                                        setIsSpecimenSheetOpen(
+                                                                            true,
+                                                                        );
+                                                                    }}
+                                                                    title="Editar Muestra"
+                                                                >
+                                                                    <Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                        <span
+                                                            className="text-[10px] text-muted-foreground"
+                                                            title={
+                                                                invoice.specimen
+                                                                    .type?.name
+                                                            }
+                                                        >
+                                                            {
+                                                                invoice.specimen
+                                                                    .type?.name
+                                                            }{' '}
+                                                            -{' '}
+                                                            {
+                                                                invoice.specimen
+                                                                    .examination
+                                                                    ?.name
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    invoice.invoice_type !==
+                                                        'credit payment' && (
+                                                        <span className="text-xs text-muted-foreground italic">
+                                                            N/A
+                                                        </span>
+                                                    )
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {/* Información del Crédito (si aplica) */}
+                                            {(invoice.invoice_type ===
+                                                'credit payment' ||
+                                                invoice.payment_type ===
+                                                    'credit') && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="w-max rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                                        Crédito #
                                                         {
-                                                            invoice.specimen
-                                                                .type?.name
-                                                        }{' '}
-                                                        -{' '}
-                                                        {
-                                                            invoice.specimen
-                                                                .examination
-                                                                ?.name
+                                                            invoice.credit_payment_id
                                                         }
                                                     </span>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-5 w-5 hover:bg-muted"
+                                                        onClick={() =>
+                                                            router.get(
+                                                                '/credits',
+                                                                {
+                                                                    search: String(
+                                                                        invoice.credit_payment_id ||
+                                                                            '',
+                                                                    ),
+                                                                },
+                                                            )
+                                                        }
+                                                        title="Ver Crédito"
+                                                    >
+                                                        <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                    </Button>
                                                 </div>
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground italic">
-                                                    N/A
-                                                </span>
                                             )}
                                         </TableCell>
                                         <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
