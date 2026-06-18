@@ -15,8 +15,10 @@ import {
     Copy,
     Check,
     Search,
+    RefreshCw,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -170,6 +172,19 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
         null,
     );
     const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
+    const [isReloading, setIsReloading] = useState(false);
+
+    const handleReload = () => {
+        setIsReloading(true);
+        router.reload({
+            onSuccess: () => {
+                toast.success('Asignaciones actualizadas desde el servidor');
+            },
+            onFinish: () => {
+                setIsReloading(false);
+            },
+        });
+    };
 
     // Filters State: Defaults matching specimens board
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
@@ -383,6 +398,20 @@ export default function MyAssignmentsIndex({ specimens, priorities }: Props) {
                             value={dateRange}
                             onChange={setDateRange}
                         />
+
+                        {/* Botón de recarga */}
+                        <Button
+                            variant="default"
+                            size="icon"
+                            disabled={isReloading}
+                            onClick={handleReload}
+                            className="h-10 w-10 shrink-0 bg-emerald-600 text-white transition-transform hover:bg-emerald-700 active:scale-95 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                            title="Recargar asignaciones"
+                        >
+                            <RefreshCw
+                                className={`h-4 w-4 ${isReloading ? 'animate-spin' : ''}`}
+                            />
+                        </Button>
                     </div>
                 </div>
 

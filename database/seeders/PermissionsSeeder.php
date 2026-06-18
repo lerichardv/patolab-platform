@@ -27,6 +27,17 @@ class PermissionsSeeder extends Seeder
 
             /*
             |--------------------------------------------------------------------------
+            | User Commission Rules
+            |--------------------------------------------------------------------------
+            |*/
+
+            ['name' => 'Ver Comisiones de Usuarios', 'slug' => 'user_commission_rules.view'],
+            ['name' => 'Crear Comisiones de Usuarios', 'slug' => 'user_commission_rules.create'],
+            ['name' => 'Editar Comisiones de Usuarios', 'slug' => 'user_commission_rules.edit'],
+            ['name' => 'Eliminar Comisiones de Usuarios', 'slug' => 'user_commission_rules.delete'],
+
+            /*
+            |--------------------------------------------------------------------------
             | Roles
             |--------------------------------------------------------------------------
             */

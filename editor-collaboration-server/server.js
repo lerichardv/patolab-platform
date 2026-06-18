@@ -138,6 +138,7 @@ const ImageGrid = Node.create({
 				default: 2,
 				parseHTML: element => {
 					const cols = element.getAttribute('data-columns');
+
 					return cols ? parseInt(cols, 10) : 2;
 				},
 				renderHTML: attributes => ({

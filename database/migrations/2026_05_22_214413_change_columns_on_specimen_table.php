@@ -22,6 +22,12 @@ return new class extends Migration
      */
     public function down(): void
     {
+        DB::table('specimen')
+            ->whereNull('diagnosis')
+            ->update(['diagnosis' => 'No']);
+        DB::table('specimen')
+            ->whereNull('clinical_notes')
+            ->update(['clinical_notes' => 'No']);
         Schema::table('specimen', function (Blueprint $table) {
             $table->string('diagnosis')->change();
             $table->string('clinical_notes')->change();

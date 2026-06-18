@@ -51,4 +51,12 @@ class SpecimenGroup extends Model
         return $this->belongsToMany(Customer::class, 'specimen_group_customers', 'specimen_group_id', 'customer_id')
             ->withTimestamps();
     }
+
+    /**
+     * Get the breakdown records for each specimen in this group.
+     */
+    public function invoiceGroupSpecimens(): HasMany
+    {
+        return $this->hasMany(InvoiceGroupSpecimen::class, 'group_id');
+    }
 }

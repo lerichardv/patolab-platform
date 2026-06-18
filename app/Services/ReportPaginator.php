@@ -492,7 +492,7 @@ class ReportPaginator
             }
 
             $rows = (int) ceil($imgCount / $columns);
-            
+
             // Available width inside page container (215.9mm - 30mm margins = 185.9mm)
             $itemWidth = 185.9 / $columns;
             $itemHeight = $itemWidth * 0.65;

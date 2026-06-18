@@ -42,6 +42,8 @@ import { index as specimenTypesIndex } from '@/actions/App/Http/Controllers/Spec
 import { index as specimenTypeExaminationsIndex } from '@/actions/App/Http/Controllers/SpecimenTypeExaminationController';
 import { index as specimenTypeTemplatesIndex } from '@/actions/App/Http/Controllers/SpecimenTypeTemplateController';
 import { index as storagesIndex } from '@/actions/App/Http/Controllers/StorageController';
+import { index as userCommissionsIndex } from '@/actions/App/Http/Controllers/UserCommissionController';
+import { index as userCommissionRulesIndex } from '@/actions/App/Http/Controllers/UserCommissionRuleController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -82,6 +84,7 @@ const mainNavItems: NavItem[] = [
         title: 'Mis Asignaciones',
         href: myAssignmentsIndex(),
         icon: ClipboardList,
+        prefetch: false,
     },
     {
         title: 'Alquileres',
@@ -184,12 +187,6 @@ const adminNavItems: NavItem[] = [
                 ],
             },
             {
-                title: 'Sucursales',
-                href: locationsIndex(),
-                icon: MapPin,
-                permission: 'locations.view',
-            },
-            {
                 title: 'Contabilidad',
                 href: '#',
                 icon: Receipt,
@@ -207,16 +204,37 @@ const adminNavItems: NavItem[] = [
                 ],
             },
             {
-                title: 'Usuarios del sistema',
-                href: usersIndex(),
+                title: 'Usuarios',
+                href: '#',
                 icon: Users,
-                permission: 'users.view',
+                items: [
+                    {
+                        title: 'Lista de Usuarios',
+                        href: usersIndex(),
+                        permission: 'users.view',
+                    },
+                    {
+                        title: 'Roles y Permisos',
+                        href: rolesIndex(),
+                        permission: 'roles.view',
+                    },
+                    {
+                        title: 'Comisiones de usuarios',
+                        href: userCommissionRulesIndex(),
+                        permission: 'user_commission_rules.view',
+                    },
+                    {
+                        title: 'Comisiones Otorgadas',
+                        href: userCommissionsIndex(),
+                        permission: 'user_commission_rules.view',
+                    },
+                ],
             },
             {
-                title: 'Roles y Permisos',
-                href: rolesIndex(),
-                icon: ShieldCheck,
-                permission: 'roles.view',
+                title: 'Sucursales',
+                href: locationsIndex(),
+                icon: MapPin,
+                permission: 'locations.view',
             },
             {
                 title: 'Ajustes del Sistema',

@@ -577,7 +577,7 @@ export default function SpecimensIndex({
         const specimenParam = urlParams.get('specimen');
         const action = urlParams.get('action');
 
-        if (specimenParam && action === 'view' && priorities.length > 0) {
+        if (specimenParam && (action === 'view' || action === 'edit') && priorities.length > 0) {
             let found: Specimen | null = null;
 
             for (const p of priorities) {
@@ -607,10 +607,17 @@ export default function SpecimensIndex({
             }
 
             if (found) {
-                setIsSheetOpen(false);
-                setSelectedSpecimen(null);
-                setSelectedSpecimenForView(found);
-                setIsViewSheetOpen(true);
+                if (action === 'view') {
+                    setIsSheetOpen(false);
+                    setSelectedSpecimen(null);
+                    setSelectedSpecimenForView(found);
+                    setIsViewSheetOpen(true);
+                } else if (action === 'edit') {
+                    setIsViewSheetOpen(false);
+                    setSelectedSpecimenForView(null);
+                    setSelectedSpecimen(found);
+                    setIsSheetOpen(true);
+                }
 
                 // Clean the query parameters from URL to avoid re-triggering on fresh re-renders/navs
                 const newUrl = window.location.pathname;

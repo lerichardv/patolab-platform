@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\Invoice;
+use App\Models\InvoiceGroupSpecimen;
 use App\Models\Location;
 use App\Models\PrioritySpecimenOrder;
 use App\Models\Product;
@@ -290,17 +291,32 @@ class SpecimenGroupController extends Controller
                     'group_id' => $group->id,
                 ]);
 
+                $basePrice = (float) $specData['selected_price'];
+                $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
+                $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
+                $disc = $ageDiscount + $additionalDiscount;
+                $sub = $basePrice - $disc;
+                if ($sub < 0) {
+                    $sub = 0.00;
+                }
+
+                // Store split record in invoice_group_specimens
+                InvoiceGroupSpecimen::create([
+                    'invoice_id' => $invoice->id,
+                    'group_id' => $group->id,
+                    'specimen_id' => $specimen->id,
+                    'discount' => $disc,
+                    'subtotal' => $sub,
+                    'exempt_amount' => $sub,
+                    'taxable_amount_15' => 0.00,
+                    'taxable_amount_18' => 0.00,
+                    'isv_15' => 0.00,
+                    'isv_18' => 0.00,
+                    'total' => $sub,
+                ]);
+
                 // Map specimen to the credit in credit_invoice_specimens if credit checkout
                 if ($validated['payment_type'] === 'credit') {
-                    $basePrice = (float) $specData['selected_price'];
-                    $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
-                    $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
-                    $disc = $ageDiscount + $additionalDiscount;
-                    $sub = $basePrice - $disc;
-                    if ($sub < 0) {
-                        $sub = 0.00;
-                    }
-
                     // Greedily mark specimen as paid if covered by initial payment
                     $isPaid = false;
                     if ($initialPaymentAmount >= $sub) {

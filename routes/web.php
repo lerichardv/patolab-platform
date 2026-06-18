@@ -23,6 +23,8 @@ use App\Http\Controllers\SpecimenTypeController;
 use App\Http\Controllers\SpecimenTypeExaminationController;
 use App\Http\Controllers\SpecimenTypeTemplateController;
 use App\Http\Controllers\StorageController;
+use App\Http\Controllers\UserCommissionController;
+use App\Http\Controllers\UserCommissionRuleController;
 use App\Http\Controllers\UserController;
 use App\Models\Customer;
 use App\Models\Department;
@@ -104,6 +106,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return response()->json($department->municipalities()->orderBy('name')->get());
     })->name('departments.municipalities.index');
     Route::resource('users', UserController::class);
+    Route::resource('user-commission-rules', UserCommissionRuleController::class);
+    Route::resource('user-commissions', UserCommissionController::class)->only(['index', 'update', 'destroy']);
     Route::resource('roles', RoleController::class);
     Route::post('specimens/update-order', [SpecimenController::class, 'updateOrder'])->name('specimens.update-order');
     Route::post('specimens/bulk-action', [SpecimenController::class, 'bulkAction'])->name('specimens.bulk-action');

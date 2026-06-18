@@ -21,6 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
+        DB::table('invoices')
+            ->whereNull('proof_of_payment')
+            ->update(['proof_of_payment' => 'No']);
         Schema::table('invoices', function (Blueprint $table) {
             $table->string('proof_of_payment')->nullable(false)->change();
         });

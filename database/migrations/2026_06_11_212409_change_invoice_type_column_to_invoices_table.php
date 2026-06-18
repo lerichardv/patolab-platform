@@ -21,6 +21,11 @@ return new class extends Migration
      */
     public function down(): void
     {
+        DB::table('invoices')
+            ->where('invoice_type', 'credit payment')
+            ->update([
+                'invoice_type' => 'specimen',
+            ]);
         Schema::table('invoices', function (Blueprint $table) {
             $table->enum('invoice_type', ['specimen', 'rental'])->default('specimen')->after('group_id')->change();
         });

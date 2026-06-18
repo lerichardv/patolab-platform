@@ -26,6 +26,11 @@ return new class extends Migration
      */
     public function down(): void
     {
+        DB::table('invoices')
+            ->whereNull('customer_id')
+            ->update([
+                'customer_id' => 1,
+            ]);
         Schema::table('invoices', function (Blueprint $table) {
             $table->dropForeign(['customer_id']);
             $table->unsignedBigInteger('customer_id')->nullable(false)->change();

@@ -13,4 +13,5 @@ export type NavItem = {
     isActive?: boolean;
     items?: NavItem[];
     permission?: string | string[];
+    prefetch?: InertiaLinkProps['prefetch'];
 };

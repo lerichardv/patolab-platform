@@ -13,6 +13,11 @@ class RolesSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call([
+            PermissionsSeeder::class,
+            MorePermissionsSeeder::class,
+        ]);
+
         // 1. Create Admin Role
         $admin = Role::updateOrCreate(
             ['slug' => 'admin'],

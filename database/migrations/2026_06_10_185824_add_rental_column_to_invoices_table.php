@@ -27,6 +27,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        DB::table('invoices')
+            ->whereNull('specimen_id')->update([
+                'specimen_id' => 1,
+            ]);
         Schema::table('invoices', function (Blueprint $table) {
             $table->dropForeign(['rental_id']);
             $table->dropColumn('rental_id');

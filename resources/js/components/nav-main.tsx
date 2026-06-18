@@ -66,7 +66,7 @@ export function NavMain({
                                 >
                                     <Link
                                         href={item.href}
-                                        prefetch
+                                        prefetch={item.prefetch ?? true}
                                         onClick={handleLinkClick}
                                     >
                                         {item.icon && <item.icon />}
@@ -158,7 +158,9 @@ function CollapsibleMenuItem({
                                         >
                                             <Link
                                                 href={subItem.href}
-                                                prefetch
+                                                prefetch={
+                                                    subItem.prefetch ?? true
+                                                }
                                                 className="sidebar-marquee-container"
                                                 onClick={handleLinkClick}
                                             >
@@ -245,7 +247,7 @@ function CollapsibleSubMenuItem({
                                 >
                                     <Link
                                         href={ssItem.href}
-                                        prefetch
+                                        prefetch={ssItem.prefetch ?? true}
                                         className="sidebar-marquee-container"
                                         onClick={handleLinkClick}
                                     >

@@ -21,6 +21,11 @@ return new class extends Migration
      */
     public function down(): void
     {
+        DB::table('rentals')
+            ->whereNull('description')
+            ->update([
+                'description' => '',
+            ]);
         Schema::table('rentals', function (Blueprint $table) {
             $table->string('description')->nullable(false)->change();
         });

@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Editor;
 
 use App\Http\Controllers\Controller;
+use App\Models\InvoiceGroupSpecimen;
 use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenReport;
 use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
+use App\Models\UserCommission;
+use App\Models\UserCommissionRule;
 use App\Services\ImageOptimizerService;
 use App\Services\ReportPaginator;
 use Illuminate\Http\Request;
@@ -226,7 +229,7 @@ class ReportEditorController extends Controller
         $hasMacroAccess = $assignment ? (bool) $assignment->macroscopy_access : false;
         $hasMicroAccess = $assignment ? (bool) $assignment->microscopy_access : false;
 
-        if (!$hasMacroAccess && !$hasMicroAccess) {
+        if (! $hasMacroAccess && ! $hasMicroAccess) {
             return redirect()->back()->with('error', 'No tienes permisos de edición para esta muestra.');
         }
 
@@ -271,7 +274,7 @@ class ReportEditorController extends Controller
         $hasMacroAccess = $assignment ? (bool) $assignment->macroscopy_access : false;
         $hasMicroAccess = $assignment ? (bool) $assignment->microscopy_access : false;
 
-        if (!$hasMacroAccess && !$hasMicroAccess) {
+        if (! $hasMacroAccess && ! $hasMicroAccess) {
             return response()->json(['error' => 'No tienes permisos de edición para esta muestra.'], 403);
         }
 
@@ -350,9 +353,112 @@ class ReportEditorController extends Controller
             $specimen->update([
                 'status' => $status,
             ]);
+
+            if ($status === 'finalized') {
+                $this->calculateCommissions($specimen);
+            }
         });
 
         return redirect()->back()->with('success', 'Estado de la muestra actualizado con éxito.');
+    }
+
+    /**
+     * Calculate and store pathologist commissions when the report is finalized.
+     */
+    protected function calculateCommissions(Specimen $specimen)
+    {
+        // 1. Get all assigned pathologists
+        $assignedUsers = $specimen->users()->withPivot(['macroscopy_access', 'microscopy_access'])->get();
+
+        // 2. Filter pathologists with macroscopy access
+        $macroUsers = $assignedUsers->filter(function ($user) {
+            return (bool) $user->pivot->macroscopy_access;
+        });
+
+        // 3. Filter pathologists with microscopy access
+        $microUsers = $assignedUsers->filter(function ($user) {
+            return (bool) $user->pivot->microscopy_access;
+        });
+
+        // 4. Calculate base amount for the specimen
+        $baseAmount = 0.00;
+        if ($specimen->is_group || ! empty($specimen->group_id)) {
+            $groupSpecimen = InvoiceGroupSpecimen::where('specimen_id', $specimen->id)->first();
+            if ($groupSpecimen) {
+                $baseAmount = (float) $groupSpecimen->total;
+            }
+        } else {
+            $invoice = $specimen->invoiceRelation;
+            if ($invoice) {
+                $baseAmount = (float) $invoice->total;
+            }
+        }
+
+        // 5. Macroscopy commission: for all pathologists with macroscopy access
+        foreach ($macroUsers as $macroUser) {
+            $rule = UserCommissionRule::where('user_id', $macroUser->id)
+                ->where('specimen_type_id', $specimen->specimen_type)
+                ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+                ->first();
+
+            if ($rule && $rule->macroscopy_commission_enabled) {
+                $commissionAmount = 0.00;
+                if ($rule->macroscopy_calculation_type === 'fixed') {
+                    $commissionAmount = (float) $rule->macroscopy_commission_value;
+                } elseif ($rule->macroscopy_calculation_type === 'percentage') {
+                    $commissionAmount = ($baseAmount * (float) $rule->macroscopy_commission_value) / 100.00;
+                }
+
+                UserCommission::updateOrCreate(
+                    [
+                        'user_id' => $macroUser->id,
+                        'specimen_id' => $specimen->id,
+                        'phase' => 'macroscopy',
+                    ],
+                    [
+                        'user_commission_rule_id' => $rule->id,
+                        'specimen_base_amount' => $baseAmount,
+                        'calculated_comission_amount' => $commissionAmount,
+                        'user_commission_rule_applied' => $rule->toArray(),
+                        'created_by' => auth()->id() ?? $macroUser->id,
+                        'updated_by' => auth()->id(),
+                    ]
+                );
+            }
+        }
+
+        // 6. Microscopy commission: for all pathologists with microscopy access
+        foreach ($microUsers as $microUser) {
+            $rule = UserCommissionRule::where('user_id', $microUser->id)
+                ->where('specimen_type_id', $specimen->specimen_type)
+                ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+                ->first();
+
+            if ($rule && $rule->microscopy_commission_enabled) {
+                $commissionAmount = 0.00;
+                if ($rule->microscopy_calculation_type === 'fixed') {
+                    $commissionAmount = (float) $rule->microscopy_commission_value;
+                } elseif ($rule->microscopy_calculation_type === 'percentage') {
+                    $commissionAmount = ($baseAmount * (float) $rule->microscopy_commission_value) / 100.00;
+                }
+
+                UserCommission::updateOrCreate(
+                    [
+                        'user_id' => $microUser->id,
+                        'specimen_id' => $specimen->id,
+                        'phase' => 'microscopy',
+                    ],
+                    [
+                        'user_commission_rule_id' => $rule->id,
+                        'specimen_base_amount' => $baseAmount,
+                        'calculated_comission_amount' => $commissionAmount,
+                        'user_commission_rule_applied' => $rule->toArray(),
+                        'created_by' => auth()->id() ?? $microUser->id,
+                        'updated_by' => auth()->id(),
+                    ]
+                );
+            }
+        }
     }
 
     /**

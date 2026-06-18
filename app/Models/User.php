@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -36,6 +37,22 @@ class User extends Authenticatable
             ->using(SpecimenUser::class)
             ->withPivot(['macroscopy_access', 'microscopy_access'])
             ->withTimestamps();
+    }
+
+    /**
+     * Obtiene las reglas de comisión asociadas al usuario (patólogo).
+     */
+    public function commissionRules(): HasMany
+    {
+        return $this->hasMany(UserCommissionRule::class, 'user_id');
+    }
+
+    /**
+     * Obtiene las comisiones generadas por el usuario.
+     */
+    public function commissions(): HasMany
+    {
+        return $this->hasMany(UserCommission::class, 'user_id');
     }
 
     /**

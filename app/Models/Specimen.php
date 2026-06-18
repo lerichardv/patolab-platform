@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -148,5 +149,21 @@ class Specimen extends Model
     public function group(): BelongsTo
     {
         return $this->belongsTo(SpecimenGroup::class, 'group_id');
+    }
+
+    /**
+     * Obtiene las comisiones generadas por este espécimen.
+     */
+    public function commissions(): HasMany
+    {
+        return $this->hasMany(UserCommission::class, 'specimen_id');
+    }
+
+    /**
+     * Get the group specimen breakdown record for this specimen.
+     */
+    public function invoiceGroupSpecimen(): HasOne
+    {
+        return $this->hasOne(InvoiceGroupSpecimen::class, 'specimen_id');
     }
 }

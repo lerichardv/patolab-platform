@@ -106,6 +106,16 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Comisiones de Usuarios',
+        description: 'Reglas y gestión de comisiones de patólogos.',
+        slugs: {
+            view: 'user_commission_rules.view',
+            create: 'user_commission_rules.create',
+            edit: 'user_commission_rules.edit',
+            delete: 'user_commission_rules.delete',
+        },
+    },
+    {
         label: 'Pacientes',
         description: 'Visualización y gestión de expedientes de pacientes.',
         slugs: {

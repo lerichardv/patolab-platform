@@ -126,4 +126,12 @@ class Invoice extends Model
     {
         return $this->hasMany(CreditInvoiceSpecimen::class, 'invoice_id');
     }
+
+    /**
+     * Get the group specimen breakdown records associated with this invoice.
+     */
+    public function groupSpecimens(): HasMany
+    {
+        return $this->hasMany(InvoiceGroupSpecimen::class, 'invoice_id');
+    }
 }
