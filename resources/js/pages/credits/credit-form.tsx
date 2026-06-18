@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPicker } from '@/components/ui/number-picker';
 import {
     Select,
     SelectContent,
@@ -56,6 +57,8 @@ interface CreditInvoiceSpecimen {
     discount: string | number;
     subtotal: string | number;
     total: string | number;
+    quantity: number;
+    quantity_paid?: number;
     specimen?: {
         id: number;
         sequence_code: string;
@@ -181,7 +184,7 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
         transfer_authorization_code: '',
         proof_of_payment: null as File | null,
         invoice_type: 'credit payment',
-        specimen_ids: [] as number[],
+        specimens: [] as { id: number; quantity: number }[],
     });
 
     // Sync local payment sheet state when opened
@@ -393,30 +396,78 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
     };
 
     const handleSpecimenToggle = (specimenId: number) => {
-        let newSpecimenIds = [...data.specimen_ids];
+        const item = credit.credit_invoice_specimens?.find(
+            (x) => x.specimen_id === specimenId,
+        );
 
-        if (newSpecimenIds.includes(specimenId)) {
-            newSpecimenIds = newSpecimenIds.filter((id) => id !== specimenId);
-        } else {
-            newSpecimenIds.push(specimenId);
+        if (!item) {
+            return;
         }
 
-        // Calculate sum of selected specimen totals
+        let newSpecimens = [...data.specimens];
+        const isAlreadySelected = newSpecimens.some((x) => x.id === specimenId);
+
+        if (isAlreadySelected) {
+            newSpecimens = newSpecimens.filter((x) => x.id !== specimenId);
+        } else {
+            const maxQty = item.quantity - (item.quantity_paid ?? 0);
+            newSpecimens.push({ id: specimenId, quantity: maxQty });
+        }
+
+        recalculateAmountPaid(newSpecimens);
+    };
+
+    const handleSpecimenQuantityChange = (
+        specimenId: number,
+        newQty: number,
+    ) => {
+        const item = credit.credit_invoice_specimens?.find(
+            (x) => x.specimen_id === specimenId,
+        );
+
+        if (!item) {
+            return;
+        }
+
+        const maxQty = item.quantity - (item.quantity_paid ?? 0);
+        const qty = Math.max(1, Math.min(maxQty, newQty));
+
+        const newSpecimens = [...data.specimens];
+        const index = newSpecimens.findIndex((x) => x.id === specimenId);
+
+        if (index > -1) {
+            newSpecimens[index] = { ...newSpecimens[index], quantity: qty };
+        } else {
+            newSpecimens.push({ id: specimenId, quantity: qty });
+        }
+
+        recalculateAmountPaid(newSpecimens);
+    };
+
+    const recalculateAmountPaid = (
+        newSpecimens: { id: number; quantity: number }[],
+    ) => {
         const specimensList = credit.credit_invoice_specimens || [];
-        const selectedSum = specimensList.reduce((sum, item) => {
-            if (newSpecimenIds.includes(item.specimen_id)) {
-                return sum + parseFloat(String(item.total));
+        const selectedSum = newSpecimens.reduce((sum, specItem) => {
+            const dbItem = specimensList.find(
+                (x) => x.specimen_id === specItem.id,
+            );
+
+            if (dbItem) {
+                const unitPrice = parseFloat(String(dbItem.amount));
+                const unitDiscount = parseFloat(String(dbItem.discount));
+
+                return sum + (unitPrice - unitDiscount) * specItem.quantity;
             }
 
             return sum;
         }, 0);
 
-        // Cap at remainingVal
         const finalAmount = Math.min(selectedSum, remainingVal);
 
         setData((prev) => ({
             ...prev,
-            specimen_ids: newSpecimenIds,
+            specimens: newSpecimens,
             amount_paid: finalAmount.toFixed(2),
         }));
     };
@@ -425,24 +476,19 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
         const unpaidSpecimens =
             credit.credit_invoice_specimens?.filter((item) => !item.is_paid) ||
             [];
-        const newSpecimenIds = unpaidSpecimens.map((item) => item.specimen_id);
-        const selectedSum = unpaidSpecimens.reduce(
-            (sum, item) => sum + parseFloat(String(item.total)),
-            0,
-        );
-        const finalAmount = Math.min(selectedSum, remainingVal);
+        const newSpecimens = unpaidSpecimens.map((item) => {
+            const maxQty = item.quantity - (item.quantity_paid ?? 0);
 
-        setData((prev) => ({
-            ...prev,
-            specimen_ids: newSpecimenIds,
-            amount_paid: finalAmount.toFixed(2),
-        }));
+            return { id: item.specimen_id, quantity: maxQty };
+        });
+
+        recalculateAmountPaid(newSpecimens);
     };
 
     const handleSelectNone = () => {
         setData((prev) => ({
             ...prev,
-            specimen_ids: [],
+            specimens: [],
             amount_paid: '0.00',
         }));
     };
@@ -454,7 +500,7 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
         e.preventDefault();
         e.stopPropagation();
 
-        if (credit.is_group && data.specimen_ids.length === 0) {
+        if (credit.is_group && data.specimens.length === 0) {
             toast.error('Debe seleccionar al menos una muestra para pagar');
 
             return;
@@ -693,9 +739,15 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
                             {credit.credit_invoice_specimens.map((item) => {
                                 const spec = item.specimen;
                                 const isPaid = item.is_paid;
-                                const isChecked = data.specimen_ids.includes(
-                                    item.specimen_id,
+                                const maxQty =
+                                    item.quantity - (item.quantity_paid ?? 0);
+                                const currentItem = data.specimens.find(
+                                    (x) => x.id === item.specimen_id,
                                 );
+                                const isChecked = !!currentItem;
+                                const currentQty = currentItem
+                                    ? currentItem.quantity
+                                    : maxQty;
 
                                 return (
                                     <div
@@ -751,34 +803,79 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
                                                     {spec?.examination?.name &&
                                                         ` - ${spec.examination.name}`}
                                                 </span>
+                                                {!isPaid && (
+                                                    <span className="text-[10px] font-semibold text-primary">
+                                                        Cantidad pendiente:{' '}
+                                                        {maxQty}{' '}
+                                                        {item.quantity_paid &&
+                                                        item.quantity_paid > 0
+                                                            ? `(Total: ${item.quantity}, Pagados: ${item.quantity_paid})`
+                                                            : ''}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <span className="block text-xs font-semibold text-foreground">
-                                                L.{' '}
-                                                {parseFloat(
-                                                    String(item.total),
-                                                ).toFixed(2)}
-                                            </span>
-                                            {isPaid ? (
-                                                <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
-                                                    Pagado
+                                        <div className="flex flex-col items-end justify-between gap-2">
+                                            <div className="text-right">
+                                                <span className="block text-xs font-semibold text-foreground">
+                                                    L.{' '}
+                                                    {(
+                                                        (parseFloat(
+                                                            String(item.amount),
+                                                        ) -
+                                                            parseFloat(
+                                                                String(
+                                                                    item.discount,
+                                                                ),
+                                                            )) *
+                                                        currentQty
+                                                    ).toFixed(2)}
                                                 </span>
-                                            ) : isChecked ? (
-                                                <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[9px] font-bold text-primary">
-                                                    Seleccionado
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center rounded-full bg-orange-500/15 px-2 py-0.5 text-[9px] font-bold text-orange-600 dark:text-orange-400">
-                                                    Pendiente
-                                                </span>
-                                            )}
+                                                {isPaid ? (
+                                                    <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                                                        Pagado
+                                                    </span>
+                                                ) : isChecked ? (
+                                                    <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[9px] font-bold text-primary">
+                                                        Seleccionado
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center rounded-full bg-orange-500/15 px-2 py-0.5 text-[9px] font-bold text-orange-600 dark:text-orange-400">
+                                                        Pendiente
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {isChecked &&
+                                                !isPaid &&
+                                                maxQty > 1 && (
+                                                    <div
+                                                        className="flex items-center gap-1.5"
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
+                                                        }
+                                                    >
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            Cant. a pagar:
+                                                        </span>
+                                                        <NumberPicker
+                                                            value={currentQty}
+                                                            onChange={(val) =>
+                                                                handleSpecimenQuantityChange(
+                                                                    item.specimen_id,
+                                                                    val,
+                                                                )
+                                                            }
+                                                            min={1}
+                                                            max={maxQty}
+                                                        />
+                                                    </div>
+                                                )}
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
-                        <InputError message={errors.specimen_ids} />
+                        <InputError message={errors.specimens as any} />
                     </div>
                 )}
 

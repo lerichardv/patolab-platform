@@ -144,6 +144,7 @@ class RentalController extends Controller
         $validated = $request->validate([
             'rental_id' => 'required|integer|exists:rentals,id',
             'customer_id' => 'required_if:payment_type,credit|nullable|exists:customers,id',
+            'quantity' => 'required|integer|min:1',
             'amount' => 'required|numeric|min:0.01',
             'discount' => 'required|numeric|min:0',
             'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
@@ -235,10 +236,16 @@ class RentalController extends Controller
             $amount = (float) $validated['amount'];
             $discount = (float) $validated['discount'];
 
+            $qty = (int) ($validated['quantity'] ?? 1);
+            if ($qty <= 0) {
+                $qty = 1;
+            }
+
             // Business Rule: A 15% ISV rate is applied only to the rental subtotal
             // (rental base amount minus discount, excluding the custom extra charge).
             // This 15% tax is stored in the database's `isv_15` column.
             $rentalBaseAmount = $amount - $customAmountVal;
+            $unitPrice = $rentalBaseAmount / $qty;
             $rentalSubtotal = max(0.00, $rentalBaseAmount - $discount);
             $isv15 = $rentalSubtotal * 0.15;
 
@@ -279,7 +286,8 @@ class RentalController extends Controller
                 'specimen_id' => null,
                 'payment_type' => $validated['payment_type'],
                 'credit_payment_id' => $creditId,
-                'amount' => $amount,
+                'quantity' => $qty,
+                'amount' => $unitPrice,
                 'discount' => $discount,
                 'subtotal' => $subtotal,
                 'exempt_amount' => 0.00,

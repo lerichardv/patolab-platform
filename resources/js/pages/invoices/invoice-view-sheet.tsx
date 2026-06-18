@@ -4,22 +4,17 @@ import {
     Microscope,
     User,
     FileText,
-    Calendar,
     Clock,
-    Tag,
-    AlertCircle,
     CreditCard,
     Download,
     ExternalLink,
     MapPin,
-    Activity,
     FileImage,
     Coins,
     Hash,
 } from 'lucide-react';
 import HeadingSheet from '@/components/heading-sheet';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 

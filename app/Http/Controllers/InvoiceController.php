@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\Referrer;
 use App\Models\ReferrerType;
 use App\Models\Sequence;
+use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenCategory;
 use App\Models\SpecimenGroup;
@@ -36,7 +37,7 @@ class InvoiceController extends Controller
         $query = Invoice::with([
             'customer',
             'caiRange',
-            'specimen.type',
+            'specimen.type.prices',
             'specimen.examination',
             'specimen.category',
             'specimen.referrerRelation',
@@ -207,6 +208,7 @@ class InvoiceController extends Controller
             'activeLocationId' => $activeLocationId,
             'products' => $products,
             'groups' => SpecimenGroup::orderBy('name', 'asc')->get(),
+            'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
         ]);
     }
 
@@ -215,7 +217,7 @@ class InvoiceController extends Controller
         Gate::authorize('invoices.view');
         $query = Invoice::with([
             'customer',
-            'specimen.type',
+            'specimen.type.prices',
             'specimen.examination',
             'creditRelation',
         ]);
@@ -415,12 +417,17 @@ class InvoiceController extends Controller
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
+            'quantity' => 'required|integer|min:1',
             'amount' => 'required|numeric|min:0',
             'discount' => 'required|numeric|min:0',
             'subtotal' => 'required|numeric|min:0',
             'exempt_amount' => 'required|numeric|min:0',
             'total' => 'required|numeric|min:0',
             'total_paid' => 'required|numeric|min:0',
+            'custom_amount' => 'nullable|numeric|min:0',
+            'custom_amount_reason' => 'nullable|string|max:255',
+            'age_discount_type' => 'nullable|string|in:third,fourth',
+            'age_discount_amount' => 'nullable|numeric|min:0',
             'payment_method_date' => 'nullable|date',
             'cash_value' => 'nullable|numeric|min:0',
             'check_number' => 'nullable|string|max:255',
@@ -449,7 +456,7 @@ class InvoiceController extends Controller
 
         if ($request->boolean('regenerate_pdf', true)) {
             try {
-                $invoice->load(['specimen.products', 'creditRelation', 'customer', 'caiRange']);
+                $invoice->load(['specimen.products', 'creditRelation', 'customer', 'caiRange', 'groupSpecimens.specimen.examination', 'groupSpecimens.specimen.customerRelation', 'groupSpecimens.specimen.type']);
                 $totalWords = $this->numberToSpanishWords($invoice->total);
 
                 $customer = $invoice->customer;

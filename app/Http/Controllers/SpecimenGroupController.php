@@ -16,6 +16,7 @@ use App\Models\Sequence;
 use App\Models\Specimen;
 use App\Models\SpecimenGroup;
 use App\Models\SpecimenGroupCustomer;
+use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Services\WhatsAppService;
 use Illuminate\Http\File;
@@ -79,6 +80,7 @@ class SpecimenGroupController extends Controller
 
             // Nested pricing config for each specimen
             'specimens.*.selected_price' => 'required|numeric|min:0',
+            'specimens.*.quantity' => 'required|integer|min:1',
             'specimens.*.age_discount_type' => 'nullable|string|in:third,fourth',
             'specimens.*.age_discount_amount' => 'nullable|numeric|min:0',
             'specimens.*.additional_discount_enabled' => 'nullable|boolean',
@@ -103,15 +105,25 @@ class SpecimenGroupController extends Controller
             // Calculate overall totals from specimens
             $totalAmount = 0.00;
             $totalDiscount = 0.00;
+            $totalQuantity = 0;
+            $totalAgeDiscount = 0.00;
+            $firstAgeDiscountType = null;
             $specimensData = $validated['specimens'];
 
             foreach ($specimensData as $specData) {
+                $qty = (int) ($specData['quantity'] ?? 1);
                 $basePrice = (float) $specData['selected_price'];
                 $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
                 $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
 
-                $totalAmount += $basePrice;
-                $totalDiscount += $ageDiscount + $additionalDiscount;
+                $totalAmount += $basePrice * $qty;
+                $totalDiscount += ($ageDiscount + $additionalDiscount) * $qty;
+                $totalQuantity += $qty;
+                $totalAgeDiscount += $ageDiscount * $qty;
+
+                if (! empty($specData['age_discount_type']) && ! $firstAgeDiscountType) {
+                    $firstAgeDiscountType = $specData['age_discount_type'];
+                }
             }
 
             // Add custom amount if enabled
@@ -182,6 +194,7 @@ class SpecimenGroupController extends Controller
                 'specimen_id' => null, // Left null since it is linked to a group
                 'payment_type' => $validated['payment_type'],
                 'credit_payment_id' => $creditId,
+                'quantity' => $totalQuantity,
                 'amount' => $totalAmount,
                 'discount' => $totalDiscount,
                 'subtotal' => $subtotal,
@@ -197,8 +210,8 @@ class SpecimenGroupController extends Controller
                 'invoice_file' => '',
                 'custom_amount' => $customAmountVal,
                 'custom_amount_reason' => $customAmountReasonVal,
-                'age_discount_type' => null, // Calculated at item level in grouped mode
-                'age_discount_amount' => 0.00,
+                'age_discount_type' => $firstAgeDiscountType,
+                'age_discount_amount' => $totalAgeDiscount,
                 'payment_method_date' => $validated['payment_method_date'] ?? null,
                 'cash_value' => isset($validated['cash_value']) ? (float) $validated['cash_value'] : null,
                 'check_number' => $validated['check_number'] ?? null,
@@ -287,10 +300,12 @@ class SpecimenGroupController extends Controller
                     'priority_id' => $specData['priority_id'],
                     'medical_order_file' => $medOrderPath,
                     'access_token' => Str::random(32),
+                    'delivery_token' => Str::random(32),
                     'is_group' => true,
                     'group_id' => $group->id,
                 ]);
 
+                $qty = (int) ($specData['quantity'] ?? 1);
                 $basePrice = (float) $specData['selected_price'];
                 $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
                 $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
@@ -305,23 +320,26 @@ class SpecimenGroupController extends Controller
                     'invoice_id' => $invoice->id,
                     'group_id' => $group->id,
                     'specimen_id' => $specimen->id,
+                    'quantity' => $qty,
+                    'amount' => $basePrice,
                     'discount' => $disc,
-                    'subtotal' => $sub,
-                    'exempt_amount' => $sub,
+                    'subtotal' => $sub * $qty,
+                    'exempt_amount' => $sub * $qty,
                     'taxable_amount_15' => 0.00,
                     'taxable_amount_18' => 0.00,
                     'isv_15' => 0.00,
                     'isv_18' => 0.00,
-                    'total' => $sub,
+                    'total' => $sub * $qty,
                 ]);
 
                 // Map specimen to the credit in credit_invoice_specimens if credit checkout
                 if ($validated['payment_type'] === 'credit') {
                     // Greedily mark specimen as paid if covered by initial payment
                     $isPaid = false;
-                    if ($initialPaymentAmount >= $sub) {
+                    $scaledSub = $sub * $qty;
+                    if ($initialPaymentAmount >= $scaledSub) {
                         $isPaid = true;
-                        $initialPaymentAmount -= $sub;
+                        $initialPaymentAmount -= $scaledSub;
                     }
 
                     DB::table('credit_invoice_specimens')->insert([
@@ -329,15 +347,16 @@ class SpecimenGroupController extends Controller
                         'invoice_id' => $invoice->id,
                         'specimen_id' => $specimen->id,
                         'is_paid' => $isPaid ? 1 : 0,
+                        'quantity' => $qty,
                         'amount' => $basePrice,
                         'discount' => $disc,
-                        'subtotal' => $sub,
+                        'subtotal' => $sub * $qty,
                         'exempt_amount' => 0.00,
                         'taxable_amount_15' => 0.00,
                         'taxable_amount_18' => 0.00,
                         'isv_15' => 0.00,
                         'isv_18' => 0.00,
-                        'total' => $sub,
+                        'total' => $sub * $qty,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
@@ -395,14 +414,17 @@ class SpecimenGroupController extends Controller
                 }
 
                 // Add to temporary list for PDF render
+                $typeName = SpecimenType::find($specData['specimen_type'])->name;
+                $examName = SpecimenTypeExamination::find($specData['specimen_type_examination'])->name;
                 $createdSpecimensDataForPdf[] = [
                     'sequence_code' => $sequenceCode,
-                    'exam_name' => SpecimenTypeExamination::find($specData['specimen_type_examination'])->name,
+                    'exam_name' => $typeName.' - '.$examName,
                     'patient_name' => Customer::find($specData['customer'])->name,
                     'price' => (float) $specData['selected_price'],
                     'discount' => (float) ($specData['age_discount_amount'] ?? 0.00) + (! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00),
                     'age_discount_type' => $specData['age_discount_type'] ?? null,
                     'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
+                    'quantity' => $qty,
                 ];
             }
 

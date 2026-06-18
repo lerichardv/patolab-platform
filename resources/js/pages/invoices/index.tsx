@@ -113,6 +113,7 @@ interface Invoice {
     invoice_file: string | null;
     created_at: string;
     group?: any;
+    quantity?: number;
     age_discount_type?: string | null;
     age_discount_amount?: string | number | null;
     isv_15?: string | number | null;
@@ -171,6 +172,7 @@ interface Props {
     sequences: any[];
     activeLocationId: number | null;
     products: any[];
+    settings?: Record<string, string>;
 }
 
 function FormCombobox({
@@ -262,6 +264,7 @@ export default function InvoicesIndex({
     activeLocationId,
     products,
     groups,
+    settings,
 }: Props) {
     const { props } = usePage() as any;
     const { auth } = props;
@@ -962,6 +965,16 @@ export default function InvoicesIndex({
                                 </TableHead>
                                 <TableHead className="min-w-[120px] text-right">
                                     <div className="flex justify-end">
+                                        Precio
+                                    </div>
+                                </TableHead>
+                                <TableHead className="min-w-[100px] text-right">
+                                    <div className="flex justify-end">
+                                        Cantidad
+                                    </div>
+                                </TableHead>
+                                <TableHead className="min-w-[120px] text-right">
+                                    <div className="flex justify-end">
                                         Subtotal
                                     </div>
                                 </TableHead>
@@ -975,22 +988,15 @@ export default function InvoicesIndex({
                                         ISV 15%
                                     </div>
                                 </TableHead>
-                                <TableHead className="min-w-[120px] pr-6 text-right">
+                                <TableHead className="min-w-[120px] text-right">
                                     <div className="flex justify-end">
-                                        {renderSortHeader(
-                                            'total',
-                                            'Total Factura',
-                                        )}
+                                        Total Factura
                                     </div>
                                 </TableHead>
-                                <TableHead
-                                    className={`pointer-events-none z-10 w-[110px] min-w-[110px] border-l border-border bg-card text-right before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:sticky md:right-[80px] md:before:absolute dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
-                                >
+
+                                <TableHead className="min-w-[120px] text-right">
                                     <div className="flex justify-end">
-                                        {renderSortHeader(
-                                            'total_paid',
-                                            'Total Pagado',
-                                        )}
+                                        Total Pagado
                                     </div>
                                 </TableHead>
                                 <TableHead className="z-10 w-[80px] min-w-[80px] bg-card text-right md:sticky md:right-0">
@@ -1408,6 +1414,15 @@ export default function InvoicesIndex({
                                         <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
                                             L.{' '}
                                             {parseFloat(
+                                                String(invoice.amount || 0),
+                                            ).toFixed(2)}
+                                        </TableCell>
+                                        <TableCell className="min-w-[100px] text-right font-medium text-muted-foreground">
+                                            {invoice.quantity ?? 1}
+                                        </TableCell>
+                                        <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
+                                            L.{' '}
+                                            {parseFloat(
                                                 String(invoice.subtotal || 0),
                                             ).toFixed(2)}
                                         </TableCell>
@@ -1531,6 +1546,8 @@ export default function InvoicesIndex({
                 onOpenChange={setIsEditSheetOpen}
                 customers={customers}
                 banks={banks}
+                specimenTypes={specimenTypes}
+                settings={settings}
             />
 
             {/* Specimen Sheets */}

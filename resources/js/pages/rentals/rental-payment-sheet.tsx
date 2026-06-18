@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPicker } from '@/components/ui/number-picker';
 import {
     Popover,
     PopoverContent,
@@ -242,6 +243,7 @@ export default function RentalPaymentSheet({
     const { data, setData, post, processing, errors, reset } = useForm({
         rental_id: rental ? rental.id.toString() : '',
         customer_id: '',
+        quantity: 1,
         amount: '0.00',
         discount: '0.00',
         payment_type: '',
@@ -317,33 +319,46 @@ export default function RentalPaymentSheet({
     const thirdAgePercent = parseFloat(settings?.third_age_discount || '30');
     const fourthAgePercent = parseFloat(settings?.fourth_age_discount || '40');
 
+    const quantityVal = data.quantity ?? 1;
+
     // Calculate age discount
     const ageDiscountVal = useMemo(() => {
         const base = parseFloat(baseAmount) || 0;
 
         if (data.age_discount_type === 'third') {
-            return (base * thirdAgePercent) / 100;
+            return ((base * thirdAgePercent) / 100) * quantityVal;
         } else if (data.age_discount_type === 'fourth') {
-            return (base * fourthAgePercent) / 100;
+            return ((base * fourthAgePercent) / 100) * quantityVal;
         }
 
         return 0;
-    }, [baseAmount, data.age_discount_type, thirdAgePercent, fourthAgePercent]);
+    }, [
+        baseAmount,
+        data.age_discount_type,
+        thirdAgePercent,
+        fourthAgePercent,
+        quantityVal,
+    ]);
 
     // Update form age discount amount
     useEffect(() => {
         setData('age_discount_amount', ageDiscountVal.toString());
     }, [ageDiscountVal, setData]);
 
-    // Update total amount: base amount + custom amount
+    // Update total amount: base amount * quantity + custom amount
     const totalBaseAmount = useMemo(() => {
         const base = parseFloat(baseAmount) || 0;
         const custom = data.custom_amount_enabled
             ? parseFloat(data.custom_amount) || 0
             : 0;
 
-        return base + custom;
-    }, [baseAmount, data.custom_amount_enabled, data.custom_amount]);
+        return base * quantityVal + custom;
+    }, [
+        baseAmount,
+        quantityVal,
+        data.custom_amount_enabled,
+        data.custom_amount,
+    ]);
 
     useEffect(() => {
         setData('amount', totalBaseAmount.toString());
@@ -374,9 +389,10 @@ export default function RentalPaymentSheet({
     // This is the taxable portion.
     const rentalSubtotalVal = useMemo(() => {
         const base = parseFloat(baseAmount) || 0;
+        const totalBase = base * quantityVal;
 
-        return Math.max(0, base - finalDiscountVal);
-    }, [baseAmount, finalDiscountVal]);
+        return Math.max(0, totalBase - finalDiscountVal);
+    }, [baseAmount, quantityVal, finalDiscountVal]);
 
     // Calculate 15% ISV on the rental subtotal.
     // Business Rule: This 15% ISV is stored in the database's `isv_15` column.
@@ -816,6 +832,20 @@ export default function RentalPaymentSheet({
             return;
         }
 
+        if (additionalDiscountEnabled) {
+            const addDisc = parseFloat(additionalDiscount) || 0;
+            const totalBase =
+                (parseFloat(baseAmount) || 0) * (data.quantity ?? 1);
+
+            if (addDisc > totalBase - ageDiscountVal) {
+                toast.error(
+                    `El descuento adicional no puede superar el subtotal (L. ${(totalBase - ageDiscountVal).toFixed(2)}).`,
+                );
+
+                return;
+            }
+        }
+
         if (isProofRequired && !data.proof_of_payment) {
             toast.error(
                 'El comprobante de pago es requerido para este método de pago',
@@ -984,7 +1014,7 @@ export default function RentalPaymentSheet({
                             Conceptos e Importes
                         </h3>
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="base_amount">
                                     Importe / Precio Base (L.) *
@@ -1000,6 +1030,14 @@ export default function RentalPaymentSheet({
                                     }
                                     placeholder="0.00"
                                     required
+                                />
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="quantity">Cantidad *</Label>
+                                <NumberPicker
+                                    value={data.quantity}
+                                    onChange={(val) => setData('quantity', val)}
+                                    min={1}
                                 />
                             </div>
                             <div className="grid gap-1.5">
@@ -1340,7 +1378,27 @@ export default function RentalPaymentSheet({
                                 Importe Base:
                             </span>
                             <span className="font-semibold">
-                                L. {(parseFloat(baseAmount) || 0).toFixed(2)}
+                                {quantityVal > 1 ? (
+                                    <span>
+                                        L.{' '}
+                                        {(parseFloat(baseAmount) || 0).toFixed(
+                                            2,
+                                        )}{' '}
+                                        x {quantityVal} (L.{' '}
+                                        {(
+                                            (parseFloat(baseAmount) || 0) *
+                                            quantityVal
+                                        ).toFixed(2)}
+                                        )
+                                    </span>
+                                ) : (
+                                    <span>
+                                        L.{' '}
+                                        {(parseFloat(baseAmount) || 0).toFixed(
+                                            2,
+                                        )}
+                                    </span>
+                                )}
                             </span>
                         </div>
                         {finalDiscountVal > 0 && (

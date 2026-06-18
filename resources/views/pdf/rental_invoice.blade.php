@@ -370,9 +370,14 @@
             </thead>
             <tbody>
                 @php
+                    $qty = (int) ($invoice->quantity ?? 1);
+                    if ($qty <= 0) {
+                        $qty = 1;
+                    }
                     // Business Rule: Rental ISV is 15% and stored in the isv_15 column.
                     // The base rental price excludes the custom extra charge.
-                    $baseRentalPrice = (float)$invoice->amount - (float)($invoice->custom_amount ?? 0);
+                    $unitRentalPrice = (float)$invoice->amount;
+                    $unitDiscount = (float)$invoice->discount / $qty;
                     $rowNum = 1;
                 @endphp
                 <tr>
@@ -388,10 +393,10 @@
                             </div>
                         @endif
                     </td>
-                    <td>1</td>
-                    <td class="text-right">L. {{ number_format($baseRentalPrice, 2) }}</td>
-                    <td class="text-right">L. {{ number_format($invoice->discount, 2) }}</td>
-                    <td class="text-right">L. {{ number_format($baseRentalPrice - (float)$invoice->discount, 2) }}</td>
+                    <td>{{ $qty }}</td>
+                    <td class="text-right">L. {{ number_format($unitRentalPrice, 2) }}</td>
+                    <td class="text-right">L. {{ number_format($unitDiscount, 2) }}</td>
+                    <td class="text-right">L. {{ number_format(($unitRentalPrice - $unitDiscount) * $qty, 2) }}</td>
                 </tr>
                 @if((float)($invoice->custom_amount ?? 0) > 0)
                 <tr>

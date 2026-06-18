@@ -46,6 +46,7 @@ class Specimen extends Model
         'priority_id',
         'active',
         'access_token',
+        'delivery_token',
         'is_group',
         'group_id',
         'report_id',

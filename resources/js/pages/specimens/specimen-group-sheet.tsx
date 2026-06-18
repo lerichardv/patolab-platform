@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPicker } from '@/components/ui/number-picker';
 import {
     Popover,
     PopoverContent,
@@ -579,6 +580,10 @@ export default function SpecimenGroupSheet({
         const defaultPrice =
             sortedPrices.length > 0 ? sortedPrices[0].amount.toString() : '0';
 
+        const existingSpec = nestedSpecimenToEditId
+            ? specimens.find((s) => s.client_id === nestedSpecimenToEditId)
+            : null;
+
         const specObject = {
             client_id:
                 nestedSpecimenToEditId ||
@@ -605,11 +610,22 @@ export default function SpecimenGroupSheet({
             insumos: nestedInsumos,
 
             // Step 2 pricing details (set defaults here)
-            selected_price: defaultPrice,
-            age_discount_type: null,
-            age_discount_amount: '0',
-            additional_discount_enabled: false,
-            additional_discount: '0',
+            selected_price: existingSpec
+                ? existingSpec.selected_price
+                : defaultPrice,
+            quantity: existingSpec ? existingSpec.quantity : 1,
+            age_discount_type: existingSpec
+                ? existingSpec.age_discount_type
+                : null,
+            age_discount_amount: existingSpec
+                ? existingSpec.age_discount_amount
+                : '0',
+            additional_discount_enabled: existingSpec
+                ? existingSpec.additional_discount_enabled
+                : false,
+            additional_discount: existingSpec
+                ? existingSpec.additional_discount
+                : '0',
         };
 
         if (nestedSpecimenToEditId) {
@@ -634,6 +650,18 @@ export default function SpecimenGroupSheet({
             prev.map((s) => {
                 if (s.client_id === clientId) {
                     return { ...s, selected_price: price };
+                }
+
+                return s;
+            }),
+        );
+    };
+
+    const handleSpecimenQuantityChange = (clientId: string, qty: number) => {
+        setSpecimens((prev) =>
+            prev.map((s) => {
+                if (s.client_id === clientId) {
+                    return { ...s, quantity: qty };
                 }
 
                 return s;
@@ -709,6 +737,7 @@ export default function SpecimenGroupSheet({
     // Global Totals calculations
     const specimensBaseTotal = useMemo(() => {
         return specimens.reduce((sum, s) => {
+            const qty = s.quantity ?? 1;
             const prices =
                 specimenTypes.find((t) => t.id === s.specimen_type)?.prices ||
                 [];
@@ -719,12 +748,13 @@ export default function SpecimenGroupSheet({
                       )
                     : 0;
 
-            return sum + maxVal;
+            return sum + maxVal * qty;
         }, 0);
     }, [specimens, specimenTypes]);
 
     const specimensAutoDiscount = useMemo(() => {
         return specimens.reduce((sum, s) => {
+            const qty = s.quantity ?? 1;
             const prices =
                 specimenTypes.find((t) => t.id === s.specimen_type)?.prices ||
                 [];
@@ -738,17 +768,18 @@ export default function SpecimenGroupSheet({
             const diff = Math.max(0, maxVal - chosen);
             const ageDisc = parseFloat(s.age_discount_amount) || 0;
 
-            return sum + diff + ageDisc;
+            return sum + (diff + ageDisc) * qty;
         }, 0);
     }, [specimens, specimenTypes]);
 
     const specimensAdditionalDiscount = useMemo(() => {
         return specimens.reduce((sum, s) => {
+            const qty = s.quantity ?? 1;
             const addDisc = s.additional_discount_enabled
                 ? parseFloat(s.additional_discount) || 0
                 : 0;
 
-            return sum + addDisc;
+            return sum + addDisc * qty;
         }, 0);
     }, [specimens]);
 
@@ -761,22 +792,11 @@ export default function SpecimenGroupSheet({
     }, [specimensAutoDiscount, specimensAdditionalDiscount]);
 
     const finalSubtotalVal = useMemo(() => {
-        const base = specimens.reduce((sum, s) => {
-            const prices =
-                specimenTypes.find((t) => t.id === s.specimen_type)?.prices ||
-                [];
-            const maxVal =
-                prices.length > 0
-                    ? Math.max(
-                          ...prices.map((p: any) => parseFloat(p.amount) || 0),
-                      )
-                    : 0;
-
-            return sum + maxVal;
-        }, 0);
-
-        return Math.max(0, base + customAmountVal - globalDiscountTotal);
-    }, [specimens, specimenTypes, customAmountVal, globalDiscountTotal]);
+        return Math.max(
+            0,
+            specimensBaseTotal + customAmountVal - globalDiscountTotal,
+        );
+    }, [specimensBaseTotal, customAmountVal, globalDiscountTotal]);
 
     const estimatedCodes = useMemo(() => {
         const typeOffsets: Record<number, number> = {};
@@ -1191,6 +1211,7 @@ export default function SpecimenGroupSheet({
                 status: s.status,
                 priority_id: s.priority_id,
                 selected_price: s.selected_price,
+                quantity: s.quantity ?? 1,
                 age_discount_type: s.age_discount_type,
                 age_discount_amount: s.age_discount_amount,
                 additional_discount_enabled: s.additional_discount_enabled,
@@ -1676,12 +1697,14 @@ export default function SpecimenGroupSheet({
                                                           spec.additional_discount,
                                                       ) || 0
                                                     : 0;
+                                            const qty = spec.quantity ?? 1;
                                             const specimenSubtotal = Math.max(
                                                 0,
-                                                maxVal -
+                                                (maxVal -
                                                     (diffDiscount +
                                                         ageDiscVal +
-                                                        addDiscVal),
+                                                        addDiscVal)) *
+                                                    qty,
                                             );
 
                                             return (
@@ -1694,6 +1717,10 @@ export default function SpecimenGroupSheet({
                                                             <div className="text-sm font-bold text-foreground">
                                                                 Muestra #
                                                                 {specIdx + 1} -{' '}
+                                                                {
+                                                                    spec.specimen_type_name
+                                                                }{' '}
+                                                                -{' '}
                                                                 {
                                                                     spec.specimen_type_examination_name
                                                                 }
@@ -1718,7 +1745,7 @@ export default function SpecimenGroupSheet({
                                                         </Badge>
                                                     </CardHeader>
                                                     <CardContent className="space-y-4 p-4">
-                                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                                             <div className="grid gap-2">
                                                                 <Label className="text-xs font-semibold">
                                                                     Seleccionar
@@ -1738,7 +1765,7 @@ export default function SpecimenGroupSheet({
                                                                     }
                                                                 >
                                                                     <SelectTrigger className="h-9">
-                                                                        <SelectValue placeholder="Seleccione un precio" />
+                                                                        <SelectValue placeholder="Seleccione un price" />
                                                                     </SelectTrigger>
                                                                     <SelectContent className="z-[110]">
                                                                         {prices.map(
@@ -1766,6 +1793,24 @@ export default function SpecimenGroupSheet({
 
                                                             <div className="grid gap-2">
                                                                 <Label className="text-xs font-semibold">
+                                                                    Cantidad
+                                                                </Label>
+                                                                <NumberPicker
+                                                                    value={qty}
+                                                                    onChange={(
+                                                                        val,
+                                                                    ) =>
+                                                                        handleSpecimenQuantityChange(
+                                                                            spec.client_id,
+                                                                            val,
+                                                                        )
+                                                                    }
+                                                                    min={1}
+                                                                />
+                                                            </div>
+
+                                                            <div className="grid gap-2">
+                                                                <Label className="text-xs font-semibold">
                                                                     Descuento
                                                                     Estimado
                                                                     (L.)
@@ -1773,9 +1818,10 @@ export default function SpecimenGroupSheet({
                                                                 <Input
                                                                     type="number"
                                                                     value={(
-                                                                        diffDiscount +
-                                                                        ageDiscVal +
-                                                                        addDiscVal
+                                                                        (diffDiscount +
+                                                                            ageDiscVal +
+                                                                            addDiscVal) *
+                                                                        qty
                                                                     ).toFixed(
                                                                         2,
                                                                     )}

@@ -123,6 +123,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimens/{specimen:sequence_code}/report-editor/update-date', [ReportEditorController::class, 'updateDate'])->name('specimens.report-editor.update-date');
     Route::post('specimens/{specimen:sequence_code}/report-editor/transition-state', [ReportEditorController::class, 'transitionState'])->name('specimens.report-editor.transition-state');
     Route::post('specimens/{specimen:sequence_code}/report-editor/upload-image', [ReportEditorController::class, 'uploadImage'])->name('specimens.report-editor.upload-image');
+    Route::post('specimens/{specimen:sequence_code}/report-editor/update-products', [ReportEditorController::class, 'updateProducts'])->name('specimens.report-editor.update-products');
     Route::get('specimens/{specimen:sequence_code}/report-editor/pdf', [ReportEditorController::class, 'downloadPdf'])->name('specimens.report-editor.pdf');
 
     Route::resource('specimens', SpecimenController::class);

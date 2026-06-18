@@ -448,26 +448,65 @@
                         $specimensList = [];
                         if (isset($groupSpecimens)) {
                             $specimensList = $groupSpecimens;
+                        } elseif ($invoice->is_group && $invoice->groupSpecimens && $invoice->groupSpecimens->isNotEmpty()) {
+                            foreach ($invoice->groupSpecimens as $groupSpecimen) {
+                                $specimen = $groupSpecimen->specimen;
+                                $qty = (int) ($groupSpecimen->quantity ?? 1);
+                                if ($qty <= 0) {
+                                    $qty = 1;
+                                }
+                                $totalPrice = (float) $groupSpecimen->amount;
+                                $totalDiscount = (float) $groupSpecimen->discount;
+                                
+                                $typeName = $specimen->type->name ?? '';
+                                $examName = $specimen->examination->name ?? 'Examen';
+                                $combinedName = $typeName ? $typeName . ' - ' . $examName : $examName;
+
+                                $specimensList[] = [
+                                    'sequence_code' => $specimen->sequence_code ?? '',
+                                    'exam_name' => $combinedName,
+                                    'patient_name' => $specimen->customerRelation->name ?? 'Paciente',
+                                    'price' => $totalPrice,
+                                    'discount' => $totalDiscount,
+                                    'age_discount_type' => null,
+                                    'age_discount_amount' => 0.00,
+                                    'quantity' => $qty,
+                                ];
+                            }
                         } elseif ($invoice->is_group && $invoice->specimenGroup) {
                             foreach ($invoice->specimenGroup->specimens as $specimen) {
                                 $price = 0.00;
                                 if ($specimen->type && $specimen->type->prices->isNotEmpty()) {
                                     $price = (float)$specimen->type->prices->first()->amount;
                                 }
+                                $typeName = $specimen->type->name ?? '';
+                                $examName = $specimen->examination->name ?? 'Examen';
+                                $combinedName = $typeName ? $typeName . ' - ' . $examName : $examName;
+
                                 $specimensList[] = [
                                     'sequence_code' => $specimen->sequence_code,
-                                    'exam_name' => $specimen->examination->name ?? 'Examen',
+                                    'exam_name' => $combinedName,
                                     'patient_name' => $specimen->customerRelation->name ?? 'Paciente',
                                     'price' => $price,
                                     'discount' => 0.00,
                                     'age_discount_type' => null,
                                     'age_discount_amount' => 0.00,
+                                    'quantity' => 1,
                                 ];
                             }
                         }
                         $rowNum = 1;
                     @endphp
                     @foreach($specimensList as $spec)
+                        @php
+                            $qty = (int) ($spec['quantity'] ?? 1);
+                            if ($qty <= 0) {
+                                $qty = 1;
+                            }
+                            $rowPrice = (float) $spec['price'];
+                            $rowDiscount = (float) $spec['discount'];
+                            $rowTotal = ($rowPrice - $rowDiscount) * $qty;
+                        @endphp
                         <tr>
                             <td>{{ $rowNum++ }}</td>
                             <td>
@@ -481,10 +520,10 @@
                                     </div>
                                 @endif
                             </td>
-                            <td>1</td>
-                            <td class="text-right">L. {{ number_format($spec['price'], 2) }}</td>
-                            <td class="text-right">L. {{ number_format($spec['discount'], 2) }}</td>
-                            <td class="text-right">L. {{ number_format($spec['price'] - $spec['discount'], 2) }}</td>
+                            <td>{{ $qty }}</td>
+                            <td class="text-right">L. {{ number_format($rowPrice, 2) }}</td>
+                            <td class="text-right">L. {{ number_format($rowDiscount, 2) }}</td>
+                            <td class="text-right">L. {{ number_format($rowTotal, 2) }}</td>
                         </tr>
                     @endforeach
                     @if((float)($invoice->custom_amount ?? 0) > 0)
@@ -504,13 +543,23 @@
                     @endif
                 @else
                     @php
-                        $baseExamPrice = (float)$invoice->amount - (float)($invoice->custom_amount ?? 0);
+                        $qty = (int) ($invoice->quantity ?? 1);
+                        if ($qty <= 0) {
+                            $qty = 1;
+                        }
+                        $unitBaseExamPrice = (float)$invoice->amount;
+                        $unitDiscount = (float)$invoice->discount / $qty;
                         $rowNum = 2;
                     @endphp
                     <tr>
                         <td>1</td>
                         <td>
-                            <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">{{ $examination->name }}</div>
+                            <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">
+                                @if($invoice->specimen && $invoice->specimen->type)
+                                    {{ $invoice->specimen->type->name }} - 
+                                @endif
+                                {{ $examination->name }}
+                            </div>
                             <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
                                 Paciente: {{ $customer->name }}
                                 @if($invoice->specimen && $invoice->specimen->sequence_code)
@@ -523,10 +572,10 @@
                                 </div>
                             @endif
                         </td>
-                        <td>1</td>
-                        <td class="text-right">L. {{ number_format($baseExamPrice, 2) }}</td>
-                        <td class="text-right">L. {{ number_format($invoice->discount, 2) }}</td>
-                        <td class="text-right">L. {{ number_format($baseExamPrice - (float)$invoice->discount, 2) }}</td>
+                        <td>{{ $qty }}</td>
+                        <td class="text-right">L. {{ number_format($unitBaseExamPrice, 2) }}</td>
+                        <td class="text-right">L. {{ number_format($unitDiscount, 2) }}</td>
+                        <td class="text-right">L. {{ number_format(($unitBaseExamPrice - $unitDiscount) * $qty, 2) }}</td>
                     </tr>
                     @if((float)($invoice->custom_amount ?? 0) > 0)
                     <tr>

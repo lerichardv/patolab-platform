@@ -1,3 +1,4 @@
+import { usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import HeadingSheet from '@/components/heading-sheet';
 import {
@@ -19,6 +20,8 @@ interface Props {
     onOpenChange: (open: boolean) => void;
     customers: any[];
     banks: any[];
+    specimenTypes?: any[];
+    settings?: Record<string, string>;
 }
 
 export default function InvoiceSheet({
@@ -27,7 +30,14 @@ export default function InvoiceSheet({
     onOpenChange,
     customers,
     banks,
+    specimenTypes,
+    settings,
 }: Props) {
+    const { specimenTypes: pageSpecimenTypes, settings: pageSettings } =
+        usePage<any>().props;
+    const finalSpecimenTypes = specimenTypes || pageSpecimenTypes || [];
+    const finalSettings = settings || pageSettings || {};
+
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
@@ -72,6 +82,8 @@ export default function InvoiceSheet({
                             invoice={invoice}
                             customers={customers}
                             banks={banks}
+                            specimenTypes={finalSpecimenTypes}
+                            settings={finalSettings}
                             onSuccess={() => onOpenChange(false)}
                             setIsDirty={setIsFormDirty}
                         />

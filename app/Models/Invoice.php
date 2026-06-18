@@ -22,6 +22,7 @@ class Invoice extends Model
         'specimen_id',
         'payment_type',
         'credit_payment_id',
+        'quantity',
         'amount',
         'discount',
         'subtotal',
@@ -77,6 +78,7 @@ class Invoice extends Model
         'card_value_charged' => 'decimal:2',
         'transfer_value' => 'decimal:2',
         'is_group' => 'boolean',
+        'quantity' => 'integer',
     ];
 
     public function caiRange(): BelongsTo

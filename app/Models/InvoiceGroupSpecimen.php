@@ -23,6 +23,8 @@ class InvoiceGroupSpecimen extends Model
         'invoice_id',
         'group_id',
         'specimen_id',
+        'quantity',
+        'amount',
         'discount',
         'subtotal',
         'exempt_amount',
@@ -42,6 +44,8 @@ class InvoiceGroupSpecimen extends Model
         'isv_15' => 'decimal:2',
         'isv_18' => 'decimal:2',
         'total' => 'decimal:2',
+        'quantity' => 'integer',
+        'amount' => 'decimal:2',
     ];
 
     /**

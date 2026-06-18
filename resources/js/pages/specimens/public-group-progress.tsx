@@ -386,6 +386,9 @@ export default function PublicGroupProgress({ group }: Props) {
                                                                         step,
                                                                         idx,
                                                                     ) => {
+                                                                        const isDelivered =
+                                                                            specimen.status ===
+                                                                            'delivered';
                                                                         const currentStepIndex =
                                                                             STATUS_STEPS.findIndex(
                                                                                 (
@@ -395,11 +398,15 @@ export default function PublicGroupProgress({ group }: Props) {
                                                                                     specimen.status,
                                                                             );
                                                                         const isPastStep =
-                                                                            idx <
-                                                                            currentStepIndex;
+                                                                            isDelivered
+                                                                                ? true
+                                                                                : idx <
+                                                                                  currentStepIndex;
                                                                         const isCurrentStep =
-                                                                            idx ===
-                                                                            currentStepIndex;
+                                                                            isDelivered
+                                                                                ? false
+                                                                                : idx ===
+                                                                                  currentStepIndex;
 
                                                                         return (
                                                                             <div

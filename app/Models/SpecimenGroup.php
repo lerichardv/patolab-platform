@@ -20,6 +20,7 @@ class SpecimenGroup extends Model
         'invoice_id',
         'customer_id',
         'access_token',
+        'delivery_token',
     ];
 
     protected static function booted()

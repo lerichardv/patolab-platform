@@ -142,6 +142,7 @@ class SpecimenController extends Controller
                     }
                 },
             ],
+            'quantity' => 'required|integer|min:1',
             'amount' => 'required|numeric|min:0',
             'discount' => 'required|numeric|min:0',
             'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
@@ -232,6 +233,7 @@ class SpecimenController extends Controller
 
             $specimenData = $validated;
             unset(
+                $specimenData['quantity'],
                 $specimenData['amount'],
                 $specimenData['discount'],
                 $specimenData['payment_type'],
@@ -260,6 +262,7 @@ class SpecimenController extends Controller
 
             $specimenData['sequence_code'] = $sequenceCode;
             $specimenData['access_token'] = Str::random(32);
+            $specimenData['delivery_token'] = Str::random(32);
 
             $specimen = Specimen::create($specimenData);
 
@@ -373,6 +376,10 @@ class SpecimenController extends Controller
 
             $totalPaid = in_array($validated['payment_type'], ['cash', 'credit card', 'bank transfer', 'check']) ? $subtotal : $initialPaymentAmount;
 
+            $qty = (int) ($validated['quantity'] ?? 1);
+            $basePriceTotal = $amount - $customAmountVal;
+            $unitPrice = $qty > 0 ? ($basePriceTotal / $qty) : $basePriceTotal;
+
             $invoice = Invoice::create([
                 'full_invoice_number' => $fullInvoiceNumber,
                 'invoice_number' => $invoiceNumber,
@@ -381,7 +388,8 @@ class SpecimenController extends Controller
                 'specimen_id' => $specimen->id,
                 'payment_type' => $validated['payment_type'],
                 'credit_payment_id' => $creditId,
-                'amount' => $amount,
+                'quantity' => $qty,
+                'amount' => $unitPrice,
                 'discount' => $discount,
                 'subtotal' => $subtotal,
                 'exempt_amount' => 0.00,
@@ -416,7 +424,7 @@ class SpecimenController extends Controller
                 $caiRange->update(['status' => 'exhausted']);
             }
 
-            $invoice->load(['specimen.products', 'creditRelation']);
+            $invoice->load(['specimen.products', 'creditRelation', 'specimen.type']);
             $totalWords = $this->numberToSpanishWords($invoice->total);
             $customer = Customer::findOrFail($specimen->customer);
             $examination = SpecimenTypeExamination::findOrFail($specimen->specimen_type_examination);
@@ -785,13 +793,22 @@ class SpecimenController extends Controller
                     );
                 }
             } elseif ($action === 'assign_pathologist') {
+                $macroscopy = request()->boolean('macroscopy_access', true);
+                $microscopy = request()->boolean('microscopy_access', true);
                 foreach ($ids as $id) {
                     $specimen = Specimen::find($id);
-                    if ($specimen && ! $specimen->users()->where('user_id', $value)->exists()) {
-                        $specimen->users()->attach($value, [
-                            'macroscopy_access' => true,
-                            'microscopy_access' => true,
-                        ]);
+                    if ($specimen) {
+                        if ($specimen->users()->where('user_id', $value)->exists()) {
+                            $specimen->users()->updateExistingPivot($value, [
+                                'macroscopy_access' => $macroscopy,
+                                'microscopy_access' => $microscopy,
+                            ]);
+                        } else {
+                            $specimen->users()->attach($value, [
+                                'macroscopy_access' => $macroscopy,
+                                'microscopy_access' => $microscopy,
+                            ]);
+                        }
                     }
                 }
             } elseif ($action === 'unassign_pathologist') {
@@ -832,8 +849,19 @@ class SpecimenController extends Controller
             abort(404, 'Muestra no encontrada.');
         }
 
+        $justDelivered = false;
+        $deliveryToken = $request->query('delivery_token') ?? $request->input('delivery_token');
+        if ($deliveryToken && $specimen->delivery_token === $deliveryToken) {
+            if ($specimen->status === 'finalized') {
+                $specimen->update(['status' => 'delivered']);
+                $specimen->refresh();
+                $justDelivered = true;
+            }
+        }
+
         return Inertia::render('specimens/public-progress', [
             'specimen' => $specimen,
+            'just_delivered' => $justDelivered,
         ]);
     }
 }

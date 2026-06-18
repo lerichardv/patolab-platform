@@ -310,10 +310,14 @@ export default function PublicProgress({ specimen }: Props) {
 
                                 <div className="relative space-y-8 pl-6 before:absolute before:top-2 before:bottom-2 before:left-[11px] before:w-[2px] before:bg-border/60 md:pl-8">
                                     {STATUS_STEPS.map((step, idx) => {
-                                        const isPastStep =
-                                            idx < currentStepIndex;
-                                        const isCurrentStep =
-                                            idx === currentStepIndex;
+                                        const isDelivered =
+                                            specimen.status === 'delivered';
+                                        const isPastStep = isDelivered
+                                            ? true
+                                            : idx < currentStepIndex;
+                                        const isCurrentStep = isDelivered
+                                            ? false
+                                            : idx === currentStepIndex;
 
                                         return (
                                             <div

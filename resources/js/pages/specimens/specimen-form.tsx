@@ -17,6 +17,7 @@ import {
     Calendar,
 } from 'lucide-react';
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import {
     store as storeSpecimen,
@@ -44,6 +45,7 @@ import {
 } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPicker } from '@/components/ui/number-picker';
 import {
     Popover,
     PopoverContent,
@@ -588,6 +590,7 @@ export default function SpecimenForm({
         medical_order_file: null as File | null,
 
         // Billing fields (creation only)
+        quantity: 1,
         amount: '',
         selected_price: '',
         custom_amount_enabled: false,
@@ -916,9 +919,11 @@ export default function SpecimenForm({
                         'El descuento adicional debe ser mayor o igual a 0.';
                 } else if (
                     addDiscount >
-                    maxSpecimenPriceVal + customAmountVal - autoDiscountTotal
+                    maxSpecimenPriceVal * quantityVal +
+                        customAmountVal -
+                        autoDiscountTotal
                 ) {
-                    localErrors.additional_discount = `El descuento adicional no puede superar el subtotal (L. ${(maxSpecimenPriceVal + customAmountVal - autoDiscountTotal).toFixed(2)}).`;
+                    localErrors.additional_discount = `El descuento adicional no puede superar el subtotal (L. ${(maxSpecimenPriceVal * quantityVal + customAmountVal - autoDiscountTotal).toFixed(2)}).`;
                 }
             }
         }
@@ -1065,20 +1070,22 @@ export default function SpecimenForm({
     const thirdAgePercent = parseFloat(settings?.third_age_discount || '30');
     const fourthAgePercent = parseFloat(settings?.fourth_age_discount || '40');
 
+    const quantityVal = data.quantity ?? 1;
+
     // Discounts
     const specimenDiscountVal = React.useMemo(() => {
         const selected = parseFloat(data.selected_price) || 0;
 
-        return Math.max(0, maxSpecimenPriceVal - selected);
-    }, [maxSpecimenPriceVal, data.selected_price]);
+        return Math.max(0, maxSpecimenPriceVal - selected) * quantityVal;
+    }, [maxSpecimenPriceVal, data.selected_price, quantityVal]);
 
     const ageDiscountVal = React.useMemo(() => {
         const selected = parseFloat(data.selected_price) || 0;
 
         if (data.age_discount_type === 'third') {
-            return (selected * thirdAgePercent) / 100;
+            return ((selected * thirdAgePercent) / 100) * quantityVal;
         } else if (data.age_discount_type === 'fourth') {
-            return (selected * fourthAgePercent) / 100;
+            return ((selected * fourthAgePercent) / 100) * quantityVal;
         }
 
         return 0;
@@ -1087,6 +1094,7 @@ export default function SpecimenForm({
         data.age_discount_type,
         thirdAgePercent,
         fourthAgePercent,
+        quantityVal,
     ]);
 
     const autoDiscountTotal = specimenDiscountVal + ageDiscountVal;
@@ -1101,12 +1109,17 @@ export default function SpecimenForm({
         const extra = data.custom_amount_enabled
             ? parseFloat(data.custom_amount) || 0
             : 0;
-        const amountToSet = maxSpecimenPriceVal + extra;
+        const amountToSet = maxSpecimenPriceVal * quantityVal + extra;
 
         if (data.amount !== amountToSet.toString()) {
             setData('amount', amountToSet.toString());
         }
-    }, [maxSpecimenPriceVal, data.custom_amount_enabled, data.custom_amount]);
+    }, [
+        maxSpecimenPriceVal,
+        quantityVal,
+        data.custom_amount_enabled,
+        data.custom_amount,
+    ]);
 
     React.useEffect(() => {
         const additionalDiscountVal = data.additional_discount_enabled
@@ -1141,7 +1154,7 @@ export default function SpecimenForm({
     const discountVal = parseFloat(data.discount) || 0;
     const subtotalVal = Math.max(
         0,
-        maxSpecimenPriceVal +
+        maxSpecimenPriceVal * quantityVal +
             customAmountVal -
             (autoDiscountTotal + additionalDiscountVal),
     );
@@ -1590,21 +1603,24 @@ export default function SpecimenForm({
 
     return (
         <>
-            {isFacturating && (
-                <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm">
-                    <Spinner className="h-12 w-12 text-primary" />
-                    <div className="flex flex-col items-center text-center">
-                        <h3 className="text-lg font-bold text-foreground">
-                            Procesando Factura
-                        </h3>
-                        <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-                            Estamos registrando la muestra, aplicando el rango
-                            CAI y generando el PDF de la factura. Por favor,
-                            espere.
-                        </p>
-                    </div>
-                </div>
-            )}
+            {isFacturating &&
+                typeof window !== 'undefined' &&
+                createPortal(
+                    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm">
+                        <Spinner className="h-12 w-12 text-primary" />
+                        <div className="flex flex-col items-center text-center">
+                            <h3 className="text-lg font-bold text-foreground">
+                                Procesando Factura
+                            </h3>
+                            <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+                                Estamos registrando la muestra, aplicando el
+                                rango CAI y generando el PDF de la factura. Por
+                                favor, espere.
+                            </p>
+                        </div>
+                    </div>,
+                    document.body,
+                )}
 
             <form
                 ref={formRef}
@@ -2796,7 +2812,7 @@ export default function SpecimenForm({
                             <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
                                 {/* Left Column: Fields */}
                                 <div className="flex flex-col gap-5 lg:col-span-8">
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                         <div className="grid gap-2">
                                             <div className="flex flex-col gap-0.5">
                                                 <Label htmlFor="selected_price">
@@ -2805,14 +2821,6 @@ export default function SpecimenForm({
                                                         *
                                                     </span>
                                                 </Label>
-                                                <span className="text-[11px] text-muted-foreground">
-                                                    Precios de la categoría de
-                                                    muestra:{' '}
-                                                    <strong className="text-foreground">
-                                                        {selectedType?.name ||
-                                                            'Sin seleccionar'}
-                                                    </strong>
-                                                </span>
                                             </div>
                                             <Select
                                                 value={data.selected_price}
@@ -2861,11 +2869,43 @@ export default function SpecimenForm({
                                                     )}
                                                 </SelectContent>
                                             </Select>
+
+                                            <span className="text-[11px] text-muted-foreground">
+                                                <strong className="text-foreground">
+                                                    {selectedType?.name ||
+                                                        'Sin seleccionar'}
+                                                    {selectedExaminationLabel &&
+                                                    selectedExaminationLabel !==
+                                                        'Sin seleccionar'
+                                                        ? ` - ${selectedExaminationLabel}`
+                                                        : ''}
+                                                </strong>
+                                            </span>
                                             {errors.amount && (
                                                 <p className="text-sm text-destructive">
                                                     {errors.amount}
                                                 </p>
                                             )}
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="quantity">
+                                                Cantidad{' '}
+                                                <span className="text-destructive">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <NumberPicker
+                                                value={data.quantity}
+                                                onChange={(val) =>
+                                                    setData('quantity', val)
+                                                }
+                                                min={1}
+                                                className="flex items-start"
+                                            />
+                                            <p className="text-[10px] text-muted-foreground">
+                                                Número de muestras a procesar.
+                                            </p>
                                         </div>
 
                                         <div className="grid gap-2">

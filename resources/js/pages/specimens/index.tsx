@@ -577,7 +577,11 @@ export default function SpecimensIndex({
         const specimenParam = urlParams.get('specimen');
         const action = urlParams.get('action');
 
-        if (specimenParam && (action === 'view' || action === 'edit') && priorities.length > 0) {
+        if (
+            specimenParam &&
+            (action === 'view' || action === 'edit') &&
+            priorities.length > 0
+        ) {
             let found: Specimen | null = null;
 
             for (const p of priorities) {

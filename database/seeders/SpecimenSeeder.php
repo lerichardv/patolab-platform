@@ -12,6 +12,7 @@ use App\Models\SpecimenCategory;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class SpecimenSeeder extends Seeder
 {
@@ -120,6 +121,8 @@ class SpecimenSeeder extends Seeder
                 'status' => $statuses[array_rand($statuses)],
                 'priority_id' => $priority->id,
                 'active' => true,
+                'access_token' => Str::random(32),
+                'delivery_token' => Str::random(32),
             ]);
 
             // Save the exact past timestamp

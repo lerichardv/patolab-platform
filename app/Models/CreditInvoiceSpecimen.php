@@ -30,6 +30,7 @@ class CreditInvoiceSpecimen extends Model
         'invoice_id',
         'specimen_id',
         'is_paid',
+        'quantity',
         'amount',
         'discount',
         'subtotal',
@@ -39,10 +40,12 @@ class CreditInvoiceSpecimen extends Model
         'isv_15',
         'isv_18',
         'total',
+        'quantity_paid',
     ];
 
     protected $casts = [
         'is_paid' => 'boolean',
+        'quantity' => 'integer',
         'amount' => 'decimal:2',
         'discount' => 'decimal:2',
         'subtotal' => 'decimal:2',
@@ -52,6 +55,7 @@ class CreditInvoiceSpecimen extends Model
         'isv_15' => 'decimal:2',
         'isv_18' => 'decimal:2',
         'total' => 'decimal:2',
+        'quantity_paid' => 'integer',
     ];
 
     /**

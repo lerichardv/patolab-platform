@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Editor;
 
 use App\Http\Controllers\Controller;
+use App\Models\Inventory;
+use App\Models\InventoryMovement;
 use App\Models\InvoiceGroupSpecimen;
+use App\Models\Product;
 use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenReport;
@@ -13,8 +16,10 @@ use App\Models\UserCommission;
 use App\Models\UserCommissionRule;
 use App\Services\ImageOptimizerService;
 use App\Services\ReportPaginator;
+use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Spatie\Browsershot\Browsershot;
@@ -162,6 +167,7 @@ class ReportEditorController extends Controller
             'invoiceRelation.caiRange',
             'invoiceRelation.creditRelation',
             'invoiceRelation.transferBank',
+            'products.prices',
         ]);
 
         $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
@@ -169,6 +175,16 @@ class ReportEditorController extends Controller
         if ($pathologistRoleId) {
             $pathologists = User::where('active', true)->where('role_id', $pathologistRoleId)->get();
         }
+
+        $products = Product::where('active', true)
+            ->whereHas('inventory', function ($q) {
+                $q->where('active', true);
+            })
+            ->withSum(['inventory as total_stock' => function ($q) {
+                $q->where('active', true);
+            }], 'quantity')
+            ->with('prices')
+            ->get();
 
         return Inertia::render('specimens/report-editor', [
             'specimen' => $specimen,
@@ -181,6 +197,7 @@ class ReportEditorController extends Controller
                 ],
             ],
             'pathologists' => $pathologists,
+            'products' => $products,
         ]);
     }
 
@@ -356,6 +373,40 @@ class ReportEditorController extends Controller
 
             if ($status === 'finalized') {
                 $this->calculateCommissions($specimen);
+
+                // Enviar notificación de WhatsApp al paciente
+                try {
+                    $customer = $specimen->customerRelation;
+                    if ($customer) {
+                        $link = route('specimens.show-public', [
+                            'specimen_code' => $specimen->sequence_code,
+                            'token' => $specimen->access_token,
+                            'delivery_token' => $specimen->delivery_token,
+                        ]);
+                        $patientName = $customer->name;
+                        $message = "Hola, {$patientName}. El reporte de su muestra con código {$specimen->sequence_code} ha sido finalizado. Puede ver el progreso y descargar su reporte en el siguiente enlace: {$link}";
+
+                        $phone = $customer->phone;
+                        $cleanPhone = preg_replace('/\D/', '', $phone);
+                        if (strlen($cleanPhone) === 8) {
+                            $cleanPhone = '504'.$cleanPhone;
+                        }
+
+                        // All messages will be sent to +504 3366-6885 while testing
+                        if (config('app.env') !== 'production') {
+                            $cleanPhone = '50433666885';
+                        }
+
+                        if (! empty($cleanPhone)) {
+                            $whatsapp = app(WhatsAppService::class);
+                            $whatsapp->sendText($cleanPhone, $message);
+                        }
+
+                        Log::info('WhatsApp de finalización de reporte enviado: '.$message);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Error enviando notificación de WhatsApp de finalización: '.$e->getMessage());
+                }
             }
         });
 
@@ -610,6 +661,166 @@ class ReportEditorController extends Controller
 
         return response()->json([
             'url' => Storage::disk('public')->url($path),
+        ]);
+    }
+
+    /**
+     * Update the list of insumos (products) for the specimen.
+     */
+    public function updateProducts(Request $request, Specimen $specimen)
+    {
+        $request->validate([
+            'insumos' => 'nullable|array',
+            'insumos.*.id' => 'required|exists:products,id',
+            'insumos.*.quantity' => 'required|integer|min:1',
+            'insumos.*.price' => 'required|numeric|min:0',
+        ]);
+
+        $assignment = DB::table('specimen_user')
+            ->where('specimen_id', $specimen->id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        $hasMacroAccess = $assignment ? (bool) $assignment->macroscopy_access : false;
+        $hasMicroAccess = $assignment ? (bool) $assignment->microscopy_access : false;
+
+        if (! $hasMacroAccess && ! $hasMicroAccess) {
+            return redirect()->back()->with('error', 'No tienes permisos de edición para esta muestra.');
+        }
+
+        try {
+            DB::transaction(function () use ($request, $specimen) {
+                // 1. Get current products on this specimen
+                $oldInsumos = $specimen->products()->withPivot(['quantity', 'price'])->get()->keyBy('id');
+                $newInsumos = collect($request->input('insumos', []))->keyBy('id');
+
+                // 2. Identify and restore stock for deleted/decreased insumos
+                foreach ($oldInsumos as $id => $oldInsumo) {
+                    $oldQty = $oldInsumo->pivot->quantity;
+                    if (! $newInsumos->has($id)) {
+                        $this->restoreStock($oldInsumo, $oldQty);
+                    } else {
+                        $newQty = $newInsumos->get($id)['quantity'];
+                        if ($newQty < $oldQty) {
+                            $this->restoreStock($oldInsumo, $oldQty - $newQty);
+                        }
+                    }
+                }
+
+                // 3. Identify and deduct stock for added/increased insumos
+                foreach ($newInsumos as $id => $newInsumo) {
+                    $newQty = $newInsumo['quantity'];
+                    $oldQty = $oldInsumos->has($id) ? $oldInsumos->get($id)->pivot->quantity : 0;
+
+                    if ($newQty > $oldQty) {
+                        $diff = $newQty - $oldQty;
+                        $this->deductStock($id, $diff);
+                    }
+                }
+
+                // 4. Sync the specimen products relationship in DB
+                $syncData = [];
+                foreach ($newInsumos as $id => $insumo) {
+                    $syncData[$id] = [
+                        'quantity' => $insumo['quantity'],
+                        'price' => $insumo['price'],
+                    ];
+                }
+                $specimen->products()->sync($syncData);
+            });
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Insumos actualizados con éxito.');
+    }
+
+    /**
+     * Restore stock for a product when removed/decreased.
+     */
+    private function restoreStock($product, $qty)
+    {
+        $inventory = Inventory::where('product', $product->id)
+            ->where('active', true)
+            ->orderBy('id', 'asc')
+            ->first();
+
+        if ($inventory) {
+            $before = $inventory->quantity;
+            $inventory->quantity += $qty;
+            $inventory->save();
+
+            InventoryMovement::create([
+                'inventory_name' => $product->name,
+                'inventory' => $inventory->id,
+                'storage_name' => $inventory->storageRelation->name ?? 'Bodega Principal',
+                'storage' => $inventory->storage,
+                'quantity_added' => $qty,
+                'quantity_before_update' => $before,
+                'quantity_after_update' => $inventory->quantity,
+                'movement' => 'added',
+                'user_id' => auth()->id() ?? 1,
+            ]);
+        }
+    }
+
+    /**
+     * Deduct stock for a product when added/increased.
+     */
+    private function deductStock($productId, $qty)
+    {
+        $remaining = $qty;
+        $inventories = Inventory::where('product', $productId)
+            ->where('active', true)
+            ->where('quantity', '>', 0)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $totalAvailableStock = $inventories->sum('quantity');
+
+        if ($totalAvailableStock < $remaining) {
+            $product = Product::find($productId);
+            throw new \Exception('Stock insuficiente para el insumo: '.($product ? $product->name : 'ID '.$productId).". Requerido: {$remaining}, Disponible: {$totalAvailableStock}.");
+        }
+
+        foreach ($inventories as $inv) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $before = $inv->quantity;
+            if ($inv->quantity >= $remaining) {
+                $inv->quantity -= $remaining;
+                $inv->save();
+
+                $this->logInventoryMovement($inv, -$remaining, $before, $inv->quantity);
+                $remaining = 0;
+            } else {
+                $subtracted = $inv->quantity;
+                $remaining -= $subtracted;
+                $inv->quantity = 0;
+                $inv->save();
+
+                $this->logInventoryMovement($inv, -$subtracted, $before, 0);
+            }
+        }
+    }
+
+    /**
+     * Log inventory movement.
+     */
+    private function logInventoryMovement(Inventory $inventory, $quantityAdded, $before, $after)
+    {
+        InventoryMovement::create([
+            'inventory_name' => $inventory->productRelation->name,
+            'inventory' => $inventory->id,
+            'storage_name' => $inventory->storageRelation->name ?? 'Bodega Principal',
+            'storage' => $inventory->storage,
+            'quantity_added' => $quantityAdded,
+            'quantity_before_update' => $before,
+            'quantity_after_update' => $after,
+            'movement' => 'removed',
+            'user_id' => auth()->id() ?? 1,
         ]);
     }
 }

@@ -428,7 +428,10 @@
                                 ->where('credit_id', $credit->id)
                                 ->where('specimen_id', $spec->id)
                                 ->first();
-                            $specTotal = $detail ? (float)$detail->total : 0.00;
+                            $paidQty = isset($paidSpecimensData[$spec->id]) ? (int)$paidSpecimensData[$spec->id] : ($detail ? $detail->quantity : 1);
+                            $unitPrice = $detail ? (float)$detail->amount : 0.00;
+                            $unitDiscount = $detail ? (float)$detail->discount : 0.00;
+                            $specTotal = ($unitPrice - $unitDiscount) * $paidQty;
                         @endphp
                         <tr>
                             <td>{{ $index + 1 }}</td>
@@ -442,9 +445,9 @@
                                     @endif
                                 </div>
                             </td>
-                            <td>1</td>
-                            <td class="text-right">L. {{ number_format($specTotal, 2) }}</td>
-                            <td class="text-right">L. 0.00</td>
+                            <td>{{ $paidQty }}</td>
+                            <td class="text-right">L. {{ number_format($unitPrice, 2) }}</td>
+                            <td class="text-right">L. {{ number_format($unitDiscount, 2) }}</td>
                             <td class="text-right">L. {{ number_format($specTotal, 2) }}</td>
                         </tr>
                     @endforeach

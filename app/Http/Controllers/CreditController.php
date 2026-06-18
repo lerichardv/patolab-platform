@@ -369,22 +369,37 @@ class CreditController extends Controller
                     }
                 },
             ],
-            'specimen_ids' => $credit->is_group ? 'required|array|min:1' : 'nullable|array',
+            'specimen_ids' => 'nullable|array',
             'specimen_ids.*' => 'exists:specimen,id',
+            'specimens' => $credit->is_group ? 'required|array|min:1' : 'nullable|array',
+            'specimens.*.id' => 'required|exists:specimen,id',
+            'specimens.*.quantity' => 'required|integer|min:1',
         ]);
 
         if ($credit->is_group) {
-            $specimenIds = $validated['specimen_ids'];
-            $dbSpecimensCount = DB::table('credit_invoice_specimens')
+            $specimens = $validated['specimens'] ?? [];
+            $specimenIds = array_column($specimens, 'id');
+            $dbSpecimens = DB::table('credit_invoice_specimens')
                 ->where('credit_id', $credit->id)
                 ->whereIn('specimen_id', $specimenIds)
                 ->where('is_paid', 0)
-                ->count();
+                ->get()
+                ->keyBy('specimen_id');
 
-            if ($dbSpecimensCount !== count($specimenIds)) {
+            if (count($dbSpecimens) !== count($specimenIds)) {
                 throw ValidationException::withMessages([
-                    'specimen_ids' => ['Uno o más especímenes seleccionados no son válidos o ya han sido pagados.'],
+                    'specimens' => ['Uno o más especímenes seleccionados no son válidos o ya han sido pagados.'],
                 ]);
+            }
+
+            foreach ($specimens as $item) {
+                $dbSpec = $dbSpecimens->get($item['id']);
+                $remaining = $dbSpec->quantity - $dbSpec->quantity_paid;
+                if ($item['quantity'] > $remaining) {
+                    throw ValidationException::withMessages([
+                        'specimens' => ["La cantidad a pagar para la muestra con ID {$dbSpec->specimen_id} supera la cantidad pendiente ({$remaining})."],
+                    ]);
+                }
             }
         }
 
@@ -417,13 +432,24 @@ class CreditController extends Controller
             $amountPaid = (float) $validated['amount_paid'];
 
             if ($credit->is_group) {
-                DB::table('credit_invoice_specimens')
-                    ->where('credit_id', $credit->id)
-                    ->whereIn('specimen_id', $validated['specimen_ids'])
-                    ->update([
-                        'is_paid' => 1,
-                        'updated_at' => now(),
-                    ]);
+                foreach ($validated['specimens'] as $item) {
+                    $dbRow = DB::table('credit_invoice_specimens')
+                        ->where('credit_id', $credit->id)
+                        ->where('specimen_id', $item['id'])
+                        ->first();
+
+                    $newQtyPaid = $dbRow->quantity_paid + (int) $item['quantity'];
+                    $isPaid = $newQtyPaid >= $dbRow->quantity ? 1 : 0;
+
+                    DB::table('credit_invoice_specimens')
+                        ->where('credit_id', $credit->id)
+                        ->where('specimen_id', $item['id'])
+                        ->update([
+                            'quantity_paid' => $newQtyPaid,
+                            'is_paid' => $isPaid,
+                            'updated_at' => now(),
+                        ]);
+                }
             }
 
             // Create payment invoice
@@ -490,14 +516,19 @@ class CreditController extends Controller
 
             // Fetch the specimens being paid in this transaction for the PDF
             $paidSpecimens = [];
+            $paidSpecimensData = [];
             if ($credit->is_group) {
-                $paidSpecimens = Specimen::whereIn('id', $validated['specimen_ids'])
+                $specimenIds = array_column($validated['specimens'], 'id');
+                $paidSpecimens = Specimen::whereIn('id', $specimenIds)
                     ->with(['type', 'examination'])
                     ->get();
+                foreach ($validated['specimens'] as $item) {
+                    $paidSpecimensData[$item['id']] = (int) $item['quantity'];
+                }
             }
 
             // Render Blade for Credit Payment PDF
-            $htmlContent = view('pdf.credit_payment_invoice', compact('invoice', 'caiRange', 'customer', 'location', 'totalWords', 'credit', 'originalInvoice', 'paidSpecimens'))->render();
+            $htmlContent = view('pdf.credit_payment_invoice', compact('invoice', 'caiRange', 'customer', 'location', 'totalWords', 'credit', 'originalInvoice', 'paidSpecimens', 'paidSpecimensData'))->render();
 
             $filename = 'credit_invoice_'.$invoice->id.'_'.time().'.pdf';
             $pdfPath = 'invoices/'.$filename;
