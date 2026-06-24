@@ -19,6 +19,7 @@ use App\Services\ReportPaginator;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -86,12 +87,45 @@ class ReportEditorController extends Controller
 
             return response()->json(['status' => 'ignored']);
         }
+
+        if ($field === 'sections_order') {
+            if ($event === 'onConnect') {
+                return response()->json([
+                    'document' => null,
+                ]);
+            }
+            if ($event === 'create') {
+                $report = DB::table('specimen_reports')->where('id', $reportId)->first();
+
+                return response()->json([
+                    'content' => $report ? $report->sections_order : '[]',
+                ]);
+            }
+            if ($event === 'onChange') {
+                $htmlValue = $payload['html'] ?? '[]';
+                DB::table('specimen_reports')
+                    ->where('id', $reportId)
+                    ->update([
+                        'sections_order' => $htmlValue,
+                        'updated_at' => now(),
+                    ]);
+
+                return response()->json(['status' => 'success']);
+            }
+
+            return response()->json(['status' => 'ignored']);
+        }
+
         // 3. Map the room string parameters to your exact database schema columns
         $columnMap = [
             'macroscopy' => ['state' => 'yjs_macroscopy_state', 'html' => 'macroscopy_html'],
             'microscopy' => ['state' => 'yjs_microscopy_state', 'html' => 'microscopy_html'],
             'diagnosis' => ['state' => 'yjs_diagnosis_state',  'html' => 'diagnosis_html'],
             'report_date' => ['state' => 'yjs_report_date_state', 'html' => 'report_date'],
+            'clinical_details' => ['state' => 'yjs_clinical_details_state', 'html' => 'clinical_details_html'],
+            'comments_notes' => ['state' => 'yjs_comments_notes_state', 'html' => 'comments_notes_html'],
+            'protocols' => ['state' => 'yjs_protocols_state', 'html' => 'protocols_html'],
+            'legend' => ['state' => 'yjs_legend_state', 'html' => 'legend_html'],
         ];
 
         if (! array_key_exists($field, $columnMap)) {
@@ -211,13 +245,37 @@ class ReportEditorController extends Controller
         }
 
         DB::transaction(function () use ($specimen) {
-            $template = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)->first();
+            $template = SpecimenTypeTemplate::where('user_id', auth()->id())
+                ->where('specimen_type_id', $specimen->specimen_type)
+                ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+                ->first();
+
+            if (! $template) {
+                $template = SpecimenTypeTemplate::where('user_id', auth()->id())
+                    ->where('specimen_type_id', $specimen->specimen_type)
+                    ->first();
+            }
+
+            if (! $template) {
+                $template = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)
+                    ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+                    ->first();
+            }
+
+            if (! $template) {
+                $template = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)->first();
+            }
 
             $report = SpecimenReport::create([
                 'report_date' => now()->format('Y-m-d'),
                 'macroscopy_html' => $template?->macroscopy_html ?? '',
                 'microscopy_html' => $template?->microscopy_html ?? '',
                 'diagnosis_html' => $template?->diagnosis_html ?? '',
+                'clinical_details_html' => $template?->clinical_details_html ?? '',
+                'comments_notes_html' => $template?->comments_notes_html ?? '',
+                'protocols_html' => $template?->protocols_html ?? '',
+                'legend_html' => $template?->legend_html ?? '',
+                'sections_order' => $template?->sections_order ?? null,
             ]);
 
             $specimen->update([
@@ -272,10 +330,22 @@ class ReportEditorController extends Controller
             'macroscopy_html' => 'nullable|string',
             'microscopy_html' => 'nullable|string',
             'diagnosis_html' => 'nullable|string',
+            'clinical_details_html' => 'nullable|string',
+            'comments_notes_html' => 'nullable|string',
+            'protocols_html' => 'nullable|string',
+            'legend_html' => 'nullable|string',
             'yjs_macroscopy_state' => 'nullable|string',
             'yjs_microscopy_state' => 'nullable|string',
             'yjs_diagnosis_state' => 'nullable|string',
             'yjs_report_date_state' => 'nullable|string',
+            'yjs_clinical_details_state' => 'nullable|string',
+            'yjs_comments_notes_state' => 'nullable|string',
+            'yjs_protocols_state' => 'nullable|string',
+            'yjs_legend_state' => 'nullable|string',
+            'sections_order' => 'nullable|array',
+            'sections_order.*.key' => 'required|string',
+            'sections_order.*.order' => 'required|integer',
+            'sections_order.*.active' => 'required|boolean',
         ]);
 
         $specimen->load('report');
@@ -295,6 +365,7 @@ class ReportEditorController extends Controller
             return response()->json(['error' => 'No tienes permisos de edición para esta muestra.'], 403);
         }
 
+        $hasGeneralAccess = $hasMacroAccess || $hasMicroAccess;
         $updateData = [];
 
         if ($request->has('report_date')) {
@@ -310,8 +381,23 @@ class ReportEditorController extends Controller
         if ($request->has('microscopy_html') && $hasMicroAccess) {
             $updateData['microscopy_html'] = $request->input('microscopy_html') ?? '';
         }
-        if ($request->has('diagnosis_html')) {
+        if ($request->has('diagnosis_html') && $hasGeneralAccess) {
             $updateData['diagnosis_html'] = $request->input('diagnosis_html') ?? '';
+        }
+        if ($request->has('clinical_details_html') && $hasGeneralAccess) {
+            $updateData['clinical_details_html'] = $request->input('clinical_details_html') ?? '';
+        }
+        if ($request->has('comments_notes_html') && $hasGeneralAccess) {
+            $updateData['comments_notes_html'] = $request->input('comments_notes_html') ?? '';
+        }
+        if ($request->has('protocols_html') && $hasGeneralAccess) {
+            $updateData['protocols_html'] = $request->input('protocols_html') ?? '';
+        }
+        if ($request->has('legend_html') && $hasGeneralAccess) {
+            $updateData['legend_html'] = $request->input('legend_html') ?? '';
+        }
+        if ($request->has('sections_order') && $hasGeneralAccess) {
+            $updateData['sections_order'] = $request->input('sections_order');
         }
 
         if ($request->filled('yjs_macroscopy_state') && $hasMacroAccess) {
@@ -320,10 +406,22 @@ class ReportEditorController extends Controller
         if ($request->filled('yjs_microscopy_state') && $hasMicroAccess) {
             $updateData['yjs_microscopy_state'] = base64_decode($request->input('yjs_microscopy_state'));
         }
-        if ($request->filled('yjs_diagnosis_state')) {
+        if ($request->filled('yjs_diagnosis_state') && $hasGeneralAccess) {
             $updateData['yjs_diagnosis_state'] = base64_decode($request->input('yjs_diagnosis_state'));
         }
-        if ($request->filled('yjs_report_date_state')) {
+        if ($request->filled('yjs_clinical_details_state') && $hasGeneralAccess) {
+            $updateData['yjs_clinical_details_state'] = base64_decode($request->input('yjs_clinical_details_state'));
+        }
+        if ($request->filled('yjs_comments_notes_state') && $hasGeneralAccess) {
+            $updateData['yjs_comments_notes_state'] = base64_decode($request->input('yjs_comments_notes_state'));
+        }
+        if ($request->filled('yjs_protocols_state') && $hasGeneralAccess) {
+            $updateData['yjs_protocols_state'] = base64_decode($request->input('yjs_protocols_state'));
+        }
+        if ($request->filled('yjs_legend_state') && $hasGeneralAccess) {
+            $updateData['yjs_legend_state'] = base64_decode($request->input('yjs_legend_state'));
+        }
+        if ($request->filled('yjs_report_date_state') && $hasGeneralAccess) {
             $updateData['yjs_report_date_state'] = base64_decode($request->input('yjs_report_date_state'));
         }
 
@@ -531,6 +629,10 @@ class ReportEditorController extends Controller
         $report->diagnosis_html = $this->convertImagesToBase64($report->diagnosis_html);
         $report->macroscopy_html = $this->convertImagesToBase64($report->macroscopy_html);
         $report->microscopy_html = $this->convertImagesToBase64($report->microscopy_html);
+        $report->clinical_details_html = $this->convertImagesToBase64($report->clinical_details_html);
+        $report->comments_notes_html = $this->convertImagesToBase64($report->comments_notes_html);
+        $report->protocols_html = $this->convertImagesToBase64($report->protocols_html);
+        $report->legend_html = $this->convertImagesToBase64($report->legend_html);
 
         $isMicroscopyVisible = in_array($specimen->status, ['microscopic_review', 'finalized', 'delivered']);
 
@@ -728,6 +830,16 @@ class ReportEditorController extends Controller
                 }
                 $specimen->products()->sync($syncData);
             });
+
+            // Notify Express server to refresh insumos
+            try {
+                $serverUrl = env('COLLABORATION_SERVER_URL', 'http://127.0.0.1:1234');
+                Http::timeout(2)->post($serverUrl.'/api/refresh-insumos', [
+                    'reportId' => $specimen->report_id,
+                ]);
+            } catch (\Exception $e) {
+                Log::warning('Could not notify collaboration server to refresh insumos: '.$e->getMessage());
+            }
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

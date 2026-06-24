@@ -87,9 +87,13 @@ class SpecimenTypeTemplateController extends Controller
             'comments_notes_html' => 'nullable|string',
             'protocols_html' => 'nullable|string',
             'legend_html' => 'nullable|string',
+            'sections_order' => 'nullable|array',
+            'sections_order.*.key' => 'required|string',
+            'sections_order.*.order' => 'required|integer',
+            'sections_order.*.active' => 'required|boolean',
         ]);
 
-        $validated['sections_order'] = [
+        $validated['sections_order'] = $request->input('sections_order', [
             ['key' => 'clinical_details_html', 'order' => 1, 'active' => true],
             ['key' => 'diagnosis_html', 'order' => 2, 'active' => true],
             ['key' => 'macroscopy_html', 'order' => 3, 'active' => true],
@@ -97,7 +101,7 @@ class SpecimenTypeTemplateController extends Controller
             ['key' => 'comments_notes_html', 'order' => 5, 'active' => true],
             ['key' => 'protocols_html', 'order' => 6, 'active' => true],
             ['key' => 'legend_html', 'order' => 7, 'active' => true],
-        ];
+        ]);
 
         SpecimenTypeTemplate::create($validated);
 
@@ -125,6 +129,10 @@ class SpecimenTypeTemplateController extends Controller
             'comments_notes_html' => 'nullable|string',
             'protocols_html' => 'nullable|string',
             'legend_html' => 'nullable|string',
+            'sections_order' => 'nullable|array',
+            'sections_order.*.key' => 'required|string',
+            'sections_order.*.order' => 'required|integer',
+            'sections_order.*.active' => 'required|boolean',
         ]);
 
         $specimenTypeTemplate->update($validated);

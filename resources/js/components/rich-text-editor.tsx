@@ -1173,9 +1173,11 @@ export function RichTextEditorArea({
 
     return (
         <div className="space-y-1">
-            <label className="block text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                {label}
-            </label>
+            {label && (
+                <label className="block text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                    {label}
+                </label>
+            )}
             <div
                 className={cn(
                     'relative rounded-lg border bg-card text-card-foreground shadow-xs transition-all duration-200',

@@ -19,6 +19,12 @@ interface SpecimenType {
     examinations: SpecimenTypeExamination[];
 }
 
+interface SectionsOrderElement {
+    key: string;
+    order: number;
+    active: boolean;
+}
+
 interface Template {
     id: number;
     user_id: number;
@@ -31,6 +37,7 @@ interface Template {
     comments_notes_html: string | null;
     protocols_html: string | null;
     legend_html: string | null;
+    sections_order?: SectionsOrderElement[] | null;
 }
 
 interface Props {

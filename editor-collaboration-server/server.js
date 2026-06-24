@@ -237,7 +237,7 @@ const customWebhookExtension = {
 				const binaryState = Buffer.from(savedStateBase64, 'base64');
 				Y.applyUpdate(data.document, binaryState);
 
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status')) {
+				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order')) {
 					const text = data.document.getText('content').toString();
 
 					if (text && text.trim() !== '') {
@@ -275,7 +275,7 @@ const customWebhookExtension = {
 				if (htmlContent) {
 					console.log(`[webhook:onLoadDocument] Seeding document with initial content`);
 
-					if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status')) {
+					if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order')) {
 						// Seed with plain text
 						const ytext = data.document.getText('content');
 						ytext.insert(0, htmlContent);
@@ -308,7 +308,7 @@ const customWebhookExtension = {
 				// 2. Convert Ydoc to ProseMirror JSON, then to HTML (or extract plain text for date/status)
 				let htmlContent = '';
 
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status')) {
+				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order')) {
 					htmlContent = data.document.getText('content').toString();
 				} else {
 					try {
@@ -349,7 +349,7 @@ const customWebhookExtension = {
 		};
 
 		// Extract report ID to check if it's one of the report editors or the date
-		const match = data.documentName.match(/^report-(\d+)-(macroscopy|microscopy|diagnosis|report_date)$/);
+		const match = data.documentName.match(/^report-(\d+)-(macroscopy|microscopy|diagnosis|report_date|clinical_details|comments_notes|protocols|legend|sections_order)$/);
 
 		if (match) {
 			const reportId = match[1];
@@ -578,6 +578,37 @@ app.post('/api/fix-grammar', express.json(), async (req, res) => {
 		console.error('Error en Grok Corrector:', error);
 
 		return res.status(500).json({ error: 'Error en el servidor de optimización de texto', details: error.message });
+	}
+});
+
+app.post('/api/refresh-insumos', express.json(), (req, res) => {
+	const { reportId } = req.body;
+
+	if (!reportId) {
+		return res.status(400).json({ error: 'Falta el reportId.' });
+	}
+
+	const targetRoom = `report-${reportId}-insumos`;
+	console.log(`[insumos] Requesting refresh for room: ${targetRoom}`);
+
+	try {
+		const activeDoc = hocuspocus.documents.get(targetRoom);
+
+		if (activeDoc) {
+			activeDoc.transact(() => {
+				const ytext = activeDoc.getText('content');
+				ytext.delete(0, ytext.length);
+				ytext.insert(0, Date.now().toString());
+			});
+			console.log(`[insumos] Refreshed document ${targetRoom} successfully`);
+			return res.json({ success: true, updated: true });
+		} else {
+			console.log(`[insumos] Room ${targetRoom} not currently active on server`);
+			return res.json({ success: true, updated: false, message: 'Room not active' });
+		}
+	} catch (err) {
+		console.error(`[insumos] Error updating insumos Yjs document:`, err);
+		return res.status(500).json({ error: 'Error actualizando el documento Yjs de insumos', details: err.message });
 	}
 });
 

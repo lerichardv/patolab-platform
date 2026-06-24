@@ -23,43 +23,124 @@ class ReportPaginator
             'height' => $patientCardHeight,
         ];
 
-        // Diagnosis Section
-        $diagHtml = ! empty($report->diagnosis_html) ? $report->diagnosis_html : ($specimen->diagnosis ?? '');
-        if (! empty($diagHtml)) {
-            $blocks[] = [
-                'type' => 'section-header',
-                'title' => 'DIAGNÓSTICO',
-                'height' => 7.94,
-            ];
-            $diagBlocks = self::parseHtmlToBlocks($diagHtml);
-            foreach ($diagBlocks as $bHtml) {
-                $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
-            }
-        }
-
-        // Macroscopy Section
-        $macroHtml = ! empty($report->macroscopy_html) ? $report->macroscopy_html : '<i>Pendiente de revisión macroscópica.</i>';
-        $blocks[] = [
-            'type' => 'section-header',
-            'title' => 'DESCRIPCIÓN MACROSCÓPICA',
-            'height' => 7.94,
+        // 2. Build stream of content blocks according to sections_order
+        $defaultOrder = [
+            ['key' => 'clinical_details_html', 'order' => 1, 'active' => true],
+            ['key' => 'diagnosis_html', 'order' => 2, 'active' => true],
+            ['key' => 'macroscopy_html', 'order' => 3, 'active' => true],
+            ['key' => 'microscopy_html', 'order' => 4, 'active' => true],
+            ['key' => 'comments_notes_html', 'order' => 5, 'active' => true],
+            ['key' => 'protocols_html', 'order' => 6, 'active' => true],
+            ['key' => 'legend_html', 'order' => 7, 'active' => true],
         ];
-        $macroBlocks = self::parseHtmlToBlocks($macroHtml);
-        foreach ($macroBlocks as $bHtml) {
-            $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
-        }
 
-        // Microscopy Section (if visible)
-        if ($isMicroscopyVisible) {
-            $microHtml = ! empty($report->microscopy_html) ? $report->microscopy_html : '<i>Pendiente de revisión microscópica.</i>';
-            $blocks[] = [
-                'type' => 'section-header',
-                'title' => 'DESCRIPCIÓN MICROSCÓPICA',
-                'height' => 7.94,
-            ];
-            $microBlocks = self::parseHtmlToBlocks($microHtml);
-            foreach ($microBlocks as $bHtml) {
-                $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
+        $sectionsOrder = ! empty($report->sections_order) ? $report->sections_order : $defaultOrder;
+
+        // Sort sections by order value
+        usort($sectionsOrder, function ($a, $b) {
+            return $a['order'] <=> $b['order'];
+        });
+
+        foreach ($sectionsOrder as $sec) {
+            $key = $sec['key'];
+            $active = $sec['active'] ?? true;
+            if (! $active) {
+                continue;
+            }
+
+            if ($key === 'clinical_details_html') {
+                $clinHtml = ! empty($report->clinical_details_html) ? $report->clinical_details_html : '';
+                if (! self::isEmptyHtml($clinHtml)) {
+                    $blocks[] = [
+                        'type' => 'section-header',
+                        'title' => 'DATOS CLÍNICOS',
+                        'height' => 7.94,
+                    ];
+                    $clinBlocks = self::parseHtmlToBlocks($clinHtml);
+                    foreach ($clinBlocks as $bHtml) {
+                        $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
+                    }
+                }
+            } elseif ($key === 'diagnosis_html') {
+                $diagHtml = ! empty($report->diagnosis_html) ? $report->diagnosis_html : ($specimen->diagnosis ?? '');
+                if (! self::isEmptyHtml($diagHtml)) {
+                    $blocks[] = [
+                        'type' => 'section-header',
+                        'title' => 'DIAGNÓSTICO',
+                        'height' => 7.94,
+                    ];
+                    $diagBlocks = self::parseHtmlToBlocks($diagHtml);
+                    foreach ($diagBlocks as $bHtml) {
+                        $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
+                    }
+                }
+            } elseif ($key === 'macroscopy_html') {
+                $macroHtml = ! empty($report->macroscopy_html) ? $report->macroscopy_html : '';
+                if (! self::isEmptyHtml($macroHtml)) {
+                    $blocks[] = [
+                        'type' => 'section-header',
+                        'title' => 'DESCRIPCIÓN MACROSCÓPICA',
+                        'height' => 7.94,
+                    ];
+                    $macroBlocks = self::parseHtmlToBlocks($macroHtml);
+                    foreach ($macroBlocks as $bHtml) {
+                        $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
+                    }
+                }
+            } elseif ($key === 'microscopy_html') {
+                if ($isMicroscopyVisible) {
+                    $microHtml = ! empty($report->microscopy_html) ? $report->microscopy_html : '';
+                    if (! self::isEmptyHtml($microHtml)) {
+                        $blocks[] = [
+                            'type' => 'section-header',
+                            'title' => 'DESCRIPCIÓN MICROSCÓPICA',
+                            'height' => 7.94,
+                        ];
+                        $microBlocks = self::parseHtmlToBlocks($microHtml);
+                        foreach ($microBlocks as $bHtml) {
+                            $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
+                        }
+                    }
+                }
+            } elseif ($key === 'comments_notes_html') {
+                $commHtml = ! empty($report->comments_notes_html) ? $report->comments_notes_html : '';
+                if (! self::isEmptyHtml($commHtml)) {
+                    $blocks[] = [
+                        'type' => 'section-header',
+                        'title' => 'COMENTARIOS Y NOTAS',
+                        'height' => 7.94,
+                    ];
+                    $commBlocks = self::parseHtmlToBlocks($commHtml);
+                    foreach ($commBlocks as $bHtml) {
+                        $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
+                    }
+                }
+            } elseif ($key === 'protocols_html') {
+                $protHtml = ! empty($report->protocols_html) ? $report->protocols_html : '';
+                if (! self::isEmptyHtml($protHtml)) {
+                    $blocks[] = [
+                        'type' => 'section-header',
+                        'title' => 'PROTOCOLOS',
+                        'height' => 7.94,
+                    ];
+                    $protBlocks = self::parseHtmlToBlocks($protHtml);
+                    foreach ($protBlocks as $bHtml) {
+                        $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
+                    }
+                }
+            } elseif ($key === 'legend_html') {
+                $legHtml = ! empty($report->legend_html) ? $report->legend_html : '';
+                if (! self::isEmptyHtml($legHtml)) {
+                    $blocks[] = [
+                        'type' => 'section-header',
+                        'title' => 'LEYENDA',
+                        'height' => 7.94,
+                    ];
+                    $legBlocks = self::parseHtmlToBlocks($legHtml);
+                    foreach ($legBlocks as $bHtml) {
+                        $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
+                    }
+                }
             }
         }
 
@@ -418,6 +499,23 @@ class ReportPaginator
         }
 
         return $pages;
+    }
+
+    public static function isEmptyHtml(?string $html): bool
+    {
+        if (empty($html)) {
+            return true;
+        }
+
+        if (str_contains($html, '<img') || str_contains($html, '<table') || str_contains($html, '<tr') || str_contains($html, '<td')) {
+            return false;
+        }
+
+        $text = html_entity_decode(strip_tags($html));
+        $text = str_replace("\xc2\xa0", ' ', $text);
+        $text = preg_replace('/\s+/', '', $text);
+
+        return $text === '';
     }
 
     public static function estimatePatientCardHeight($specimen, $customer, $referrer): float
