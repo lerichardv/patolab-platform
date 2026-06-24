@@ -1081,7 +1081,14 @@ interface RichTextEditorAreaProps {
     onChange: (html: string) => void;
     onFocus: (editor: Editor) => void;
     onBlur: () => void;
-    field: 'diagnosis' | 'macroscopy' | 'microscopy';
+    field:
+        | 'diagnosis'
+        | 'macroscopy'
+        | 'microscopy'
+        | 'clinical_details'
+        | 'comments_notes'
+        | 'protocols'
+        | 'legend';
     label: string;
     editorRef?: React.MutableRefObject<Editor | null>;
 }
@@ -1141,12 +1148,28 @@ export function RichTextEditorArea({
         }
     }, [content, editor]);
 
-    const focusColorClass =
-        field === 'diagnosis'
-            ? 'border-blue-500 ring-1 ring-blue-500/20 shadow-xs'
-            : field === 'macroscopy'
-              ? 'border-violet-500 ring-1 ring-violet-500/20 shadow-xs'
-              : 'border-fuchsia-500 ring-1 ring-fuchsia-500/20 shadow-xs';
+    const getFocusColorClass = () => {
+        switch (field) {
+            case 'clinical_details':
+                return 'border-amber-500 ring-1 ring-amber-500/20 shadow-xs';
+            case 'diagnosis':
+                return 'border-blue-500 ring-1 ring-blue-500/20 shadow-xs';
+            case 'macroscopy':
+                return 'border-violet-500 ring-1 ring-violet-500/20 shadow-xs';
+            case 'microscopy':
+                return 'border-fuchsia-500 ring-1 ring-fuchsia-500/20 shadow-xs';
+            case 'comments_notes':
+                return 'border-teal-500 ring-1 ring-teal-500/20 shadow-xs';
+            case 'protocols':
+                return 'border-emerald-500 ring-1 ring-emerald-500/20 shadow-xs';
+            case 'legend':
+                return 'border-slate-500 ring-1 ring-slate-500/20 shadow-xs';
+            default:
+                return 'border-primary ring-1 ring-primary/20 shadow-xs';
+        }
+    };
+
+    const focusColorClass = getFocusColorClass();
 
     return (
         <div className="space-y-1">

@@ -1,5 +1,5 @@
+import { usePage } from '@inertiajs/react';
 import { format, add, startOfWeek, endOfWeek } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { CalendarClock, ChevronDown } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 
-interface DateRange {
+export interface DateRange {
     from: string;
     to: string;
 }
@@ -21,6 +21,41 @@ interface DateRangePickerProps {
     onChange: (value: DateRange) => void;
     placeholder?: string;
     align?: 'start' | 'center' | 'end';
+    cookieKey?: string;
+}
+
+export function getCookie(name: string): string | null {
+    if (typeof document === 'undefined') {
+        return null;
+    }
+
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+
+    if (parts.length === 2) {
+        return decodeURIComponent(parts.pop()?.split(';').shift() || '');
+    }
+
+    return null;
+}
+
+export function setCookie(name: string, value: string, days = 365) {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const date = new Date();
+    date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+    const expires = `; expires=${date.toUTCString()}`;
+    document.cookie = `${name}=${encodeURIComponent(value)}${expires}; path=/; SameSite=Lax`;
+}
+
+export function getLast2WeeksRange(): DateRange {
+    const today = new Date();
+    const from = format(add(today, { days: -14 }), 'yyyy-MM-dd');
+    const to = format(today, 'yyyy-MM-dd');
+
+    return { from, to };
 }
 
 export function DateRangePicker({
@@ -28,7 +63,20 @@ export function DateRangePicker({
     onChange,
     placeholder = 'Cualquier fecha',
     align = 'end',
+    cookieKey,
 }: DateRangePickerProps) {
+    const { props } = usePage() as any;
+    const userId = props.auth?.user?.id;
+
+    const handleRangeChange = (newRange: DateRange) => {
+        if (cookieKey && userId) {
+            const fullCookieKey = `${cookieKey}_user_${userId}`;
+            setCookie(fullCookieKey, JSON.stringify(newRange));
+        }
+
+        onChange(newRange);
+    };
+
     return (
         <Popover>
             <PopoverTrigger asChild>
@@ -65,7 +113,10 @@ export function DateRangePicker({
                                 type="date"
                                 value={value.from || ''}
                                 onChange={(e) =>
-                                    onChange({ ...value, from: e.target.value })
+                                    handleRangeChange({
+                                        ...value,
+                                        from: e.target.value,
+                                    })
                                 }
                                 className="h-9 w-full text-sm"
                             />
@@ -79,7 +130,10 @@ export function DateRangePicker({
                                 type="date"
                                 value={value.to || ''}
                                 onChange={(e) =>
-                                    onChange({ ...value, to: e.target.value })
+                                    handleRangeChange({
+                                        ...value,
+                                        to: e.target.value,
+                                    })
                                 }
                                 className="h-9 w-full text-sm"
                             />
@@ -95,7 +149,7 @@ export function DateRangePicker({
                                 const today = new Date();
                                 const from = format(today, 'yyyy-MM-dd');
                                 const to = format(today, 'yyyy-MM-dd');
-                                onChange({ from, to });
+                                handleRangeChange({ from, to });
                             }}
                         >
                             Hoy
@@ -115,7 +169,7 @@ export function DateRangePicker({
                                     endOfWeek(today, { weekStartsOn: 1 }),
                                     'yyyy-MM-dd',
                                 );
-                                onChange({ from, to });
+                                handleRangeChange({ from, to });
                             }}
                         >
                             Esta semana
@@ -132,7 +186,7 @@ export function DateRangePicker({
                                     'yyyy-MM-dd',
                                 );
                                 const to = format(today, 'yyyy-MM-dd');
-                                onChange({ from, to });
+                                handleRangeChange({ from, to });
                             }}
                         >
                             Últimos 7 días
@@ -143,13 +197,25 @@ export function DateRangePicker({
                             size="sm"
                             className="h-7 text-xs font-normal"
                             onClick={() => {
+                                const range = getLast2WeeksRange();
+                                handleRangeChange(range);
+                            }}
+                        >
+                            Últimas 2 semanas
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="col-span-2 h-7 text-xs font-normal"
+                            onClick={() => {
                                 const today = new Date();
                                 const from = format(
                                     add(today, { days: -30 }),
                                     'yyyy-MM-dd',
                                 );
                                 const to = format(today, 'yyyy-MM-dd');
-                                onChange({ from, to });
+                                handleRangeChange({ from, to });
                             }}
                         >
                             Últimos 30 días
@@ -160,7 +226,7 @@ export function DateRangePicker({
                             size="sm"
                             className="col-span-2 h-7 text-xs font-normal text-muted-foreground hover:text-foreground"
                             onClick={() => {
-                                onChange({ from: '', to: '' });
+                                handleRangeChange({ from: '', to: '' });
                             }}
                         >
                             Limpiar filtros de fecha

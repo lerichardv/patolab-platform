@@ -541,6 +541,7 @@ export default function UserCommissionsIndex({
                                 Rango de Fechas
                             </span>
                             <DateRangePicker
+                                cookieKey="date_filter_user_commissions"
                                 value={{
                                     from: filters.date_from || '',
                                     to: filters.date_to || '',

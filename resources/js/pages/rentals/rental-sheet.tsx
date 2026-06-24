@@ -48,7 +48,7 @@ function RentalForm({
         if (rental?.id) {
             put(updateRental(rental.id).url, {
                 onSuccess: () => {
-                    toast.success('Alquiler actualizado correctamente');
+                    toast.success('Otro cobro actualizado correctamente');
                     onSuccess();
                     reset();
                 },
@@ -56,7 +56,7 @@ function RentalForm({
         } else {
             post(storeRental().url, {
                 onSuccess: () => {
-                    toast.success('Alquiler creado correctamente');
+                    toast.success('Otro cobro creado correctamente');
                     onSuccess();
                     reset();
                 },
@@ -67,12 +67,12 @@ function RentalForm({
     return (
         <form onSubmit={submit} className="space-y-4 px-5 py-4">
             <div className="space-y-2">
-                <Label htmlFor="name">Nombre de Alquiler *</Label>
+                <Label htmlFor="name">Nombre del Cobro *</Label>
                 <Input
                     id="name"
                     value={data.name}
                     onChange={(e) => setData('name', e.target.value)}
-                    placeholder="Ej. Alquiler de Equipo de Laboratorio"
+                    placeholder="Ej. Cobro de Equipo de Laboratorio"
                     required
                 />
                 <InputError message={errors.name} />
@@ -84,14 +84,14 @@ function RentalForm({
                     id="description"
                     value={data.description}
                     onChange={(e) => setData('description', e.target.value)}
-                    placeholder="Ej. Alquiler de microscopio marca Zeiss por 1 mes"
+                    placeholder="Ej. Cobro de microscopio marca Zeiss por 1 mes"
                 />
                 <InputError message={errors.description} />
             </div>
 
             <div className="flex justify-end pt-4">
                 <Button type="submit" disabled={processing}>
-                    {rental?.id ? 'Actualizar Alquiler' : 'Guardar Alquiler'}
+                    {rental?.id ? 'Actualizar Cobro' : 'Guardar Cobro'}
                 </Button>
             </div>
         </form>
@@ -116,11 +116,11 @@ export default function RentalSheet({
                 overlayClassName={overlayClassName}
             >
                 <HeadingSheet
-                    title={rental ? 'Editar Alquiler' : 'Nuevo Alquiler'}
+                    title={rental ? 'Editar Otro Cobro' : 'Nuevo Otro Cobro'}
                     description={
                         rental
-                            ? 'Actualice la información del registro de alquiler aquí.'
-                            : 'Complete los campos para registrar un nuevo elemento de alquiler.'
+                            ? 'Actualice la información del registro de cobro aquí.'
+                            : 'Complete los campos para registrar un nuevo elemento de cobro.'
                     }
                 />
                 <RentalForm

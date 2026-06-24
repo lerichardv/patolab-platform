@@ -5,7 +5,7 @@ import { es } from 'date-fns/locale';
 import debounce from 'lodash/debounce';
 import {
     Eye,
-    Edit,
+    Edit2,
     Search,
     Receipt,
     CreditCard,
@@ -537,7 +537,7 @@ export default function InvoicesIndex({
                     variant="outline"
                     className="rounded-full border-sky-200 bg-sky-50 px-2.5 py-0.5 text-sky-700 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-400"
                 >
-                    Alquiler
+                    Otro Cobro
                 </Badge>
             );
         }
@@ -649,6 +649,7 @@ export default function InvoicesIndex({
                                 Rango de Fechas
                             </span>
                             <DateRangePicker
+                                cookieKey="date_filter_invoices"
                                 value={{
                                     from: filters.date_from || '',
                                     to: filters.date_to || '',
@@ -813,7 +814,7 @@ export default function InvoicesIndex({
                                         Muestra
                                     </SelectItem>
                                     <SelectItem value="rental">
-                                        Alquiler
+                                        Otro Cobro
                                     </SelectItem>
                                     <SelectItem value="credit payment">
                                         Pago de Crédito
@@ -1131,7 +1132,7 @@ export default function InvoicesIndex({
                                         </TableCell>
                                         <TableCell className="min-w-[220px]">
                                             <div className="flex max-w-[220px] flex-col gap-1.5 text-xs">
-                                                {/* Detalle principal (Grupo, Alquiler o Muestra) */}
+                                                {/* Detalle principal (Grupo, Otro Cobro o Muestra) */}
                                                 {invoice.group ? (
                                                     <div className="flex flex-col gap-1">
                                                         <div className="flex items-center gap-1.5">
@@ -1171,21 +1172,7 @@ export default function InvoicesIndex({
                                                                         className="inline-flex h-5 w-8 items-center justify-center gap-0.5 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
                                                                         title="Editar Muestra"
                                                                     >
-                                                                        <svg
-                                                                            xmlns="http://www.w3.org/2000/svg"
-                                                                            width="24"
-                                                                            height="24"
-                                                                            viewBox="0 0 24 24"
-                                                                            fill="none"
-                                                                            stroke="currentColor"
-                                                                            strokeWidth="2"
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            className="lucide lucide-square-pen h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
-                                                                        >
-                                                                            <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                                            <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"></path>
-                                                                        </svg>
+                                                                        <Edit2 className="h-3 w-3 text-muted-foreground hover:text-foreground" />
                                                                         <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
                                                                     </button>
                                                                 </DropdownMenuTrigger>
@@ -1272,13 +1259,13 @@ export default function InvoicesIndex({
                                                                         `${rentalsIndex().url}?search=${encodeURIComponent(invoice.rental!.name)}`,
                                                                     )
                                                                 }
-                                                                title="Ver en Alquileres"
+                                                                title="Ver en Otros Cobros"
                                                             >
                                                                 <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                                             </Button>
                                                         </div>
                                                         <span className="text-[10px] text-muted-foreground">
-                                                            Alquiler
+                                                            Otro Cobro
                                                         </span>
                                                     </div>
                                                 ) : invoice.specimen ? (
@@ -1343,7 +1330,7 @@ export default function InvoicesIndex({
                                                                     }}
                                                                     title="Editar Muestra"
                                                                 >
-                                                                    <Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                                    <Edit2 className="h-3 w-3 text-muted-foreground hover:text-foreground" />
                                                                 </Button>
                                                             </div>
                                                         )}
@@ -1499,7 +1486,7 @@ export default function InvoicesIndex({
                                                         }
                                                         title="Editar Factura"
                                                     >
-                                                        <Edit className="h-4 w-4" />
+                                                        <Edit2 className="h-4 w-4" />
                                                     </Button>
                                                 )}
                                             </div>

@@ -94,12 +94,31 @@ class CreditController extends Controller
             });
         }
 
-        // Filter by date range
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->get('date_from'));
+        // Resolve date range from request, cookie, or default
+        $userId = auth()->id();
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+
+        if (! $request->has('date_from') && ! $request->has('date_to')) {
+            $cookieName = "date_filter_credits_user_{$userId}";
+            $cookieVal = $request->cookie($cookieName);
+            if ($cookieVal) {
+                $decoded = json_decode($cookieVal, true);
+                if (is_array($decoded)) {
+                    $dateFrom = $decoded['from'] ?? '';
+                    $dateTo = $decoded['to'] ?? '';
+                }
+            } else {
+                $dateFrom = now()->subDays(14)->toDateString();
+                $dateTo = now()->toDateString();
+            }
         }
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->get('date_to'));
+
+        if (! empty($dateFrom)) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if (! empty($dateTo)) {
+            $query->whereDate('created_at', '<=', $dateTo);
         }
 
         // Filter by pending balance (saldo pendiente greater than zero)
@@ -119,7 +138,13 @@ class CreditController extends Controller
 
         return Inertia::render('credits/index', [
             'credits' => $credits,
-            'filters' => $request->only(['search', 'status', 'customer_id', 'specimen_type_id', 'date_from', 'date_to', 'has_pending_balance', 'group_id']),
+            'filters' => array_merge(
+                $request->only(['search', 'status', 'customer_id', 'specimen_type_id', 'has_pending_balance', 'group_id']),
+                [
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                ]
+            ),
             'customers' => $customers,
             'specimenTypes' => $specimenTypes,
             'groups' => SpecimenGroup::orderBy('name', 'asc')->get(),
@@ -194,12 +219,31 @@ class CreditController extends Controller
             });
         }
 
-        // Filter by date range
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->get('date_from'));
+        // Resolve date range from request, cookie, or default for export
+        $userId = auth()->id();
+        $dateFromExport = $request->get('date_from');
+        $dateToExport = $request->get('date_to');
+
+        if (! $request->has('date_from') && ! $request->has('date_to')) {
+            $cookieName = "date_filter_credits_user_{$userId}";
+            $cookieVal = $request->cookie($cookieName);
+            if ($cookieVal) {
+                $decoded = json_decode($cookieVal, true);
+                if (is_array($decoded)) {
+                    $dateFromExport = $decoded['from'] ?? '';
+                    $dateToExport = $decoded['to'] ?? '';
+                }
+            } else {
+                $dateFromExport = now()->subDays(14)->toDateString();
+                $dateToExport = now()->toDateString();
+            }
         }
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->get('date_to'));
+
+        if (! empty($dateFromExport)) {
+            $query->whereDate('created_at', '>=', $dateFromExport);
+        }
+        if (! empty($dateToExport)) {
+            $query->whereDate('created_at', '<=', $dateToExport);
         }
 
         // Filter by pending balance (saldo pendiente greater than zero)

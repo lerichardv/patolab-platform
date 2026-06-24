@@ -36,7 +36,11 @@ import {
     updateOrder as updateSpecimenOrder,
     destroy as destroySpecimen,
 } from '@/actions/App/Http/Controllers/SpecimenController';
-import { DateRangePicker } from '@/components/date-range-picker';
+import {
+    DateRangePicker,
+    getCookie,
+    getLast2WeeksRange,
+} from '@/components/date-range-picker';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -89,6 +93,8 @@ import SpecimenViewSheet from './specimen-view-sheet';
 interface Specimen {
     id: number;
     priority_id: number;
+    specimen_type?: number;
+    specimen_type_examination?: number;
     customer_relation: any;
     type: any;
     examination: any;
@@ -298,23 +304,64 @@ export default function SpecimensIndex({
 
     const [dateRange, setDateRange] = useState<{ from: string; to: string }>(
         () => {
-            const today = new Date();
-            const from = format(
-                startOfWeek(today, { weekStartsOn: 1 }),
-                'yyyy-MM-dd',
-            );
-            const to = format(
-                endOfWeek(today, { weekStartsOn: 1 }),
-                'yyyy-MM-dd',
-            );
+            const userId = props.auth?.user?.id;
 
-            return { from, to };
+            if (userId) {
+                const cookieVal = getCookie(
+                    `date_filter_specimens_user_${userId}`,
+                );
+
+                if (cookieVal) {
+                    try {
+                        return JSON.parse(cookieVal);
+                    } catch (e) {}
+                }
+            }
+
+            return getLast2WeeksRange();
         },
     );
 
     const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
     const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+
+    const [selectedSpecimenTypeId, setSelectedSpecimenTypeId] =
+        useState<string>('all');
+    const [selectedExaminationId, setSelectedExaminationId] =
+        useState<string>('all');
+    const [isSpecimenTypeFilterOpen, setIsSpecimenTypeFilterOpen] =
+        useState(false);
+    const [isExaminationFilterOpen, setIsExaminationFilterOpen] =
+        useState(false);
+
+    const filteredExaminationsForDropdown = useMemo(() => {
+        if (selectedSpecimenTypeId === 'all') {
+            return examinations;
+        }
+
+        return examinations.filter(
+            (exam) => exam.specimen_type?.toString() === selectedSpecimenTypeId,
+        );
+    }, [examinations, selectedSpecimenTypeId]);
+
+    const handleSpecimenTypeChange = (typeId: string) => {
+        setSelectedSpecimenTypeId(typeId);
+
+        if (typeId !== 'all') {
+            const hasValidExam = examinations.some(
+                (exam) =>
+                    exam.id.toString() === selectedExaminationId &&
+                    exam.specimen_type?.toString() === typeId,
+            );
+
+            if (!hasValidExam) {
+                setSelectedExaminationId('all');
+            }
+        } else {
+            setSelectedExaminationId('all');
+        }
+    };
 
     const availableGroups = useMemo(() => {
         const groupsMap = new Map<string, { id: string; name: string }>();
@@ -389,11 +436,26 @@ export default function SpecimensIndex({
                             .toLowerCase()
                             .includes(searchLower));
 
+                const specimenTypeId =
+                    specimen.specimen_type || specimen.type?.id;
+                const matchesSpecimenType =
+                    selectedSpecimenTypeId === 'all' ||
+                    specimenTypeId?.toString() === selectedSpecimenTypeId;
+
+                const examId =
+                    specimen.specimen_type_examination ||
+                    specimen.examination?.id;
+                const matchesExamination =
+                    selectedExaminationId === 'all' ||
+                    examId?.toString() === selectedExaminationId;
+
                 return (
                     matchesStatus &&
                     matchesDate &&
                     matchesGroup &&
-                    matchesSearch
+                    matchesSearch &&
+                    matchesSpecimenType &&
+                    matchesExamination
                 );
             });
 
@@ -402,7 +464,15 @@ export default function SpecimensIndex({
                 specimens: filteredSpecimens,
             };
         });
-    }, [priorities, selectedStatuses, dateRange, selectedGroupId, searchQuery]);
+    }, [
+        priorities,
+        selectedStatuses,
+        dateRange,
+        selectedGroupId,
+        searchQuery,
+        selectedSpecimenTypeId,
+        selectedExaminationId,
+    ]);
 
     const visibleSpecimenIds = useMemo(() => {
         return filteredPriorities.flatMap((p) => p.specimens.map((s) => s.id));
@@ -1070,6 +1140,7 @@ export default function SpecimensIndex({
 
                         {/* Filtro de Rango de Fechas */}
                         <DateRangePicker
+                            cookieKey="date_filter_specimens"
                             value={dateRange}
                             onChange={setDateRange}
                         />
@@ -1107,8 +1178,7 @@ export default function SpecimensIndex({
                             </DropdownMenu>
                         )}
                     </div>
-                </div>
-
+                </div>{' '}
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                     {/* Buscador */}
                     <div className="relative w-full shrink-0 sm:w-72">
@@ -1121,6 +1191,195 @@ export default function SpecimensIndex({
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
+
+                    {/* Filtro de Tipo de Muestra (Combobox con Búsqueda) */}
+                    <Popover
+                        open={isSpecimenTypeFilterOpen}
+                        onOpenChange={setIsSpecimenTypeFilterOpen}
+                    >
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={isSpecimenTypeFilterOpen}
+                                className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50 sm:w-[200px]"
+                            >
+                                <div className="flex items-center gap-2 truncate">
+                                    <Microscope className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="truncate">
+                                        {selectedSpecimenTypeId === 'all'
+                                            ? 'Todos los tipos'
+                                            : (() => {
+                                                  const t = specimenTypes.find(
+                                                      (t) =>
+                                                          t.id.toString() ===
+                                                          selectedSpecimenTypeId,
+                                                  );
+
+                                                  return t
+                                                      ? t.name
+                                                      : 'Tipo seleccionado';
+                                              })()}
+                                    </span>
+                                </div>
+                                <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0" align="start">
+                            <Command>
+                                <CommandInput placeholder="Buscar tipo..." />
+                                <CommandList>
+                                    <CommandEmpty>
+                                        No se encontraron tipos.
+                                    </CommandEmpty>
+                                    <CommandGroup>
+                                        <CommandItem
+                                            value="todos"
+                                            onSelect={() => {
+                                                handleSpecimenTypeChange('all');
+                                                setIsSpecimenTypeFilterOpen(
+                                                    false,
+                                                );
+                                            }}
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    'mr-2 h-4 w-4',
+                                                    selectedSpecimenTypeId ===
+                                                        'all'
+                                                        ? 'opacity-100'
+                                                        : 'opacity-0',
+                                                )}
+                                            />
+                                            Todos los tipos
+                                        </CommandItem>
+                                        {specimenTypes.map((type) => (
+                                            <CommandItem
+                                                key={type.id}
+                                                value={type.name}
+                                                onSelect={() => {
+                                                    handleSpecimenTypeChange(
+                                                        type.id.toString(),
+                                                    );
+                                                    setIsSpecimenTypeFilterOpen(
+                                                        false,
+                                                    );
+                                                }}
+                                            >
+                                                <Check
+                                                    className={cn(
+                                                        'mr-2 h-4 w-4',
+                                                        selectedSpecimenTypeId ===
+                                                            type.id.toString()
+                                                            ? 'opacity-100'
+                                                            : 'opacity-0',
+                                                    )}
+                                                />
+                                                {type.name}
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+
+                    {/* Filtro de Análisis/Examen (Combobox con Búsqueda) */}
+                    <Popover
+                        open={isExaminationFilterOpen}
+                        onOpenChange={setIsExaminationFilterOpen}
+                    >
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={isExaminationFilterOpen}
+                                className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50 sm:w-[200px]"
+                                disabled={selectedSpecimenTypeId === 'all'}
+                            >
+                                <div className="flex items-center gap-2 truncate">
+                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="truncate">
+                                        {selectedSpecimenTypeId === 'all'
+                                            ? 'Seleccione tipo primero'
+                                            : selectedExaminationId === 'all'
+                                              ? 'Todos los análisis'
+                                              : (() => {
+                                                    const e = examinations.find(
+                                                        (e) =>
+                                                            e.id.toString() ===
+                                                            selectedExaminationId,
+                                                    );
+
+                                                    return e
+                                                        ? e.name
+                                                        : 'Análisis seleccionado';
+                                                })()}
+                                    </span>
+                                </div>
+                                <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0" align="start">
+                            <Command>
+                                <CommandInput placeholder="Buscar análisis..." />
+                                <CommandList>
+                                    <CommandEmpty>
+                                        No se encontraron análisis.
+                                    </CommandEmpty>
+                                    <CommandGroup>
+                                        <CommandItem
+                                            value="todos"
+                                            onSelect={() => {
+                                                setSelectedExaminationId('all');
+                                                setIsExaminationFilterOpen(
+                                                    false,
+                                                );
+                                            }}
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    'mr-2 h-4 w-4',
+                                                    selectedExaminationId ===
+                                                        'all'
+                                                        ? 'opacity-100'
+                                                        : 'opacity-0',
+                                                )}
+                                            />
+                                            Todos los análisis
+                                        </CommandItem>
+                                        {filteredExaminationsForDropdown.map(
+                                            (exam) => (
+                                                <CommandItem
+                                                    key={exam.id}
+                                                    value={exam.name}
+                                                    onSelect={() => {
+                                                        setSelectedExaminationId(
+                                                            exam.id.toString(),
+                                                        );
+                                                        setIsExaminationFilterOpen(
+                                                            false,
+                                                        );
+                                                    }}
+                                                >
+                                                    <Check
+                                                        className={cn(
+                                                            'mr-2 h-4 w-4',
+                                                            selectedExaminationId ===
+                                                                exam.id.toString()
+                                                                ? 'opacity-100'
+                                                                : 'opacity-0',
+                                                        )}
+                                                    />
+                                                    {exam.name}
+                                                </CommandItem>
+                                            ),
+                                        )}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
 
                     {/* Seleccionar control */}
                     <div
@@ -1150,241 +1409,232 @@ export default function SpecimensIndex({
                             onClick={(e) => e.stopPropagation()}
                         />
                     </div>
-                    {isSelectionMode && (
-                        <div className="flex w-full flex-col justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2 px-3 select-none sm:flex-row sm:items-center sm:p-0 sm:py-1 sm:pr-1 sm:pl-3 dark:border-border/60 dark:bg-muted/10">
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:flex-nowrap sm:text-sm">
-                                <span>
-                                    <span className="font-semibold text-primary">
-                                        {selectedIds.length}
-                                    </span>{' '}
-                                    <span className="sm:hidden">
-                                        {selectedIds.length === 1
-                                            ? 'seleccionada'
-                                            : 'seleccionadas'}
-                                    </span>
-                                    <span className="hidden sm:inline">
-                                        {selectedIds.length === 1
-                                            ? 'muestra seleccionada'
-                                            : 'muestras seleccionadas'}
-                                    </span>
+                </div>
+                {isSelectionMode && (
+                    <div className="flex w-full flex-col justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2 px-3 select-none sm:flex-row sm:items-center sm:p-0 sm:py-1 sm:pr-1 sm:pl-3 dark:border-border/60 dark:bg-muted/10">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:flex-nowrap sm:text-sm">
+                            <span>
+                                <span className="font-semibold text-primary">
+                                    {selectedIds.length}
+                                </span>{' '}
+                                <span className="sm:hidden">
+                                    {selectedIds.length === 1
+                                        ? 'seleccionada'
+                                        : 'seleccionadas'}
                                 </span>
-                                {visibleSpecimenIds.length > 0 && (
-                                    <>
-                                        <span className="text-muted-foreground/30">
-                                            |
+                                <span className="hidden sm:inline">
+                                    {selectedIds.length === 1
+                                        ? 'muestra seleccionada'
+                                        : 'muestras seleccionadas'}
+                                </span>
+                            </span>
+                            {visibleSpecimenIds.length > 0 && (
+                                <>
+                                    <span className="text-muted-foreground/30">
+                                        |
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        onClick={handleSelectAllVisible}
+                                        className="h-auto p-0 text-xs font-semibold text-primary transition-colors hover:text-primary/80 sm:text-sm"
+                                    >
+                                        <span className="sm:hidden">
+                                            {isAllVisibleSelected
+                                                ? 'Deseleccionar'
+                                                : 'Seleccionar todas'}
                                         </span>
-                                        <Button
-                                            type="button"
-                                            variant="link"
-                                            onClick={handleSelectAllVisible}
-                                            className="h-auto p-0 text-xs font-semibold text-primary transition-colors hover:text-primary/80 sm:text-sm"
-                                        >
-                                            <span className="sm:hidden">
-                                                {isAllVisibleSelected
-                                                    ? 'Deseleccionar'
-                                                    : 'Seleccionar todas'}
-                                            </span>
-                                            <span className="hidden sm:inline">
-                                                {isAllVisibleSelected
-                                                    ? 'Deseleccionar todas'
-                                                    : 'Seleccionar todas'}
-                                            </span>
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                                {(auth.permissions?.includes(
-                                    'specimens.edit',
+                                        <span className="hidden sm:inline">
+                                            {isAllVisibleSelected
+                                                ? 'Deseleccionar todas'
+                                                : 'Seleccionar todas'}
+                                        </span>
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                            {(auth.permissions?.includes('specimens.edit') ||
+                                auth.permissions?.includes(
+                                    'specimens.manage',
                                 ) ||
-                                    auth.permissions?.includes(
-                                        'specimens.manage',
-                                    ) ||
-                                    auth.permissions?.includes(
-                                        'specimens.delete',
-                                    )) && (
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                disabled={
-                                                    selectedIds.length === 0
-                                                }
-                                                className="flex h-8 w-full items-center gap-2 px-3 text-xs sm:w-auto sm:px-4"
-                                            >
-                                                <Layers className="h-4 w-4" />{' '}
-                                                Acciones en Bulk{' '}
-                                                <ChevronDown className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent
-                                            align="end"
-                                            className="w-56"
+                                auth.permissions?.includes(
+                                    'specimens.delete',
+                                )) && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            disabled={selectedIds.length === 0}
+                                            className="flex h-8 w-full items-center gap-2 px-3 text-xs sm:w-auto sm:px-4"
                                         >
-                                            <DropdownMenuLabel>
-                                                Acciones en Lote
-                                            </DropdownMenuLabel>
-                                            <DropdownMenuSeparator />
+                                            <Layers className="h-4 w-4" />{' '}
+                                            Acciones en Bulk{' '}
+                                            <ChevronDown className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        className="w-56"
+                                    >
+                                        <DropdownMenuLabel>
+                                            Acciones en Lote
+                                        </DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
 
-                                            {/* Cambiar Estado Submenu */}
-                                            {auth.permissions?.includes(
-                                                'specimens.edit',
-                                            ) && (
-                                                <DropdownMenuSub>
-                                                    <DropdownMenuSubTrigger>
-                                                        <Tag className="mr-2 h-4 w-4" />
-                                                        <span>
-                                                            Cambiar Estado
-                                                        </span>
-                                                    </DropdownMenuSubTrigger>
-                                                    <DropdownMenuSubContent>
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                handleBulkChangeStatus(
-                                                                    'received',
-                                                                )
-                                                            }
-                                                        >
-                                                            Recibida
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                handleBulkChangeStatus(
-                                                                    'macroscopic_review',
-                                                                )
-                                                            }
-                                                        >
-                                                            Rev. Macroscópica
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                handleBulkChangeStatus(
-                                                                    'processing',
-                                                                )
-                                                            }
-                                                        >
-                                                            En Proceso
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                handleBulkChangeStatus(
-                                                                    'microscopic_review',
-                                                                )
-                                                            }
-                                                        >
-                                                            Rev. Microscópica
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                handleBulkChangeStatus(
-                                                                    'finalized',
-                                                                )
-                                                            }
-                                                        >
-                                                            Finalizada
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                handleBulkChangeStatus(
-                                                                    'delivered',
-                                                                )
-                                                            }
-                                                        >
-                                                            Entregada
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                handleBulkChangeStatus(
-                                                                    'cancelled',
-                                                                )
-                                                            }
-                                                        >
-                                                            Cancelada
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuSubContent>
-                                                </DropdownMenuSub>
-                                            )}
+                                        {/* Cambiar Estado Submenu */}
+                                        {auth.permissions?.includes(
+                                            'specimens.edit',
+                                        ) && (
+                                            <DropdownMenuSub>
+                                                <DropdownMenuSubTrigger>
+                                                    <Tag className="mr-2 h-4 w-4" />
+                                                    <span>Cambiar Estado</span>
+                                                </DropdownMenuSubTrigger>
+                                                <DropdownMenuSubContent>
+                                                    <DropdownMenuItem
+                                                        onClick={() =>
+                                                            handleBulkChangeStatus(
+                                                                'received',
+                                                            )
+                                                        }
+                                                    >
+                                                        Recibida
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() =>
+                                                            handleBulkChangeStatus(
+                                                                'macroscopic_review',
+                                                            )
+                                                        }
+                                                    >
+                                                        Rev. Macroscópica
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() =>
+                                                            handleBulkChangeStatus(
+                                                                'processing',
+                                                            )
+                                                        }
+                                                    >
+                                                        En Proceso
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() =>
+                                                            handleBulkChangeStatus(
+                                                                'microscopic_review',
+                                                            )
+                                                        }
+                                                    >
+                                                        Rev. Microscópica
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() =>
+                                                            handleBulkChangeStatus(
+                                                                'finalized',
+                                                            )
+                                                        }
+                                                    >
+                                                        Finalizada
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() =>
+                                                            handleBulkChangeStatus(
+                                                                'delivered',
+                                                            )
+                                                        }
+                                                    >
+                                                        Entregada
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() =>
+                                                            handleBulkChangeStatus(
+                                                                'cancelled',
+                                                            )
+                                                        }
+                                                    >
+                                                        Cancelada
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuSubContent>
+                                            </DropdownMenuSub>
+                                        )}
 
-                                            {/* Cambiar Prioridad Submenu */}
-                                            {auth.permissions?.includes(
-                                                'specimens.edit',
-                                            ) && (
-                                                <DropdownMenuSub>
-                                                    <DropdownMenuSubTrigger>
-                                                        <CalendarClock className="mr-2 h-4 w-4" />
-                                                        <span>
-                                                            Cambiar Prioridad
-                                                        </span>
-                                                    </DropdownMenuSubTrigger>
-                                                    <DropdownMenuSubContent>
-                                                        {priorities.map((p) => (
-                                                            <DropdownMenuItem
-                                                                key={p.id}
-                                                                onClick={() =>
-                                                                    handleBulkChangePriority(
-                                                                        p.id,
-                                                                    )
-                                                                }
-                                                            >
-                                                                {p.name}
-                                                            </DropdownMenuItem>
-                                                        ))}
-                                                    </DropdownMenuSubContent>
-                                                </DropdownMenuSub>
-                                            )}
+                                        {/* Cambiar Prioridad Submenu */}
+                                        {auth.permissions?.includes(
+                                            'specimens.edit',
+                                        ) && (
+                                            <DropdownMenuSub>
+                                                <DropdownMenuSubTrigger>
+                                                    <CalendarClock className="mr-2 h-4 w-4" />
+                                                    <span>
+                                                        Cambiar Prioridad
+                                                    </span>
+                                                </DropdownMenuSubTrigger>
+                                                <DropdownMenuSubContent>
+                                                    {priorities.map((p) => (
+                                                        <DropdownMenuItem
+                                                            key={p.id}
+                                                            onClick={() =>
+                                                                handleBulkChangePriority(
+                                                                    p.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            {p.name}
+                                                        </DropdownMenuItem>
+                                                    ))}
+                                                </DropdownMenuSubContent>
+                                            </DropdownMenuSub>
+                                        )}
 
-                                            {/* Asignar Patólogo in Bulk */}
-                                            {auth.permissions?.includes(
-                                                'specimens.manage',
-                                            ) && (
+                                        {/* Asignar Patólogo in Bulk */}
+                                        {auth.permissions?.includes(
+                                            'specimens.manage',
+                                        ) && (
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setIsBulkAssignSheetOpen(
+                                                        true,
+                                                    )
+                                                }
+                                            >
+                                                <UserPlus className="mr-2 h-4 w-4" />
+                                                <span>Asignar Patólogo</span>
+                                            </DropdownMenuItem>
+                                        )}
+
+                                        {auth.permissions?.includes(
+                                            'specimens.delete',
+                                        ) && (
+                                            <>
+                                                {(auth.permissions?.includes(
+                                                    'specimens.edit',
+                                                ) ||
+                                                    auth.permissions?.includes(
+                                                        'specimens.manage',
+                                                    )) && (
+                                                    <DropdownMenuSeparator />
+                                                )}
                                                 <DropdownMenuItem
+                                                    variant="destructive"
                                                     onClick={() =>
-                                                        setIsBulkAssignSheetOpen(
+                                                        setIsBulkDeleteDialogOpen(
                                                             true,
                                                         )
                                                     }
                                                 >
-                                                    <UserPlus className="mr-2 h-4 w-4" />
+                                                    <Trash2 className="mr-2 h-4 w-4" />
                                                     <span>
-                                                        Asignar Patólogo
+                                                        Desactivar Muestras
                                                     </span>
                                                 </DropdownMenuItem>
-                                            )}
-
-                                            {auth.permissions?.includes(
-                                                'specimens.delete',
-                                            ) && (
-                                                <>
-                                                    {(auth.permissions?.includes(
-                                                        'specimens.edit',
-                                                    ) ||
-                                                        auth.permissions?.includes(
-                                                            'specimens.manage',
-                                                        )) && (
-                                                        <DropdownMenuSeparator />
-                                                    )}
-                                                    <DropdownMenuItem
-                                                        variant="destructive"
-                                                        onClick={() =>
-                                                            setIsBulkDeleteDialogOpen(
-                                                                true,
-                                                            )
-                                                        }
-                                                    >
-                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                        <span>
-                                                            Desactivar Muestras
-                                                        </span>
-                                                    </DropdownMenuItem>
-                                                </>
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                )}
-                            </div>
+                                            </>
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
                         </div>
-                    )}
-                </div>
-
+                    </div>
+                )}
                 <div
                     className="group/kanban relative flex-1 overflow-hidden"
                     onMouseMove={handleMouseMove}

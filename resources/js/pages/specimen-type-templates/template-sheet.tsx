@@ -2,23 +2,41 @@ import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import TemplateForm from './template-form';
 
+interface User {
+    id: number;
+    name: string;
+    email: string;
+}
+
+interface SpecimenTypeExamination {
+    id: number;
+    name: string;
+}
+
 interface SpecimenType {
     id: number;
     name: string;
-    has_template: boolean;
+    examinations: SpecimenTypeExamination[];
 }
 
 interface Template {
     id: number;
+    user_id: number;
     specimen_type_id: number;
+    specimen_type_examination_id: number;
+    clinical_details_html: string | null;
     diagnosis_html: string | null;
     macroscopy_html: string | null;
     microscopy_html: string | null;
+    comments_notes_html: string | null;
+    protocols_html: string | null;
+    legend_html: string | null;
 }
 
 interface Props {
     template: Template | null;
     specimenTypes: SpecimenType[];
+    users: User[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
@@ -26,6 +44,7 @@ interface Props {
 export default function TemplateSheet({
     template,
     specimenTypes,
+    users,
     open,
     onOpenChange,
 }: Props) {
@@ -40,10 +59,11 @@ export default function TemplateSheet({
                             : 'Complete el formulario para crear una nueva plantilla.'
                     }
                 />
-                <div className="mt-4 flex flex-1 flex-col overflow-hidden">
+                <div className="flex flex-1 flex-col overflow-hidden">
                     <TemplateForm
                         template={template}
                         specimenTypes={specimenTypes}
+                        users={users}
                         onSuccess={() => onOpenChange(false)}
                     />
                 </div>

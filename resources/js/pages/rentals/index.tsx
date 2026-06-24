@@ -268,7 +268,7 @@ export default function RentalsIndex({
 
     return (
         <>
-            <Head title="Gestión de Alquileres" />
+            <Head title="Gestión de Otros Cobros" />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header */}
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -276,13 +276,12 @@ export default function RentalsIndex({
                         <div className="flex items-center gap-2">
                             <Tag className="h-6 w-6 text-primary" />
                             <h1 className="text-2xl font-bold tracking-tight">
-                                Gestión de Alquileres
+                                Gestión de Otros Cobros
                             </h1>
                         </div>
                         <p className="text-muted-foreground">
-                            Cree y gestione elementos de alquiler, registre
-                            pagos fiscales y visualice los comprobantes
-                            generados.
+                            Cree y gestione otros cobros, registre pagos
+                            fiscales y visualice los comprobantes generados.
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -293,7 +292,7 @@ export default function RentalsIndex({
                                 className="h-10 gap-2 border-primary text-primary hover:bg-primary/5"
                             >
                                 <Plus className="h-4 w-4" />
-                                <span>Nuevo Alquiler</span>
+                                <span>Nuevo Cobro</span>
                             </Button>
                         )}
                         {canEdit && (
@@ -326,6 +325,7 @@ export default function RentalsIndex({
                                 Rango de Fechas
                             </span>
                             <DateRangePicker
+                                cookieKey="date_filter_rentals"
                                 value={{
                                     from: filters.date_from || '',
                                     to: filters.date_to || '',
@@ -471,7 +471,7 @@ export default function RentalsIndex({
                                 <TableHead className="min-w-[200px] pl-5">
                                     {renderSortHeader(
                                         'name',
-                                        'Nombre Alquiler',
+                                        'Nombre del Cobro',
                                     )}
                                 </TableHead>
                                 <TableHead className="min-w-[250px]">
@@ -597,7 +597,7 @@ export default function RentalsIndex({
                                                                     rentalItem,
                                                                 )
                                                             }
-                                                            title="Editar Alquiler"
+                                                            title="Editar Cobro"
                                                             className="h-8 w-8"
                                                         >
                                                             <Edit2 className="h-4 w-4" />
@@ -614,8 +614,8 @@ export default function RentalsIndex({
                                         colSpan={canEdit ? 6 : 5}
                                         className="h-24 text-center text-muted-foreground"
                                     >
-                                        No se encontraron registros de
-                                        alquileres.
+                                        No se encontraron registros de otros
+                                        cobros.
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -660,13 +660,13 @@ export default function RentalsIndex({
                     <AlertDialogHeader>
                         <AlertDialogTitle className="flex items-center gap-2">
                             <FileText className="h-5 w-5 text-primary" />
-                            Factura de Alquiler Generada con Éxito
+                            Factura de Otro Cobro Generada con Éxito
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            El pago de alquiler ha sido registrado correctamente
-                            y la factura fiscal se generó en formato PDF. Puede
-                            visualizarla, imprimirla o descargarla a
-                            continuación.
+                            El pago de otro cobro ha sido registrado
+                            correctamente y la factura fiscal se generó en
+                            formato PDF. Puede visualizarla, imprimirla o
+                            descargarla a continuación.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
 
@@ -675,7 +675,7 @@ export default function RentalsIndex({
                             <iframe
                                 src={invoiceUrl}
                                 className="h-[400px] w-full border-none"
-                                title="Factura de Alquiler PDF"
+                                title="Factura de Otro Cobro PDF"
                             />
                         </div>
                     )}

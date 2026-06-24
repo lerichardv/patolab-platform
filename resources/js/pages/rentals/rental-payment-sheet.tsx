@@ -809,7 +809,7 @@ export default function RentalPaymentSheet({
         e.stopPropagation();
 
         if (!data.rental_id) {
-            toast.error('Debe seleccionar o crear un alquiler');
+            toast.error('Debe seleccionar o crear un cobro');
 
             return;
         }
@@ -856,7 +856,7 @@ export default function RentalPaymentSheet({
 
         post(payRental(parseInt(data.rental_id)).url, {
             onSuccess: () => {
-                toast.success('Pago de alquiler registrado con éxito');
+                toast.success('Pago de otro cobro registrado con éxito');
                 onOpenChange(false);
             },
             onError: (errs) => {
@@ -872,22 +872,22 @@ export default function RentalPaymentSheet({
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="z-[100] w-full overflow-y-auto sm:max-w-[750px]">
                 <HeadingSheet
-                    title="Registrar Pago de Alquiler"
-                    description="Configure el alquiler, el cliente, e ingrese los datos de facturación y forma de pago."
+                    title="Registrar Pago de Otro Cobro"
+                    description="Configure el cobro, el cliente, e ingrese los datos de facturación y forma de pago."
                 />
 
                 <form onSubmit={submit} className="mt-6 space-y-6 px-5 pb-10">
                     {/* SECTION 1: RENTAL & CUSTOMER */}
                     <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
                         <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                            Información del Alquiler y Cliente
+                            Información del Cobro y Cliente
                         </h3>
 
                         {/* Rental Selection */}
                         <div className="grid gap-2">
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="rental_id">
-                                    Alquiler Seleccionado *
+                                    Cobro Seleccionado *
                                 </Label>
                                 <button
                                     type="button"
@@ -909,7 +909,7 @@ export default function RentalPaymentSheet({
                                     id="rental_id"
                                     className="w-full"
                                 >
-                                    <SelectValue placeholder="Seleccione un alquiler existente" />
+                                    <SelectValue placeholder="Seleccione un cobro existente" />
                                 </SelectTrigger>
                                 <SelectContent className="z-[110]">
                                     {rentals.map((r) => (
@@ -1363,7 +1363,7 @@ export default function RentalPaymentSheet({
                                 onChange={(e) =>
                                     setData('description', e.target.value)
                                 }
-                                placeholder="Ej. Alquiler de sala de reuniones, período mensual, etc."
+                                placeholder="Ej. Cobro de sala de reuniones, período mensual, etc."
                                 rows={3}
                                 className="resize-none"
                             />

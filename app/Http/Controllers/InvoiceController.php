@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Bank;
 use App\Models\CaiRange;
+use App\Models\Credit;
+use App\Models\CreditInvoiceSpecimen;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\InvoiceGroupSpecimen;
 use App\Models\Location;
 use App\Models\Priority;
 use App\Models\Product;
@@ -45,11 +48,15 @@ class InvoiceController extends Controller
             'creditRelation',
             'rental',
             'group.specimens.customerRelation',
-            'group.specimens.type',
+            'group.specimens.type.prices',
             'group.specimens.examination',
             'group.specimens.category',
             'group.specimens.referrerRelation',
             'group.specimens.priority',
+            'groupSpecimens.specimen.type.prices',
+            'groupSpecimens.specimen.examination',
+            'groupSpecimens.specimen.customerRelation',
+            'groupSpecimens.specimen.products',
         ]);
 
         // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
@@ -98,12 +105,31 @@ class InvoiceController extends Controller
             $query->where('invoice_type', $request->get('invoice_type'));
         }
 
-        // Filter by date range
-        if ($request->filled('date_from')) {
-            $query->whereDate('invoices.created_at', '>=', $request->get('date_from'));
+        // Resolve date range from request, cookie, or default
+        $userId = auth()->id();
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+
+        if (! $request->has('date_from') && ! $request->has('date_to')) {
+            $cookieName = "date_filter_invoices_user_{$userId}";
+            $cookieVal = $request->cookie($cookieName);
+            if ($cookieVal) {
+                $decoded = json_decode($cookieVal, true);
+                if (is_array($decoded)) {
+                    $dateFrom = $decoded['from'] ?? '';
+                    $dateTo = $decoded['to'] ?? '';
+                }
+            } else {
+                $dateFrom = now()->subDays(14)->toDateString();
+                $dateTo = now()->toDateString();
+            }
         }
-        if ($request->filled('date_to')) {
-            $query->whereDate('invoices.created_at', '<=', $request->get('date_to'));
+
+        if (! empty($dateFrom)) {
+            $query->whereDate('invoices.created_at', '>=', $dateFrom);
+        }
+        if (! empty($dateTo)) {
+            $query->whereDate('invoices.created_at', '<=', $dateTo);
         }
 
         // Filter by specimen group
@@ -191,10 +217,16 @@ class InvoiceController extends Controller
 
         return Inertia::render('invoices/index', [
             'invoices' => $invoices,
-            'filters' => $request->only([
-                'search', 'payment_type', 'customer_id', 'specimen_type_id',
-                'has_credit', 'date_from', 'date_to', 'sort_field', 'sort_direction', 'group_id', 'invoice_type',
-            ]),
+            'filters' => array_merge(
+                $request->only([
+                    'search', 'payment_type', 'customer_id', 'specimen_type_id',
+                    'has_credit', 'sort_field', 'sort_direction', 'group_id', 'invoice_type',
+                ]),
+                [
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                ]
+            ),
             'customers' => $customers,
             'specimenTypes' => $specimenTypes,
             'banks' => $banks,
@@ -265,12 +297,31 @@ class InvoiceController extends Controller
             $query->where('invoice_type', $request->get('invoice_type'));
         }
 
-        // Filter by date range
-        if ($request->filled('date_from')) {
-            $query->whereDate('invoices.created_at', '>=', $request->get('date_from'));
+        // Resolve date range from request, cookie, or default for export
+        $userId = auth()->id();
+        $dateFromExport = $request->get('date_from');
+        $dateToExport = $request->get('date_to');
+
+        if (! $request->has('date_from') && ! $request->has('date_to')) {
+            $cookieName = "date_filter_invoices_user_{$userId}";
+            $cookieVal = $request->cookie($cookieName);
+            if ($cookieVal) {
+                $decoded = json_decode($cookieVal, true);
+                if (is_array($decoded)) {
+                    $dateFromExport = $decoded['from'] ?? '';
+                    $dateToExport = $decoded['to'] ?? '';
+                }
+            } else {
+                $dateFromExport = now()->subDays(14)->toDateString();
+                $dateToExport = now()->toDateString();
+            }
         }
-        if ($request->filled('date_to')) {
-            $query->whereDate('invoices.created_at', '<=', $request->get('date_to'));
+
+        if (! empty($dateFromExport)) {
+            $query->whereDate('invoices.created_at', '>=', $dateFromExport);
+        }
+        if (! empty($dateToExport)) {
+            $query->whereDate('invoices.created_at', '<=', $dateToExport);
         }
 
         // Sorting
@@ -440,6 +491,15 @@ class InvoiceController extends Controller
             'transfer_value' => 'nullable|numeric|min:0',
             'transfer_authorization_code' => 'nullable|string|max:255',
             'proof_of_payment' => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp,gif|max:30720',
+            'group_specimens' => 'nullable|array',
+            'group_specimens.*.id' => 'required|integer|exists:invoice_group_specimens,id',
+            'group_specimens.*.selected_price' => 'required|string',
+            'group_specimens.*.custom_specimen_price' => 'required|numeric|min:0',
+            'group_specimens.*.quantity' => 'required|integer|min:1',
+            'group_specimens.*.age_discount_type' => 'nullable|string|in:third,fourth',
+            'group_specimens.*.age_discount_amount' => 'nullable|numeric|min:0',
+            'group_specimens.*.additional_discount_enabled' => 'nullable|boolean',
+            'group_specimens.*.additional_discount' => 'nullable|numeric|min:0',
         ]);
 
         if ($request->hasFile('proof_of_payment')) {
@@ -452,11 +512,109 @@ class InvoiceController extends Controller
             unset($validated['proof_of_payment']);
         }
 
+        // Extract group_specimens to process separately
+        $groupSpecimensData = $validated['group_specimens'] ?? null;
+        unset($validated['group_specimens']);
+
         $invoice->update($validated);
+
+        if ($groupSpecimensData) {
+            foreach ($groupSpecimensData as $item) {
+                $igs = InvoiceGroupSpecimen::with('specimen.type.prices')->findOrFail($item['id']);
+
+                $qty = (int) ($item['quantity'] ?? 1);
+                $priceVal = $item['selected_price'] === 'custom'
+                    ? (float) $item['custom_specimen_price']
+                    : (float) $item['selected_price'];
+
+                $prices = $igs->specimen->type->prices ?? collect();
+                $priceAmounts = $prices->map(fn ($p) => (float) $p->amount)->toArray();
+                $maxPrice = count($priceAmounts) > 0 ? max($priceAmounts) : 0.0;
+                $maxPrice = max($maxPrice, $priceVal);
+
+                $ageDiscountVal = (float) ($item['age_discount_amount'] ?? 0.0);
+                $addDiscountVal = ! empty($item['additional_discount_enabled']) ? (float) ($item['additional_discount'] ?? 0.0) : 0.0;
+                $diffDiscountVal = max(0.0, $maxPrice - $priceVal);
+
+                $totalDiscountPerUnit = $diffDiscountVal + $ageDiscountVal + $addDiscountVal;
+                $discountVal = $totalDiscountPerUnit * $qty;
+                $subtotalVal = ($maxPrice - $totalDiscountPerUnit) * $qty;
+                if ($subtotalVal < 0) {
+                    $subtotalVal = 0.0;
+                }
+                $totalVal = $subtotalVal;
+
+                $igs->update([
+                    'quantity' => $qty,
+                    'amount' => $priceVal,
+                    'discount' => $discountVal,
+                    'subtotal' => $subtotalVal,
+                    'exempt_amount' => $totalVal,
+                    'total' => $totalVal,
+                    'selected_price' => $item['selected_price'],
+                    'custom_specimen_price' => $item['selected_price'] === 'custom' ? $priceVal : 0.00,
+                    'additional_discount_enabled' => ! empty($item['additional_discount_enabled']),
+                    'additional_discount' => (float) ($item['additional_discount'] ?? 0.00),
+                    'age_discount_type' => $item['age_discount_type'] ?? null,
+                    'age_discount_amount' => $ageDiscountVal,
+                ]);
+
+                // Synchronize credit_invoice_specimens
+                $cis = CreditInvoiceSpecimen::where('invoice_id', $invoice->id)
+                    ->where('specimen_id', $igs->specimen_id)
+                    ->first();
+                if ($cis) {
+                    $cis->update([
+                        'quantity' => $qty,
+                        'amount' => $priceVal,
+                        'discount' => $discountVal,
+                        'subtotal' => $subtotalVal,
+                        'exempt_amount' => $totalVal,
+                        'total' => $totalVal,
+                        'selected_price' => $item['selected_price'],
+                        'custom_specimen_price' => $item['selected_price'] === 'custom' ? $priceVal : 0.00,
+                        'additional_discount_enabled' => ! empty($item['additional_discount_enabled']) ? 1 : 0,
+                        'additional_discount' => (float) ($item['additional_discount'] ?? 0.00),
+                        'age_discount_type' => $item['age_discount_type'] ?? null,
+                        'age_discount_amount' => $ageDiscountVal,
+                    ]);
+                }
+            }
+        }
+
+        // Update parent Credit record if present
+        if ($invoice->credit_payment_id) {
+            $credit = Credit::find($invoice->credit_payment_id);
+            if ($credit) {
+                // If it's a single specimen credit, synchronize credit_invoice_specimens
+                if (! $credit->is_group && $invoice->specimen_id) {
+                    $cis = CreditInvoiceSpecimen::where('credit_id', $credit->id)
+                        ->where('invoice_id', $invoice->id)
+                        ->where('specimen_id', $invoice->specimen_id)
+                        ->first();
+                    if ($cis) {
+                        $cis->update([
+                            'amount' => (float) $validated['amount'] - (float) ($validated['custom_amount'] ?? 0),
+                            'discount' => (float) $validated['discount'],
+                            'subtotal' => (float) $validated['subtotal'],
+                            'exempt_amount' => (float) $validated['total'],
+                            'total' => (float) $validated['total'],
+                        ]);
+                    }
+                }
+
+                $newTotal = (float) $validated['total'];
+                $amountPaid = (float) $credit->amount_paid;
+                $credit->update([
+                    'credit_amount' => $newTotal,
+                    'amount_remaining' => max(0.0, $newTotal - $amountPaid),
+                ]);
+            }
+        }
 
         if ($request->boolean('regenerate_pdf', true)) {
             try {
-                $invoice->load(['specimen.products', 'creditRelation', 'customer', 'caiRange', 'groupSpecimens.specimen.examination', 'groupSpecimens.specimen.customerRelation', 'groupSpecimens.specimen.type']);
+                $invoice->load(['specimen.products', 'creditRelation', 'customer', 'caiRange', 'groupSpecimens.specimen.examination', 'groupSpecimens.specimen.customerRelation', 'groupSpecimens.specimen.type.prices', 'groupSpecimens.specimen.products']);
                 $totalWords = $this->numberToSpanishWords($invoice->total);
 
                 $customer = $invoice->customer;

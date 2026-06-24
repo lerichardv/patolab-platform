@@ -50,12 +50,12 @@ export default function SpecimenViewSheet({
 }: Props) {
     const { auth } = usePage<any>().props;
 
+    const [copied, setCopied] = useState(false);
+    const [copiedGroup, setCopiedGroup] = useState(false);
+
     if (!specimen) {
         return null;
     }
-
-    const [copied, setCopied] = useState(false);
-    const [copiedGroup, setCopiedGroup] = useState(false);
 
     const copyPublicLink = () => {
         if (!specimen.access_token) {
@@ -216,7 +216,7 @@ export default function SpecimenViewSheet({
             const date = new Date(year, month - 1, day);
 
             return format(date, "dd 'de' MMMM, yyyy", { locale: es });
-        } catch (e) {
+        } catch {
             return dateStr;
         }
     };
@@ -265,6 +265,7 @@ export default function SpecimenViewSheet({
                         <div className="flex w-full justify-center gap-2 sm:w-auto sm:justify-start">
                             {invoice &&
                                 onEditInvoiceClick &&
+                                auth.permissions?.includes('invoices.view') &&
                                 auth.permissions?.includes(
                                     'specimens.edit',
                                 ) && (
@@ -730,353 +731,372 @@ export default function SpecimenViewSheet({
 
                             {invoice ? (
                                 <>
-                                    <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
-                                        <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
-                                            <CreditCard className="h-5 w-5" />{' '}
-                                            Información de Facturación
-                                        </h3>
-                                        <Separator />
-
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-1">
-                                                    <span className="text-xs text-muted-foreground">
-                                                        Número de Factura
-                                                    </span>
-                                                    <p className="text-sm font-semibold">
-                                                        {
-                                                            invoice.full_invoice_number
-                                                        }
-                                                    </p>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <span className="text-xs text-muted-foreground">
-                                                        Método de Pago
-                                                    </span>
-                                                    <div>
-                                                        <Badge
-                                                            variant={
-                                                                invoice.payment_type ===
-                                                                'credit'
-                                                                    ? 'destructive'
-                                                                    : 'default'
-                                                            }
-                                                            className="capitalize"
-                                                        >
-                                                            {getPaymentTypeLabel(
-                                                                invoice.payment_type,
-                                                            )}
-                                                        </Badge>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* CAI Details */}
-                                            {invoice.cai_range && (
-                                                <div className="space-y-1 rounded bg-muted/30 p-3 text-xs">
-                                                    <p className="font-semibold text-muted-foreground">
-                                                        Datos del Rango CAI:
-                                                    </p>
-                                                    <p>
-                                                        <span className="font-medium">
-                                                            CAI:
-                                                        </span>{' '}
-                                                        {invoice.cai_range.cai}
-                                                    </p>
-                                                    <p>
-                                                        <span className="font-medium">
-                                                            Rango:
-                                                        </span>{' '}
-                                                        {
-                                                            invoice.cai_range
-                                                                .from_number
-                                                        }{' '}
-                                                        al{' '}
-                                                        {
-                                                            invoice.cai_range
-                                                                .to_number
-                                                        }
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {/* Detalles de Método de Pago */}
-                                            {(invoice.payment_type !==
-                                                'credit' ||
-                                                (invoice.payment_type ===
-                                                    'credit' &&
-                                                    parseFloat(
-                                                        invoice.total_paid,
-                                                    ) > 0)) && (
-                                                <div className="space-y-2.5 rounded-lg border border-border bg-muted/20 p-4">
-                                                    <h4 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                                        Detalles del Pago{' '}
-                                                        {invoice.payment_type ===
-                                                            'credit' &&
-                                                            '(Pago Inicial)'}
-                                                    </h4>
-
-                                                    {invoice.payment_method_date && (
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-muted-foreground">
-                                                                Fecha de Pago:
-                                                            </span>
-                                                            <span className="font-medium">
-                                                                {formatPaymentDate(
-                                                                    invoice.payment_method_date,
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Cash */}
-                                                    {invoice.cash_value !==
-                                                        null &&
-                                                        parseFloat(
-                                                            invoice.cash_value,
-                                                        ) > 0 && (
-                                                            <div className="flex justify-between text-sm">
-                                                                <span className="text-muted-foreground">
-                                                                    Efectivo
-                                                                    Recibido:
-                                                                </span>
-                                                                <span className="font-medium text-foreground">
-                                                                    L.{' '}
-                                                                    {parseFloat(
-                                                                        invoice.cash_value,
-                                                                    ).toFixed(
-                                                                        2,
-                                                                    )}
-                                                                </span>
-                                                            </div>
-                                                        )}
-
-                                                    {/* Check */}
-                                                    {invoice.check_number && (
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-muted-foreground">
-                                                                Número de
-                                                                Cheque:
-                                                            </span>
-                                                            <span className="font-mono font-medium text-foreground">
-                                                                {
-                                                                    invoice.check_number
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {invoice.check_value !==
-                                                        null &&
-                                                        parseFloat(
-                                                            invoice.check_value,
-                                                        ) > 0 && (
-                                                            <div className="flex justify-between text-sm">
-                                                                <span className="text-muted-foreground">
-                                                                    Monto del
-                                                                    Cheque:
-                                                                </span>
-                                                                <span className="font-medium text-foreground">
-                                                                    L.{' '}
-                                                                    {parseFloat(
-                                                                        invoice.check_value,
-                                                                    ).toFixed(
-                                                                        2,
-                                                                    )}
-                                                                </span>
-                                                            </div>
-                                                        )}
-
-                                                    {/* Credit Card */}
-                                                    {invoice.card_last_4 && (
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-muted-foreground">
-                                                                Tarjeta (Últimos
-                                                                4):
-                                                            </span>
-                                                            <span className="font-mono font-medium text-foreground">
-                                                                **** **** ****{' '}
-                                                                {
-                                                                    invoice.card_last_4
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {invoice.card_expiration && (
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-muted-foreground">
-                                                                Vencimiento
-                                                                Tarjeta:
-                                                            </span>
-                                                            <span className="font-medium text-foreground">
-                                                                {
-                                                                    invoice.card_expiration
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {invoice.card_authorization_code && (
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-muted-foreground">
-                                                                Aut. Tarjeta:
-                                                            </span>
-                                                            <span className="font-mono font-medium text-foreground">
-                                                                {
-                                                                    invoice.card_authorization_code
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {invoice.card_value_charged !==
-                                                        null &&
-                                                        parseFloat(
-                                                            invoice.card_value_charged,
-                                                        ) > 0 && (
-                                                            <div className="flex justify-between text-sm">
-                                                                <span className="text-muted-foreground">
-                                                                    Monto
-                                                                    Cobrado
-                                                                    (Tarjeta):
-                                                                </span>
-                                                                <span className="font-medium text-foreground">
-                                                                    L.{' '}
-                                                                    {parseFloat(
-                                                                        invoice.card_value_charged,
-                                                                    ).toFixed(
-                                                                        2,
-                                                                    )}
-                                                                </span>
-                                                            </div>
-                                                        )}
-
-                                                    {/* Bank Transfer */}
-                                                    {invoice.transfer_bank && (
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-muted-foreground">
-                                                                Banco
-                                                                Transferencia:
-                                                            </span>
-                                                            <span className="font-medium text-foreground">
-                                                                {
-                                                                    invoice
-                                                                        .transfer_bank
-                                                                        .name
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {invoice.transfer_authorization_code && (
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-muted-foreground">
-                                                                Referencia/Autorización:
-                                                            </span>
-                                                            <span className="font-mono font-medium text-foreground">
-                                                                {
-                                                                    invoice.transfer_authorization_code
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {invoice.transfer_value !==
-                                                        null &&
-                                                        parseFloat(
-                                                            invoice.transfer_value,
-                                                        ) > 0 && (
-                                                            <div className="flex justify-between text-sm">
-                                                                <span className="text-muted-foreground">
-                                                                    Monto
-                                                                    Transferido:
-                                                                </span>
-                                                                <span className="font-medium text-foreground">
-                                                                    L.{' '}
-                                                                    {parseFloat(
-                                                                        invoice.transfer_value,
-                                                                    ).toFixed(
-                                                                        2,
-                                                                    )}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                </div>
-                                            )}
-
+                                    {auth.permissions?.includes(
+                                        'invoices.view',
+                                    ) && (
+                                        <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                            <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
+                                                <CreditCard className="h-5 w-5" />{' '}
+                                                Información de Facturación
+                                            </h3>
                                             <Separator />
 
-                                            {/* Totals Table */}
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-muted-foreground">
-                                                        Importe
-                                                    </span>
-                                                    <span>
-                                                        L.{' '}
-                                                        {parseFloat(
-                                                            invoice.amount,
-                                                        ).toFixed(2)}
-                                                    </span>
+                                            <div className="space-y-4">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-1">
+                                                        <span className="text-xs text-muted-foreground">
+                                                            Número de Factura
+                                                        </span>
+                                                        <p className="text-sm font-semibold">
+                                                            {
+                                                                invoice.full_invoice_number
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <span className="text-xs text-muted-foreground">
+                                                            Método de Pago
+                                                        </span>
+                                                        <div>
+                                                            <Badge
+                                                                variant={
+                                                                    invoice.payment_type ===
+                                                                    'credit'
+                                                                        ? 'destructive'
+                                                                        : 'default'
+                                                                }
+                                                                className="capitalize"
+                                                            >
+                                                                {getPaymentTypeLabel(
+                                                                    invoice.payment_type,
+                                                                )}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
-                                                    <span>Descuento</span>
-                                                    <span>
-                                                        - L.{' '}
-                                                        {parseFloat(
-                                                            invoice.discount,
-                                                        ).toFixed(2)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-muted-foreground">
-                                                        Subtotal
-                                                    </span>
-                                                    <span>
-                                                        L.{' '}
-                                                        {parseFloat(
-                                                            invoice.subtotal,
-                                                        ).toFixed(2)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-muted-foreground">
-                                                        Exento
-                                                    </span>
-                                                    <span>
-                                                        L.{' '}
-                                                        {parseFloat(
-                                                            invoice.exempt_amount,
-                                                        ).toFixed(2)}
-                                                    </span>
-                                                </div>
-                                                <Separator />
-                                                <div className="flex justify-between text-base font-bold text-primary">
-                                                    <span>Total Facturado</span>
-                                                    <span>
-                                                        L.{' '}
-                                                        {parseFloat(
-                                                            invoice.total,
-                                                        ).toFixed(2)}
-                                                    </span>
-                                                </div>
-                                            </div>
 
-                                            {/* Actions */}
-                                            {invoice.invoice_file && (
-                                                <div className="flex gap-2 pt-2">
-                                                    <a
-                                                        href={`/storage/${invoice.invoice_file}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-                                                    >
-                                                        <ExternalLink className="h-4 w-4" />{' '}
-                                                        Ver Factura PDF
-                                                    </a>
+                                                {/* CAI Details */}
+                                                {invoice.cai_range && (
+                                                    <div className="space-y-1 rounded bg-muted/30 p-3 text-xs">
+                                                        <p className="font-semibold text-muted-foreground">
+                                                            Datos del Rango CAI:
+                                                        </p>
+                                                        <p>
+                                                            <span className="font-medium">
+                                                                CAI:
+                                                            </span>{' '}
+                                                            {
+                                                                invoice
+                                                                    .cai_range
+                                                                    .cai
+                                                            }
+                                                        </p>
+                                                        <p>
+                                                            <span className="font-medium">
+                                                                Rango:
+                                                            </span>{' '}
+                                                            {
+                                                                invoice
+                                                                    .cai_range
+                                                                    .from_number
+                                                            }{' '}
+                                                            al{' '}
+                                                            {
+                                                                invoice
+                                                                    .cai_range
+                                                                    .to_number
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Detalles de Método de Pago */}
+                                                {(invoice.payment_type !==
+                                                    'credit' ||
+                                                    (invoice.payment_type ===
+                                                        'credit' &&
+                                                        parseFloat(
+                                                            invoice.total_paid,
+                                                        ) > 0)) && (
+                                                    <div className="space-y-2.5 rounded-lg border border-border bg-muted/20 p-4">
+                                                        <h4 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                                            Detalles del Pago{' '}
+                                                            {invoice.payment_type ===
+                                                                'credit' &&
+                                                                '(Pago Inicial)'}
+                                                        </h4>
+
+                                                        {invoice.payment_method_date && (
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-muted-foreground">
+                                                                    Fecha de
+                                                                    Pago:
+                                                                </span>
+                                                                <span className="font-medium">
+                                                                    {formatPaymentDate(
+                                                                        invoice.payment_method_date,
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Cash */}
+                                                        {invoice.cash_value !==
+                                                            null &&
+                                                            parseFloat(
+                                                                invoice.cash_value,
+                                                            ) > 0 && (
+                                                                <div className="flex justify-between text-sm">
+                                                                    <span className="text-muted-foreground">
+                                                                        Efectivo
+                                                                        Recibido:
+                                                                    </span>
+                                                                    <span className="font-medium text-foreground">
+                                                                        L.{' '}
+                                                                        {parseFloat(
+                                                                            invoice.cash_value,
+                                                                        ).toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                        {/* Check */}
+                                                        {invoice.check_number && (
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-muted-foreground">
+                                                                    Número de
+                                                                    Cheque:
+                                                                </span>
+                                                                <span className="font-mono font-medium text-foreground">
+                                                                    {
+                                                                        invoice.check_number
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {invoice.check_value !==
+                                                            null &&
+                                                            parseFloat(
+                                                                invoice.check_value,
+                                                            ) > 0 && (
+                                                                <div className="flex justify-between text-sm">
+                                                                    <span className="text-muted-foreground">
+                                                                        Monto
+                                                                        del
+                                                                        Cheque:
+                                                                    </span>
+                                                                    <span className="font-medium text-foreground">
+                                                                        L.{' '}
+                                                                        {parseFloat(
+                                                                            invoice.check_value,
+                                                                        ).toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                        {/* Credit Card */}
+                                                        {invoice.card_last_4 && (
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-muted-foreground">
+                                                                    Tarjeta
+                                                                    (Últimos 4):
+                                                                </span>
+                                                                <span className="font-mono font-medium text-foreground">
+                                                                    **** ****
+                                                                    ****{' '}
+                                                                    {
+                                                                        invoice.card_last_4
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {invoice.card_expiration && (
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-muted-foreground">
+                                                                    Vencimiento
+                                                                    Tarjeta:
+                                                                </span>
+                                                                <span className="font-medium text-foreground">
+                                                                    {
+                                                                        invoice.card_expiration
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {invoice.card_authorization_code && (
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-muted-foreground">
+                                                                    Aut.
+                                                                    Tarjeta:
+                                                                </span>
+                                                                <span className="font-mono font-medium text-foreground">
+                                                                    {
+                                                                        invoice.card_authorization_code
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {invoice.card_value_charged !==
+                                                            null &&
+                                                            parseFloat(
+                                                                invoice.card_value_charged,
+                                                            ) > 0 && (
+                                                                <div className="flex justify-between text-sm">
+                                                                    <span className="text-muted-foreground">
+                                                                        Monto
+                                                                        Cobrado
+                                                                        (Tarjeta):
+                                                                    </span>
+                                                                    <span className="font-medium text-foreground">
+                                                                        L.{' '}
+                                                                        {parseFloat(
+                                                                            invoice.card_value_charged,
+                                                                        ).toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                        {/* Bank Transfer */}
+                                                        {invoice.transfer_bank && (
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-muted-foreground">
+                                                                    Banco
+                                                                    Transferencia:
+                                                                </span>
+                                                                <span className="font-medium text-foreground">
+                                                                    {
+                                                                        invoice
+                                                                            .transfer_bank
+                                                                            .name
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {invoice.transfer_authorization_code && (
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-muted-foreground">
+                                                                    Referencia/Autorización:
+                                                                </span>
+                                                                <span className="font-mono font-medium text-foreground">
+                                                                    {
+                                                                        invoice.transfer_authorization_code
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {invoice.transfer_value !==
+                                                            null &&
+                                                            parseFloat(
+                                                                invoice.transfer_value,
+                                                            ) > 0 && (
+                                                                <div className="flex justify-between text-sm">
+                                                                    <span className="text-muted-foreground">
+                                                                        Monto
+                                                                        Transferido:
+                                                                    </span>
+                                                                    <span className="font-medium text-foreground">
+                                                                        L.{' '}
+                                                                        {parseFloat(
+                                                                            invoice.transfer_value,
+                                                                        ).toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                    </div>
+                                                )}
+
+                                                <Separator />
+
+                                                {/* Totals Table */}
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-muted-foreground">
+                                                            Importe
+                                                        </span>
+                                                        <span>
+                                                            L.{' '}
+                                                            {parseFloat(
+                                                                invoice.amount,
+                                                            ).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
+                                                        <span>Descuento</span>
+                                                        <span>
+                                                            - L.{' '}
+                                                            {parseFloat(
+                                                                invoice.discount,
+                                                            ).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-muted-foreground">
+                                                            Subtotal
+                                                        </span>
+                                                        <span>
+                                                            L.{' '}
+                                                            {parseFloat(
+                                                                invoice.subtotal,
+                                                            ).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm">
+                                                        <span className="text-muted-foreground">
+                                                            Exento
+                                                        </span>
+                                                        <span>
+                                                            L.{' '}
+                                                            {parseFloat(
+                                                                invoice.exempt_amount,
+                                                            ).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                    <Separator />
+                                                    <div className="flex justify-between text-base font-bold text-primary">
+                                                        <span>
+                                                            Total Facturado
+                                                        </span>
+                                                        <span>
+                                                            L.{' '}
+                                                            {parseFloat(
+                                                                invoice.total,
+                                                            ).toFixed(2)}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            )}
+
+                                                {/* Actions */}
+                                                {invoice.invoice_file && (
+                                                    <div className="flex gap-2 pt-2">
+                                                        <a
+                                                            href={`/storage/${invoice.invoice_file}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                                                        >
+                                                            <ExternalLink className="h-4 w-4" />{' '}
+                                                            Ver Factura PDF
+                                                        </a>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* Credit Status Card */}
                                     {invoice.payment_type === 'credit' &&
-                                        credit && (
+                                        credit &&
+                                        auth.permissions?.includes(
+                                            'credits.view',
+                                        ) && (
                                             <div className="space-y-4 rounded-lg border border-yellow-500/30 bg-card bg-yellow-500/[0.02] p-5 text-card-foreground shadow-sm">
                                                 <h3 className="flex items-center gap-2 text-lg font-semibold text-yellow-600 dark:text-yellow-400">
                                                     <Coins className="h-5 w-5" />{' '}
@@ -1154,69 +1174,74 @@ export default function SpecimenViewSheet({
                                         )}
 
                                     {/* Proof of Payment File */}
-                                    {invoice.proof_of_payment && (
-                                        <div className="mb-10 space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
-                                            <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
-                                                <FileText className="h-5 w-5" />{' '}
-                                                Comprobante de Pago
-                                            </h3>
-                                            <Separator />
+                                    {invoice.proof_of_payment &&
+                                        auth.permissions?.includes(
+                                            'invoices.view',
+                                        ) && (
+                                            <div className="mb-10 space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                                <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
+                                                    <FileText className="h-5 w-5" />{' '}
+                                                    Comprobante de Pago
+                                                </h3>
+                                                <Separator />
 
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-between rounded bg-muted/40 p-3">
-                                                    <div className="flex items-center gap-2">
-                                                        {isImageFile(
-                                                            invoice.proof_of_payment,
-                                                        ) ? (
-                                                            <FileImage className="h-5 w-5 text-blue-500" />
-                                                        ) : (
-                                                            <FileText className="h-5 w-5 text-red-500" />
-                                                        )}
-                                                        <span className="max-w-[200px] truncate text-xs font-medium">
-                                                            {invoice.proof_of_payment
-                                                                .split('/')
-                                                                .pop()}
-                                                        </span>
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center justify-between rounded bg-muted/40 p-3">
+                                                        <div className="flex items-center gap-2">
+                                                            {isImageFile(
+                                                                invoice.proof_of_payment,
+                                                            ) ? (
+                                                                <FileImage className="h-5 w-5 text-blue-500" />
+                                                            ) : (
+                                                                <FileText className="h-5 w-5 text-red-500" />
+                                                            )}
+                                                            <span className="max-w-[200px] truncate text-xs font-medium">
+                                                                {invoice.proof_of_payment
+                                                                    .split('/')
+                                                                    .pop()}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            <a
+                                                                href={`/storage/${invoice.proof_of_payment}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
+                                                            >
+                                                                <ExternalLink className="h-3.5 w-3.5" />{' '}
+                                                                Ver
+                                                            </a>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex gap-1">
-                                                        <a
-                                                            href={`/storage/${invoice.proof_of_payment}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
-                                                        >
-                                                            <ExternalLink className="h-3.5 w-3.5" />{' '}
-                                                            Ver
-                                                        </a>
-                                                    </div>
+
+                                                    {isImageFile(
+                                                        invoice.proof_of_payment,
+                                                    ) && (
+                                                        <div className="flex max-h-[250px] items-center justify-center overflow-hidden rounded-md border bg-muted/20">
+                                                            <img
+                                                                src={`/storage/${invoice.proof_of_payment}`}
+                                                                alt="Comprobante de Pago"
+                                                                className="max-h-[250px] max-w-full object-contain"
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
-
-                                                {isImageFile(
-                                                    invoice.proof_of_payment,
-                                                ) && (
-                                                    <div className="flex max-h-[250px] items-center justify-center overflow-hidden rounded-md border bg-muted/20">
-                                                        <img
-                                                            src={`/storage/${invoice.proof_of_payment}`}
-                                                            alt="Comprobante de Pago"
-                                                            className="max-h-[250px] max-w-full object-contain"
-                                                        />
-                                                    </div>
-                                                )}
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
                                 </>
                             ) : (
-                                <div className="space-y-2 rounded-lg border border-dashed p-6 text-center">
-                                    <CreditCard className="mx-auto h-8 w-8 text-muted-foreground" />
-                                    <h3 className="text-sm font-semibold">
-                                        Sin facturación registrada
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground">
-                                        Esta muestra no tiene un comprobante de
-                                        facturación asociado.
-                                    </p>
-                                </div>
+                                auth.permissions?.includes('invoices.view') && (
+                                    <div className="space-y-2 rounded-lg border border-dashed p-6 text-center">
+                                        <CreditCard className="mx-auto h-8 w-8 text-muted-foreground" />
+                                        <h3 className="text-sm font-semibold">
+                                            Sin facturación registrada
+                                        </h3>
+                                        <p className="text-xs text-muted-foreground">
+                                            Esta muestra no tiene un comprobante
+                                            de facturación asociado.
+                                        </p>
+                                    </div>
+                                )
                             )}
                         </div>
                     </div>

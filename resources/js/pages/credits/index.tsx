@@ -460,6 +460,7 @@ export default function CreditsIndex({
                                 Rango de Fechas
                             </span>
                             <DateRangePicker
+                                cookieKey="date_filter_credits"
                                 value={{
                                     from: filters.date_from || '',
                                     to: filters.date_to || '',

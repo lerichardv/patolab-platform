@@ -613,6 +613,9 @@ export default function SpecimenGroupSheet({
             selected_price: existingSpec
                 ? existingSpec.selected_price
                 : defaultPrice,
+            custom_specimen_price: existingSpec
+                ? existingSpec.custom_specimen_price
+                : '0',
             quantity: existingSpec ? existingSpec.quantity : 1,
             age_discount_type: existingSpec
                 ? existingSpec.age_discount_type
@@ -644,12 +647,55 @@ export default function SpecimenGroupSheet({
         setIsFormDirty(true);
     };
 
-    // Step 2 Price calculations per specimen and global
     const handleSpecimenPriceChange = (clientId: string, price: string) => {
         setSpecimens((prev) =>
             prev.map((s) => {
                 if (s.client_id === clientId) {
-                    return { ...s, selected_price: price };
+                    let ageAmt = 0;
+                    const chosenPrice =
+                        price === 'custom'
+                            ? parseFloat(s.custom_specimen_price) || 0
+                            : parseFloat(price) || 0;
+
+                    if (s.age_discount_type === 'third') {
+                        ageAmt = (chosenPrice * thirdAgePercent) / 100;
+                    } else if (s.age_discount_type === 'fourth') {
+                        ageAmt = (chosenPrice * fourthAgePercent) / 100;
+                    }
+
+                    return {
+                        ...s,
+                        selected_price: price,
+                        age_discount_amount: ageAmt.toString(),
+                    };
+                }
+
+                return s;
+            }),
+        );
+    };
+
+    const handleSpecimenCustomPriceChange = (
+        clientId: string,
+        customPrice: string,
+    ) => {
+        setSpecimens((prev) =>
+            prev.map((s) => {
+                if (s.client_id === clientId) {
+                    let ageAmt = 0;
+                    const chosenPrice = parseFloat(customPrice) || 0;
+
+                    if (s.age_discount_type === 'third') {
+                        ageAmt = (chosenPrice * thirdAgePercent) / 100;
+                    } else if (s.age_discount_type === 'fourth') {
+                        ageAmt = (chosenPrice * fourthAgePercent) / 100;
+                    }
+
+                    return {
+                        ...s,
+                        custom_specimen_price: customPrice,
+                        age_discount_amount: ageAmt.toString(),
+                    };
                 }
 
                 return s;
@@ -748,7 +794,13 @@ export default function SpecimenGroupSheet({
                       )
                     : 0;
 
-            return sum + maxVal * qty;
+            const chosen =
+                s.selected_price === 'custom'
+                    ? parseFloat(s.custom_specimen_price) || 0
+                    : parseFloat(s.selected_price) || 0;
+            const basePrice = Math.max(maxVal, chosen);
+
+            return sum + basePrice * qty;
         }, 0);
     }, [specimens, specimenTypes]);
 
@@ -764,8 +816,12 @@ export default function SpecimenGroupSheet({
                           ...prices.map((p: any) => parseFloat(p.amount) || 0),
                       )
                     : 0;
-            const chosen = parseFloat(s.selected_price) || 0;
-            const diff = Math.max(0, maxVal - chosen);
+            const chosen =
+                s.selected_price === 'custom'
+                    ? parseFloat(s.custom_specimen_price) || 0
+                    : parseFloat(s.selected_price) || 0;
+            const basePrice = Math.max(maxVal, chosen);
+            const diff = Math.max(0, basePrice - chosen);
             const ageDisc = parseFloat(s.age_discount_amount) || 0;
 
             return sum + (diff + ageDisc) * qty;
@@ -1211,6 +1267,7 @@ export default function SpecimenGroupSheet({
                 status: s.status,
                 priority_id: s.priority_id,
                 selected_price: s.selected_price,
+                custom_specimen_price: s.custom_specimen_price || '0',
                 quantity: s.quantity ?? 1,
                 age_discount_type: s.age_discount_type,
                 age_discount_amount: s.age_discount_amount,
@@ -1765,30 +1822,87 @@ export default function SpecimenGroupSheet({
                                                                     }
                                                                 >
                                                                     <SelectTrigger className="h-9">
-                                                                        <SelectValue placeholder="Seleccione un price" />
+                                                                        <SelectValue placeholder="Seleccione un precio" />
                                                                     </SelectTrigger>
                                                                     <SelectContent className="z-[110]">
-                                                                        {prices.map(
-                                                                            (
-                                                                                p: any,
-                                                                            ) => (
-                                                                                <SelectItem
-                                                                                    key={
-                                                                                        p.id
-                                                                                    }
-                                                                                    value={p.amount.toString()}
-                                                                                >
-                                                                                    L.{' '}
-                                                                                    {parseFloat(
-                                                                                        p.amount,
-                                                                                    ).toFixed(
-                                                                                        2,
-                                                                                    )}
+                                                                        {prices.length >
+                                                                        0 ? (
+                                                                            <>
+                                                                                {prices.map(
+                                                                                    (
+                                                                                        p: any,
+                                                                                    ) => (
+                                                                                        <SelectItem
+                                                                                            key={
+                                                                                                p.id
+                                                                                            }
+                                                                                            value={p.amount.toString()}
+                                                                                        >
+                                                                                            L.{' '}
+                                                                                            {parseFloat(
+                                                                                                p.amount,
+                                                                                            ).toFixed(
+                                                                                                2,
+                                                                                            )}
+                                                                                        </SelectItem>
+                                                                                    ),
+                                                                                )}
+                                                                                <SelectItem value="custom">
+                                                                                    Precio
+                                                                                    Personalizado
                                                                                 </SelectItem>
-                                                                            ),
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <SelectItem
+                                                                                    value="0"
+                                                                                    disabled
+                                                                                >
+                                                                                    No
+                                                                                    hay
+                                                                                    precios
+                                                                                    configurados
+                                                                                </SelectItem>
+                                                                                <SelectItem value="custom">
+                                                                                    Precio
+                                                                                    Personalizado
+                                                                                </SelectItem>
+                                                                            </>
                                                                         )}
                                                                     </SelectContent>
                                                                 </Select>
+                                                                {spec.selected_price ===
+                                                                    'custom' && (
+                                                                    <div className="mt-2 grid gap-1 transition-all duration-300">
+                                                                        <div className="relative">
+                                                                            <span className="absolute top-1/2 left-3 -translate-y-1/2 font-mono text-xs text-muted-foreground select-none">
+                                                                                L.
+                                                                            </span>
+                                                                            <Input
+                                                                                type="number"
+                                                                                step="0.01"
+                                                                                min="0"
+                                                                                value={
+                                                                                    spec.custom_specimen_price ||
+                                                                                    ''
+                                                                                }
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    handleSpecimenCustomPriceChange(
+                                                                                        spec.client_id,
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    )
+                                                                                }
+                                                                                placeholder="0.00"
+                                                                                className="h-8 pl-7 font-mono text-xs"
+                                                                                required
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
 
                                                             <div className="grid gap-2">

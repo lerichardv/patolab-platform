@@ -87,7 +87,7 @@ const mainNavItems: NavItem[] = [
         prefetch: false,
     },
     {
-        title: 'Alquileres',
+        title: 'Otros Cobros',
         href: rentalsIndex(),
         icon: Tag,
         permission: 'rentals.view',

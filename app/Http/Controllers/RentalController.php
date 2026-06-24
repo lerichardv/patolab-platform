@@ -55,12 +55,31 @@ class RentalController extends Controller
             });
         }
 
-        // Filter by date range
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->get('date_from'));
+        // Resolve date range from request, cookie, or default
+        $userId = auth()->id();
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+
+        if (! $request->has('date_from') && ! $request->has('date_to')) {
+            $cookieName = "date_filter_rentals_user_{$userId}";
+            $cookieVal = $request->cookie($cookieName);
+            if ($cookieVal) {
+                $decoded = json_decode($cookieVal, true);
+                if (is_array($decoded)) {
+                    $dateFrom = $decoded['from'] ?? '';
+                    $dateTo = $decoded['to'] ?? '';
+                }
+            } else {
+                $dateFrom = now()->subDays(14)->toDateString();
+                $dateTo = now()->toDateString();
+            }
         }
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->get('date_to'));
+
+        if (! empty($dateFrom)) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if (! empty($dateTo)) {
+            $query->whereDate('created_at', '<=', $dateTo);
         }
 
         // Sorting
@@ -92,7 +111,13 @@ class RentalController extends Controller
         return Inertia::render('rentals/index', [
             'rentals' => $rentals,
             'allRentals' => $allRentals,
-            'filters' => $request->only(['search', 'customer_id', 'date_from', 'date_to', 'sort_field', 'sort_direction']),
+            'filters' => array_merge(
+                $request->only(['search', 'customer_id', 'sort_field', 'sort_direction']),
+                [
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                ]
+            ),
             'customers' => $customers,
             'banks' => $banks,
         ]);

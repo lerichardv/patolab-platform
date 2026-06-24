@@ -33,6 +33,12 @@ class InvoiceGroupSpecimen extends Model
         'isv_15',
         'isv_18',
         'total',
+        'selected_price',
+        'custom_specimen_price',
+        'additional_discount_enabled',
+        'additional_discount',
+        'age_discount_type',
+        'age_discount_amount',
     ];
 
     protected $casts = [
@@ -46,6 +52,10 @@ class InvoiceGroupSpecimen extends Model
         'total' => 'decimal:2',
         'quantity' => 'integer',
         'amount' => 'decimal:2',
+        'custom_specimen_price' => 'decimal:2',
+        'additional_discount_enabled' => 'boolean',
+        'additional_discount' => 'decimal:2',
+        'age_discount_amount' => 'decimal:2',
     ];
 
     /**

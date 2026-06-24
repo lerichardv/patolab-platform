@@ -61,12 +61,31 @@ class UserCommissionController extends Controller
             $query->where('specimen.specimen_type', $request->get('specimen_type_id'));
         }
 
-        if ($request->has('date_from') && $request->filled('date_from')) {
-            $query->whereDate('user_commissions.created_at', '>=', $request->get('date_from'));
+        // Resolve date range from request, cookie, or default
+        $userId = auth()->id();
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+
+        if (! $request->has('date_from') && ! $request->has('date_to')) {
+            $cookieName = "date_filter_user_commissions_user_{$userId}";
+            $cookieVal = $request->cookie($cookieName);
+            if ($cookieVal) {
+                $decoded = json_decode($cookieVal, true);
+                if (is_array($decoded)) {
+                    $dateFrom = $decoded['from'] ?? '';
+                    $dateTo = $decoded['to'] ?? '';
+                }
+            } else {
+                $dateFrom = now()->subDays(14)->toDateString();
+                $dateTo = now()->toDateString();
+            }
         }
 
-        if ($request->has('date_to') && $request->filled('date_to')) {
-            $query->whereDate('user_commissions.created_at', '<=', $request->get('date_to'));
+        if (! empty($dateFrom)) {
+            $query->whereDate('user_commissions.created_at', '>=', $dateFrom);
+        }
+        if (! empty($dateTo)) {
+            $query->whereDate('user_commissions.created_at', '<=', $dateTo);
         }
 
         // Apply sorting
@@ -99,16 +118,20 @@ class UserCommissionController extends Controller
             'commissions' => $commissions,
             'users' => $users,
             'specimenTypes' => $specimenTypes,
-            'filters' => $request->only([
-                'search',
-                'status',
-                'user_id',
-                'specimen_type_id',
-                'date_from',
-                'date_to',
-                'sort_field',
-                'sort_direction',
-            ]),
+            'filters' => array_merge(
+                $request->only([
+                    'search',
+                    'status',
+                    'user_id',
+                    'specimen_type_id',
+                    'sort_field',
+                    'sort_direction',
+                ]),
+                [
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                ]
+            ),
         ]);
     }
 

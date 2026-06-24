@@ -1,7 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
 import { Edit2, FileSpreadsheet, Plus, Search, Trash2 } from 'lucide-react';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
     index as specimenTypeTemplatesIndex,
@@ -30,22 +30,41 @@ import {
 } from '@/components/ui/table';
 import TemplateSheet from './template-sheet';
 
+interface User {
+    id: number;
+    name: string;
+    email: string;
+}
+
+interface SpecimenTypeExamination {
+    id: number;
+    name: string;
+}
+
 interface SpecimenType {
     id: number;
     name: string;
-    has_template: boolean;
+    examinations: SpecimenTypeExamination[];
 }
 
 interface Template {
     id: number;
+    user_id: number;
+    user: User | null;
     specimen_type_id: number;
     specimen_type: {
         id: number;
         name: string;
-    };
+    } | null;
+    specimen_type_examination_id: number;
+    specimen_type_examination: SpecimenTypeExamination | null;
+    clinical_details_html: string | null;
     diagnosis_html: string | null;
     macroscopy_html: string | null;
     microscopy_html: string | null;
+    comments_notes_html: string | null;
+    protocols_html: string | null;
+    legend_html: string | null;
     created_at: string;
 }
 
@@ -64,6 +83,7 @@ interface Props {
         to: number;
     };
     specimenTypes: SpecimenType[];
+    users: User[];
     filters: {
         search?: string;
     };
@@ -72,6 +92,7 @@ interface Props {
 export default function TemplatesIndex({
     templates,
     specimenTypes,
+    users,
     filters,
 }: Props) {
     const { auth } = usePage<any>().props;
@@ -93,31 +114,35 @@ export default function TemplatesIndex({
     );
     const [search, setSearch] = useState(filters.search || '');
 
-    const handleFilterChange = (key: string, value: string) => {
-        const newFilters = { ...filters, [key]: value };
+    const handleFilterChange = useCallback(
+        (key: string, value: string) => {
+            const newFilters = { ...filters, [key]: value };
 
-        if (value === '') {
-            delete newFilters[key as keyof typeof filters];
-        }
+            if (value === '') {
+                delete newFilters[key as keyof typeof filters];
+            }
 
-        router.get(specimenTypeTemplatesIndex().url, newFilters, {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            handleFilterChange('search', value);
-        }, 300),
+            router.get(specimenTypeTemplatesIndex().url, newFilters, {
+                preserveState: true,
+                replace: true,
+            });
+        },
         [filters],
+    );
+
+    const debouncedSearch = useMemo(
+        () =>
+            debounce((value: string) => {
+                handleFilterChange('search', value);
+            }, 300),
+        [handleFilterChange],
     );
 
     useEffect(() => {
         if (search !== filters.search) {
             debouncedSearch(search);
         }
-    }, [search]);
+    }, [search, filters.search, debouncedSearch]);
 
     const handleEdit = (template: Template) => {
         setSelectedTemplate(template);
@@ -194,7 +219,7 @@ export default function TemplatesIndex({
                     <div className="relative">
                         <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Buscar por tipo de muestra..."
+                            placeholder="Buscar por usuario, tipo de muestra, examen..."
                             className="pl-8"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -206,7 +231,9 @@ export default function TemplatesIndex({
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead>Usuario</TableHead>
                                 <TableHead>Tipo de Muestra</TableHead>
+                                <TableHead>Examen</TableHead>
                                 <TableHead>Diagnóstico</TableHead>
                                 <TableHead>Macroscopía</TableHead>
                                 <TableHead>Microscopía</TableHead>
@@ -220,8 +247,16 @@ export default function TemplatesIndex({
                                 templates.data.map((template) => (
                                     <TableRow key={template.id}>
                                         <TableCell className="font-medium">
+                                            {template.user?.name ||
+                                                'Desconocido'}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
                                             {template.specimen_type?.name ||
                                                 'Desconocido'}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                            {template.specimen_type_examination
+                                                ?.name || 'Desconocido'}
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">
                                             {stripHtml(template.diagnosis_html)}
@@ -275,7 +310,7 @@ export default function TemplatesIndex({
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={5}
+                                        colSpan={7}
                                         className="h-24 text-center"
                                     >
                                         No se encontraron resultados.
@@ -299,6 +334,7 @@ export default function TemplatesIndex({
             <TemplateSheet
                 template={selectedTemplate}
                 specimenTypes={specimenTypes}
+                users={users}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
             />
@@ -316,7 +352,12 @@ export default function TemplatesIndex({
                             Esta acción eliminará de forma permanente la
                             plantilla para{' '}
                             <strong>
-                                {templateToDelete?.specimen_type?.name}
+                                {templateToDelete?.specimen_type?.name} -{' '}
+                                {
+                                    templateToDelete?.specimen_type_examination
+                                        ?.name
+                                }{' '}
+                                ({templateToDelete?.user?.name})
                             </strong>
                             . No se puede deshacer.
                         </AlertDialogDescription>

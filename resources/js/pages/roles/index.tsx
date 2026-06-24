@@ -146,8 +146,8 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
-        label: 'Alquileres',
-        description: 'Gestión de alquileres de equipos, espacios o servicios.',
+        label: 'Otros Cobros',
+        description: 'Gestión de cobros de equipos, espacios o servicios.',
         slugs: {
             view: 'rentals.view',
             create: 'rentals.create',

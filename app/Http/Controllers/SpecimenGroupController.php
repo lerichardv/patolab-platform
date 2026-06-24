@@ -79,7 +79,8 @@ class SpecimenGroupController extends Controller
             'specimens.*.priority_id' => 'required|exists:priorities,id',
 
             // Nested pricing config for each specimen
-            'specimens.*.selected_price' => 'required|numeric|min:0',
+            'specimens.*.selected_price' => 'required|string',
+            'specimens.*.custom_specimen_price' => 'nullable|numeric|min:0',
             'specimens.*.quantity' => 'required|integer|min:1',
             'specimens.*.age_discount_type' => 'nullable|string|in:third,fourth',
             'specimens.*.age_discount_amount' => 'nullable|numeric|min:0',
@@ -112,7 +113,9 @@ class SpecimenGroupController extends Controller
 
             foreach ($specimensData as $specData) {
                 $qty = (int) ($specData['quantity'] ?? 1);
-                $basePrice = (float) $specData['selected_price'];
+                $basePrice = $specData['selected_price'] === 'custom'
+                    ? (float) ($specData['custom_specimen_price'] ?? 0.00)
+                    : (float) $specData['selected_price'];
                 $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
                 $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
 
@@ -306,7 +309,9 @@ class SpecimenGroupController extends Controller
                 ]);
 
                 $qty = (int) ($specData['quantity'] ?? 1);
-                $basePrice = (float) $specData['selected_price'];
+                $basePrice = $specData['selected_price'] === 'custom'
+                    ? (float) ($specData['custom_specimen_price'] ?? 0.00)
+                    : (float) $specData['selected_price'];
                 $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
                 $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
                 $disc = $ageDiscount + $additionalDiscount;
@@ -330,6 +335,12 @@ class SpecimenGroupController extends Controller
                     'isv_15' => 0.00,
                     'isv_18' => 0.00,
                     'total' => $sub * $qty,
+                    'selected_price' => $specData['selected_price'],
+                    'custom_specimen_price' => $specData['selected_price'] === 'custom' ? (float) ($specData['custom_specimen_price'] ?? 0.00) : 0.00,
+                    'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']),
+                    'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
+                    'age_discount_type' => $specData['age_discount_type'] ?? null,
+                    'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
                 ]);
 
                 // Map specimen to the credit in credit_invoice_specimens if credit checkout
@@ -357,6 +368,12 @@ class SpecimenGroupController extends Controller
                         'isv_15' => 0.00,
                         'isv_18' => 0.00,
                         'total' => $sub * $qty,
+                        'selected_price' => $specData['selected_price'],
+                        'custom_specimen_price' => $specData['selected_price'] === 'custom' ? (float) ($specData['custom_specimen_price'] ?? 0.00) : 0.00,
+                        'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']) ? 1 : 0,
+                        'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
+                        'age_discount_type' => $specData['age_discount_type'] ?? null,
+                        'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
@@ -420,7 +437,7 @@ class SpecimenGroupController extends Controller
                     'sequence_code' => $sequenceCode,
                     'exam_name' => $typeName.' - '.$examName,
                     'patient_name' => Customer::find($specData['customer'])->name,
-                    'price' => (float) $specData['selected_price'],
+                    'price' => $basePrice,
                     'discount' => (float) ($specData['age_discount_amount'] ?? 0.00) + (! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00),
                     'age_discount_type' => $specData['age_discount_type'] ?? null,
                     'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),

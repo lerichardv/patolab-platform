@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Priority;
+use App\Models\SpecimenType;
+use App\Models\SpecimenTypeExamination;
 use Inertia\Inertia;
 
 class MyAssignmentController extends Controller
@@ -21,10 +23,14 @@ class MyAssignmentController extends Controller
             ->get();
 
         $priorities = Priority::orderBy('order', 'asc')->get();
+        $specimenTypes = SpecimenType::where('active', true)->get();
+        $examinations = SpecimenTypeExamination::where('active', true)->get();
 
         return Inertia::render('my-assignments/index', [
             'specimens' => $specimens,
             'priorities' => $priorities,
+            'specimenTypes' => $specimenTypes,
+            'examinations' => $examinations,
         ]);
     }
 }

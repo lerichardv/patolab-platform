@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Factura de Alquiler {{ $invoice->full_invoice_number }}</title>
+    <title>Factura de Otro Cobro {{ $invoice->full_invoice_number }}</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
         
@@ -383,7 +383,7 @@
                 <tr>
                     <td>{{ $rowNum++ }}</td>
                     <td>
-                        <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">Alquiler: {{ $rental->name }}</div>
+                        <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">Otro Cobro: {{ $rental->name }}</div>
                         <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
                             Detalle: {{ $invoice->description ?? '-' }}
                         </div>

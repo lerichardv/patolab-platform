@@ -176,11 +176,11 @@ export default function Dashboard({
 
     const fallbackActions: DashboardAction[] = [
         {
-            title: 'Alquileres',
+            title: 'Otros Cobros',
             href: rentalsIndex(),
             icon: Tag,
             description:
-                'Administra el alquiler de equipos y espacios del laboratorio.',
+                'Administra cobros de equipos y espacios del laboratorio.',
             permission: 'rentals.view',
             bgIcon: 'bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-400',
             hoverBorder: 'hover:border-rose-500/30',
