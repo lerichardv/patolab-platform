@@ -26,11 +26,15 @@ import {
     Coins,
     Microscope,
 } from 'lucide-react';
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
 import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
 import { index as rentalsIndex } from '@/actions/App/Http/Controllers/RentalController';
-import { DateRangePicker } from '@/components/date-range-picker';
+import {
+    DateRangePicker,
+    setCookie,
+    getLast2WeeksRange,
+} from '@/components/date-range-picker';
 import HeadingSheet from '@/components/heading-sheet';
 import { Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -138,6 +142,8 @@ interface Props {
         payment_type?: string;
         customer_id?: string;
         specimen_type_id?: string;
+        status?: string;
+        examination_id?: string;
         has_credit?: string;
         date_from?: string;
         date_to?: string;
@@ -248,6 +254,20 @@ function FormCombobox({
     );
 }
 
+const ALL_STATUSES = [
+    {
+        value: 'active',
+        label: 'Activas (Recibida, Rev. Macro, Proceso, Rev. Micro)',
+    },
+    { value: 'received', label: 'Recibida' },
+    { value: 'macroscopic_review', label: 'Rev. Macroscópica' },
+    { value: 'processing', label: 'En Proceso' },
+    { value: 'microscopic_review', label: 'Rev. Microscópica' },
+    { value: 'finalized', label: 'Finalizada' },
+    { value: 'delivered', label: 'Entregada' },
+    { value: 'cancelled', label: 'Cancelada' },
+];
+
 export default function InvoicesIndex({
     invoices,
     filters,
@@ -269,6 +289,17 @@ export default function InvoicesIndex({
     const { props } = usePage() as any;
     const { auth } = props;
     const flash = props.flash || {};
+
+    const filteredExaminationsForDropdown = useMemo(() => {
+        const specTypeId = filters.specimen_type_id || 'all';
+        if (specTypeId === 'all') {
+            return examinations;
+        }
+
+        return examinations.filter(
+            (exam) => exam.specimen_type?.toString() === specTypeId,
+        );
+    }, [examinations, filters.specimen_type_id]);
     const canCreateSpecimen = auth.permissions?.includes('specimens.create');
     const canViewSpecimen = auth.permissions?.includes('specimens.view');
     const canEditSpecimen = auth.permissions?.includes('specimens.edit');
@@ -360,6 +391,41 @@ export default function InvoicesIndex({
 
         if (value === 'all' || value === '') {
             delete newFilters[key as keyof typeof filters];
+        }
+
+        const userId = auth?.user?.id;
+        if (userId) {
+            if (key === 'status') {
+                setCookie(`status_filter_invoices_user_${userId}`, value);
+            } else if (key === 'specimen_type_id') {
+                setCookie(
+                    `specimen_type_filter_invoices_user_${userId}`,
+                    value,
+                );
+                const examId = filters.examination_id || 'all';
+                if (value !== 'all' && examId !== 'all') {
+                    const hasValidExam = examinations.some(
+                        (exam) =>
+                            exam.id.toString() === examId &&
+                            exam.specimen_type?.toString() === value,
+                    );
+                    if (!hasValidExam) {
+                        delete newFilters.examination_id;
+                        setCookie(
+                            `examination_filter_invoices_user_${userId}`,
+                            'all',
+                        );
+                    }
+                } else if (value === 'all') {
+                    delete newFilters.examination_id;
+                    setCookie(
+                        `examination_filter_invoices_user_${userId}`,
+                        'all',
+                    );
+                }
+            } else if (key === 'examination_id') {
+                setCookie(`examination_filter_invoices_user_${userId}`, value);
+            }
         }
 
         router.get(invoicesIndex().url, newFilters, {
@@ -571,6 +637,41 @@ export default function InvoicesIndex({
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            className="h-10 gap-2"
+                            onClick={() => {
+                                const userId = auth?.user?.id;
+                                if (userId) {
+                                    const defaultRange = getLast2WeeksRange();
+                                    setCookie(
+                                        `status_filter_invoices_user_${userId}`,
+                                        'active',
+                                    );
+                                    setCookie(
+                                        `specimen_type_filter_invoices_user_${userId}`,
+                                        'all',
+                                    );
+                                    setCookie(
+                                        `examination_filter_invoices_user_${userId}`,
+                                        'all',
+                                    );
+                                    setCookie(
+                                        `date_filter_invoices_user_${userId}`,
+                                        JSON.stringify(defaultRange),
+                                    );
+                                }
+                                router.get(
+                                    invoicesIndex().url,
+                                    {},
+                                    {
+                                        preserveState: false,
+                                    },
+                                );
+                            }}
+                        >
+                            Limpiar filtros
+                        </Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
@@ -683,7 +784,7 @@ export default function InvoicesIndex({
                     </div>
 
                     {/* Row 2: Advanced filters */}
-                    <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+                    <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
                         <div className="flex w-full flex-col gap-1.5">
                             <span className="text-xs font-semibold text-muted-foreground">
                                 Método de Pago
@@ -743,6 +844,34 @@ export default function InvoicesIndex({
                         </div>
                         <div className="flex w-full flex-col gap-1.5">
                             <span className="text-xs font-semibold text-muted-foreground">
+                                Estado de Muestra
+                            </span>
+                            <Select
+                                value={filters.status || 'all'}
+                                onValueChange={(v) =>
+                                    handleFilterChange('status', v)
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Estado de Muestra" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        Todos los estados
+                                    </SelectItem>
+                                    {ALL_STATUSES.map((status) => (
+                                        <SelectItem
+                                            key={status.value}
+                                            value={status.value}
+                                        >
+                                            {status.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex w-full flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">
                                 Tipo de Muestra
                             </span>
                             <Select
@@ -766,6 +895,40 @@ export default function InvoicesIndex({
                                             {st.name}
                                         </SelectItem>
                                     ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex w-full flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                Examen
+                            </span>
+                            <Select
+                                value={filters.examination_id || 'all'}
+                                onValueChange={(v) =>
+                                    handleFilterChange('examination_id', v)
+                                }
+                                disabled={
+                                    filters.specimen_type_id === 'all' ||
+                                    !filters.specimen_type_id
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Examen" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        Todos los exámenes
+                                    </SelectItem>
+                                    {filteredExaminationsForDropdown.map(
+                                        (exam) => (
+                                            <SelectItem
+                                                key={exam.id}
+                                                value={exam.id.toString()}
+                                            >
+                                                {exam.name}
+                                            </SelectItem>
+                                        ),
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>

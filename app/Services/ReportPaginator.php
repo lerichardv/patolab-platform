@@ -6,7 +6,7 @@ class ReportPaginator
 {
     public static function paginate($specimen, $report, $customer, $referrer, $isMicroscopyVisible): array
     {
-        $pageContentHeight = 250.50; // mm
+        $pageContentHeight = 190.50; // mm
         $lineHeight = 3.97; // mm
         $maxCharsPerLine = 140;
         $signatureHeight = 19.84; // mm
@@ -219,6 +219,129 @@ class ReportPaginator
 
                 $currentPage[] = $block;
                 $currentHeight += $headingCost;
+
+                continue;
+            }
+
+            if ($block['type'] === 'image-grid') {
+                $columns = $block['columns'];
+                $images = $block['images'];
+
+                if (empty($images)) {
+                    $currentPage[] = [
+                        'type' => 'html',
+                        'html' => $block['html'],
+                        'height' => 5.3,
+                    ];
+                    $currentHeight += 5.3;
+
+                    continue;
+                }
+
+                $itemWidth = 185.9 / $columns;
+                $rowsRemaining = array_chunk($images, $columns);
+
+                // Pre-calculate height of each row using actual aspect ratios
+                $rowHeights = [];
+                foreach ($rowsRemaining as $rowIndex => $rowImages) {
+                    $maxRowAspectRatio = 0.0;
+                    foreach ($rowImages as $imgTag) {
+                        $aspectRatio = self::getImageAspectRatio($imgTag);
+                        if ($aspectRatio > $maxRowAspectRatio) {
+                            $maxRowAspectRatio = $aspectRatio;
+                        }
+                    }
+                    if ($maxRowAspectRatio <= 0.0) {
+                        $maxRowAspectRatio = 1.0;
+                    }
+                    $rowHeights[$rowIndex] = $itemWidth * $maxRowAspectRatio;
+                }
+
+                while (! empty($rowsRemaining)) {
+                    $maxHeightForPage = $pageContentHeight;
+                    $remaining = $maxHeightForPage - $currentHeight;
+
+                    // The index of the first row currently remaining
+                    $totalRows = count($rowHeights);
+                    $currentIndex = $totalRows - count($rowsRemaining);
+
+                    $minGridHeight = $rowHeights[$currentIndex] + 5.3;
+
+                    if ($remaining < $minGridHeight && count($currentPage) > 0) {
+                        $pages[] = $currentPage;
+                        $currentPage = [];
+                        $currentHeight = 0.0;
+
+                        continue;
+                    }
+
+                    // Find how many rows can fit in the remaining height
+                    $r = 0;
+                    for ($tempR = 1; $tempR <= count($rowsRemaining); $tempR++) {
+                        $cost = 5.3;
+                        for ($i = 0; $i < $tempR; $i++) {
+                            $cost += $rowHeights[$currentIndex + $i];
+                            if ($i > 0) {
+                                $cost += 3.18;
+                            }
+                        }
+                        if ($cost <= $remaining) {
+                            $r = $tempR;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    // If we can't fit even one row
+                    if ($r === 0) {
+                        if (count($currentPage) > 0) {
+                            // Move to next page
+                            $pages[] = $currentPage;
+                            $currentPage = [];
+                            $currentHeight = 0.0;
+
+                            continue;
+                        } else {
+                            // Already on empty page, force 1 row to prevent infinite loop
+                            $r = 1;
+                        }
+                    }
+
+                    // Build the slice of rows
+                    $sliceImages = [];
+                    for ($i = 0; $i < $r; $i++) {
+                        foreach ($rowsRemaining[$i] as $imgTag) {
+                            $aspect = self::getImageAspectRatio($imgTag);
+                            if (preg_match('/style=["\']([^"\']*)["\']/i', $imgTag, $styleMatch)) {
+                                $existingStyle = rtrim($styleMatch[1], ';');
+                                $newStyle = "{$existingStyle}; aspect-ratio: 1 / {$aspect}; object-fit: cover;";
+                                $imgTag = preg_replace('/style=["\']([^"\']*)["\']/i', 'style="'.$newStyle.'"', $imgTag);
+                            } else {
+                                $imgTag = str_replace('<img', '<img style="aspect-ratio: 1 / '.$aspect.'; object-fit: cover;"', $imgTag);
+                            }
+                            $sliceImages[] = $imgTag;
+                        }
+                    }
+
+                    $sliceHtml = "<div data-type=\"image-grid\" data-columns=\"{$columns}\">".implode('', $sliceImages).'</div>';
+
+                    $cost = 5.3;
+                    for ($i = 0; $i < $r; $i++) {
+                        $cost += $rowHeights[$currentIndex + $i];
+                        if ($i > 0) {
+                            $cost += 3.18;
+                        }
+                    }
+
+                    $currentPage[] = [
+                        'type' => 'html',
+                        'html' => $sliceHtml,
+                        'height' => $cost,
+                    ];
+
+                    $currentHeight += $cost;
+                    $rowsRemaining = array_slice($rowsRemaining, $r);
+                }
 
                 continue;
             }
@@ -584,21 +707,37 @@ class ReportPaginator
                 $columns = 2;
             }
 
-            $imgCount = preg_match_all('/<img/i', $blockHtml, $imgMatches);
-            if ($imgCount === 0) {
-                $imgCount = 1;
+            preg_match_all('/<img[^>]+>/i', $blockHtml, $imgMatches);
+            $imgTags = $imgMatches[0] ?? [];
+            if (empty($imgTags)) {
+                $imgTags = [];
             }
 
-            $rows = (int) ceil($imgCount / $columns);
-
-            // Available width inside page container (215.9mm - 30mm margins = 185.9mm)
+            $rowsOfImages = array_chunk($imgTags, $columns);
             $itemWidth = 185.9 / $columns;
-            $itemHeight = $itemWidth * 0.65;
-            $gridHeight = ($rows * $itemHeight) + (($rows - 1) * 3.18) + 5.3;
+            $gridHeight = 5.3;
+            foreach ($rowsOfImages as $i => $rowImages) {
+                $maxRowAspectRatio = 0.0;
+                foreach ($rowImages as $imgTag) {
+                    $aspectRatio = self::getImageAspectRatio($imgTag);
+                    if ($aspectRatio > $maxRowAspectRatio) {
+                        $maxRowAspectRatio = $aspectRatio;
+                    }
+                }
+                if ($maxRowAspectRatio <= 0.0) {
+                    $maxRowAspectRatio = 1.0;
+                }
+                $gridHeight += $itemWidth * $maxRowAspectRatio;
+                if ($i > 0) {
+                    $gridHeight += 3.18;
+                }
+            }
 
             return [
-                'type' => 'image',
+                'type' => 'image-grid',
                 'html' => $blockHtml,
+                'columns' => $columns,
+                'images' => $imgTags,
                 'height' => $gridHeight,
             ];
         }
@@ -772,20 +911,33 @@ class ReportPaginator
             $src = $srcMatch[1];
             $localPath = null;
 
-            $urlPath = parse_url($src, PHP_URL_PATH);
-            if ($urlPath) {
-                if (preg_match('/^\/storage\/(.+)$/', $urlPath, $storageMatches)) {
-                    $localPath = storage_path('app/public/'.$storageMatches[1]);
-                } else {
-                    $localPath = public_path(ltrim($urlPath, '/'));
+            if (str_starts_with($src, 'data:')) {
+                if (preg_match('/^data:[^;]+;base64,(.+)$/', $src, $base64Matches)) {
+                    $imgData = @base64_decode($base64Matches[1]);
+                    if ($imgData !== false) {
+                        $info = @getimagesizefromstring($imgData);
+                        if ($info) {
+                            $width = $info[0];
+                            $height = $info[1];
+                        }
+                    }
                 }
-            }
+            } else {
+                $urlPath = parse_url($src, PHP_URL_PATH);
+                if ($urlPath) {
+                    if (preg_match('/^\/storage\/(.+)$/', $urlPath, $storageMatches)) {
+                        $localPath = storage_path('app/public/'.$storageMatches[1]);
+                    } else {
+                        $localPath = public_path(ltrim($urlPath, '/'));
+                    }
+                }
 
-            if ($localPath && file_exists($localPath)) {
-                $info = @getimagesize($localPath);
-                if ($info) {
-                    $width = $info[0];
-                    $height = $info[1];
+                if ($localPath && file_exists($localPath)) {
+                    $info = @getimagesize($localPath);
+                    if ($info) {
+                        $width = $info[0];
+                        $height = $info[1];
+                    }
                 }
             }
         }
@@ -800,6 +952,57 @@ class ReportPaginator
         }
 
         return 47.64;
+    }
+
+    public static function getImageAspectRatio(string $imgTag): float
+    {
+        preg_match('/src=["\']([^"\']+)["\']/i', $imgTag, $srcMatch);
+        preg_match('/height=["\'](\d+)["\']/i', $imgTag, $heightMatch);
+        preg_match('/width=["\'](\d+)["\']/i', $imgTag, $widthMatch);
+
+        $height = isset($heightMatch[1]) ? (int) $heightMatch[1] : null;
+        $width = isset($widthMatch[1]) ? (int) $widthMatch[1] : null;
+
+        if ((! $height || ! $width) && isset($srcMatch[1])) {
+            $src = $srcMatch[1];
+            $localPath = null;
+
+            if (str_starts_with($src, 'data:')) {
+                if (preg_match('/^data:[^;]+;base64,(.+)$/', $src, $base64Matches)) {
+                    $imgData = @base64_decode($base64Matches[1]);
+                    if ($imgData !== false) {
+                        $info = @getimagesizefromstring($imgData);
+                        if ($info) {
+                            $width = $info[0];
+                            $height = $info[1];
+                        }
+                    }
+                }
+            } else {
+                $urlPath = parse_url($src, PHP_URL_PATH);
+                if ($urlPath) {
+                    if (preg_match('/^\/storage\/(.+)$/', $urlPath, $storageMatches)) {
+                        $localPath = storage_path('app/public/'.$storageMatches[1]);
+                    } else {
+                        $localPath = public_path(ltrim($urlPath, '/'));
+                    }
+                }
+
+                if ($localPath && file_exists($localPath)) {
+                    $info = @getimagesize($localPath);
+                    if ($info) {
+                        $width = $info[0];
+                        $height = $info[1];
+                    }
+                }
+            }
+        }
+
+        if ($height && $width && $width > 0) {
+            return (float) $height / $width;
+        }
+
+        return 1.0;
     }
 
     public static function paginateList(string $listHtml): array

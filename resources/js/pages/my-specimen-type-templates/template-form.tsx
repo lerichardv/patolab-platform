@@ -4,7 +4,6 @@ import { useForm } from '@inertiajs/react';
 import type { Editor } from '@tiptap/react';
 import {
     Check,
-    ChevronsUpDown,
     Microscope,
     ChevronDown,
     FileText,
@@ -16,7 +15,7 @@ import { toast } from 'sonner';
 import {
     store as storeTemplate,
     update as updateTemplate,
-} from '@/actions/App/Http/Controllers/SpecimenTypeTemplateController';
+} from '@/actions/App/Http/Controllers/MySpecimenTypeTemplateController';
 import {
     RichTextEditorArea,
     EditorToolbar,
@@ -39,12 +38,6 @@ import {
 } from '@/components/ui/popover';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-
-interface User {
-    id: number;
-    name: string;
-    email: string;
-}
 
 interface SpecimenTypeExamination {
     id: number;
@@ -81,97 +74,12 @@ interface Template {
 interface Props {
     template: Template | null;
     specimenTypes: SpecimenType[];
-    users: User[];
     onSuccess: () => void;
-}
-
-function FormCombobox({
-    options,
-    value,
-    onChange,
-    placeholder,
-    emptyMessage = 'No se encontraron resultados.',
-    disabled = false,
-}: {
-    options: { label: string; value: string }[];
-    value: string;
-    onChange: (value: string) => void;
-    placeholder: string;
-    emptyMessage?: string;
-    disabled?: boolean;
-}) {
-    const [open, setOpen] = useState(false);
-
-    const selectedOption = options.find((opt) => opt.value === value);
-
-    return (
-        <Popover open={open} onOpenChange={setOpen} modal={true}>
-            <PopoverTrigger asChild className="w-full">
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="h-10 w-full justify-between px-3 text-left font-normal"
-                    disabled={disabled}
-                >
-                    <span
-                        className={cn(
-                            'truncate',
-                            !selectedOption && 'text-muted-foreground',
-                        )}
-                    >
-                        {selectedOption ? selectedOption.label : placeholder}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                className="z-[120] w-[var(--radix-popover-trigger-width)] p-0"
-                align="start"
-            >
-                <Command>
-                    <CommandInput placeholder="Buscar..." />
-                    <CommandList>
-                        <CommandEmpty>{emptyMessage}</CommandEmpty>
-                        <CommandGroup>
-                            {options.map((option) => {
-                                const isSelected = option.value === value;
-
-                                return (
-                                    <CommandItem
-                                        key={option.value}
-                                        value={option.label}
-                                        onSelect={() => {
-                                            onChange(option.value);
-                                            setOpen(false);
-                                        }}
-                                    >
-                                        <Check
-                                            className={cn(
-                                                'mr-2 h-4 w-4 shrink-0',
-                                                isSelected
-                                                    ? 'opacity-100'
-                                                    : 'opacity-0',
-                                            )}
-                                        />
-                                        <span className="truncate">
-                                            {option.label}
-                                        </span>
-                                    </CommandItem>
-                                );
-                            })}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
-    );
 }
 
 export default function TemplateForm({
     template,
     specimenTypes,
-    users,
     onSuccess,
 }: Props) {
     const defaultSectionsOrder = [
@@ -185,7 +93,6 @@ export default function TemplateForm({
     ];
 
     const { data, setData, post, put, processing, errors } = useForm({
-        user_id: template?.user_id?.toString() || '',
         specimen_type_id: template?.specimen_type_id?.toString() || '',
         specimen_type_examination_id:
             template?.specimen_type_examination_id?.toString() || '',
@@ -217,7 +124,6 @@ export default function TemplateForm({
 
     useEffect(() => {
         setData({
-            user_id: template?.user_id?.toString() || '',
             specimen_type_id: template?.specimen_type_id?.toString() || '',
             specimen_type_examination_id:
                 template?.specimen_type_examination_id?.toString() || '',
@@ -292,12 +198,6 @@ export default function TemplateForm({
         }
     };
 
-    // Prepare users options for combobox
-    const userOptions = users.map((u) => ({
-        label: `${u.name} (${u.email})`,
-        value: u.id.toString(),
-    }));
-
     // Filter examinations based on selected specimen type
     const selectedType = specimenTypes.find(
         (type) => type.id.toString() === data.specimen_type_id,
@@ -313,22 +213,6 @@ export default function TemplateForm({
             >
                 {/* Header selection */}
                 <div className="shrink-0 space-y-4 border-b border-border bg-card px-4 py-4">
-                    {/* User Combobox */}
-                    <div className="space-y-2">
-                        <Label htmlFor="user_id">Usuario *</Label>
-                        <FormCombobox
-                            options={userOptions}
-                            value={data.user_id}
-                            onChange={(val) => setData('user_id', val)}
-                            placeholder="Seleccione un usuario"
-                            emptyMessage="No se encontraron usuarios."
-                        />
-                        {errors.user_id && (
-                            <p className="text-sm text-destructive">
-                                {errors.user_id}
-                            </p>
-                        )}
-                    </div>
                     <div className="flex flex-col items-start gap-4 md:flex-row md:items-center">
                         {/* Specimen Type Select */}
                         <div className="space-y-2">

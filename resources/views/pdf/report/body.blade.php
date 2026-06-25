@@ -405,7 +405,7 @@
         }
 
         .section-content div[data-type="image-grid"] img {
-            max-width: 100% !important;
+            width: 100% !important;
             height: auto !important;
             object-fit: cover;
             border-radius: 1.06mm;

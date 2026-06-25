@@ -9,6 +9,7 @@ use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MyAssignmentController;
+use App\Http\Controllers\MySpecimenTypeTemplateController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReferrerController;
 use App\Http\Controllers\ReferrerTypeController;
@@ -137,6 +138,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('rentals/{rental}/pay', [RentalController::class, 'pay'])->name('rentals.pay');
     Route::post('specimen-type-templates/upload-image', [SpecimenTypeTemplateController::class, 'uploadImage'])->name('specimen-type-templates.upload-image');
     Route::resource('specimen-type-templates', SpecimenTypeTemplateController::class);
+
+    Route::post('my-specimen-type-templates/upload-image', [MySpecimenTypeTemplateController::class, 'uploadImage'])->name('my-specimen-type-templates.upload-image');
+    Route::resource('my-specimen-type-templates', MySpecimenTypeTemplateController::class);
     Route::resource('specimen-categories', SpecimenCategoryController::class);
     Route::resource('specimen-types', SpecimenTypeController::class);
     Route::resource('specimen-type-examinations', SpecimenTypeExaminationController::class);

@@ -17,11 +17,12 @@ import {
     Search,
     RefreshCw,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
     DateRangePicker,
     getCookie,
+    setCookie,
     getLast2WeeksRange,
 } from '@/components/date-range-picker';
 import { Badge } from '@/components/ui/badge';
@@ -103,6 +104,13 @@ interface Props {
     priorities: Priority[];
     specimenTypes: any[];
     examinations: any[];
+    filters: {
+        status?: string[];
+        specimen_type_id?: string;
+        examination_id?: string;
+        date_from?: string;
+        date_to?: string;
+    };
 }
 
 const ALL_STATUSES = [
@@ -189,6 +197,7 @@ export default function MyAssignmentsIndex({
     priorities,
     specimenTypes,
     examinations,
+    filters,
 }: Props) {
     const { props } = usePage() as any;
     const [selectedSpecimen, setSelectedSpecimen] = useState<Specimen | null>(
@@ -209,39 +218,30 @@ export default function MyAssignmentsIndex({
         });
     };
 
-    // Filters State: Defaults matching specimens board
-    const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
-        'received',
-        'macroscopic_review',
-        'processing',
-        'microscopic_review',
-    ]);
+    // Filters State: Initialize from props
+    const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
+        () =>
+            filters.status || [
+                'received',
+                'macroscopic_review',
+                'processing',
+                'microscopic_review',
+            ],
+    );
 
     const [dateRange, setDateRange] = useState<{ from: string; to: string }>(
-        () => {
-            const userId = props.auth?.user?.id;
-
-            if (userId) {
-                const cookieVal = getCookie(
-                    `date_filter_my_assignments_user_${userId}`,
-                );
-
-                if (cookieVal) {
-                    try {
-                        return JSON.parse(cookieVal);
-                    } catch (e) {}
-                }
-            }
-
-            return getLast2WeeksRange();
-        },
+        () => ({
+            from: filters.date_from || '',
+            to: filters.date_to || '',
+        }),
     );
     const [searchQuery, setSearchQuery] = useState('');
 
     const [selectedSpecimenTypeId, setSelectedSpecimenTypeId] =
-        useState<string>('all');
-    const [selectedExaminationId, setSelectedExaminationId] =
-        useState<string>('all');
+        useState<string>(() => filters.specimen_type_id || 'all');
+    const [selectedExaminationId, setSelectedExaminationId] = useState<string>(
+        () => filters.examination_id || 'all',
+    );
     const [isSpecimenTypeFilterOpen, setIsSpecimenTypeFilterOpen] =
         useState(false);
     const [isExaminationFilterOpen, setIsExaminationFilterOpen] =
@@ -260,6 +260,7 @@ export default function MyAssignmentsIndex({
     const handleSpecimenTypeChange = (typeId: string) => {
         setSelectedSpecimenTypeId(typeId);
 
+        let nextExamId = selectedExaminationId;
         if (typeId !== 'all') {
             const hasValidExam = examinations.some(
                 (exam) =>
@@ -268,11 +269,38 @@ export default function MyAssignmentsIndex({
             );
 
             if (!hasValidExam) {
+                nextExamId = 'all';
                 setSelectedExaminationId('all');
             }
         } else {
+            nextExamId = 'all';
             setSelectedExaminationId('all');
         }
+
+        const userId = props.auth?.user?.id;
+        if (userId) {
+            setCookie(
+                `specimen_type_filter_my_assignments_user_${userId}`,
+                typeId,
+            );
+            setCookie(
+                `examination_filter_my_assignments_user_${userId}`,
+                nextExamId,
+            );
+        }
+
+        router.get(
+            '/my-assignments',
+            {
+                ...filters,
+                specimen_type_id: typeId,
+                examination_id: nextExamId,
+            },
+            {
+                preserveState: true,
+                replace: true,
+            },
+        );
     };
 
     // Filter specimens client-side
@@ -364,6 +392,24 @@ export default function MyAssignmentsIndex({
         return groups;
     }, [filteredSpecimens, priorities]);
 
+    useEffect(() => {
+        if (filters.status) {
+            setSelectedStatuses(filters.status);
+        }
+        if (filters.date_from !== undefined || filters.date_to !== undefined) {
+            setDateRange({
+                from: filters.date_from || '',
+                to: filters.date_to || '',
+            });
+        }
+        if (filters.specimen_type_id !== undefined) {
+            setSelectedSpecimenTypeId(filters.specimen_type_id || 'all');
+        }
+        if (filters.examination_id !== undefined) {
+            setSelectedExaminationId(filters.examination_id || 'all');
+        }
+    }, [filters]);
+
     const handleViewSpecimen = (specimen: Specimen) => {
         setSelectedSpecimen(specimen);
         setIsViewSheetOpen(true);
@@ -405,18 +451,40 @@ export default function MyAssignmentsIndex({
                                         <button
                                             type="button"
                                             onClick={() => {
+                                                const userId =
+                                                    props.auth?.user?.id;
+                                                let nextStatuses: string[] = [];
                                                 if (
-                                                    selectedStatuses.length ===
+                                                    selectedStatuses.length !==
                                                     ALL_STATUSES.length
                                                 ) {
-                                                    setSelectedStatuses([]);
-                                                } else {
-                                                    setSelectedStatuses(
+                                                    nextStatuses =
                                                         ALL_STATUSES.map(
                                                             (s) => s.value,
+                                                        );
+                                                }
+                                                setSelectedStatuses(
+                                                    nextStatuses,
+                                                );
+                                                if (userId) {
+                                                    setCookie(
+                                                        `status_filter_my_assignments_user_${userId}`,
+                                                        JSON.stringify(
+                                                            nextStatuses,
                                                         ),
                                                     );
                                                 }
+                                                router.get(
+                                                    '/my-assignments',
+                                                    {
+                                                        ...filters,
+                                                        status: nextStatuses,
+                                                    },
+                                                    {
+                                                        preserveState: true,
+                                                        replace: true,
+                                                    },
+                                                );
                                             }}
                                             className="cursor-pointer font-medium transition-colors hover:text-primary"
                                         >
@@ -438,20 +506,43 @@ export default function MyAssignmentsIndex({
                                                     key={status.value}
                                                     className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
                                                     onClick={() => {
-                                                        setSelectedStatuses(
-                                                            (prev) =>
-                                                                prev.includes(
-                                                                    status.value,
-                                                                )
-                                                                    ? prev.filter(
-                                                                          (s) =>
-                                                                              s !==
-                                                                              status.value,
-                                                                      )
-                                                                    : [
-                                                                          ...prev,
+                                                        const userId =
+                                                            props.auth?.user
+                                                                ?.id;
+                                                        const nextStatuses =
+                                                            selectedStatuses.includes(
+                                                                status.value,
+                                                            )
+                                                                ? selectedStatuses.filter(
+                                                                      (s) =>
+                                                                          s !==
                                                                           status.value,
-                                                                      ],
+                                                                  )
+                                                                : [
+                                                                      ...selectedStatuses,
+                                                                      status.value,
+                                                                  ];
+                                                        setSelectedStatuses(
+                                                            nextStatuses,
+                                                        );
+                                                        if (userId) {
+                                                            setCookie(
+                                                                `status_filter_my_assignments_user_${userId}`,
+                                                                JSON.stringify(
+                                                                    nextStatuses,
+                                                                ),
+                                                            );
+                                                        }
+                                                        router.get(
+                                                            '/my-assignments',
+                                                            {
+                                                                ...filters,
+                                                                status: nextStatuses,
+                                                            },
+                                                            {
+                                                                preserveState: true,
+                                                                replace: true,
+                                                            },
                                                         );
                                                     }}
                                                 >
@@ -473,8 +564,63 @@ export default function MyAssignmentsIndex({
                         <DateRangePicker
                             cookieKey="date_filter_my_assignments"
                             value={dateRange}
-                            onChange={setDateRange}
+                            onChange={(range) => {
+                                setDateRange(range);
+                                router.get(
+                                    '/my-assignments',
+                                    {
+                                        ...filters,
+                                        date_from: range.from,
+                                        date_to: range.to,
+                                    },
+                                    {
+                                        preserveState: true,
+                                        replace: true,
+                                    },
+                                );
+                            }}
                         />
+
+                        <Button
+                            variant="outline"
+                            className="h-10 w-full gap-2 px-5 text-sm md:w-auto"
+                            onClick={() => {
+                                const userId = props.auth?.user?.id;
+                                if (userId) {
+                                    const defaultRange = getLast2WeeksRange();
+                                    setCookie(
+                                        `status_filter_my_assignments_user_${userId}`,
+                                        JSON.stringify([
+                                            'received',
+                                            'macroscopic_review',
+                                            'processing',
+                                            'microscopic_review',
+                                        ]),
+                                    );
+                                    setCookie(
+                                        `specimen_type_filter_my_assignments_user_${userId}`,
+                                        'all',
+                                    );
+                                    setCookie(
+                                        `examination_filter_my_assignments_user_${userId}`,
+                                        'all',
+                                    );
+                                    setCookie(
+                                        `date_filter_my_assignments_user_${userId}`,
+                                        JSON.stringify(defaultRange),
+                                    );
+                                }
+                                router.get(
+                                    '/my-assignments',
+                                    {},
+                                    {
+                                        preserveState: false,
+                                    },
+                                );
+                            }}
+                        >
+                            Limpiar filtros
+                        </Button>
 
                         {/* Botón de recarga */}
                         <Button
@@ -649,6 +795,25 @@ export default function MyAssignmentsIndex({
                                                 setIsExaminationFilterOpen(
                                                     false,
                                                 );
+                                                const userId =
+                                                    props.auth?.user?.id;
+                                                if (userId) {
+                                                    setCookie(
+                                                        `examination_filter_my_assignments_user_${userId}`,
+                                                        'all',
+                                                    );
+                                                }
+                                                router.get(
+                                                    '/my-assignments',
+                                                    {
+                                                        ...filters,
+                                                        examination_id: 'all',
+                                                    },
+                                                    {
+                                                        preserveState: true,
+                                                        replace: true,
+                                                    },
+                                                );
                                             }}
                                         >
                                             <Check
@@ -668,11 +833,34 @@ export default function MyAssignmentsIndex({
                                                     key={exam.id}
                                                     value={exam.name}
                                                     onSelect={() => {
+                                                        const examId =
+                                                            exam.id.toString();
                                                         setSelectedExaminationId(
-                                                            exam.id.toString(),
+                                                            examId,
                                                         );
                                                         setIsExaminationFilterOpen(
                                                             false,
+                                                        );
+                                                        const userId =
+                                                            props.auth?.user
+                                                                ?.id;
+                                                        if (userId) {
+                                                            setCookie(
+                                                                `examination_filter_my_assignments_user_${userId}`,
+                                                                examId,
+                                                            );
+                                                        }
+                                                        router.get(
+                                                            '/my-assignments',
+                                                            {
+                                                                ...filters,
+                                                                examination_id:
+                                                                    examId,
+                                                            },
+                                                            {
+                                                                preserveState: true,
+                                                                replace: true,
+                                                            },
                                                         );
                                                     }}
                                                 >

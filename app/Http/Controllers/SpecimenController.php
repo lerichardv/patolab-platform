@@ -37,14 +37,108 @@ use Spatie\Browsershot\Browsershot;
 
 class SpecimenController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         Gate::authorize('specimens.view');
+        $userId = auth()->id();
+
+        // 1. Status Filter
+        $statusCookie = $request->cookie("status_filter_specimens_user_{$userId}");
+        $statuses = $request->get('status');
+        if (! $request->has('status') && $statusCookie) {
+            $statuses = json_decode($statusCookie, true);
+        }
+        $validStatuses = ['received', 'macroscopic_review', 'processing', 'microscopic_review', 'finalized', 'delivered', 'cancelled'];
+        if (! $statuses || ! is_array($statuses)) {
+            $statuses = ['received', 'macroscopic_review', 'processing', 'microscopic_review'];
+        } else {
+            $statuses = array_values(array_intersect($statuses, $validStatuses));
+            if (empty($statuses)) {
+                $statuses = ['received', 'macroscopic_review', 'processing', 'microscopic_review'];
+            }
+        }
+        if ($request->has('status')) {
+            cookie()->queue(cookie("status_filter_specimens_user_{$userId}", json_encode($statuses), 525600, null, null, null, false));
+        }
+
+        // 2. Specimen Type Filter
+        $typeCookie = $request->cookie("specimen_type_filter_specimens_user_{$userId}");
+        $specimenTypeId = $request->get('specimen_type_id', $typeCookie ?: 'all');
+        if ($specimenTypeId !== 'all' && ! is_numeric($specimenTypeId)) {
+            $specimenTypeId = 'all';
+        }
+        if ($request->has('specimen_type_id')) {
+            cookie()->queue(cookie("specimen_type_filter_specimens_user_{$userId}", $specimenTypeId, 525600, null, null, null, false));
+        }
+
+        // 3. Examination Filter
+        $examCookie = $request->cookie("examination_filter_specimens_user_{$userId}");
+        $examinationId = $request->get('examination_id', $examCookie ?: 'all');
+        if ($examinationId !== 'all' && ! is_numeric($examinationId)) {
+            $examinationId = 'all';
+        }
+        if ($request->has('examination_id')) {
+            cookie()->queue(cookie("examination_filter_specimens_user_{$userId}", $examinationId, 525600, null, null, null, false));
+        }
+
+        // 4. Date Range Filter
+        $dateCookie = $request->cookie("date_filter_specimens_user_{$userId}");
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+        if (! $request->has('date_from') && ! $request->has('date_to')) {
+            if ($dateCookie) {
+                $decoded = json_decode($dateCookie, true);
+                if (is_array($decoded)) {
+                    $dateFrom = $decoded['from'] ?? '';
+                    $dateTo = $decoded['to'] ?? '';
+                }
+            } else {
+                $dateFrom = now()->subDays(14)->toDateString();
+                $dateTo = now()->toDateString();
+            }
+        }
+        $isValidDate = function ($date) {
+            return ! empty($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date);
+        };
+        if ($dateFrom && ! $isValidDate($dateFrom)) {
+            $dateFrom = now()->subDays(14)->toDateString();
+        }
+        if ($dateTo && ! $isValidDate($dateTo)) {
+            $dateTo = now()->toDateString();
+        }
+        if ($request->has('date_from') || $request->has('date_to')) {
+            cookie()->queue(cookie("date_filter_specimens_user_{$userId}", json_encode(['from' => $dateFrom ?? '', 'to' => $dateTo ?? '']), 525600, null, null, null, false));
+        }
+
         $priorities = Priority::orderBy('order', 'desc')->get();
 
-        $priorities->load(['specimens' => function ($q) {
-            $q->where('specimen.active', true)
-                ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank'])
+        $priorities->load(['specimens' => function ($q) use ($statuses, $specimenTypeId, $examinationId, $dateFrom, $dateTo) {
+            $q->where('specimen.active', true);
+
+            // Filter by statuses
+            if (! empty($statuses)) {
+                $q->whereIn('specimen.status', $statuses);
+            }
+
+            // Filter by specimen type
+            if ($specimenTypeId && $specimenTypeId !== 'all') {
+                $q->where('specimen.specimen_type', $specimenTypeId);
+            }
+
+            // Filter by examination
+            if ($examinationId && $examinationId !== 'all') {
+                $q->where('specimen.specimen_type_examination', $examinationId);
+            }
+
+            // Filter by date range
+            if (! empty($dateFrom)) {
+                $q->whereDate('specimen.created_at', '>=', $dateFrom);
+            }
+            if (! empty($dateTo)) {
+                $q->whereDate('specimen.created_at', '<=', $dateTo);
+            }
+
+            $q->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank'])
                 ->leftJoin(\DB::raw('(SELECT specimen_id, priority_id, MIN(`order`) as board_order FROM priorities_specimens_order GROUP BY specimen_id, priority_id) as pso'), function ($join) {
                     $join->on('specimen.id', '=', 'pso.specimen_id')
                         ->on('specimen.priority_id', '=', 'pso.priority_id');
@@ -104,6 +198,13 @@ class SpecimenController extends Controller
             'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
             'pathologists' => $pathologists,
             'banks' => Bank::all(),
+            'filters' => [
+                'status' => $statuses,
+                'specimen_type_id' => $specimenTypeId,
+                'examination_id' => $examinationId,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ],
         ]);
     }
 

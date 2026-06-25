@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Cookie\Middleware\EncryptCookies as BaseEncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
 
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'date_filter_*']);
+        $middleware->replace(BaseEncryptCookies::class, EncryptCookies::class);
 
         $middleware->web(append: [
             HandleAppearance::class,

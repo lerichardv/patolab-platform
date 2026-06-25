@@ -82,6 +82,8 @@ class MorePermissionsSeeder extends Seeder
             ['name' => 'Crear Plantilla de Muestra', 'slug' => 'specimen_type_templates.create'],
             ['name' => 'Editar Plantilla de Muestra', 'slug' => 'specimen_type_templates.edit'],
             ['name' => 'Eliminar Plantilla de Muestra', 'slug' => 'specimen_type_templates.delete'],
+            ['name' => 'Ver Mis Plantillas de Muestra', 'slug' => 'my_specimen_type_templates.view'],
+            ['name' => 'Gestionar Mis Plantillas de Muestra', 'slug' => 'my_specimen_type_templates.manage'],
         ];
 
         foreach ($permissions as $permission) {

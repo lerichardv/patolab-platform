@@ -6,28 +6,28 @@
     
     <table class="footer-contact-table">
         <tr>
-            <td class="contact-col">
+            <td class="contact-col" style="width: 22%;">
                 <div class="contact-item">
                     <span class="contact-icon">&#9993;</span>
                     <span class="contact-text">info@PatoLab.org</span>
                 </div>
             </td>
-            <td class="contact-col">
+            <td class="contact-col" style="width: 20%;">
                 <div class="contact-item">
                     <span class="contact-icon">&#9742;</span>
                     <span class="contact-text">+504 2510-6502</span>
                 </div>
             </td>
-            <td class="contact-col">
+            <td class="contact-col" style="width: 20%;">
                 <div class="contact-item">
                     <span class="contact-icon">&#128222;</span>
                     <span class="contact-text">+504 9442 8529</span>
                 </div>
             </td>
-            <td class="contact-col" style="text-align: right;">
-                <div class="contact-item" style="display: inline-block; text-align: left; max-width: 52.92mm;">
-                    <span class="contact-icon">&#128205;</span>
-                    <span class="contact-text" style="font-size: 1.98mm;">Bo. Los Andes 7 Calle Entre 12 Y 13 Ave. Blvd Los Caminantes, San Pedro Sula, Cortés, Honduras, C. A.</span>
+            <td class="contact-col" style="width: 38%; text-align: right;">
+                <div class="contact-item" style="display: inline-block; text-align: left; max-width: 70mm;">
+                    <span class="contact-icon" style="display: inline-block; vertical-align: top;">&#128205;</span>
+                    <span class="contact-text" style="font-size: 1.5mm; line-height: 1.15; display: inline-block; vertical-align: top; max-width: 64mm;">Barrio los Andes: 7, 12-13 Calle Avenida, Sector N.O., Casa NO.: 105, Departamento: Cortes, Municipio: San Pedro Sula</span>
                 </div>
             </td>
         </tr>

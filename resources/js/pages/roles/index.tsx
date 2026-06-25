@@ -222,6 +222,15 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Mis Plantillas de Muestra',
+        description:
+            'Plantillas de diagnóstico que pertenezcan o sean creadas por el usuario actual.',
+        slugs: {
+            view: 'my_specimen_type_templates.view',
+            manage: 'my_specimen_type_templates.manage',
+        },
+    },
+    {
         label: 'Análisis y Exámenes',
         description: 'Configuración de pruebas médicas específicas.',
         slugs: {

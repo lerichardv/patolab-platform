@@ -39,6 +39,7 @@ import {
 import {
     DateRangePicker,
     getCookie,
+    setCookie,
     getLast2WeeksRange,
 } from '@/components/date-range-picker';
 import {
@@ -134,6 +135,13 @@ interface Props {
     products: any[];
     pathologists: any[];
     banks: any[];
+    filters: {
+        status?: string[];
+        specimen_type_id?: string;
+        examination_id?: string;
+        date_from?: string;
+        date_to?: string;
+    };
 }
 
 const getDueDateInfo = (specimen: Specimen) => {
@@ -251,6 +259,7 @@ export default function SpecimensIndex({
     products,
     pathologists,
     banks,
+    filters,
 }: Props) {
     const { props } = usePage() as any;
     const auth = props.auth || {};
@@ -295,31 +304,21 @@ export default function SpecimensIndex({
     const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
     const [isInvoiceSheetOpen, setIsInvoiceSheetOpen] = useState(false);
 
-    const [selectedStatuses, setSelectedStatuses] = useState<string[]>([
-        'received',
-        'macroscopic_review',
-        'processing',
-        'microscopic_review',
-    ]);
+    const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
+        () =>
+            filters.status || [
+                'received',
+                'macroscopic_review',
+                'processing',
+                'microscopic_review',
+            ],
+    );
 
     const [dateRange, setDateRange] = useState<{ from: string; to: string }>(
-        () => {
-            const userId = props.auth?.user?.id;
-
-            if (userId) {
-                const cookieVal = getCookie(
-                    `date_filter_specimens_user_${userId}`,
-                );
-
-                if (cookieVal) {
-                    try {
-                        return JSON.parse(cookieVal);
-                    } catch (e) {}
-                }
-            }
-
-            return getLast2WeeksRange();
-        },
+        () => ({
+            from: filters.date_from || '',
+            to: filters.date_to || '',
+        }),
     );
 
     const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
@@ -327,9 +326,10 @@ export default function SpecimensIndex({
     const [searchQuery, setSearchQuery] = useState('');
 
     const [selectedSpecimenTypeId, setSelectedSpecimenTypeId] =
-        useState<string>('all');
-    const [selectedExaminationId, setSelectedExaminationId] =
-        useState<string>('all');
+        useState<string>(() => filters.specimen_type_id || 'all');
+    const [selectedExaminationId, setSelectedExaminationId] = useState<string>(
+        () => filters.examination_id || 'all',
+    );
     const [isSpecimenTypeFilterOpen, setIsSpecimenTypeFilterOpen] =
         useState(false);
     const [isExaminationFilterOpen, setIsExaminationFilterOpen] =
@@ -348,6 +348,7 @@ export default function SpecimensIndex({
     const handleSpecimenTypeChange = (typeId: string) => {
         setSelectedSpecimenTypeId(typeId);
 
+        let nextExamId = selectedExaminationId;
         if (typeId !== 'all') {
             const hasValidExam = examinations.some(
                 (exam) =>
@@ -356,11 +357,35 @@ export default function SpecimensIndex({
             );
 
             if (!hasValidExam) {
+                nextExamId = 'all';
                 setSelectedExaminationId('all');
             }
         } else {
+            nextExamId = 'all';
             setSelectedExaminationId('all');
         }
+
+        const userId = props.auth?.user?.id;
+        if (userId) {
+            setCookie(`specimen_type_filter_specimens_user_${userId}`, typeId);
+            setCookie(
+                `examination_filter_specimens_user_${userId}`,
+                nextExamId,
+            );
+        }
+
+        router.get(
+            '/specimens',
+            {
+                ...filters,
+                specimen_type_id: typeId,
+                examination_id: nextExamId,
+            },
+            {
+                preserveState: true,
+                replace: true,
+            },
+        );
     };
 
     const availableGroups = useMemo(() => {
@@ -501,6 +526,24 @@ export default function SpecimensIndex({
     useEffect(() => {
         setPriorities(deduplicateSpecimens(initialPriorities));
     }, [initialPriorities]);
+
+    useEffect(() => {
+        if (filters.status) {
+            setSelectedStatuses(filters.status);
+        }
+        if (filters.date_from !== undefined || filters.date_to !== undefined) {
+            setDateRange({
+                from: filters.date_from || '',
+                to: filters.date_to || '',
+            });
+        }
+        if (filters.specimen_type_id !== undefined) {
+            setSelectedSpecimenTypeId(filters.specimen_type_id || 'all');
+        }
+        if (filters.examination_id !== undefined) {
+            setSelectedExaminationId(filters.examination_id || 'all');
+        }
+    }, [filters]);
 
     const findSpecimenById = (id: number): Specimen | null => {
         for (const p of priorities) {
@@ -980,18 +1023,40 @@ export default function SpecimensIndex({
                                         <button
                                             type="button"
                                             onClick={() => {
+                                                const userId =
+                                                    props.auth?.user?.id;
+                                                let nextStatuses: string[] = [];
                                                 if (
-                                                    selectedStatuses.length ===
+                                                    selectedStatuses.length !==
                                                     ALL_STATUSES.length
                                                 ) {
-                                                    setSelectedStatuses([]);
-                                                } else {
-                                                    setSelectedStatuses(
+                                                    nextStatuses =
                                                         ALL_STATUSES.map(
                                                             (s) => s.value,
+                                                        );
+                                                }
+                                                setSelectedStatuses(
+                                                    nextStatuses,
+                                                );
+                                                if (userId) {
+                                                    setCookie(
+                                                        `status_filter_specimens_user_${userId}`,
+                                                        JSON.stringify(
+                                                            nextStatuses,
                                                         ),
                                                     );
                                                 }
+                                                router.get(
+                                                    '/specimens',
+                                                    {
+                                                        ...filters,
+                                                        status: nextStatuses,
+                                                    },
+                                                    {
+                                                        preserveState: true,
+                                                        replace: true,
+                                                    },
+                                                );
                                             }}
                                             className="cursor-pointer font-medium transition-colors hover:text-primary"
                                         >
@@ -1013,20 +1078,43 @@ export default function SpecimensIndex({
                                                     key={status.value}
                                                     className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
                                                     onClick={() => {
-                                                        setSelectedStatuses(
-                                                            (prev) =>
-                                                                prev.includes(
-                                                                    status.value,
-                                                                )
-                                                                    ? prev.filter(
-                                                                          (s) =>
-                                                                              s !==
-                                                                              status.value,
-                                                                      )
-                                                                    : [
-                                                                          ...prev,
+                                                        const userId =
+                                                            props.auth?.user
+                                                                ?.id;
+                                                        const nextStatuses =
+                                                            selectedStatuses.includes(
+                                                                status.value,
+                                                            )
+                                                                ? selectedStatuses.filter(
+                                                                      (s) =>
+                                                                          s !==
                                                                           status.value,
-                                                                      ],
+                                                                  )
+                                                                : [
+                                                                      ...selectedStatuses,
+                                                                      status.value,
+                                                                  ];
+                                                        setSelectedStatuses(
+                                                            nextStatuses,
+                                                        );
+                                                        if (userId) {
+                                                            setCookie(
+                                                                `status_filter_specimens_user_${userId}`,
+                                                                JSON.stringify(
+                                                                    nextStatuses,
+                                                                ),
+                                                            );
+                                                        }
+                                                        router.get(
+                                                            '/specimens',
+                                                            {
+                                                                ...filters,
+                                                                status: nextStatuses,
+                                                            },
+                                                            {
+                                                                preserveState: true,
+                                                                replace: true,
+                                                            },
                                                         );
                                                     }}
                                                 >
@@ -1142,8 +1230,63 @@ export default function SpecimensIndex({
                         <DateRangePicker
                             cookieKey="date_filter_specimens"
                             value={dateRange}
-                            onChange={setDateRange}
+                            onChange={(range) => {
+                                setDateRange(range);
+                                router.get(
+                                    '/specimens',
+                                    {
+                                        ...filters,
+                                        date_from: range.from,
+                                        date_to: range.to,
+                                    },
+                                    {
+                                        preserveState: true,
+                                        replace: true,
+                                    },
+                                );
+                            }}
                         />
+
+                        <Button
+                            variant="outline"
+                            className="h-10 w-full gap-2 px-5 text-sm md:w-auto"
+                            onClick={() => {
+                                const userId = props.auth?.user?.id;
+                                if (userId) {
+                                    const defaultRange = getLast2WeeksRange();
+                                    setCookie(
+                                        `status_filter_specimens_user_${userId}`,
+                                        JSON.stringify([
+                                            'received',
+                                            'macroscopic_review',
+                                            'processing',
+                                            'microscopic_review',
+                                        ]),
+                                    );
+                                    setCookie(
+                                        `specimen_type_filter_specimens_user_${userId}`,
+                                        'all',
+                                    );
+                                    setCookie(
+                                        `examination_filter_specimens_user_${userId}`,
+                                        'all',
+                                    );
+                                    setCookie(
+                                        `date_filter_specimens_user_${userId}`,
+                                        JSON.stringify(defaultRange),
+                                    );
+                                }
+                                router.get(
+                                    '/specimens',
+                                    {},
+                                    {
+                                        preserveState: false,
+                                    },
+                                );
+                            }}
+                        >
+                            Limpiar filtros
+                        </Button>
 
                         {auth.permissions?.includes('specimens.create') && (
                             <DropdownMenu>
@@ -1335,6 +1478,25 @@ export default function SpecimensIndex({
                                                 setIsExaminationFilterOpen(
                                                     false,
                                                 );
+                                                const userId =
+                                                    props.auth?.user?.id;
+                                                if (userId) {
+                                                    setCookie(
+                                                        `examination_filter_specimens_user_${userId}`,
+                                                        'all',
+                                                    );
+                                                }
+                                                router.get(
+                                                    '/specimens',
+                                                    {
+                                                        ...filters,
+                                                        examination_id: 'all',
+                                                    },
+                                                    {
+                                                        preserveState: true,
+                                                        replace: true,
+                                                    },
+                                                );
                                             }}
                                         >
                                             <Check
@@ -1354,11 +1516,34 @@ export default function SpecimensIndex({
                                                     key={exam.id}
                                                     value={exam.name}
                                                     onSelect={() => {
+                                                        const examId =
+                                                            exam.id.toString();
                                                         setSelectedExaminationId(
-                                                            exam.id.toString(),
+                                                            examId,
                                                         );
                                                         setIsExaminationFilterOpen(
                                                             false,
+                                                        );
+                                                        const userId =
+                                                            props.auth?.user
+                                                                ?.id;
+                                                        if (userId) {
+                                                            setCookie(
+                                                                `examination_filter_specimens_user_${userId}`,
+                                                                examId,
+                                                            );
+                                                        }
+                                                        router.get(
+                                                            '/specimens',
+                                                            {
+                                                                ...filters,
+                                                                examination_id:
+                                                                    examId,
+                                                            },
+                                                            {
+                                                                preserveState: true,
+                                                                replace: true,
+                                                            },
                                                         );
                                                     }}
                                                 >
