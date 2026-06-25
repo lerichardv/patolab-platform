@@ -36,7 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (HttpExceptionInterface $e, $request) {
             $status = $e->getStatusCode();
             if (in_array($status, [403, 404])) {
-                return inertia("errors/{$status}")
+                return inertia('errors/'.$status)
                     ->toResponse($request)
                     ->setStatusCode($status);
             }
