@@ -97,6 +97,8 @@ class ReportPdfService
             ->paperWidth('215.9mm')
             ->paperHeight('279.4mm')
             ->margins(0, 0, 0, 0)
+            ->timeout(120)
+            ->waitUntilNetworkIdle()
             ->pdf();
     }
 

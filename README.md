@@ -155,6 +155,12 @@ When deploying the project to a production server or container environment:
    chmod -R 775 storage
    chmod -R 775 bootstrap/cache
    chown -R www-data:www-data storage bootstrap/cache
+   # 1. Set correct ownership (usually www-data, or the user running PHP-FPM)
+   sudo chown -R www-data:www-data storage bootstrap/cache
+   # 2. Make all directories under storage readable and traversable (775)
+   sudo find storage -type d -exec chmod 775 {} \;
+   # 3. Make all files under storage readable (664)
+   sudo find storage -type f -exec chmod 664 {} \;
    ```
 
 6. **Run Production Migrations**:
