@@ -64,33 +64,33 @@
         .header-table {
             width: 100%;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: flex-start;
             margin-bottom: 0.53mm;
+            position: relative;
+            margin-top: -4mm;
         }
 
         .header-logo-cell {
             display: flex;
             flex-direction: column;
-            align-items: flex-start;
+            align-items: center;
+            text-align: center;
         }
 
         .header-logo-img {
-            max-height: 13.76mm;
+            height: 20mm;
             width: auto;
-        }
-
-        .header-tagline {
-            font-size: 2.38mm;
-            font-style: italic;
-            color: #4b5563;
-            margin-top: 0.26mm;
+            margin-left: auto;
+            margin-right: auto;
+			margin-top: -4mm;
+			margin-bottom: 2mm;
         }
 
         .header-code-cell {
-            display: flex;
-            justify-content: flex-end;
-            align-items: flex-start;
+            position: absolute;
+            right: 0;
+            top: 0;
         }
 
         .specimen-badge {

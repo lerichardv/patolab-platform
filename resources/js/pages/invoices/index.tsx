@@ -290,7 +290,6 @@ export default function InvoicesIndex({
     const { auth } = props;
     const flash = props.flash || {};
 
-
     const canCreateSpecimen = auth.permissions?.includes('specimens.create');
     const canViewSpecimen = auth.permissions?.includes('specimens.view');
     const canEditSpecimen = auth.permissions?.includes('specimens.edit');

@@ -5335,23 +5335,27 @@ export default function ReportWorkspace({
                         style={{
                             width: '100%',
                             display: 'flex',
-                            justifyContent: 'space-between',
+                            justifyContent: 'center',
                             alignItems: 'flex-start',
                             marginBottom: '0.53mm',
+                            position: 'relative',
+                            marginTop: '-4mm',
                         }}
                     >
                         <div
                             style={{
                                 display: 'flex',
                                 flexDirection: 'column',
-                                alignItems: 'flex-start',
+                                alignItems: 'center',
                             }}
                         >
                             <img
                                 style={{
-                                    maxHeight: '13.76mm',
+                                    maxHeight: '20mm',
                                     width: 'auto',
                                     marginBottom: '1.06mm',
+                                    marginLeft: 'auto',
+                                    marginRight: 'auto',
                                 }}
                                 src="/images/patolab-logo-horizontal.png"
                                 alt="Logo PatoLab"
@@ -5368,11 +5372,11 @@ export default function ReportWorkspace({
                             />
                             <div
                                 id={`preview-logo-text-fallback-${pageNum}`}
-                                style={{ display: 'none' }}
+                                style={{ display: 'none', textAlign: 'center' }}
                             >
                                 <div
                                     style={{
-                                        fontSize: '5.82mm',
+                                        fontSize: '8.5mm',
                                         fontWeight: 800,
                                         color: '#1e3a8a',
                                         fontFamily: 'Outfit, sans-serif',
@@ -5391,22 +5395,12 @@ export default function ReportWorkspace({
                                     LABORATORIO DE PATOLOGÍA & CITOLOGÍA
                                 </div>
                             </div>
-                            <div
-                                style={{
-                                    fontSize: '2.38mm',
-                                    fontStyle: 'italic',
-                                    color: '#4b5563',
-                                    marginTop: '0.26mm',
-                                }}
-                            >
-                                Calidad Diagnóstica a su Servicio
-                            </div>
                         </div>
                         <div
                             style={{
-                                display: 'flex',
-                                justifyContent: 'flex-end',
-                                alignItems: 'flex-start',
+                                position: 'absolute',
+                                right: '0mm',
+                                top: '0mm',
                             }}
                         >
                             <div
@@ -5422,7 +5416,7 @@ export default function ReportWorkspace({
                                     display: 'inline-block',
                                 }}
                             >
-                                Biopsia N° {specimen.sequence_code}
+                                N° {specimen.sequence_code}
                             </div>
                         </div>
                     </div>
@@ -5558,7 +5552,7 @@ export default function ReportWorkspace({
                             <tr style={{ border: 'none' }}>
                                 <td
                                     style={{
-                                        width: '22%',
+                                        width: '30%',
                                         verticalAlign: 'middle',
                                         fontSize: '2.12mm',
                                         color: '#4b5563',
@@ -5570,19 +5564,7 @@ export default function ReportWorkspace({
                                 </td>
                                 <td
                                     style={{
-                                        width: '20%',
-                                        verticalAlign: 'middle',
-                                        fontSize: '2.12mm',
-                                        color: '#4b5563',
-                                        border: 'none',
-                                        padding: '0mm',
-                                    }}
-                                >
-                                    ☎ +504 2510-6502
-                                </td>
-                                <td
-                                    style={{
-                                        width: '20%',
+                                        width: '30%',
                                         verticalAlign: 'middle',
                                         fontSize: '2.12mm',
                                         color: '#4b5563',
@@ -5594,7 +5576,7 @@ export default function ReportWorkspace({
                                 </td>
                                 <td
                                     style={{
-                                        width: '38%',
+                                        width: '40%',
                                         verticalAlign: 'middle',
                                         fontSize: '2.12mm',
                                         color: '#4b5563',
