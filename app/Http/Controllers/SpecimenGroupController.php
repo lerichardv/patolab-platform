@@ -111,16 +111,31 @@ class SpecimenGroupController extends Controller
             $firstAgeDiscountType = null;
             $specimensData = $validated['specimens'];
 
+            // Preload specimen types with prices to optimize queries
+            $specimenTypeIds = collect($specimensData)->pluck('specimen_type')->unique()->toArray();
+            $specimenTypes = SpecimenType::with('prices')->whereIn('id', $specimenTypeIds)->get()->keyBy('id');
+
             foreach ($specimensData as $specData) {
                 $qty = (int) ($specData['quantity'] ?? 1);
-                $basePrice = $specData['selected_price'] === 'custom'
+
+                $specType = $specimenTypes->get($specData['specimen_type']);
+                $maxPrice = 0.00;
+                if ($specType && $specType->prices->isNotEmpty()) {
+                    $maxPrice = (float) $specType->prices->max('amount');
+                }
+
+                $chosenPrice = $specData['selected_price'] === 'custom'
                     ? (float) ($specData['custom_specimen_price'] ?? 0.00)
                     : (float) $specData['selected_price'];
+
+                $basePrice = max($maxPrice, $chosenPrice);
+                $listPriceDiscount = max(0.00, $basePrice - $chosenPrice);
+
                 $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
                 $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
 
                 $totalAmount += $basePrice * $qty;
-                $totalDiscount += ($ageDiscount + $additionalDiscount) * $qty;
+                $totalDiscount += ($listPriceDiscount + $ageDiscount + $additionalDiscount) * $qty;
                 $totalQuantity += $qty;
                 $totalAgeDiscount += $ageDiscount * $qty;
 
@@ -309,12 +324,23 @@ class SpecimenGroupController extends Controller
                 ]);
 
                 $qty = (int) ($specData['quantity'] ?? 1);
-                $basePrice = $specData['selected_price'] === 'custom'
+
+                $specType = $specimenTypes->get($specData['specimen_type']);
+                $maxPrice = 0.00;
+                if ($specType && $specType->prices->isNotEmpty()) {
+                    $maxPrice = (float) $specType->prices->max('amount');
+                }
+
+                $chosenPrice = $specData['selected_price'] === 'custom'
                     ? (float) ($specData['custom_specimen_price'] ?? 0.00)
                     : (float) $specData['selected_price'];
+
+                $basePrice = max($maxPrice, $chosenPrice);
+                $listPriceDiscount = max(0.00, $basePrice - $chosenPrice);
+
                 $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
                 $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
-                $disc = $ageDiscount + $additionalDiscount;
+                $disc = $listPriceDiscount + $ageDiscount + $additionalDiscount;
                 $sub = $basePrice - $disc;
                 if ($sub < 0) {
                     $sub = 0.00;
@@ -438,9 +464,11 @@ class SpecimenGroupController extends Controller
                     'exam_name' => $typeName.' - '.$examName,
                     'patient_name' => Customer::find($specData['customer'])->name,
                     'price' => $basePrice,
-                    'discount' => (float) ($specData['age_discount_amount'] ?? 0.00) + (! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00),
+                    'discount' => $disc,
                     'age_discount_type' => $specData['age_discount_type'] ?? null,
                     'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
+                    'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']),
+                    'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
                     'quantity' => $qty,
                 ];
             }

@@ -444,6 +444,18 @@
                                         - {{ $spec->examination->name }}
                                     @endif
                                 </div>
+                                @if($detail)
+                                    @if(!empty($detail->age_discount_type) && (float)($detail->age_discount_amount ?? 0) > 0)
+                                        <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
+                                            * Descuento de {{ $detail->age_discount_type === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }} aplicado: - L. {{ number_format($detail->age_discount_amount, 2) }}
+                                        </div>
+                                    @endif
+                                    @if(!empty($detail->additional_discount_enabled) && (float)($detail->additional_discount ?? 0) > 0)
+                                        <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
+                                            * Descuento Adicional aplicado: - L. {{ number_format($detail->additional_discount, 2) }}
+                                        </div>
+                                    @endif
+                                @endif
                             </td>
                             <td>{{ $paidQty }}</td>
                             <td class="text-right">L. {{ number_format($unitPrice, 2) }}</td>

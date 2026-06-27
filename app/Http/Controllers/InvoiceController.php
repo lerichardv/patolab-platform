@@ -77,36 +77,7 @@ class InvoiceController extends Controller
         // Resolve user cookies and query parameters
         $userId = auth()->id();
 
-        // 1. Status Filter
-        $statusCookie = $request->cookie("status_filter_invoices_user_{$userId}");
-        $status = $request->get('status', $statusCookie ?: 'active');
-        $validStatuses = ['active', 'all', 'received', 'macroscopic_review', 'processing', 'microscopic_review', 'finalized', 'delivered', 'cancelled'];
-        if (! in_array($status, $validStatuses)) {
-            $status = 'active';
-        }
-        if ($request->has('status')) {
-            cookie()->queue(cookie("status_filter_invoices_user_{$userId}", $status, 525600, null, null, null, false));
-        }
 
-        // 2. Specimen Type Filter
-        $typeCookie = $request->cookie("specimen_type_filter_invoices_user_{$userId}");
-        $specimenTypeId = $request->get('specimen_type_id', $typeCookie ?: 'all');
-        if ($specimenTypeId !== 'all' && ! is_numeric($specimenTypeId)) {
-            $specimenTypeId = 'all';
-        }
-        if ($request->has('specimen_type_id')) {
-            cookie()->queue(cookie("specimen_type_filter_invoices_user_{$userId}", $specimenTypeId, 525600, null, null, null, false));
-        }
-
-        // 3. Examination Filter
-        $examCookie = $request->cookie("examination_filter_invoices_user_{$userId}");
-        $examinationId = $request->get('examination_id', $examCookie ?: 'all');
-        if ($examinationId !== 'all' && ! is_numeric($examinationId)) {
-            $examinationId = 'all';
-        }
-        if ($request->has('examination_id')) {
-            cookie()->queue(cookie("examination_filter_invoices_user_{$userId}", $examinationId, 525600, null, null, null, false));
-        }
 
         // 4. Date Range Filter
         $dateCookie = $request->cookie("date_filter_invoices_user_{$userId}");
@@ -148,30 +119,7 @@ class InvoiceController extends Controller
             $query->where('customer_id', $request->get('customer_id'));
         }
 
-        // Filter by specimen type
-        if ($specimenTypeId && $specimenTypeId !== 'all') {
-            $query->whereHas('specimen', function ($q) use ($specimenTypeId) {
-                $q->where('specimen_type', $specimenTypeId);
-            });
-        }
 
-        // Filter by specimen status
-        if ($status && $status !== 'all') {
-            $query->whereHas('specimen', function ($q) use ($status) {
-                if ($status === 'active') {
-                    $q->whereIn('status', ['received', 'macroscopic_review', 'processing', 'microscopic_review']);
-                } else {
-                    $q->where('status', $status);
-                }
-            });
-        }
-
-        // Filter by specimen examination
-        if ($examinationId && $examinationId !== 'all') {
-            $query->whereHas('specimen', function ($q) use ($examinationId) {
-                $q->where('specimen_type_examination', $examinationId);
-            });
-        }
 
         // Filter by credit status
         if ($request->filled('has_credit') && $request->get('has_credit') !== 'all') {
@@ -285,9 +233,6 @@ class InvoiceController extends Controller
                     'has_credit', 'sort_field', 'sort_direction', 'group_id', 'invoice_type',
                 ]),
                 [
-                    'specimen_type_id' => $specimenTypeId,
-                    'status' => $status,
-                    'examination_id' => $examinationId,
                     'date_from' => $dateFrom,
                     'date_to' => $dateTo,
                 ]
@@ -341,12 +286,7 @@ class InvoiceController extends Controller
             $query->where('customer_id', $request->get('customer_id'));
         }
 
-        // Filter by specimen type
-        if ($request->filled('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
-            $query->whereHas('specimen', function ($q) use ($request) {
-                $q->where('specimen_type', $request->get('specimen_type_id'));
-            });
-        }
+
 
         // Filter by credit status
         if ($request->filled('has_credit') && $request->get('has_credit') !== 'all') {

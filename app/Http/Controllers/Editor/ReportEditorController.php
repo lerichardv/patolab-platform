@@ -15,7 +15,7 @@ use App\Models\User;
 use App\Models\UserCommission;
 use App\Models\UserCommissionRule;
 use App\Services\ImageOptimizerService;
-use App\Services\ReportPaginator;
+use App\Services\ReportPdfService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -451,6 +451,21 @@ class ReportEditorController extends Controller
         }
 
         $status = $request->status;
+
+        if ($status === 'finalized') {
+            $unsignedUsers = $specimen->users()->where(function ($q) {
+                $q->whereNull('user_signature')->orWhere('user_signature', '');
+            })->get();
+
+            if ($unsignedUsers->isNotEmpty()) {
+                $names = $unsignedUsers->pluck('name')->implode(', ');
+
+                return redirect()->back()->withErrors([
+                    'error' => "No se puede finalizar el reporte porque los siguientes patólogos no han definido su firma: {$names}.",
+                ]);
+            }
+        }
+
         $reportData = [];
 
         if ($status === 'processing') {
@@ -470,6 +485,8 @@ class ReportEditorController extends Controller
             ]);
 
             if ($status === 'finalized') {
+                app(ReportPdfService::class)->generateAndStoreReport($specimen);
+
                 $this->calculateCommissions($specimen);
 
                 // Enviar notificación de WhatsApp al paciente
@@ -577,6 +594,7 @@ class ReportEditorController extends Controller
         }
 
         // 6. Microscopy commission: for all pathologists with microscopy access
+        $microCount = $microUsers->count();
         foreach ($microUsers as $microUser) {
             $rule = UserCommissionRule::where('user_id', $microUser->id)
                 ->where('specimen_type_id', $specimen->specimen_type)
@@ -589,6 +607,10 @@ class ReportEditorController extends Controller
                     $commissionAmount = (float) $rule->microscopy_commission_value;
                 } elseif ($rule->microscopy_calculation_type === 'percentage') {
                     $commissionAmount = ($baseAmount * (float) $rule->microscopy_commission_value) / 100.00;
+                }
+
+                if ($microCount > 1) {
+                    $commissionAmount = $commissionAmount / $microCount;
                 }
 
                 UserCommission::updateOrCreate(
@@ -611,137 +633,66 @@ class ReportEditorController extends Controller
     }
 
     /**
-     * Generate and download PDF using Browsershot.
+     * Generate a temporary PDF file for report editor preview.
+     */
+    public function generateTempPdf(Specimen $specimen)
+    {
+        $assignment = DB::table('specimen_user')
+            ->where('specimen_id', $specimen->id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        $hasMacroAccess = $assignment ? (bool) $assignment->macroscopy_access : false;
+        $hasMicroAccess = $assignment ? (bool) $assignment->microscopy_access : false;
+
+        if (! $hasMacroAccess && ! $hasMicroAccess) {
+            return response()->json(['error' => 'No tienes permisos de edición para esta muestra.'], 403);
+        }
+
+        $specimen->load('report');
+        if (! $specimen->report) {
+            return response()->json(['error' => 'No hay reporte asociado a esta muestra.'], 404);
+        }
+
+        // Generate the PDF and return computed pages
+        $pages = [];
+        $pdfContent = app(ReportPdfService::class)->generatePdfContent($specimen, $pages);
+
+        // Delete any existing temp files for this specimen to keep storage clean
+        Storage::disk('public')->deleteDirectory("temp_reports/{$specimen->sequence_code}");
+
+        // Save new temp PDF file
+        $tempPath = "temp_reports/{$specimen->sequence_code}/report_".time().'.pdf';
+        Storage::disk('public')->put($tempPath, $pdfContent);
+
+        return response()->json([
+            'url' => Storage::disk('public')->url($tempPath),
+            'total_pages' => count($pages),
+        ]);
+    }
+
+    /**
+     * Generate and download PDF using Browsershot or directly from storage.
      */
     public function downloadPdf(Specimen $specimen)
     {
-        $specimen->load(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'report']);
+        $specimen->load('report');
         if (! $specimen->report) {
             abort(404, 'No hay reporte asociado a esta muestra.');
         }
 
-        $customer = $specimen->customerRelation;
-        $report = $specimen->report;
-        $examination = $specimen->examination;
-        $referrer = $specimen->referrerRelation;
-
-        // Convert all local/remote images in editor contents to Base64 data URIs so Browsershot can render them.
-        $report->diagnosis_html = $this->convertImagesToBase64($report->diagnosis_html);
-        $report->macroscopy_html = $this->convertImagesToBase64($report->macroscopy_html);
-        $report->microscopy_html = $this->convertImagesToBase64($report->microscopy_html);
-        $report->clinical_details_html = $this->convertImagesToBase64($report->clinical_details_html);
-        $report->comments_notes_html = $this->convertImagesToBase64($report->comments_notes_html);
-        $report->protocols_html = $this->convertImagesToBase64($report->protocols_html);
-        $report->legend_html = $this->convertImagesToBase64($report->legend_html);
-
-        $isMicroscopyVisible = in_array($specimen->status, ['microscopic_review', 'finalized', 'delivered']);
-
-        $pages = ReportPaginator::paginate($specimen, $report, $customer, $referrer, $isMicroscopyVisible);
-
-        $htmlContent = view('pdf.report.body', compact('specimen', 'report', 'customer', 'examination', 'referrer', 'pages'))->render();
-
-        $browsershot = Browsershot::html($htmlContent);
-
-        if (app()->environment('production')) {
-            $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
-                ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
-                ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
-                ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
+        if ($specimen->report->report_file && Storage::disk('public')->exists($specimen->report->report_file)) {
+            return Storage::disk('public')->download(
+                $specimen->report->report_file,
+                "reporte_{$specimen->sequence_code}.pdf"
+            );
         }
 
-        $pdfContent = $browsershot->addChromiumArguments([
-            'disable-crash-reporter',
-            'disable-dev-shm-usage',
-            'no-sandbox',
-        ])
-            ->noSandbox()
-            ->paperWidth('215.9mm')
-            ->paperHeight('279.4mm')
-            ->margins(0, 0, 0, 0)
-            ->pdf();
+        $pdfContent = app(ReportPdfService::class)->generatePdfContent($specimen);
 
         return response($pdfContent)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', 'attachment; filename="reporte_'.$specimen->sequence_code.'.pdf"');
-    }
-
-    /**
-     * Convert image src attributes in the given HTML to Base64 inline data URIs.
-     */
-    private function convertImagesToBase64($html)
-    {
-        if (empty($html)) {
-            return $html;
-        }
-
-        return preg_replace_callback('/<img\s+([^>]*\s*)src=["\']([^"\']+)["\']([^>]*)/i', function ($matches) {
-            $beforeSrc = $matches[1];
-            $url = $matches[2];
-            $afterSrc = $matches[3];
-
-            // If it's already base64, don't convert again
-            if (str_starts_with($url, 'data:image/')) {
-                return $matches[0];
-            }
-
-            $base64 = $this->getImageBase64($url);
-            if ($base64) {
-                return '<img '.$beforeSrc.'src="'.$base64.'"'.$afterSrc;
-            }
-
-            return $matches[0];
-        }, $html);
-    }
-
-    /**
-     * Retrieve base64 encoded data URI of an image by local path mapping or URL request.
-     */
-    private function getImageBase64($url)
-    {
-        $path = parse_url($url, PHP_URL_PATH);
-        if ($path) {
-            // Check if it's a storage path (e.g. /storage/report-images/...)
-            if (preg_match('/^\/storage\/(.+)$/', $path, $storageMatches)) {
-                $relativePath = $storageMatches[1];
-                $localPath = storage_path('app/public/'.$relativePath);
-                if (file_exists($localPath)) {
-                    $data = file_get_contents($localPath);
-                    $mime = mime_content_type($localPath) ?: 'image/jpeg';
-
-                    return 'data:'.$mime.';base64,'.base64_encode($data);
-                }
-            }
-
-            // Fallback: check public directory
-            $publicPath = public_path(ltrim($path, '/'));
-            if (file_exists($publicPath)) {
-                $data = file_get_contents($publicPath);
-                $mime = mime_content_type($publicPath) ?: 'image/jpeg';
-
-                return 'data:'.$mime.';base64,'.base64_encode($data);
-            }
-        }
-
-        // External/Remote URL fallback
-        try {
-            $data = file_get_contents($url);
-            if ($data !== false) {
-                $mime = 'image/jpeg';
-                $ext = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
-                if (in_array(strtolower($ext), ['png', 'gif', 'webp', 'svg'])) {
-                    $mime = 'image/'.strtolower($ext);
-                    if (strtolower($ext) === 'svg') {
-                        $mime = 'image/svg+xml';
-                    }
-                }
-
-                return 'data:'.$mime.';base64,'.base64_encode($data);
-            }
-        } catch (\Exception $e) {
-            // Ignore/Log
-        }
-
-        return null;
     }
 
     /**

@@ -601,13 +601,16 @@ app.post('/api/refresh-insumos', express.json(), (req, res) => {
 				ytext.insert(0, Date.now().toString());
 			});
 			console.log(`[insumos] Refreshed document ${targetRoom} successfully`);
+
 			return res.json({ success: true, updated: true });
 		} else {
 			console.log(`[insumos] Room ${targetRoom} not currently active on server`);
+
 			return res.json({ success: true, updated: false, message: 'Room not active' });
 		}
 	} catch (err) {
 		console.error(`[insumos] Error updating insumos Yjs document:`, err);
+
 		return res.status(500).json({ error: 'Error actualizando el documento Yjs de insumos', details: err.message });
 	}
 });

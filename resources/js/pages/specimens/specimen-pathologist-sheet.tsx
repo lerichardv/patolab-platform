@@ -349,23 +349,17 @@ export default function SpecimenPathologistSheet({
                         <label className="text-sm font-semibold text-foreground">
                             Patólogos Asignados
                         </label>
-                        <div className="min-h-[180px] flex-1 overflow-hidden rounded-lg border border-border/80 bg-card shadow-sm">
+                        <div className="max-h-[300px] w-full overflow-y-auto rounded-lg border border-border/80 bg-card shadow-sm">
                             {specimen.users && specimen.users.length > 0 ? (
                                 <div className="w-full overflow-x-auto">
                                     <table className="w-full border-collapse text-left text-sm">
-                                        <thead>
-                                            <tr className="border-b bg-muted/50 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                        <thead className="sticky top-0 z-10 border-b bg-muted/95 backdrop-blur-sm">
+                                            <tr className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                                 <th className="p-3.5">
-                                                    Nombre
+                                                    Patólogo
                                                 </th>
-                                                <th className="p-3.5">
-                                                    Correo Electrónico
-                                                </th>
-                                                <th className="p-3.5 text-center">
-                                                    Macroscopía
-                                                </th>
-                                                <th className="p-3.5 text-center">
-                                                    Microscopía
+                                                <th className="p-3.5 pl-0">
+                                                    Accesos
                                                 </th>
                                                 <th className="w-20 p-3.5 text-right">
                                                     Acciones
@@ -378,64 +372,86 @@ export default function SpecimenPathologistSheet({
                                                     key={user.id}
                                                     className="transition-colors hover:bg-muted/20"
                                                 >
-                                                    <td className="p-3.5 font-medium text-foreground">
-                                                        {user.name}
-                                                    </td>
-                                                    <td className="p-3.5 text-muted-foreground">
-                                                        {user.email}
-                                                    </td>
-                                                    <td className="p-3.5 text-center">
-                                                        <div className="flex items-center justify-center">
-                                                            <Switch
-                                                                checked={
-                                                                    user.pivot
-                                                                        ?.macroscopy_access !==
-                                                                    undefined
-                                                                        ? Boolean(
-                                                                              user
-                                                                                  .pivot
-                                                                                  .macroscopy_access,
-                                                                          )
-                                                                        : false
-                                                                }
-                                                                onCheckedChange={(
-                                                                    checked,
-                                                                ) =>
-                                                                    handleToggleAccess(
-                                                                        user.id,
-                                                                        'macroscopy',
-                                                                        checked,
-                                                                    )
-                                                                }
-                                                                title="Alternar acceso a macroscopía"
-                                                            />
+                                                    <td className="p-3.5 text-left">
+                                                        <div className="flex flex-col items-start gap-2.5">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm leading-tight font-semibold text-foreground">
+                                                                        {
+                                                                            user.name
+                                                                        }
+                                                                    </span>
+                                                                    <span className="text-xs font-normal text-muted-foreground">
+                                                                        {
+                                                                            user.email
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </td>
-                                                    <td className="p-3.5 text-center">
-                                                        <div className="flex items-center justify-center">
-                                                            <Switch
-                                                                checked={
-                                                                    user.pivot
-                                                                        ?.microscopy_access !==
-                                                                    undefined
-                                                                        ? Boolean(
-                                                                              user
-                                                                                  .pivot
-                                                                                  .microscopy_access,
-                                                                          )
-                                                                        : false
-                                                                }
-                                                                onCheckedChange={(
-                                                                    checked,
-                                                                ) =>
-                                                                    handleToggleAccess(
-                                                                        user.id,
-                                                                        'microscopy',
+                                                    <td>
+                                                        <div className="flex flex-nowrap items-start gap-3">
+                                                            <div className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1 text-[11px] transition-colors hover:bg-muted/50">
+                                                                <span className="font-medium text-muted-foreground">
+                                                                    Macroscopía
+                                                                </span>
+                                                                <Switch
+                                                                    checked={
+                                                                        user
+                                                                            .pivot
+                                                                            ?.macroscopy_access !==
+                                                                        undefined
+                                                                            ? Boolean(
+                                                                                  user
+                                                                                      .pivot
+                                                                                      .macroscopy_access,
+                                                                              )
+                                                                            : false
+                                                                    }
+                                                                    onCheckedChange={(
                                                                         checked,
-                                                                    )
-                                                                }
-                                                                title="Alternar acceso a microscopía"
-                                                            />
+                                                                    ) =>
+                                                                        handleToggleAccess(
+                                                                            user.id,
+                                                                            'macroscopy',
+                                                                            checked,
+                                                                        )
+                                                                    }
+                                                                    title="Alternar acceso a macroscopía"
+                                                                    className="scale-90"
+                                                                />
+                                                            </div>
+                                                            <div className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1 text-[11px] transition-colors hover:bg-muted/50">
+                                                                <span className="font-medium text-muted-foreground">
+                                                                    Microscopía
+                                                                </span>
+                                                                <Switch
+                                                                    checked={
+                                                                        user
+                                                                            .pivot
+                                                                            ?.microscopy_access !==
+                                                                        undefined
+                                                                            ? Boolean(
+                                                                                  user
+                                                                                      .pivot
+                                                                                      .microscopy_access,
+                                                                              )
+                                                                            : false
+                                                                    }
+                                                                    onCheckedChange={(
+                                                                        checked,
+                                                                    ) =>
+                                                                        handleToggleAccess(
+                                                                            user.id,
+                                                                            'microscopy',
+                                                                            checked,
+                                                                        )
+                                                                    }
+                                                                    title="Alternar acceso a microscopía"
+                                                                    className="scale-90"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     <td className="p-3.5 text-right">

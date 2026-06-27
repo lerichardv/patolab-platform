@@ -1,4 +1,4 @@
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { format, add, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -21,8 +21,10 @@ import {
     Check,
     Layers,
     UserPlus,
+    Loader2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import HeadingSheet from '@/components/heading-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,8 +41,43 @@ interface Props {
     onAssignPathologistClick?: () => void;
 }
 
+const findSpecimenInProps = (
+    obj: any,
+    id: number,
+    visited = new Set(),
+): any => {
+    if (!obj || typeof obj !== 'object') {
+        return null;
+    }
+
+    if (visited.has(obj)) {
+        return null;
+    }
+
+    visited.add(obj);
+
+    if (obj.id === id && typeof obj.sequence_code === 'string') {
+        return obj;
+    }
+
+    for (const key of Object.keys(obj)) {
+        try {
+            const val = obj[key];
+            const result = findSpecimenInProps(val, id, visited);
+
+            if (result) {
+                return result;
+            }
+        } catch (e) {
+            // Ignore potential getter errors
+        }
+    }
+
+    return null;
+};
+
 export default function SpecimenViewSheet({
-    specimen,
+    specimen: initialSpecimen,
     open,
     onOpenChange,
     onEditClick,
@@ -48,10 +85,48 @@ export default function SpecimenViewSheet({
     onEditInvoiceClick,
     onAssignPathologistClick,
 }: Props) {
-    const { auth } = usePage<any>().props;
+    const pageProps = usePage<any>().props;
+    const { auth } = pageProps;
+
+    const specimen = useMemo(() => {
+        if (!initialSpecimen) {
+            return null;
+        }
+
+        const found = findSpecimenInProps(pageProps, initialSpecimen.id);
+
+        return found || initialSpecimen;
+    }, [pageProps, initialSpecimen]);
 
     const [copied, setCopied] = useState(false);
     const [copiedGroup, setCopiedGroup] = useState(false);
+    const [generating, setGenerating] = useState(false);
+
+    const handleGenerateReport = () => {
+        if (!specimen) {
+            return;
+        }
+
+        setGenerating(true);
+        toast.promise(
+            new Promise((resolve, reject) => {
+                router.post(
+                    `/specimens/${specimen.sequence_code}/generate-report`,
+                    {},
+                    {
+                        onSuccess: () => resolve(true),
+                        onError: (err) => reject(err),
+                        onFinish: () => setGenerating(false),
+                    },
+                );
+            }),
+            {
+                loading: 'Generando reporte...',
+                success: 'Reporte generado con éxito',
+                error: 'Error al generar el reporte',
+            },
+        );
+    };
 
     if (!specimen) {
         return null;
@@ -139,6 +214,7 @@ export default function SpecimenViewSheet({
     const isCompleted = ['finalized', 'delivered', 'cancelled'].includes(
         specimen.status,
     );
+    const isFinished = ['finalized', 'delivered'].includes(specimen.status);
     const isOverdue = estimatedDate
         ? isPast(estimatedDate) && !isToday(estimatedDate) && !isCompleted
         : false;
@@ -548,6 +624,61 @@ export default function SpecimenViewSheet({
                                                 'N/A'}
                                         </p>
                                     </div>
+                                </div>
+                                <div className="w-full">
+                                    {specimen.report?.report_file && (
+                                        <div className="flex w-full items-center justify-between rounded-md border border-dashed bg-muted/40 p-2.5 sm:col-span-2">
+                                            <span className="flex items-center gap-1 text-sm text-black">
+                                                <FileText className="h-3.5 w-3.5 text-primary" />{' '}
+                                                Reporte de Muestra
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <a
+                                                    href={`/storage/${specimen.report.report_file}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
+                                                >
+                                                    <Download className="h-3.5 w-3.5" />
+                                                    Ver Reporte
+                                                </a>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {isFinished &&
+                                        !specimen.report?.report_file && (
+                                            <div className="animate-in space-y-2 duration-200 fade-in-50 sm:col-span-2">
+                                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                    <FileText className="h-3.5 w-3.5 text-primary" />{' '}
+                                                    Reporte de Muestra
+                                                </span>
+                                                <div className="flex flex-col gap-2 rounded-md border border-dashed border-amber-500/20 bg-amber-500/5 p-2 sm:flex-row sm:items-center sm:justify-between dark:bg-amber-500/10">
+                                                    <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
+                                                        <AlertCircle className="h-4.5 w-4.5" />
+                                                        El reporte no ha sido
+                                                        generado aún
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        onClick={
+                                                            handleGenerateReport
+                                                        }
+                                                        disabled={generating}
+                                                        size="sm"
+                                                        className="w-full text-xs font-semibold sm:w-auto"
+                                                    >
+                                                        {generating ? (
+                                                            <>
+                                                                <Loader2 className="h-4 w-4 animate-spin" />{' '}
+                                                                Generando...
+                                                            </>
+                                                        ) : (
+                                                            'Generar Reporte'
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
                                 </div>
                             </div>
 

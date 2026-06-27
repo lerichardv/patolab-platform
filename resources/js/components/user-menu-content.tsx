@@ -1,5 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { LogOut, Settings, BookOpen } from 'lucide-react';
+import { index as myTemplatesIndex } from '@/actions/App/Http/Controllers/MySpecimenTypeTemplateController';
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -8,7 +9,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
-import { index as myTemplatesIndex } from '@/actions/App/Http/Controllers/MySpecimenTypeTemplateController';
 import { logout } from '@/routes';
 import { edit } from '@/routes/profile';
 import type { User } from '@/types';

@@ -6,6 +6,7 @@ import {
     RefreshCw,
     X,
     AlertCircle,
+    Trash2,
 } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
@@ -19,7 +20,6 @@ import {
     SheetFooter,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
 
 interface AIDictationSheetProps {
     open: boolean;
@@ -59,9 +59,31 @@ export default function AIDictationSheet({
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const isRecordingRef = useRef(false);
 
+    const cleanupRecordingResources = () => {
+        if (
+            mediaRecorderRef.current &&
+            mediaRecorderRef.current.state !== 'inactive'
+        ) {
+            mediaRecorderRef.current.onstop = null;
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stream
+                .getTracks()
+                .forEach((track) => track.stop());
+        }
+
+        mediaRecorderRef.current = null;
+        isRecordingRef.current = false;
+
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+    };
+
     // Reset sheet states when it is opened/closed
     useEffect(() => {
         if (open) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setStatus('idle');
             setTranscription('');
             setError(null);
@@ -88,6 +110,7 @@ export default function AIDictationSheet({
 
         if (status === 'sending') {
             let index = 0;
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setLoaderText(SENDING_TEXTS[0]);
             interval = setInterval(() => {
                 index = (index + 1) % SENDING_TEXTS.length;
@@ -105,27 +128,6 @@ export default function AIDictationSheet({
         return () => clearInterval(interval);
     }, [status]);
 
-    const cleanupRecordingResources = () => {
-        if (
-            mediaRecorderRef.current &&
-            mediaRecorderRef.current.state !== 'inactive'
-        ) {
-            mediaRecorderRef.current.onstop = null;
-            mediaRecorderRef.current.stop();
-            mediaRecorderRef.current.stream
-                .getTracks()
-                .forEach((track) => track.stop());
-        }
-
-        mediaRecorderRef.current = null;
-        isRecordingRef.current = false;
-
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-        }
-    };
-
     const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -136,7 +138,7 @@ export default function AIDictationSheet({
 
             try {
                 recorder = new MediaRecorder(stream, options);
-            } catch (e) {
+            } catch {
                 recorder = new MediaRecorder(stream);
             }
 
@@ -192,7 +194,13 @@ export default function AIDictationSheet({
 
     const cancelRecording = () => {
         cleanupRecordingResources();
-        setStatus('idle');
+
+        if (transcription) {
+            setStatus('success');
+        } else {
+            setStatus('idle');
+        }
+
         setRecordingTime(0);
         toast.info('Grabación cancelada.');
     };
@@ -226,7 +234,20 @@ export default function AIDictationSheet({
             const data = await response.json();
 
             if (data.success && data.text) {
-                setTranscription(data.text);
+                setTranscription((prev) => {
+                    const cleanPrev = prev ? prev.trim() : '';
+                    const cleanNew = data.text ? data.text.trim() : '';
+
+                    if (!cleanPrev) {
+                        return cleanNew;
+                    }
+
+                    if (!cleanNew) {
+                        return cleanPrev;
+                    }
+
+                    return cleanPrev + '\n\n' + cleanNew;
+                });
                 setStatus('success');
             } else {
                 throw new Error(
@@ -266,163 +287,283 @@ export default function AIDictationSheet({
                         insertar.
                     </SheetDescription>
                 </SheetHeader>
+                <div className="flex flex-1 flex-col space-y-6 overflow-y-auto p-6">
+                    {/* Active Status Panel at the top (Recording, Processing, or Error) when transcription exists */}
+                    {transcription &&
+                        (status === 'recording' ||
+                            status === 'sending' ||
+                            status === 'transcribing' ||
+                            status === 'error') && (
+                            <div className="rounded-xl border bg-muted/30 p-4 shadow-sm">
+                                {status === 'recording' && (
+                                    <div className="flex flex-col items-center justify-center space-y-3 py-1 text-center">
+                                        <div className="flex items-center justify-center gap-1">
+                                            <span className="h-6 w-1 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.4s]" />
+                                            <span className="h-9 w-1 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.2s]" />
+                                            <span className="h-12 w-1 animate-pulse rounded-full bg-emerald-500" />
+                                            <span className="h-9 w-1 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.2s]" />
+                                            <span className="h-6 w-1 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.4s]" />
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <span className="font-mono text-xl font-bold tracking-wider text-foreground">
+                                                {formatTime(recordingTime)}
+                                            </span>
+                                            <p className="animate-pulse text-[10px] font-semibold tracking-widest text-emerald-500 uppercase">
+                                                Grabando audio...
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={stopRecording}
+                                                className="h-8 bg-red-500 px-3 text-xs font-semibold text-white hover:bg-red-600"
+                                            >
+                                                <Square className="mr-1.5 h-3.5 w-3.5" />
+                                                Detener y Transcribir
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={cancelRecording}
+                                                className="h-8 px-3 text-xs font-semibold"
+                                            >
+                                                <X className="mr-1.5 h-3.5 w-3.5" />
+                                                Cancelar
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
 
-                <div className="flex-1 space-y-6 overflow-y-auto p-6">
-                    {status === 'idle' && (
-                        <div className="flex flex-col items-center justify-center space-y-4 py-16 text-center">
-                            <div className="relative">
-                                <button
-                                    type="button"
-                                    onClick={startRecording}
-                                    className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 hover:bg-emerald-600 focus:outline-hidden"
-                                >
-                                    <Mic className="h-8 w-8" />
-                                </button>
-                                <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex h-4 w-4 rounded-full bg-emerald-500"></span>
-                                </span>
+                                {(status === 'sending' ||
+                                    status === 'transcribing') && (
+                                    <div className="flex flex-col items-center justify-center space-y-2 py-2 text-center">
+                                        <Loader2 className="h-7 w-7 animate-spin text-teal-600" />
+                                        <div className="space-y-0.5">
+                                            <p className="text-xs font-semibold text-foreground">
+                                                Procesando transcripción...
+                                            </p>
+                                            <p className="max-w-md text-[10px] text-muted-foreground italic">
+                                                "{loaderText}"
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {status === 'error' && (
+                                    <div className="flex flex-col items-center justify-center space-y-2 py-1 text-center">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                                            <AlertCircle className="h-4.5 w-4.5" />
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <p className="text-xs font-semibold text-foreground">
+                                                Error de Transcripción
+                                            </p>
+                                            <p className="max-w-md rounded-lg border border-destructive/10 bg-destructive/5 p-2 text-[10px] text-red-500">
+                                                {error}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={() => setStatus('success')}
+                                            className="h-8 px-3 text-xs font-semibold"
+                                        >
+                                            Regresar al texto
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-sm font-semibold text-foreground">
-                                    Presione el botón para iniciar grabación
-                                </p>
-                                <p className="max-w-sm text-xs text-muted-foreground">
-                                    Asegúrese de estar en un ambiente silencioso
-                                    y usar un vocabulario claro para mejores
-                                    resultados de transcripción médica.
-                                </p>
-                            </div>
-                        </div>
+                        )}
+
+                    {/* Standard layout when there is no text yet */}
+                    {!transcription && (
+                        <>
+                            {status === 'idle' && (
+                                <div className="flex flex-1 flex-col items-center justify-center space-y-4 py-16 text-center">
+                                    <div className="relative">
+                                        <button
+                                            type="button"
+                                            onClick={startRecording}
+                                            className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 hover:bg-emerald-600 focus:outline-hidden"
+                                        >
+                                            <Mic className="h-8 w-8" />
+                                        </button>
+                                        <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                            <span className="relative inline-flex h-4 w-4 rounded-full bg-emerald-500"></span>
+                                        </span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-semibold text-foreground">
+                                            Presione el botón para iniciar
+                                            grabación
+                                        </p>
+                                        <p className="max-w-sm text-xs text-muted-foreground">
+                                            Asegúrese de estar en un ambiente
+                                            silencioso y usar un vocabulario
+                                            claro para mejores resultados de
+                                            transcripción médica.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {status === 'recording' && (
+                                <div className="flex flex-1 flex-col items-center justify-center space-y-6 py-12 text-center">
+                                    {/* Animated Waves */}
+                                    <div className="flex items-center justify-center gap-1.5 py-6">
+                                        <span className="h-8 w-1.5 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.4s]" />
+                                        <span className="h-12 w-1.5 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.2s]" />
+                                        <span className="h-16 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                                        <span className="h-12 w-1.5 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.2s]" />
+                                        <span className="h-8 w-1.5 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.4s]" />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <span className="font-mono text-2xl font-bold tracking-wider text-foreground">
+                                            {formatTime(recordingTime)}
+                                        </span>
+                                        <p className="animate-pulse text-xs font-semibold tracking-widest text-emerald-500 uppercase">
+                                            Grabando audio...
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-4">
+                                        <Button
+                                            type="button"
+                                            onClick={stopRecording}
+                                            className="bg-red-500 font-semibold text-white hover:bg-red-600"
+                                        >
+                                            <Square className="mr-2 h-4 w-4" />
+                                            Detener y Transcribir
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={cancelRecording}
+                                            className="font-semibold"
+                                        >
+                                            <X className="mr-2 h-4 w-4" />
+                                            Cancelar
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {(status === 'sending' ||
+                                status === 'transcribing') && (
+                                <div className="flex flex-1 flex-col items-center justify-center space-y-4 py-16 text-center">
+                                    <Loader2 className="h-10 w-10 animate-spin text-teal-600" />
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-semibold text-foreground">
+                                            Procesando transcripción
+                                        </p>
+                                        <p className="max-w-sm text-xs text-muted-foreground italic">
+                                            "{loaderText}"
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {status === 'error' && (
+                                <div className="flex flex-1 flex-col items-center justify-center space-y-4 py-12 text-center">
+                                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                                        <AlertCircle className="h-6 w-6" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <p className="text-sm font-semibold text-foreground">
+                                            Error de Transcripción
+                                        </p>
+                                        <p className="max-w-md rounded-lg border border-destructive/10 bg-destructive/5 p-3 text-xs text-red-500">
+                                            {error}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        onClick={() => setStatus('idle')}
+                                        className="font-semibold"
+                                    >
+                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                        Intentar de nuevo
+                                    </Button>
+                                </div>
+                            )}
+                        </>
                     )}
 
-                    {status === 'recording' && (
-                        <div className="flex flex-col items-center justify-center space-y-6 py-12 text-center">
-                            {/* Animated Waves */}
-                            <div className="flex items-center justify-center gap-1.5 py-6">
-                                <span className="h-8 w-1.5 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.4s]" />
-                                <span className="h-12 w-1.5 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.2s]" />
-                                <span className="h-16 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                                <span className="h-12 w-1.5 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.2s]" />
-                                <span className="h-8 w-1.5 animate-pulse rounded-full bg-emerald-500 [animation-delay:-0.4s]" />
-                            </div>
-
-                            <div className="space-y-2">
-                                <span className="font-mono text-2xl font-bold tracking-wider text-foreground">
-                                    {formatTime(recordingTime)}
-                                </span>
-                                <p className="animate-pulse text-xs font-semibold tracking-widest text-emerald-500 uppercase">
-                                    Grabando audio...
-                                </p>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                <Button
-                                    type="button"
-                                    onClick={stopRecording}
-                                    className="bg-red-500 font-semibold text-white hover:bg-red-600"
-                                >
-                                    <Square className="mr-2 h-4 w-4" />
-                                    Detener y Transcribir
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={cancelRecording}
-                                    className="font-semibold"
-                                >
-                                    <X className="mr-2 h-4 w-4" />
-                                    Cancelar
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-
-                    {(status === 'sending' || status === 'transcribing') && (
-                        <div className="flex flex-col items-center justify-center space-y-4 py-16 text-center">
-                            <Loader2 className="h-10 w-10 animate-spin text-teal-600" />
-                            <div className="space-y-1">
-                                <p className="text-sm font-semibold text-foreground">
-                                    Procesando transcripción
-                                </p>
-                                <p className="max-w-sm text-xs text-muted-foreground italic">
-                                    "{loaderText}"
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {status === 'success' && (
-                        <div className="space-y-4">
+                    {/* Textarea Area - shown if we have some transcription */}
+                    {transcription && (
+                        <div className="flex min-h-[250px] flex-1 flex-col space-y-2">
                             <span className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                Transcripción sugerida
+                                Transcripción acumulada
                             </span>
                             <Textarea
-                                className="text-md min-h-[200px] w-full resize-none leading-relaxed"
+                                className="text-md min-h-[200px] w-full flex-1 resize-none leading-relaxed"
                                 value={transcription}
                                 onChange={(e) =>
                                     setTranscription(e.target.value)
                                 }
+                                disabled={
+                                    status === 'recording' ||
+                                    status === 'sending' ||
+                                    status === 'transcribing'
+                                }
                                 placeholder="La transcripción de su dictado aparecerá aquí..."
                             />
                             <p className="text-[10px] text-muted-foreground italic">
-                                * Puede editar el texto libremente antes de
-                                insertarlo en el reporte.
+                                * Puede editar el texto libremente. Las
+                                grabaciones adicionales se agregarán como nuevos
+                                párrafos.
                             </p>
-                        </div>
-                    )}
-
-                    {status === 'error' && (
-                        <div className="flex flex-col items-center justify-center space-y-4 py-12 text-center">
-                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-                                <AlertCircle className="h-6 w-6" />
-                            </div>
-                            <div className="space-y-2">
-                                <p className="text-sm font-semibold text-foreground">
-                                    Error de Transcripción
-                                </p>
-                                <p className="max-w-md rounded-lg border border-destructive/10 bg-destructive/5 p-3 text-xs text-red-500">
-                                    {error}
-                                </p>
-                            </div>
-                            <Button
-                                type="button"
-                                onClick={() => setStatus('idle')}
-                                className="font-semibold"
-                            >
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Intentar de nuevo
-                            </Button>
                         </div>
                     )}
                 </div>
 
                 <SheetFooter className="mt-auto flex flex-col gap-2 border-t border-border bg-muted/10 p-6 sm:flex-row">
-                    {status === 'success' && (
-                        <>
-                            <Button
-                                type="button"
-                                onClick={() => {
-                                    onInsert(transcription);
-                                    onOpenChange(false);
-                                }}
-                                className="w-full font-semibold sm:flex-1"
-                            >
-                                <Check className="mr-2 h-4 w-4" />
-                                Aplicar dictado
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setStatus('idle')}
-                                className="w-full font-semibold sm:flex-1"
-                            >
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Grabar de nuevo
-                            </Button>
-                        </>
-                    )}
-                    {status !== 'success' && (
+                    {transcription &&
+                        (status === 'success' || status === 'idle') && (
+                            <>
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        onInsert(transcription);
+                                        onOpenChange(false);
+                                    }}
+                                    className="w-full font-semibold sm:flex-1"
+                                >
+                                    <Check className="mr-2 h-4 w-4" />
+                                    Aplicar dictado
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={startRecording}
+                                    className="w-full font-semibold sm:flex-1"
+                                >
+                                    <Mic className="mr-2 h-4 w-4" />
+                                    Grabar más
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    onClick={() => {
+                                        setTranscription('');
+                                        setStatus('idle');
+                                        toast.info('Transcripción limpiada.');
+                                    }}
+                                    className="w-full font-semibold sm:w-auto"
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Limpiar
+                                </Button>
+                            </>
+                        )}
+                    {(!transcription ||
+                        status === 'recording' ||
+                        status === 'sending' ||
+                        status === 'transcribing') && (
                         <Button
                             type="button"
                             variant="outline"

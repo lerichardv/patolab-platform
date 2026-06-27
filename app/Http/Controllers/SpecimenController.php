@@ -23,6 +23,7 @@ use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Models\User;
 use App\Services\ImageOptimizerService;
+use App\Services\ReportPdfService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -138,7 +139,7 @@ class SpecimenController extends Controller
                 $q->whereDate('specimen.created_at', '<=', $dateTo);
             }
 
-            $q->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank'])
+            $q->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report'])
                 ->leftJoin(\DB::raw('(SELECT specimen_id, priority_id, MIN(`order`) as board_order FROM priorities_specimens_order GROUP BY specimen_id, priority_id) as pso'), function ($join) {
                     $join->on('specimen.id', '=', 'pso.specimen_id')
                         ->on('specimen.priority_id', '=', 'pso.priority_id');
@@ -964,5 +965,24 @@ class SpecimenController extends Controller
             'specimen' => $specimen,
             'just_delivered' => $justDelivered,
         ]);
+    }
+
+    public function generateReport(Specimen $specimen)
+    {
+        Gate::authorize('specimens.edit');
+
+        if (! $specimen->report) {
+            return redirect()->back()->with('error', 'No hay reporte asociado a esta muestra.');
+        }
+
+        try {
+            app(ReportPdfService::class)->generateAndStoreReport($specimen);
+
+            return redirect()->back()->with('success', 'Reporte generado con éxito.');
+        } catch (\Exception $e) {
+            Log::error('Error generating report: '.$e->getMessage());
+
+            return redirect()->back()->with('error', 'Error al generar el reporte: '.$e->getMessage());
+        }
     }
 }

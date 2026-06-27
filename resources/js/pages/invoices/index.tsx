@@ -290,16 +290,7 @@ export default function InvoicesIndex({
     const { auth } = props;
     const flash = props.flash || {};
 
-    const filteredExaminationsForDropdown = useMemo(() => {
-        const specTypeId = filters.specimen_type_id || 'all';
-        if (specTypeId === 'all') {
-            return examinations;
-        }
 
-        return examinations.filter(
-            (exam) => exam.specimen_type?.toString() === specTypeId,
-        );
-    }, [examinations, filters.specimen_type_id]);
     const canCreateSpecimen = auth.permissions?.includes('specimens.create');
     const canViewSpecimen = auth.permissions?.includes('specimens.view');
     const canEditSpecimen = auth.permissions?.includes('specimens.edit');
@@ -784,7 +775,7 @@ export default function InvoicesIndex({
                     </div>
 
                     {/* Row 2: Advanced filters */}
-                    <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+                    <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                         <div className="flex w-full flex-col gap-1.5">
                             <span className="text-xs font-semibold text-muted-foreground">
                                 Método de Pago
@@ -841,96 +832,6 @@ export default function InvoicesIndex({
                                     })),
                                 ]}
                             />
-                        </div>
-                        <div className="flex w-full flex-col gap-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground">
-                                Estado de Muestra
-                            </span>
-                            <Select
-                                value={filters.status || 'all'}
-                                onValueChange={(v) =>
-                                    handleFilterChange('status', v)
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Estado de Muestra" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        Todos los estados
-                                    </SelectItem>
-                                    {ALL_STATUSES.map((status) => (
-                                        <SelectItem
-                                            key={status.value}
-                                            value={status.value}
-                                        >
-                                            {status.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex w-full flex-col gap-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground">
-                                Tipo de Muestra
-                            </span>
-                            <Select
-                                value={filters.specimen_type_id || 'all'}
-                                onValueChange={(v) =>
-                                    handleFilterChange('specimen_type_id', v)
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Tipo de Muestra" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        Todos los tipos
-                                    </SelectItem>
-                                    {specimenTypes.map((st) => (
-                                        <SelectItem
-                                            key={st.id}
-                                            value={st.id.toString()}
-                                        >
-                                            {st.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex w-full flex-col gap-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground">
-                                Examen
-                            </span>
-                            <Select
-                                value={filters.examination_id || 'all'}
-                                onValueChange={(v) =>
-                                    handleFilterChange('examination_id', v)
-                                }
-                                disabled={
-                                    filters.specimen_type_id === 'all' ||
-                                    !filters.specimen_type_id
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Examen" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        Todos los exámenes
-                                    </SelectItem>
-                                    {filteredExaminationsForDropdown.map(
-                                        (exam) => (
-                                            <SelectItem
-                                                key={exam.id}
-                                                value={exam.id.toString()}
-                                            >
-                                                {exam.name}
-                                            </SelectItem>
-                                        ),
-                                    )}
-                                </SelectContent>
-                            </Select>
                         </div>
                         <div className="flex w-full flex-col gap-1.5">
                             <span className="text-xs font-medium font-semibold text-muted-foreground">

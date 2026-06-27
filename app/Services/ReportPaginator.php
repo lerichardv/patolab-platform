@@ -9,7 +9,9 @@ class ReportPaginator
         $pageContentHeight = 190.50; // mm
         $lineHeight = 3.97; // mm
         $maxCharsPerLine = 140;
-        $signatureHeight = 19.84; // mm
+        $pathologistsCount = max(1, $specimen->users ? $specimen->users->count() : 1);
+        $rowsCount = (int) ceil($pathologistsCount / 2);
+        $signatureHeight = $rowsCount * 25.0; // 25mm per row
 
         // 1. Calculate Patient Metadata Card height (mm)
         $patientCardHeight = self::estimatePatientCardHeight($specimen, $customer, $referrer);

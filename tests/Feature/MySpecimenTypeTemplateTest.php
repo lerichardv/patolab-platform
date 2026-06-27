@@ -42,6 +42,7 @@ beforeEach(function () {
     $this->examination1 = SpecimenTypeExamination::create([
         'specimen_type' => $this->specimenType->id,
         'name' => 'Stomach Biopsy',
+        'description' => 'Test Stomach Biopsy',
         'active' => true,
     ]);
 });

@@ -27,6 +27,8 @@ import {
     Check,
     FileText,
     ArrowLeft,
+    ArrowDown,
+    Unlock,
     Download,
     UserRound,
     Tag,
@@ -178,6 +180,8 @@ interface Specimen {
         role?: {
             name: string;
         };
+        user_signature?: string | null;
+        signature_url?: string | null;
         pivot?: {
             macroscopy_access: boolean;
             microscopy_access: boolean;
@@ -1483,7 +1487,21 @@ function EditorToolbar({
             return;
         }
 
-        editor.chain().focus().insertContent(text).run();
+        const htmlContent = text
+            .split('\n\n')
+            .map((p) => {
+                const clean = p.trim();
+
+                if (!clean) {
+                    return '';
+                }
+
+                return `<p>${clean.replace(/\n/g, '<br>')}</p>`;
+            })
+            .filter(Boolean)
+            .join('');
+
+        editor.chain().focus().insertContent(htmlContent).run();
         toast.success('El texto dictado fue insertado con éxito.');
     };
 
@@ -2782,6 +2800,7 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
         const imgRegex = /<img[^>]+>/gi;
         const imgTags: string[] = [];
         let match;
+
         while ((match = imgRegex.exec(blockHtml)) !== null) {
             imgTags.push(match[0]);
         }
@@ -2790,6 +2809,7 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
 
         // Group images into rows
         const rowsOfImages: string[][] = [];
+
         for (let i = 0; i < imgTags.length; i += columns) {
             rowsOfImages.push(imgTags.slice(i, i + columns));
         }
@@ -2799,14 +2819,18 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             let maxRowAspectRatio = 0.0;
             rowImages.forEach((imgTag) => {
                 const aspect = getImageAspectRatio(imgTag);
+
                 if (aspect > maxRowAspectRatio) {
                     maxRowAspectRatio = aspect;
                 }
             });
+
             if (maxRowAspectRatio <= 0.0) {
                 maxRowAspectRatio = 1.0;
             }
+
             gridHeight += itemWidth * maxRowAspectRatio;
+
             if (i > 0) {
                 gridHeight += 3.18;
             }
@@ -3095,76 +3119,143 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 function SignatureBlock({
-    pathologistName,
-    pathologistTitle,
+    users,
     reportDate,
 }: {
-    pathologistName: string;
-    pathologistTitle: string;
+    users?: Array<{
+        id: number;
+        name: string;
+        role?: {
+            name: string;
+        };
+        user_signature?: string | null;
+        signature_url?: string | null;
+    }>;
     reportDate: string;
-    isLastPage?: boolean;
 }) {
+    const assignedUsers =
+        users && users.length > 0
+            ? users
+            : [
+                  {
+                      id: 0,
+                      name: 'DRA. ESTEFANY LAGOS',
+                      role: { name: 'PATOLOGÍA ONCOLÓGICA' },
+                      signature_url: null,
+                      user_signature: null,
+                  },
+              ];
+
+    // Chunk assignedUsers into rows of 2
+    const chunks: (typeof assignedUsers)[] = [];
+
+    for (let i = 0; i < assignedUsers.length; i += 2) {
+        chunks.push(assignedUsers.slice(i, i + 2));
+    }
+
     return (
         <div
             style={{
                 marginTop: '3.97mm',
-                height: '19.84mm',
-                textAlign: 'center',
-                lineHeight: '3.97mm',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4mm',
+                alignItems: 'center',
+                width: '100%',
             }}
             className="shrink-0"
         >
-            <div
-                style={{
-                    width: '58.21mm',
-                    borderTop: '0.40mm solid #4b5563',
-                    margin: '0 auto 1.32mm auto',
-                }}
-            />
-            <div
-                style={{
-                    fontSize: '2.65mm',
-                    fontWeight: 700,
-                    color: '#1f2937',
-                    textTransform: 'uppercase',
-                }}
-            >
-                {pathologistName}
-            </div>
-            <div
-                style={{
-                    fontSize: '2.25mm',
-                    color: '#4b5563',
-                    fontWeight: 500,
-                    textTransform: 'uppercase',
-                }}
-            >
-                {pathologistTitle}
-            </div>
-            <div
-                style={{
-                    fontSize: '2.38mm',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginTop: '1.32mm',
-                }}
-            >
-                FECHA:{' '}
-                {reportDate
-                    ? new Date(reportDate + 'T00:00:00').toLocaleDateString(
-                          'es-HN',
-                          {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: '2-digit',
-                          },
-                      )
-                    : new Date().toLocaleDateString('es-HN', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: '2-digit',
-                      })}
-            </div>
+            {chunks.map((row, rowIndex) => (
+                <div
+                    key={rowIndex}
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'flex-end',
+                        gap: '15mm',
+                        width: '100%',
+                    }}
+                >
+                    {row.map((pathologist) => (
+                        <div
+                            key={pathologist.id}
+                            style={{
+                                width: '58.21mm',
+                                textAlign: 'center',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                            }}
+                        >
+                            {pathologist.signature_url ? (
+                                <img
+                                    src={pathologist.signature_url}
+                                    alt={`Firma de ${pathologist.name}`}
+                                    style={{
+                                        maxHeight: '12mm',
+                                        width: 'auto',
+                                        marginBottom: '2mm',
+                                        display: 'block',
+                                    }}
+                                />
+                            ) : (
+                                <div style={{ height: '14mm' }} />
+                            )}
+                            <div
+                                style={{
+                                    width: '100%',
+                                    borderTop: '0.40mm solid #4b5563',
+                                    marginBottom: '1.32mm',
+                                }}
+                            />
+                            <div
+                                style={{
+                                    fontSize: '2.65mm',
+                                    fontWeight: 700,
+                                    color: '#1f2937',
+                                    textTransform: 'uppercase',
+                                }}
+                            >
+                                {pathologist.name}
+                            </div>
+                            <div
+                                style={{
+                                    fontSize: '2.25mm',
+                                    color: '#4b5563',
+                                    fontWeight: 500,
+                                    textTransform: 'uppercase',
+                                }}
+                            >
+                                {pathologist.role?.name ||
+                                    'PATOLOGÍA ONCOLÓGICA'}
+                            </div>
+                            <div
+                                style={{
+                                    fontSize: '2.38mm',
+                                    fontWeight: 600,
+                                    color: '#374151',
+                                    marginTop: '1.32mm',
+                                }}
+                            >
+                                FECHA:{' '}
+                                {reportDate
+                                    ? new Date(
+                                          reportDate + 'T00:00:00',
+                                      ).toLocaleDateString('es-HN', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: '2-digit',
+                                      })
+                                    : new Date().toLocaleDateString('es-HN', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: '2-digit',
+                                      })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ))}
         </div>
     );
 }
@@ -3548,6 +3639,17 @@ export default function ReportWorkspace({
 
     const [dialogZoomScale, setDialogZoomScale] = useState(0.75);
     const [hasScrolledToEnd, setHasScrolledToEnd] = useState(false);
+    const [scrollPercentage, setScrollPercentage] = useState(0);
+    const [showCompleteMicroscopyDialog, setShowCompleteMicroscopyDialog] =
+        useState(false);
+    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+    const [tempPdfUrl, setTempPdfUrl] = useState<string | null>(null);
+    const [tempPdfTotalPages, setTempPdfTotalPages] = useState(1);
+    const [showSignatureWarning, setShowSignatureWarning] = useState(false);
+    const [unsignedPathologists, setUnsignedPathologists] = useState<
+        Array<{ id: number; name: string }>
+    >([]);
+
     const dialogPreviewRef = useRef<HTMLDivElement>(null);
     const dialogPreviewContainerRef = useRef<HTMLDivElement>(null);
 
@@ -3555,7 +3657,9 @@ export default function ReportWorkspace({
         const pageContentHeight = 190.5; // mm
         const lineHeight = 3.97; // mm
         const maxCharsPerLine = 140;
-        const signatureHeight = 19.84; // mm
+        const pathologistsCount = Math.max(1, specimen.users?.length || 0);
+        const rowsCount = Math.ceil(pathologistsCount / 2);
+        const signatureHeight = rowsCount * 25.0; // 25mm per row
 
         const patientCardHeight = estimatePatientCardHeight(specimen);
 
@@ -3798,6 +3902,7 @@ export default function ReportWorkspace({
 
                 const itemWidth = 185.9 / columns;
                 const rowsRemaining: string[][] = [];
+
                 for (let i = 0; i < images.length; i += columns) {
                     rowsRemaining.push(images.slice(i, i + columns));
                 }
@@ -3807,13 +3912,16 @@ export default function ReportWorkspace({
                     let maxRowAspectRatio = 0.0;
                     rowImages.forEach((imgTag) => {
                         const aspect = getImageAspectRatio(imgTag);
+
                         if (aspect > maxRowAspectRatio) {
                             maxRowAspectRatio = aspect;
                         }
                     });
+
                     if (maxRowAspectRatio <= 0.0) {
                         maxRowAspectRatio = 1.0;
                     }
+
                     return itemWidth * maxRowAspectRatio;
                 });
 
@@ -3839,18 +3947,22 @@ export default function ReportWorkspace({
 
                     // Find how many rows can fit in the remaining height
                     let r = 0;
+
                     for (
                         let tempR = 1;
                         tempR <= remainingRows.length;
                         tempR++
                     ) {
                         let cost = 5.3;
+
                         for (let i = 0; i < tempR; i++) {
                             cost += rowHeights[currentIndex + i];
+
                             if (i > 0) {
                                 cost += 3.18;
                             }
                         }
+
                         if (cost <= remaining) {
                             r = tempR;
                         } else {
@@ -3871,12 +3983,14 @@ export default function ReportWorkspace({
                     }
 
                     const sliceImages: string[] = [];
+
                     for (let i = 0; i < r; i++) {
                         remainingRows[i].forEach((imgTag) => {
                             const aspect = getImageAspectRatio(imgTag);
                             const styleMatch = imgTag.match(
                                 /style=["\']([^"\']*)["\']/i,
                             );
+
                             if (styleMatch) {
                                 const existingStyle = styleMatch[1].replace(
                                     /;$/,
@@ -3893,6 +4007,7 @@ export default function ReportWorkspace({
                                     `<img style="aspect-ratio: 1 / ${aspect}; object-fit: cover;"`,
                                 );
                             }
+
                             sliceImages.push(imgTag);
                         });
                     }
@@ -3900,8 +4015,10 @@ export default function ReportWorkspace({
                     const sliceHtml = `<div data-type="image-grid" data-columns="${columns}">${sliceImages.join('')}</div>`;
 
                     let cost = 5.3;
+
                     for (let i = 0; i < r; i++) {
                         cost += rowHeights[currentIndex + i];
+
                         if (i > 0) {
                             cost += 3.18;
                         }
@@ -5003,7 +5120,69 @@ export default function ReportWorkspace({
         }
     };
 
+    const handleStartMicroscopyFinalization = async () => {
+        setIsGeneratingPdf(true);
+
+        const csrfToken =
+            (
+                document.querySelector(
+                    'meta[name="csrf-token"]',
+                ) as HTMLMetaElement
+            )?.content ?? '';
+
+        try {
+            const response = await fetch(
+                `/specimens/${specimen.sequence_code}/report-editor/generate-temp-pdf`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        Accept: 'application/json',
+                    },
+                },
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+
+                throw new Error(
+                    errorData.error ||
+                        'Error al generar la previsualización del PDF.',
+                );
+            }
+
+            const data = await response.json();
+            setTempPdfUrl(data.url);
+            setTempPdfTotalPages(data.total_pages || 1);
+            setScrollPercentage(0);
+            setHasScrolledToEnd(false);
+            setShowCompleteMicroscopyDialog(true);
+        } catch (error: any) {
+            toast.error(
+                error.message || 'Error al generar el PDF de previsualización.',
+            );
+        } finally {
+            setIsGeneratingPdf(false);
+        }
+    };
+
     const handleTransitionState = (targetStatus: Specimen['status']) => {
+        if (targetStatus === 'finalized') {
+            const unsignedUsers =
+                specimen.users?.filter(
+                    (u) => !u.user_signature && !u.signature_url,
+                ) || [];
+
+            if (unsignedUsers.length > 0) {
+                setUnsignedPathologists(unsignedUsers);
+                setShowSignatureWarning(true);
+                toast.error('Faltan firmas de patólogos');
+
+                return;
+            }
+        }
+
         router.post(
             `/specimens/${specimen.sequence_code}/report-editor/transition-state`,
             {
@@ -5023,8 +5202,24 @@ export default function ReportWorkspace({
                         });
                     }
                 },
-                onError: () => {
-                    toast.error('Error al actualizar el estado del proceso');
+                onError: (errors) => {
+                    if (errors && errors.error) {
+                        toast.error(errors.error);
+                    } else if (errors && typeof errors === 'object') {
+                        const firstKey = Object.keys(errors)[0];
+
+                        if (firstKey && errors[firstKey]) {
+                            toast.error(errors[firstKey] as string);
+                        } else {
+                            toast.error(
+                                'Error al actualizar el estado del proceso',
+                            );
+                        }
+                    } else {
+                        toast.error(
+                            'Error al actualizar el estado del proceso',
+                        );
+                    }
                 },
             },
         );
@@ -5112,20 +5307,6 @@ export default function ReportWorkspace({
         (specimen.status === 'microscopic_review' ||
             (isFinished && sessionEditingEnabled)) &&
         hasMicroAccess;
-    const isDiagnosisEditable =
-        (!['finalized', 'delivered'].includes(specimen.status) ||
-            (isFinished && sessionEditingEnabled)) &&
-        (hasMacroAccess || hasMicroAccess);
-
-    // Pathologist information logic
-    const pathologist = specimen.users?.[0];
-    const pathologistName = pathologist
-        ? pathologist.name
-        : 'DRA. ESTEFANY LAGOS';
-    const pathologistTitle = pathologist
-        ? pathologist.role?.name || 'PATOLOGÍA ONCOLÓGICA'
-        : 'PATOLOGÍA ONCOLÓGICA';
-
     const totalPages = pages.length > 0 ? pages.length : 1;
 
     const renderPreviewPage = (pageNum: number) => {
@@ -5305,8 +5486,7 @@ export default function ReportWorkspace({
                             return (
                                 <SignatureBlock
                                     key={block.id}
-                                    pathologistName={pathologistName}
-                                    pathologistTitle={pathologistTitle}
+                                    users={specimen.users}
                                     reportDate={reportDate}
                                 />
                             );
@@ -6576,15 +6756,39 @@ export default function ReportWorkspace({
                                                                             {specimen.status ===
                                                                                 'microscopic_review' && (
                                                                                 <div className="flex justify-end pt-2">
-                                                                                    <AlertDialog>
-                                                                                        <AlertDialogTrigger
-                                                                                            asChild
-                                                                                        >
-                                                                                            <Button className="cursor-pointer bg-fuchsia-600 font-semibold text-white shadow-sm hover:bg-fuchsia-700">
+                                                                                    <Button
+                                                                                        onClick={
+                                                                                            handleStartMicroscopyFinalization
+                                                                                        }
+                                                                                        disabled={
+                                                                                            isGeneratingPdf
+                                                                                        }
+                                                                                        className="cursor-pointer gap-2 bg-fuchsia-600 font-semibold text-white shadow-sm hover:bg-fuchsia-700"
+                                                                                    >
+                                                                                        {isGeneratingPdf ? (
+                                                                                            <>
+                                                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                                                                <span>
+                                                                                                    Generando
+                                                                                                    previsualización...
+                                                                                                </span>
+                                                                                            </>
+                                                                                        ) : (
+                                                                                            <span>
                                                                                                 Completar
                                                                                                 Microscopía
-                                                                                            </Button>
-                                                                                        </AlertDialogTrigger>
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </Button>
+
+                                                                                    <AlertDialog
+                                                                                        open={
+                                                                                            showCompleteMicroscopyDialog
+                                                                                        }
+                                                                                        onOpenChange={
+                                                                                            setShowCompleteMicroscopyDialog
+                                                                                        }
+                                                                                    >
                                                                                         <AlertDialogContent className="max-w-4xl">
                                                                                             <AlertDialogHeader>
                                                                                                 <AlertDialogTitle>
@@ -6609,107 +6813,170 @@ export default function ReportWorkspace({
                                                                                                     previa
                                                                                                     del
                                                                                                     PDF
-                                                                                                    interactivo.
+                                                                                                    real.
                                                                                                 </AlertDialogDescription>
                                                                                             </AlertDialogHeader>
-                                                                                            <div className="flex max-h-[60vh] justify-center overflow-y-auto rounded-lg border bg-slate-50 p-4 dark:bg-slate-900">
+                                                                                            <div className="relative flex w-full flex-col">
+                                                                                                {/* Progress indicators */}
+                                                                                                <div className="mb-2 flex items-center justify-between px-1 text-xs">
+                                                                                                    <span className="font-medium text-muted-foreground">
+                                                                                                        Progreso
+                                                                                                        de
+                                                                                                        lectura
+                                                                                                        del
+                                                                                                        reporte
+                                                                                                    </span>
+                                                                                                    <span className="font-bold text-fuchsia-600 dark:text-fuchsia-400">
+                                                                                                        {
+                                                                                                            scrollPercentage
+                                                                                                        }
+
+                                                                                                        %
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                                                                                                    <div
+                                                                                                        className="h-full rounded-full bg-fuchsia-600 transition-all duration-200"
+                                                                                                        style={{
+                                                                                                            width: `${scrollPercentage}%`,
+                                                                                                        }}
+                                                                                                    />
+                                                                                                </div>
+
+                                                                                                {/* Scrollable Container */}
                                                                                                 <div
                                                                                                     ref={
                                                                                                         dialogPreviewContainerRef
                                                                                                     }
-                                                                                                    className="w-full overflow-hidden"
+                                                                                                    className="relative flex max-h-[55vh] w-full scrollbar-thin scrollbar-thumb-slate-300 justify-center overflow-y-auto scroll-smooth rounded-lg border bg-slate-100/50 p-4 dark:scrollbar-thumb-slate-800 dark:bg-slate-950/50"
                                                                                                     onScroll={(
                                                                                                         e,
                                                                                                     ) => {
                                                                                                         const target =
                                                                                                             e.currentTarget;
-                                                                                                        const isAtBottom =
+                                                                                                        const totalScrollable =
                                                                                                             target.scrollHeight -
-                                                                                                                target.scrollTop <=
-                                                                                                            target.clientHeight +
-                                                                                                                50;
+                                                                                                            target.clientHeight;
 
                                                                                                         if (
-                                                                                                            isAtBottom &&
-                                                                                                            !hasScrolledToEnd
+                                                                                                            totalScrollable >
+                                                                                                            0
                                                                                                         ) {
+                                                                                                            const pct =
+                                                                                                                Math.min(
+                                                                                                                    100,
+                                                                                                                    Math.round(
+                                                                                                                        (target.scrollTop /
+                                                                                                                            totalScrollable) *
+                                                                                                                            100,
+                                                                                                                    ),
+                                                                                                                );
+                                                                                                            setScrollPercentage(
+                                                                                                                pct,
+                                                                                                            );
+
+                                                                                                            const isAtBottom =
+                                                                                                                totalScrollable -
+                                                                                                                    target.scrollTop <=
+                                                                                                                50;
+
+                                                                                                            if (
+                                                                                                                isAtBottom &&
+                                                                                                                !hasScrolledToEnd
+                                                                                                            ) {
+                                                                                                                setHasScrolledToEnd(
+                                                                                                                    true,
+                                                                                                                );
+                                                                                                            }
+                                                                                                        } else {
+                                                                                                            setScrollPercentage(
+                                                                                                                100,
+                                                                                                            );
                                                                                                             setHasScrolledToEnd(
                                                                                                                 true,
                                                                                                             );
                                                                                                         }
                                                                                                     }}
                                                                                                 >
-                                                                                                    <div
-                                                                                                        ref={
-                                                                                                            dialogPreviewRef
-                                                                                                        }
-                                                                                                        className="shrink-0"
-                                                                                                        style={{
-                                                                                                            width: '800px',
-                                                                                                            transform: `scale(${dialogZoomScale})`,
-                                                                                                            transformOrigin:
-                                                                                                                'top center',
-                                                                                                        }}
-                                                                                                    >
-                                                                                                        {Array.from(
-                                                                                                            {
-                                                                                                                length: totalPages,
-                                                                                                            },
-                                                                                                        ).map(
-                                                                                                            (
-                                                                                                                _,
-                                                                                                                i,
-                                                                                                            ) => (
-                                                                                                                <Fragment
-                                                                                                                    key={
-                                                                                                                        i
-                                                                                                                    }
-                                                                                                                >
-                                                                                                                    {renderPreviewPage(
-                                                                                                                        i +
-                                                                                                                            1,
-                                                                                                                    )}
-                                                                                                                </Fragment>
-                                                                                                            ),
-                                                                                                        )}
-                                                                                                    </div>
+                                                                                                    {tempPdfUrl && (
+                                                                                                        <iframe
+                                                                                                            src={`${tempPdfUrl}#toolbar=0&navpanes=0&view=FitH`}
+                                                                                                            title="PDF Preview"
+                                                                                                            className="pointer-events-none w-full border-0 select-none"
+                                                                                                            style={{
+                                                                                                                height: `${tempPdfTotalPages * 1056}px`,
+                                                                                                                pointerEvents:
+                                                                                                                    'none',
+                                                                                                            }}
+                                                                                                        />
+                                                                                                    )}
                                                                                                 </div>
+
+                                                                                                {/* Floating bottom cue */}
+                                                                                                {!hasScrolledToEnd && (
+                                                                                                    <div className="pointer-events-none absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-900/90 px-4 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-sm transition-all duration-300 dark:bg-slate-50/90 dark:text-slate-900">
+                                                                                                        <ArrowDown className="h-3.5 w-3.5 animate-pulse" />
+                                                                                                        <span>{`Desplace para confirmar lectura (${scrollPercentage}%)`}</span>
+                                                                                                    </div>
+                                                                                                )}
                                                                                             </div>
 
                                                                                             {!hasScrolledToEnd && (
-                                                                                                <p className="animate-pulse text-center text-[11px] font-medium text-muted-foreground">
-                                                                                                    Desplace
-                                                                                                    hasta
-                                                                                                    el
-                                                                                                    final
-                                                                                                    de
-                                                                                                    la
-                                                                                                    previsualización
-                                                                                                    para
-                                                                                                    habilitar
-                                                                                                    la
-                                                                                                    finalización
-                                                                                                    del
-                                                                                                    reporte.
+                                                                                                <p className="mt-2 animate-pulse text-center text-[11px] font-medium text-muted-foreground">
+                                                                                                    {
+                                                                                                        'Desplace hasta el final de la previsualización para habilitar la finalización del reporte.'
+                                                                                                    }
                                                                                                 </p>
                                                                                             )}
-                                                                                            <AlertDialogFooter>
-                                                                                                <AlertDialogCancel>
-                                                                                                    Cancelar
-                                                                                                </AlertDialogCancel>
-                                                                                                <AlertDialogAction
+                                                                                            <AlertDialogFooter className="mt-4">
+                                                                                                <AlertDialogCancel
                                                                                                     onClick={() =>
-                                                                                                        handleTransitionState(
-                                                                                                            'finalized',
+                                                                                                        setShowCompleteMicroscopyDialog(
+                                                                                                            false,
                                                                                                         )
                                                                                                     }
+                                                                                                >
+                                                                                                    {
+                                                                                                        'Cancelar'
+                                                                                                    }
+                                                                                                </AlertDialogCancel>
+                                                                                                <AlertDialogAction
+                                                                                                    onClick={() => {
+                                                                                                        setShowCompleteMicroscopyDialog(
+                                                                                                            false,
+                                                                                                        );
+                                                                                                        handleTransitionState(
+                                                                                                            'finalized',
+                                                                                                        );
+                                                                                                    }}
                                                                                                     disabled={
                                                                                                         !hasScrolledToEnd
                                                                                                     }
-                                                                                                    className="cursor-pointer bg-fuchsia-600 text-white hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                                                                                    className={cn(
+                                                                                                        'cursor-pointer gap-2 transition-all duration-300',
+                                                                                                        hasScrolledToEnd
+                                                                                                            ? 'bg-fuchsia-600 text-white shadow-md shadow-fuchsia-500/25 hover:bg-fuchsia-700 active:scale-[0.98]'
+                                                                                                            : 'pointer-events-none cursor-not-allowed bg-slate-200 text-slate-400 opacity-50 dark:bg-slate-800 dark:text-slate-500',
+                                                                                                    )}
                                                                                                 >
-                                                                                                    Finalizar
-                                                                                                    Reporte
+                                                                                                    {hasScrolledToEnd ? (
+                                                                                                        <>
+                                                                                                            <Unlock className="h-4 w-4" />
+                                                                                                            <span>
+                                                                                                                {
+                                                                                                                    'Finalizar Reporte'
+                                                                                                                }
+                                                                                                            </span>
+                                                                                                        </>
+                                                                                                    ) : (
+                                                                                                        <>
+                                                                                                            <Lock className="h-4 w-4" />
+                                                                                                            <span>
+                                                                                                                Finalizar
+                                                                                                                Reporte
+                                                                                                            </span>
+                                                                                                        </>
+                                                                                                    )}
                                                                                                 </AlertDialogAction>
                                                                                             </AlertDialogFooter>
                                                                                         </AlertDialogContent>
@@ -7121,6 +7388,53 @@ export default function ReportWorkspace({
                 onOpenChange={setIsProductsSheetOpen}
                 products={products}
             />
+
+            <AlertDialog
+                open={showSignatureWarning}
+                onOpenChange={setShowSignatureWarning}
+            >
+                <AlertDialogContent className="max-w-md">
+                    <AlertDialogHeader className="flex flex-col items-center">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+                            <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <AlertDialogTitle className="mt-3 text-center text-lg font-bold text-slate-900 dark:text-slate-100">
+                            {'Firmas Requeridas Faltantes'}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
+                            {
+                                'No se puede finalizar el reporte porque algunos patólogos asignados aún no han configurado su firma en su perfil de usuario:'
+                            }
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="my-4 max-h-[150px] overflow-y-auto rounded-md border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+                        <ul className="space-y-2">
+                            {unsignedPathologists.map((pathologist) => (
+                                <li
+                                    key={pathologist.id}
+                                    className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300"
+                                >
+                                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                    {pathologist.name}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <p className="mb-2 text-center text-xs text-muted-foreground">
+                        {
+                            'Por favor, asegúrese de que todos los patólogos agreguen su firma dibujándola o subiendo un archivo PNG transparente en su sección de Ajustes de Perfil antes de intentar finalizar.'
+                        }
+                    </p>
+                    <AlertDialogFooter className="sm:justify-center">
+                        <AlertDialogAction
+                            onClick={() => setShowSignatureWarning(false)}
+                            className="w-full cursor-pointer bg-amber-600 font-semibold text-white hover:bg-amber-700 sm:w-auto"
+                        >
+                            {'Entendido'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <Sheet open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
                 <SheetContent

@@ -35,6 +35,7 @@ class SpecimenReport extends Model
         'legend_html',
         'report_finalization_datetime',
         'sections_order',
+        'report_file',
     ];
 
     protected $casts = [

@@ -1,16 +1,15 @@
 import { router } from '@inertiajs/react';
-import {
-    User,
-    Trash2,
-    Microscope,
-    UserPlus,
-    Tag,
-    AlertCircle,
-} from 'lucide-react';
+import { User, Trash2, Microscope, UserPlus } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import HeadingSheet from '@/components/heading-sheet';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import {
     Select,
     SelectContent,
@@ -44,6 +43,14 @@ export default function SpecimenBulkPathologistSheet({
 
     const specimenIds = useMemo(() => {
         return selectedSpecimens.map((s) => s.id);
+    }, [selectedSpecimens]);
+
+    const displayedSpecimens = useMemo(() => {
+        if (selectedSpecimens.length <= 7) {
+            return selectedSpecimens;
+        }
+
+        return selectedSpecimens.slice(0, 6);
     }, [selectedSpecimens]);
 
     // Pathologists that are assigned to at least one of the selected specimens
@@ -218,27 +225,75 @@ export default function SpecimenBulkPathologistSheet({
                         </h3>
                         <Separator className="opacity-60" />
 
-                        <div className="max-h-[150px] space-y-2 overflow-y-auto pr-2">
-                            {selectedSpecimens.map((specimen) => (
+                        <div className="flex flex-wrap gap-2 py-1">
+                            {displayedSpecimens.map((specimen) => (
                                 <div
                                     key={specimen.id}
-                                    className="flex items-center justify-between border-b border-border/40 pb-1.5 text-sm last:border-0 last:pb-0"
+                                    title={`${specimen.customer_relation?.name || 'Paciente N/A'} - ${specimen.type?.name || 'N/A'}`}
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary shadow-sm transition-colors hover:bg-primary/10"
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <span className="rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-xs font-bold text-primary">
-                                            {specimen.sequence_code ||
-                                                `#${specimen.id}`}
-                                        </span>
-                                        <span className="font-medium text-foreground">
-                                            {specimen.customer_relation?.name ||
-                                                'Paciente N/A'}
-                                        </span>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">
-                                        {specimen.type?.name}
+                                    <span className="font-mono font-bold">
+                                        {specimen.sequence_code ||
+                                            `#${specimen.id}`}
+                                    </span>
+                                    <span className="max-w-[100px] truncate border-l pl-1.5 text-[10px] text-muted-foreground">
+                                        {specimen.customer_relation?.name ||
+                                            'Paciente N/A'}
                                     </span>
                                 </div>
                             ))}
+
+                            {selectedSpecimens.length > 4 && (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <button
+                                            type="button"
+                                            className="inline-flex cursor-pointer items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary shadow-sm transition-all hover:bg-primary/20 focus:outline-none"
+                                        >
+                                            +{selectedSpecimens.length - 3} más
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        className="w-80 p-4"
+                                        align="start"
+                                    >
+                                        <div className="space-y-3">
+                                            <h4 className="border-b pb-2 text-sm leading-none font-semibold text-foreground">
+                                                Todas las Muestras Seleccionadas
+                                                ({selectedSpecimens.length})
+                                            </h4>
+                                            <div className="max-h-[220px] space-y-2 overflow-y-auto pr-1">
+                                                {selectedSpecimens.map(
+                                                    (specimen) => (
+                                                        <div
+                                                            key={specimen.id}
+                                                            className="flex items-center justify-between border-b border-border/40 pb-1.5 text-xs last:border-0 last:pb-0"
+                                                        >
+                                                            <span className="rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono font-bold text-primary">
+                                                                {specimen.sequence_code ||
+                                                                    `#${specimen.id}`}
+                                                            </span>
+                                                            <span
+                                                                className="max-w-[150px] truncate font-medium text-foreground"
+                                                                title={
+                                                                    specimen
+                                                                        .customer_relation
+                                                                        ?.name
+                                                                }
+                                                            >
+                                                                {specimen
+                                                                    .customer_relation
+                                                                    ?.name ||
+                                                                    'Paciente N/A'}
+                                                            </span>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
                         </div>
                     </div>
 
@@ -329,26 +384,17 @@ export default function SpecimenBulkPathologistSheet({
                             Patólogos Asignados (a una o más de las muestras
                             seleccionadas)
                         </label>
-                        <div className="min-h-[180px] flex-1 overflow-hidden rounded-lg border border-border/80 bg-card shadow-sm">
+                        <div className="max-h-[300px] w-full overflow-y-auto rounded-lg border border-border/80 bg-card shadow-sm">
                             {assignedPathologists.length > 0 ? (
                                 <div className="w-full overflow-x-auto">
                                     <table className="w-full border-collapse text-left text-sm">
-                                        <thead>
-                                            <tr className="border-b bg-muted/50 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                        <thead className="sticky top-0 z-10 border-b bg-muted/95 backdrop-blur-sm">
+                                            <tr className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                                 <th className="p-3.5">
-                                                    Nombre
-                                                </th>
-                                                <th className="p-3.5">
-                                                    Correo Electrónico
+                                                    Patólogo y accesos
                                                 </th>
                                                 <th className="p-3.5 text-center">
                                                     Asignaciones
-                                                </th>
-                                                <th className="p-3.5 text-center">
-                                                    Macroscopía
-                                                </th>
-                                                <th className="p-3.5 text-center">
-                                                    Microscopía
                                                 </th>
                                                 <th className="w-20 p-3.5 text-right">
                                                     Acciones
@@ -421,11 +467,67 @@ export default function SpecimenBulkPathologistSheet({
                                                             key={user.id}
                                                             className="transition-colors hover:bg-muted/20"
                                                         >
-                                                            <td className="p-3.5 font-medium text-foreground">
-                                                                {user.name}
-                                                            </td>
-                                                            <td className="p-3.5 text-muted-foreground">
-                                                                {user.email}
+                                                            <td className="p-3.5 text-left">
+                                                                <div className="flex flex-col items-start gap-2.5">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-sm leading-tight font-semibold text-foreground">
+                                                                                {
+                                                                                    user.name
+                                                                                }
+                                                                            </span>
+                                                                            <span className="text-xs font-normal text-muted-foreground">
+                                                                                {
+                                                                                    user.email
+                                                                                }
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex flex-nowrap items-start gap-3">
+                                                                        <div className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1 text-[11px] transition-colors hover:bg-muted/50">
+                                                                            <span className="font-medium text-muted-foreground">
+                                                                                Macroscopía
+                                                                            </span>
+                                                                            <Switch
+                                                                                checked={
+                                                                                    isMacroChecked
+                                                                                }
+                                                                                onCheckedChange={(
+                                                                                    checked,
+                                                                                ) =>
+                                                                                    handleToggleAccess(
+                                                                                        user.id,
+                                                                                        'macroscopy',
+                                                                                        checked,
+                                                                                    )
+                                                                                }
+                                                                                title="Alternar acceso a macroscopía en lote"
+                                                                                className="scale-90"
+                                                                            />
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1 text-[11px] transition-colors hover:bg-muted/50">
+                                                                            <span className="font-medium text-muted-foreground">
+                                                                                Microscopía
+                                                                            </span>
+                                                                            <Switch
+                                                                                checked={
+                                                                                    isMicroChecked
+                                                                                }
+                                                                                onCheckedChange={(
+                                                                                    checked,
+                                                                                ) =>
+                                                                                    handleToggleAccess(
+                                                                                        user.id,
+                                                                                        'microscopy',
+                                                                                        checked,
+                                                                                    )
+                                                                                }
+                                                                                title="Alternar acceso a microscopía en lote"
+                                                                                className="scale-90"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
                                                             </td>
                                                             <td className="p-3.5 text-center font-medium">
                                                                 <div className="flex flex-col items-center gap-1.5">
@@ -438,62 +540,104 @@ export default function SpecimenBulkPathologistSheet({
                                                                             selectedSpecimens.length
                                                                         }
                                                                     </span>
-                                                                    <div className="flex max-w-[220px] flex-wrap justify-center gap-1">
-                                                                        {assignedSpecimens.map(
+                                                                    <div className="flex max-w-[280px] flex-wrap justify-center gap-1">
+                                                                        {(assignedCount <=
+                                                                        4
+                                                                            ? assignedSpecimens
+                                                                            : assignedSpecimens.slice(
+                                                                                  0,
+                                                                                  3,
+                                                                              )
+                                                                        ).map(
                                                                             (
                                                                                 specimen,
                                                                             ) => (
-                                                                                <span
+                                                                                <div
                                                                                     key={
                                                                                         specimen.id
                                                                                     }
-                                                                                    title={`${specimen.sequence_code || `#${specimen.id}`} - ${specimen.customer_relation?.name || 'Paciente N/A'}`}
-                                                                                    className="inline-flex cursor-help items-center rounded border border-border/60 bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-secondary-foreground transition-colors hover:bg-secondary/80"
+                                                                                    title={`${specimen.customer_relation?.name || 'Paciente N/A'} - ${specimen.type?.name || 'N/A'}`}
+                                                                                    className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary transition-colors hover:bg-primary/10"
                                                                                 >
-                                                                                    {specimen.sequence_code ||
-                                                                                        `#${specimen.id}`}
-                                                                                </span>
+                                                                                    <span className="font-mono font-bold">
+                                                                                        {specimen.sequence_code ||
+                                                                                            `#${specimen.id}`}
+                                                                                    </span>
+                                                                                </div>
                                                                             ),
                                                                         )}
+                                                                        {assignedCount >
+                                                                            4 && (
+                                                                            <Popover>
+                                                                                <PopoverTrigger
+                                                                                    asChild
+                                                                                >
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className="inline-flex cursor-pointer items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm transition-all hover:bg-primary/20 focus:outline-none"
+                                                                                    >
+                                                                                        +
+                                                                                        {assignedCount -
+                                                                                            3}{' '}
+                                                                                        más
+                                                                                    </button>
+                                                                                </PopoverTrigger>
+                                                                                <PopoverContent
+                                                                                    className="w-80 p-4"
+                                                                                    align="center"
+                                                                                >
+                                                                                    <div className="space-y-3">
+                                                                                        <h4 className="border-b pb-2 text-sm leading-none font-semibold text-foreground">
+                                                                                            Muestras
+                                                                                            Asignadas
+                                                                                            a{' '}
+                                                                                            {
+                                                                                                user.name
+                                                                                            }{' '}
+                                                                                            (
+                                                                                            {
+                                                                                                assignedCount
+                                                                                            }
+
+                                                                                            )
+                                                                                        </h4>
+                                                                                        <div className="max-h-[220px] space-y-2 overflow-y-auto pr-1">
+                                                                                            {assignedSpecimens.map(
+                                                                                                (
+                                                                                                    specimen,
+                                                                                                ) => (
+                                                                                                    <div
+                                                                                                        key={
+                                                                                                            specimen.id
+                                                                                                        }
+                                                                                                        className="flex items-center justify-between border-b border-border/40 pb-1.5 text-xs last:border-0 last:pb-0"
+                                                                                                    >
+                                                                                                        <span className="rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono font-bold text-primary">
+                                                                                                            {specimen.sequence_code ||
+                                                                                                                `#${specimen.id}`}
+                                                                                                        </span>
+                                                                                                        <span
+                                                                                                            className="max-w-[150px] truncate font-medium text-foreground"
+                                                                                                            title={
+                                                                                                                specimen
+                                                                                                                    .customer_relation
+                                                                                                                    ?.name
+                                                                                                            }
+                                                                                                        >
+                                                                                                            {specimen
+                                                                                                                .customer_relation
+                                                                                                                ?.name ||
+                                                                                                                'Paciente N/A'}
+                                                                                                        </span>
+                                                                                                    </div>
+                                                                                                ),
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </PopoverContent>
+                                                                            </Popover>
+                                                                        )}
                                                                     </div>
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-3.5 text-center">
-                                                                <div className="flex items-center justify-center">
-                                                                    <Switch
-                                                                        checked={
-                                                                            isMacroChecked
-                                                                        }
-                                                                        onCheckedChange={(
-                                                                            checked,
-                                                                        ) =>
-                                                                            handleToggleAccess(
-                                                                                user.id,
-                                                                                'macroscopy',
-                                                                                checked,
-                                                                            )
-                                                                        }
-                                                                        title="Alternar acceso a macroscopía en lote"
-                                                                    />
-                                                                </div>
-                                                            </td>
-                                                            <td className="p-3.5 text-center">
-                                                                <div className="flex items-center justify-center">
-                                                                    <Switch
-                                                                        checked={
-                                                                            isMicroChecked
-                                                                        }
-                                                                        onCheckedChange={(
-                                                                            checked,
-                                                                        ) =>
-                                                                            handleToggleAccess(
-                                                                                user.id,
-                                                                                'microscopy',
-                                                                                checked,
-                                                                            )
-                                                                        }
-                                                                        title="Alternar acceso a microscopía en lote"
-                                                                    />
                                                                 </div>
                                                             </td>
                                                             <td className="p-3.5 text-right">

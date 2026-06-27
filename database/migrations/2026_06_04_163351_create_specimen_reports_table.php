@@ -29,9 +29,17 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE specimen_reports ADD yjs_macroscopy_state LONGBLOB NULL AFTER macroscopy_html');
-        DB::statement('ALTER TABLE specimen_reports ADD yjs_microscopy_state LONGBLOB NULL AFTER microscopy_html');
-        DB::statement('ALTER TABLE specimen_reports ADD yjs_diagnosis_state LONGBLOB NULL AFTER diagnosis_html');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE specimen_reports ADD yjs_macroscopy_state LONGBLOB NULL AFTER macroscopy_html');
+            DB::statement('ALTER TABLE specimen_reports ADD yjs_microscopy_state LONGBLOB NULL AFTER microscopy_html');
+            DB::statement('ALTER TABLE specimen_reports ADD yjs_diagnosis_state LONGBLOB NULL AFTER diagnosis_html');
+        } else {
+            Schema::table('specimen_reports', function (Blueprint $table) {
+                $table->binary('yjs_macroscopy_state')->nullable();
+                $table->binary('yjs_microscopy_state')->nullable();
+                $table->binary('yjs_diagnosis_state')->nullable();
+            });
+        }
     }
 
     /**

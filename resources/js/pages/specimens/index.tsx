@@ -349,6 +349,7 @@ export default function SpecimensIndex({
         setSelectedSpecimenTypeId(typeId);
 
         let nextExamId = selectedExaminationId;
+
         if (typeId !== 'all') {
             const hasValidExam = examinations.some(
                 (exam) =>
@@ -366,6 +367,7 @@ export default function SpecimensIndex({
         }
 
         const userId = props.auth?.user?.id;
+
         if (userId) {
             setCookie(`specimen_type_filter_specimens_user_${userId}`, typeId);
             setCookie(
@@ -531,15 +533,18 @@ export default function SpecimensIndex({
         if (filters.status) {
             setSelectedStatuses(filters.status);
         }
+
         if (filters.date_from !== undefined || filters.date_to !== undefined) {
             setDateRange({
                 from: filters.date_from || '',
                 to: filters.date_to || '',
             });
         }
+
         if (filters.specimen_type_id !== undefined) {
             setSelectedSpecimenTypeId(filters.specimen_type_id || 'all');
         }
+
         if (filters.examination_id !== undefined) {
             setSelectedExaminationId(filters.examination_id || 'all');
         }
@@ -1026,6 +1031,7 @@ export default function SpecimensIndex({
                                                 const userId =
                                                     props.auth?.user?.id;
                                                 let nextStatuses: string[] = [];
+
                                                 if (
                                                     selectedStatuses.length !==
                                                     ALL_STATUSES.length
@@ -1035,9 +1041,11 @@ export default function SpecimensIndex({
                                                             (s) => s.value,
                                                         );
                                                 }
+
                                                 setSelectedStatuses(
                                                     nextStatuses,
                                                 );
+
                                                 if (userId) {
                                                     setCookie(
                                                         `status_filter_specimens_user_${userId}`,
@@ -1046,6 +1054,7 @@ export default function SpecimensIndex({
                                                         ),
                                                     );
                                                 }
+
                                                 router.get(
                                                     '/specimens',
                                                     {
@@ -1097,6 +1106,7 @@ export default function SpecimensIndex({
                                                         setSelectedStatuses(
                                                             nextStatuses,
                                                         );
+
                                                         if (userId) {
                                                             setCookie(
                                                                 `status_filter_specimens_user_${userId}`,
@@ -1105,6 +1115,7 @@ export default function SpecimensIndex({
                                                                 ),
                                                             );
                                                         }
+
                                                         router.get(
                                                             '/specimens',
                                                             {
@@ -1252,6 +1263,7 @@ export default function SpecimensIndex({
                             className="h-10 w-full gap-2 px-5 text-sm md:w-auto"
                             onClick={() => {
                                 const userId = props.auth?.user?.id;
+
                                 if (userId) {
                                     const defaultRange = getLast2WeeksRange();
                                     setCookie(
@@ -1276,6 +1288,7 @@ export default function SpecimensIndex({
                                         JSON.stringify(defaultRange),
                                     );
                                 }
+
                                 router.get(
                                     '/specimens',
                                     {},
@@ -1480,12 +1493,14 @@ export default function SpecimensIndex({
                                                 );
                                                 const userId =
                                                     props.auth?.user?.id;
+
                                                 if (userId) {
                                                     setCookie(
                                                         `examination_filter_specimens_user_${userId}`,
                                                         'all',
                                                     );
                                                 }
+
                                                 router.get(
                                                     '/specimens',
                                                     {
@@ -1527,12 +1542,14 @@ export default function SpecimensIndex({
                                                         const userId =
                                                             props.auth?.user
                                                                 ?.id;
+
                                                         if (userId) {
                                                             setCookie(
                                                                 `examination_filter_specimens_user_${userId}`,
                                                                 examId,
                                                             );
                                                         }
+
                                                         router.get(
                                                             '/specimens',
                                                             {

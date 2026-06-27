@@ -468,17 +468,36 @@
                                     'patient_name' => $specimen->customerRelation->name ?? 'Paciente',
                                     'price' => $totalPrice,
                                     'discount' => $totalDiscount,
-                                    'age_discount_type' => null,
-                                    'age_discount_amount' => 0.00,
+                                    'age_discount_type' => $groupSpecimen->age_discount_type,
+                                    'age_discount_amount' => (float) $groupSpecimen->age_discount_amount,
+                                    'additional_discount_enabled' => (bool) $groupSpecimen->additional_discount_enabled,
+                                    'additional_discount' => (float) $groupSpecimen->additional_discount,
                                     'quantity' => $qty,
                                 ];
                             }
                         } elseif ($invoice->is_group && $invoice->specimenGroup) {
                             foreach ($invoice->specimenGroup->specimens as $specimen) {
+                                $igs = $specimen->invoiceGroupSpecimen()->where('invoice_id', $invoice->id)->first() ?? $specimen->invoiceGroupSpecimen;
                                 $price = 0.00;
-                                if ($specimen->type && $specimen->type->prices->isNotEmpty()) {
+                                $discount = 0.00;
+                                $qty = 1;
+                                $ageDiscountType = null;
+                                $ageDiscountAmount = 0.00;
+                                $additionalDiscountEnabled = false;
+                                $additionalDiscount = 0.00;
+                                
+                                if ($igs) {
+                                    $price = (float)$igs->amount;
+                                    $discount = (float)$igs->discount;
+                                    $qty = (int)$igs->quantity;
+                                    $ageDiscountType = $igs->age_discount_type;
+                                    $ageDiscountAmount = (float)$igs->age_discount_amount;
+                                    $additionalDiscountEnabled = (bool)$igs->additional_discount_enabled;
+                                    $additionalDiscount = (float)$igs->additional_discount;
+                                } else if ($specimen->type && $specimen->type->prices->isNotEmpty()) {
                                     $price = (float)$specimen->type->prices->first()->amount;
                                 }
+                                
                                 $typeName = $specimen->type->name ?? '';
                                 $examName = $specimen->examination->name ?? 'Examen';
                                 $combinedName = $typeName ? $typeName . ' - ' . $examName : $examName;
@@ -488,10 +507,12 @@
                                     'exam_name' => $combinedName,
                                     'patient_name' => $specimen->customerRelation->name ?? 'Paciente',
                                     'price' => $price,
-                                    'discount' => 0.00,
-                                    'age_discount_type' => null,
-                                    'age_discount_amount' => 0.00,
-                                    'quantity' => 1,
+                                    'discount' => $discount,
+                                    'age_discount_type' => $ageDiscountType,
+                                    'age_discount_amount' => $ageDiscountAmount,
+                                    'additional_discount_enabled' => $additionalDiscountEnabled,
+                                    'additional_discount' => $additionalDiscount,
+                                    'quantity' => $qty,
                                 ];
                             }
                         }
@@ -514,9 +535,14 @@
                                 <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
                                     Paciente: {{ $spec['patient_name'] }} &nbsp;|&nbsp; Muestra: <span style="font-family: monospace; font-weight: bold; color: #1e3a8a; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px;">{{ $spec['sequence_code'] }}</span>
                                 </div>
-                                @if(!empty($spec['age_discount_type']))
+                                @if(!empty($spec['age_discount_type']) && (float)($spec['age_discount_amount'] ?? 0) > 0)
                                     <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
                                         * Descuento de {{ $spec['age_discount_type'] === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }} aplicado: - L. {{ number_format($spec['age_discount_amount'], 2) }}
+                                    </div>
+                                @endif
+                                @if(!empty($spec['additional_discount_enabled']) && (float)($spec['additional_discount'] ?? 0) > 0)
+                                    <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
+                                        * Descuento Adicional aplicado: - L. {{ number_format($spec['additional_discount'], 2) }}
                                     </div>
                                 @endif
                             </td>

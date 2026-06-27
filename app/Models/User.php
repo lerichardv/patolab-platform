@@ -7,14 +7,16 @@ use App\Traits\Auditable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'email', 'password', 'active', 'role_id'])]
+#[Fillable(['name', 'email', 'password', 'active', 'role_id', 'user_signature'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -22,6 +24,23 @@ class User extends Authenticatable
 
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
+
+    /**
+     * The attributes that should be appended to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = ['signature_url'];
+
+    /**
+     * Get the public URL for the user signature.
+     * Pathologists' signatures are critical during the report finalization process.
+     * The PDF generation engine uses these signatures to sign off the document.
+     */
+    protected function signatureUrl(): Attribute
+    {
+        return Attribute::get(fn () => $this->user_signature ? Storage::disk('public')->url($this->user_signature) : null);
+    }
 
     public function role()
     {

@@ -10,7 +10,9 @@ return new class extends Migration
     public function up(): void
     {
         // Set next AUTO_INCREMENT value
-        DB::statement('ALTER TABLE credits AUTO_INCREMENT = 100000;');
+        if (Illuminate\Support\Facades\DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE credits AUTO_INCREMENT = 100000;');
+        }
     }
 
     /**
@@ -18,9 +20,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        $maxId = DB::table('credits')->max('id') ?? 0;
-        $nextId = $maxId + 1;
+        if (Illuminate\Support\Facades\DB::getDriverName() === 'mysql') {
+            $maxId = DB::table('credits')->max('id') ?? 0;
+            $nextId = $maxId + 1;
 
-        DB::statement("ALTER TABLE credits AUTO_INCREMENT = {$nextId};");
+            DB::statement("ALTER TABLE credits AUTO_INCREMENT = {$nextId};");
+        }
     }
 };

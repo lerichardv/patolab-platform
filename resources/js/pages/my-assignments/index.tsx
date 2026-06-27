@@ -261,6 +261,7 @@ export default function MyAssignmentsIndex({
         setSelectedSpecimenTypeId(typeId);
 
         let nextExamId = selectedExaminationId;
+
         if (typeId !== 'all') {
             const hasValidExam = examinations.some(
                 (exam) =>
@@ -278,6 +279,7 @@ export default function MyAssignmentsIndex({
         }
 
         const userId = props.auth?.user?.id;
+
         if (userId) {
             setCookie(
                 `specimen_type_filter_my_assignments_user_${userId}`,
@@ -396,15 +398,18 @@ export default function MyAssignmentsIndex({
         if (filters.status) {
             setSelectedStatuses(filters.status);
         }
+
         if (filters.date_from !== undefined || filters.date_to !== undefined) {
             setDateRange({
                 from: filters.date_from || '',
                 to: filters.date_to || '',
             });
         }
+
         if (filters.specimen_type_id !== undefined) {
             setSelectedSpecimenTypeId(filters.specimen_type_id || 'all');
         }
+
         if (filters.examination_id !== undefined) {
             setSelectedExaminationId(filters.examination_id || 'all');
         }
@@ -454,6 +459,7 @@ export default function MyAssignmentsIndex({
                                                 const userId =
                                                     props.auth?.user?.id;
                                                 let nextStatuses: string[] = [];
+
                                                 if (
                                                     selectedStatuses.length !==
                                                     ALL_STATUSES.length
@@ -463,9 +469,11 @@ export default function MyAssignmentsIndex({
                                                             (s) => s.value,
                                                         );
                                                 }
+
                                                 setSelectedStatuses(
                                                     nextStatuses,
                                                 );
+
                                                 if (userId) {
                                                     setCookie(
                                                         `status_filter_my_assignments_user_${userId}`,
@@ -474,6 +482,7 @@ export default function MyAssignmentsIndex({
                                                         ),
                                                     );
                                                 }
+
                                                 router.get(
                                                     '/my-assignments',
                                                     {
@@ -525,6 +534,7 @@ export default function MyAssignmentsIndex({
                                                         setSelectedStatuses(
                                                             nextStatuses,
                                                         );
+
                                                         if (userId) {
                                                             setCookie(
                                                                 `status_filter_my_assignments_user_${userId}`,
@@ -533,6 +543,7 @@ export default function MyAssignmentsIndex({
                                                                 ),
                                                             );
                                                         }
+
                                                         router.get(
                                                             '/my-assignments',
                                                             {
@@ -586,6 +597,7 @@ export default function MyAssignmentsIndex({
                             className="h-10 w-full gap-2 px-5 text-sm md:w-auto"
                             onClick={() => {
                                 const userId = props.auth?.user?.id;
+
                                 if (userId) {
                                     const defaultRange = getLast2WeeksRange();
                                     setCookie(
@@ -610,6 +622,7 @@ export default function MyAssignmentsIndex({
                                         JSON.stringify(defaultRange),
                                     );
                                 }
+
                                 router.get(
                                     '/my-assignments',
                                     {},
@@ -797,12 +810,14 @@ export default function MyAssignmentsIndex({
                                                 );
                                                 const userId =
                                                     props.auth?.user?.id;
+
                                                 if (userId) {
                                                     setCookie(
                                                         `examination_filter_my_assignments_user_${userId}`,
                                                         'all',
                                                     );
                                                 }
+
                                                 router.get(
                                                     '/my-assignments',
                                                     {
@@ -844,12 +859,14 @@ export default function MyAssignmentsIndex({
                                                         const userId =
                                                             props.auth?.user
                                                                 ?.id;
+
                                                         if (userId) {
                                                             setCookie(
                                                                 `examination_filter_my_assignments_user_${userId}`,
                                                                 examId,
                                                             );
                                                         }
+
                                                         router.get(
                                                             '/my-assignments',
                                                             {

@@ -12,7 +12,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement('ALTER TABLE specimen_reports ADD yjs_report_date_state LONGBLOB NULL AFTER report_date');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE specimen_reports ADD yjs_report_date_state LONGBLOB NULL AFTER report_date');
+        } else {
+            Schema::table('specimen_reports', function (Blueprint $table) {
+                $table->binary('yjs_report_date_state')->nullable();
+            });
+        }
     }
 
     /**
