@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Specimen;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Browsershot\Browsershot;
 
@@ -116,15 +117,20 @@ class ReportPdfService
             $url = $matches[2];
             $afterSrc = $matches[3];
 
+            Log::info("ReportPdfService: Found image in HTML. Source URL: {$url}");
+
             if (str_starts_with($url, 'data:image/')) {
+                Log::info("ReportPdfService: Image is already in base64 format.");
                 return $matches[0];
             }
 
             $base64 = $this->getImageBase64($url);
             if ($base64) {
+                Log::info("ReportPdfService: Successfully converted URL to base64.");
                 return '<img '.$beforeSrc.'src="'.$base64.'"'.$afterSrc;
             }
 
+            Log::warning("ReportPdfService: Could not convert image to base64. Keeping original URL: {$url}");
             return $matches[0];
         }, $html);
     }
@@ -134,28 +140,41 @@ class ReportPdfService
      */
     private function getImageBase64($url)
     {
+        Log::info("ReportPdfService: Resolving base64 for image URL: {$url}");
         $path = parse_url($url, PHP_URL_PATH);
+        Log::info("ReportPdfService: Parsed URL path: " . ($path ?? 'NULL'));
+
         if ($path) {
             if (preg_match('/^\/storage\/(.+)$/', $path, $storageMatches)) {
                 $relativePath = $storageMatches[1];
                 $localPath = storage_path('app/public/'.$relativePath);
+                Log::info("ReportPdfService: Matched /storage/ path. Checking local file: {$localPath}");
+
                 if (file_exists($localPath)) {
                     $data = file_get_contents($localPath);
                     $mime = mime_content_type($localPath) ?: 'image/jpeg';
+                    Log::info("ReportPdfService: Local storage file exists. Size: " . strlen($data) . " bytes. Mime: {$mime}");
 
                     return 'data:'.$mime.';base64,'.base64_encode($data);
+                } else {
+                    Log::warning("ReportPdfService: Local storage file DOES NOT exist: {$localPath}");
                 }
             }
 
             $publicPath = public_path(ltrim($path, '/'));
+            Log::info("ReportPdfService: Checking public path: {$publicPath}");
             if (file_exists($publicPath)) {
                 $data = file_get_contents($publicPath);
                 $mime = mime_content_type($publicPath) ?: 'image/jpeg';
+                Log::info("ReportPdfService: Local public file exists. Size: " . strlen($data) . " bytes. Mime: {$mime}");
 
                 return 'data:'.$mime.';base64,'.base64_encode($data);
+            } else {
+                Log::info("ReportPdfService: Local public file DOES NOT exist: {$publicPath}");
             }
         }
 
+        Log::info("ReportPdfService: Falling back to HTTP request for remote file: {$url}");
         try {
             $data = @file_get_contents($url);
             if ($data !== false) {
@@ -167,10 +186,14 @@ class ReportPdfService
                         $mime = 'image/svg+xml';
                     }
                 }
+                Log::info("ReportPdfService: Successfully fetched remote file. Size: " . strlen($data) . " bytes. Mime: {$mime}");
 
                 return 'data:'.$mime.';base64,'.base64_encode($data);
+            } else {
+                Log::error("ReportPdfService: file_get_contents returned false for URL: {$url}");
             }
         } catch (\Exception $e) {
+            Log::error("ReportPdfService: Exception while fetching remote URL {$url}: " . $e->getMessage());
         }
 
         return null;
