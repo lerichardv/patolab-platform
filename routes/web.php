@@ -10,6 +10,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MyAssignmentController;
 use App\Http\Controllers\MySpecimenTypeTemplateController;
+use App\Http\Controllers\MyWorkOrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReferrerController;
 use App\Http\Controllers\ReferrerTypeController;
@@ -27,6 +28,8 @@ use App\Http\Controllers\StorageController;
 use App\Http\Controllers\UserCommissionController;
 use App\Http\Controllers\UserCommissionRuleController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WorkOrderController;
+use App\Http\Controllers\WorkOrderTypeController;
 use App\Models\Customer;
 use App\Models\Department;
 use App\Models\Invoice;
@@ -145,6 +148,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('specimen-categories', SpecimenCategoryController::class);
     Route::resource('specimen-types', SpecimenTypeController::class);
     Route::resource('specimen-type-examinations', SpecimenTypeExaminationController::class);
+    Route::resource('work-orders', WorkOrderTypeController::class)->parameters([
+        'work-orders' => 'work_order_type',
+    ]);
+    Route::post('work-order-records', [WorkOrderController::class, 'store'])->name('work-order-records.store');
+    Route::get('admin-work-orders', [WorkOrderController::class, 'index'])->name('admin-work-orders.index');
+    Route::get('my-work-orders', [MyWorkOrderController::class, 'index'])->name('my-work-orders.index');
+    Route::put('my-work-orders/{work_order}/status', [MyWorkOrderController::class, 'updateStatus'])->name('my-work-orders.update-status');
     Route::resource('referrers', ReferrerController::class);
     Route::resource('referrer-types', ReferrerTypeController::class);
     Route::resource('locations', LocationController::class);

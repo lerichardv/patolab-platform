@@ -52,6 +52,16 @@ class MorePermissionsSeeder extends Seeder
 
             /*
             |--------------------------------------------------------------------------
+            | Work Orders Administration
+            |--------------------------------------------------------------------------
+            */
+            ['name' => 'Ver Tipos de Órdenes de trabajo', 'slug' => 'work_orders.view'],
+            ['name' => 'Crear Tipo de Orden de trabajo', 'slug' => 'work_orders.create'],
+            ['name' => 'Editar Tipo de Orden de trabajo', 'slug' => 'work_orders.edit'],
+            ['name' => 'Eliminar Tipo de Orden de trabajo', 'slug' => 'work_orders.delete'],
+
+            /*
+            |--------------------------------------------------------------------------
             | Remittances
             |--------------------------------------------------------------------------
             */
@@ -84,6 +94,8 @@ class MorePermissionsSeeder extends Seeder
             ['name' => 'Eliminar Plantilla de Muestra', 'slug' => 'specimen_type_templates.delete'],
             ['name' => 'Ver Mis Plantillas de Muestra', 'slug' => 'my_specimen_type_templates.view'],
             ['name' => 'Gestionar Mis Plantillas de Muestra', 'slug' => 'my_specimen_type_templates.manage'],
+            ['name' => 'Ver Mis Órdenes de Trabajo', 'slug' => 'my_work_orders.view'],
+            ['name' => 'Ver Todas las Órdenes de Trabajo', 'slug' => 'work_orders.admin_view'],
         ];
 
         foreach ($permissions as $permission) {

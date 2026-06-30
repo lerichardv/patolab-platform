@@ -69,6 +69,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Editar Muestras', 'slug' => 'specimens.edit'],
             ['name' => 'Eliminar Muestras', 'slug' => 'specimens.delete'],
             ['name' => 'Asignar Patólogos a Muestras', 'slug' => 'specimens.manage'],
+            ['name' => 'Ver Mis Asignaciones', 'slug' => 'my_assignments.view'],
 
             /*
             |--------------------------------------------------------------------------

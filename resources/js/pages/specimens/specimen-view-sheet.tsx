@@ -22,6 +22,7 @@ import {
     Layers,
     UserPlus,
     Loader2,
+    ClipboardList,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -30,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 
 interface Props {
     specimen: any | null;
@@ -68,7 +70,7 @@ const findSpecimenInProps = (
             if (result) {
                 return result;
             }
-        } catch (e) {
+        } catch {
             // Ignore potential getter errors
         }
     }
@@ -169,6 +171,31 @@ export default function SpecimenViewSheet({
     const getEstimatedDate = () => {
         if (
             !specimen.category ||
+            !specimen.category.intern_unit ||
+            !specimen.category.intern_quantity ||
+            !specimen.created_at
+        ) {
+            return null;
+        }
+
+        const createdAt = new Date(specimen.created_at);
+        const unitMap: Record<string, string> = {
+            minutes: 'minutes',
+            hours: 'hours',
+            days: 'days',
+            weeks: 'weeks',
+        };
+        const duration = {
+            [unitMap[specimen.category.intern_unit] || 'days']:
+                specimen.category.intern_quantity,
+        };
+
+        return add(createdAt, duration);
+    };
+
+    const getClientEstimatedDate = () => {
+        if (
+            !specimen.category ||
             !specimen.category.unit ||
             !specimen.category.quantity ||
             !specimen.created_at
@@ -196,9 +223,31 @@ export default function SpecimenViewSheet({
         ? format(estimatedDate, "dd 'de' MMMM, yyyy - HH:mm", { locale: es })
         : null;
 
+    const clientEstimatedDate = getClientEstimatedDate();
+    const formattedClientEstimatedDate = clientEstimatedDate
+        ? format(clientEstimatedDate, "dd 'de' MMMM, yyyy - HH:mm", {
+              locale: es,
+          })
+        : null;
+
     const durationText =
+        specimen.category?.intern_quantity && specimen.category?.intern_unit
+            ? `Int: ${specimen.category.intern_quantity} ${
+                  specimen.category.intern_unit === 'minutes'
+                      ? 'minutos'
+                      : specimen.category.intern_unit === 'hours'
+                        ? 'horas'
+                        : specimen.category.intern_unit === 'days'
+                          ? 'días'
+                          : specimen.category.intern_unit === 'weeks'
+                            ? 'semanas'
+                            : specimen.category.intern_unit
+              }`
+            : null;
+
+    const clientDurationText =
         specimen.category?.quantity && specimen.category?.unit
-            ? `${specimen.category.quantity} ${
+            ? `Cli: ${specimen.category.quantity} ${
                   specimen.category.unit === 'minutes'
                       ? 'minutos'
                       : specimen.category.unit === 'hours'
@@ -230,7 +279,7 @@ export default function SpecimenViewSheet({
     let textClass = 'text-primary';
     let labelClass = 'text-muted-foreground';
     let iconClass = 'text-primary';
-    let badgeLabel = 'Fecha Estimada de Finalización';
+    let badgeLabel = 'Fecha Estimada de Finalización (Interna)';
 
     if (isOverdue) {
         containerClass =
@@ -238,14 +287,14 @@ export default function SpecimenViewSheet({
         textClass = 'text-destructive';
         labelClass = 'text-destructive/80';
         iconClass = 'text-destructive';
-        badgeLabel = 'Fecha Estimada de Finalización (Vencida)';
+        badgeLabel = 'Fecha Estimada de Finalización (Interna - Vencida)';
     } else if (isEstimatedToday) {
         containerClass =
             'bg-yellow-100/50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800/30 text-yellow-800 dark:text-yellow-300';
         textClass = 'text-yellow-800 dark:text-yellow-300';
         labelClass = 'text-yellow-800/80 dark:text-yellow-300/80';
         iconClass = 'text-yellow-600 dark:text-yellow-400';
-        badgeLabel = 'Fecha Estimada de Finalización (Hoy)';
+        badgeLabel = 'Fecha Estimada de Finalización (Interna - Hoy)';
     } else if (isFuture) {
         containerClass =
             'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-300';
@@ -525,15 +574,27 @@ export default function SpecimenViewSheet({
                                             <Tag className="h-3.5 w-3.5" />{' '}
                                             Categoría
                                         </span>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
                                             <p className="text-sm font-medium">
                                                 {specimen.category?.name ||
                                                     'N/A'}
                                             </p>
                                             {durationText && (
-                                                <div className="inline-flex w-fit items-center gap-1 rounded-full border border-transparent bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                                                <div
+                                                    className="inline-flex w-fit items-center gap-1 rounded-full border border-transparent bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-secondary-foreground"
+                                                    title="Tiempo límite interno"
+                                                >
                                                     <Clock className="h-3 w-3 text-muted-foreground" />{' '}
                                                     {durationText}
+                                                </div>
+                                            )}
+                                            {clientDurationText && (
+                                                <div
+                                                    className="inline-flex w-fit items-center gap-1 rounded-full border border-transparent bg-secondary/50 px-2 py-0.5 text-[10px] font-medium text-secondary-foreground"
+                                                    title="Tiempo de entrega al cliente"
+                                                >
+                                                    <Clock className="h-3 w-3 text-muted-foreground" />{' '}
+                                                    {clientDurationText}
                                                 </div>
                                             )}
                                         </div>
@@ -606,6 +667,17 @@ export default function SpecimenViewSheet({
                                             {specimen.examination?.name}
                                         </p>
                                     </div>
+                                    {formattedClientEstimatedDate && (
+                                        <div className="space-y-1 sm:col-span-2">
+                                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />{' '}
+                                                Fecha de Entrega al Cliente
+                                            </span>
+                                            <p className="text-sm font-medium text-muted-foreground">
+                                                {formattedClientEstimatedDate}
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="space-y-1 sm:col-span-2">
                                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                             <MapPin className="h-3.5 w-3.5" />{' '}
@@ -856,6 +928,130 @@ export default function SpecimenViewSheet({
                                                     Asignar Patólogo
                                                 </Button>
                                             )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Órdenes de Trabajo Card */}
+                            <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
+                                    <ClipboardList className="h-5 w-5" />{' '}
+                                    Órdenes de Trabajo
+                                </h3>
+                                <Separator />
+                                {specimen.work_orders &&
+                                specimen.work_orders.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {specimen.work_orders.map(
+                                            (order: any) => {
+                                                const priorityLabel =
+                                                    order.priority === 1
+                                                        ? 'Alta'
+                                                        : order.priority === 2
+                                                          ? 'Media'
+                                                          : 'Baja';
+
+                                                const priorityColor =
+                                                    order.priority === 1
+                                                        ? 'bg-orange-500 text-white animate-pulse'
+                                                        : order.priority === 2
+                                                          ? 'bg-yellow-500 text-black'
+                                                          : 'bg-green-500 text-white';
+
+                                                return (
+                                                    <div
+                                                        key={order.id}
+                                                        className="flex flex-col gap-3 rounded-lg border border-border/80 bg-muted/5 p-3.5 transition-colors hover:bg-muted/10"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div>
+                                                                <p className="text-sm font-semibold text-foreground">
+                                                                    {order.type
+                                                                        ?.name ||
+                                                                        'Tipo Desconocido'}
+                                                                </p>
+                                                                {order.due_date && (
+                                                                    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                                        <Clock className="h-3 w-3" />
+                                                                        Vence:{' '}
+                                                                        {format(
+                                                                            new Date(
+                                                                                order.due_date,
+                                                                            ),
+                                                                            'dd/MM/yyyy HH:mm',
+                                                                            {
+                                                                                locale: es,
+                                                                            },
+                                                                        )}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                                                <span className="inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold text-primary uppercase">
+                                                                    {
+                                                                        order.status
+                                                                    }
+                                                                </span>
+                                                                <span
+                                                                    className={cn(
+                                                                        'inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase',
+                                                                        priorityColor,
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        priorityLabel
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {order.comments && (
+                                                            <p className="rounded bg-muted/40 p-2 text-xs text-muted-foreground italic">
+                                                                "
+                                                                {order.comments}
+                                                                "
+                                                            </p>
+                                                        )}
+
+                                                        {order.users &&
+                                                            order.users.length >
+                                                                0 && (
+                                                                <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
+                                                                    <span className="text-[10px] font-medium text-muted-foreground">
+                                                                        Técnicos
+                                                                        Asignados:
+                                                                    </span>
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {order.users.map(
+                                                                            (
+                                                                                u: any,
+                                                                            ) => (
+                                                                                <span
+                                                                                    key={
+                                                                                        u.id
+                                                                                    }
+                                                                                    className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground"
+                                                                                >
+                                                                                    {
+                                                                                        u.name
+                                                                                    }
+                                                                                </span>
+                                                                            ),
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                    </div>
+                                                );
+                                            },
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-6 text-center">
+                                        <p className="text-xs text-muted-foreground">
+                                            No hay órdenes de trabajo
+                                            registradas para esta muestra.
+                                        </p>
                                     </div>
                                 )}
                             </div>

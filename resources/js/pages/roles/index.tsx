@@ -1,6 +1,6 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { ShieldCheck, Plus, Edit2, Trash2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { ShieldCheck, Plus, Edit2, Trash2, Search } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
     index as rolesIndex,
@@ -75,6 +75,7 @@ interface Props {
 interface PermissionRow {
     label: string;
     description: string;
+    module: string;
     slugs: {
         view?: string;
         create?: string;
@@ -88,6 +89,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Usuarios del Sistema',
         description: 'Gestión de cuentas de colaboradores y acceso.',
+        module: 'Seguridad y Accesos',
         slugs: {
             view: 'users.view',
             create: 'users.create',
@@ -98,6 +100,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Roles y Permisos',
         description: 'Administración de roles y asignación de permisos.',
+        module: 'Seguridad y Accesos',
         slugs: {
             view: 'roles.view',
             create: 'roles.create',
@@ -108,6 +111,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Comisiones de Usuarios',
         description: 'Reglas y gestión de comisiones de patólogos.',
+        module: 'Seguridad y Accesos',
         slugs: {
             view: 'user_commission_rules.view',
             create: 'user_commission_rules.create',
@@ -118,6 +122,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Pacientes',
         description: 'Visualización y gestión de expedientes de pacientes.',
+        module: 'Operaciones del Laboratorio',
         slugs: {
             view: 'patients.view',
             create: 'patients.create',
@@ -129,6 +134,7 @@ const permissionRows: PermissionRow[] = [
         label: 'Muestras Médicas',
         description:
             'Recepción, análisis, diagnóstico y asignación de patólogos.',
+        module: 'Operaciones del Laboratorio',
         slugs: {
             view: 'specimens.view',
             create: 'specimens.create',
@@ -138,8 +144,18 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Mis Asignaciones',
+        description:
+            'Visualización y gestión de las muestras asignadas al patólogo.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            view: 'my_assignments.view',
+        },
+    },
+    {
         label: 'Reportes y Estadísticas',
         description: 'Consulta y exportación de reportes operativos.',
+        module: 'Operaciones del Laboratorio',
         slugs: {
             view: 'reports.view',
             manage: 'reports.export',
@@ -148,6 +164,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Otros Cobros',
         description: 'Gestión de cobros de equipos, espacios o servicios.',
+        module: 'Otros Cobros',
         slugs: {
             view: 'rentals.view',
             create: 'rentals.create',
@@ -158,6 +175,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Configuración del Sistema',
         description: 'Parámetros generales de la plataforma y del laboratorio.',
+        module: 'Configuración General',
         slugs: {
             view: 'settings.view',
             edit: 'settings.edit',
@@ -167,6 +185,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Productos de Inventario',
         description: 'Catálogo de reactivos, insumos y materiales.',
+        module: 'Inventario',
         slugs: {
             view: 'products.view',
             create: 'products.create',
@@ -177,6 +196,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Inventario (Carga y Abastecimiento)',
         description: 'Ingresos, egresos y control de stock de insumos.',
+        module: 'Inventario',
         slugs: {
             view: 'inventory.view',
             create: 'inventory.add',
@@ -186,6 +206,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Movimientos de Inventario',
         description: 'Historial de transacciones de almacén.',
+        module: 'Inventario',
         slugs: {
             view: 'inventory.movements.view',
         },
@@ -193,6 +214,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Almacenes (Bodegas)',
         description: 'Registro y asignación física de productos.',
+        module: 'Inventario',
         slugs: {
             view: 'storages.view',
             create: 'storages.create',
@@ -203,6 +225,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Tipos de Muestra',
         description: 'Configuración de tipos de tejidos y fluidos admitidos.',
+        module: 'Administración de Muestras',
         slugs: {
             view: 'specimen_types.view',
             create: 'specimen_types.create',
@@ -211,9 +234,31 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Tipos de Órdenes de Trabajo',
+        description:
+            'Configuración de los tipos de órdenes, tiempos estimados y entregas.',
+        module: 'Órdenes de Trabajo',
+        slugs: {
+            view: 'work_orders.view',
+            create: 'work_orders.create',
+            edit: 'work_orders.edit',
+            delete: 'work_orders.delete',
+        },
+    },
+    {
+        label: 'Mis Órdenes de Trabajo',
+        description:
+            'Visualización de las órdenes de trabajo asignadas al técnico.',
+        module: 'Órdenes de Trabajo',
+        slugs: {
+            view: 'my_work_orders.view',
+        },
+    },
+    {
         label: 'Plantillas de Muestra',
         description:
             'Plantillas prediseñadas para diagnósticos rápidos de muestras.',
+        module: 'Administración de Muestras',
         slugs: {
             view: 'specimen_type_templates.view',
             create: 'specimen_type_templates.create',
@@ -225,6 +270,7 @@ const permissionRows: PermissionRow[] = [
         label: 'Mis Plantillas de Muestra',
         description:
             'Plantillas de diagnóstico que pertenezcan o sean creadas por el usuario actual.',
+        module: 'Administración de Muestras',
         slugs: {
             view: 'my_specimen_type_templates.view',
             manage: 'my_specimen_type_templates.manage',
@@ -233,6 +279,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Análisis y Exámenes',
         description: 'Configuración de pruebas médicas específicas.',
+        module: 'Administración de Muestras',
         slugs: {
             view: 'specimen_type_examinations.view',
             create: 'specimen_type_examinations.create',
@@ -243,6 +290,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Categorías de Muestra',
         description: 'Clasificaciones y agrupaciones para muestras.',
+        module: 'Administración de Muestras',
         slugs: {
             view: 'specimen_categories.view',
             create: 'specimen_categories.create',
@@ -253,6 +301,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Secuencias y Numeración',
         description: 'Rangos de correlativos y folios internos.',
+        module: 'Administración de Muestras',
         slugs: {
             view: 'sequences.view',
             create: 'sequences.create',
@@ -263,6 +312,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Remitentes (Médicos/Clínicas)',
         description: 'Médicos referentes y orígenes de muestras.',
+        module: 'Directorio y Ubicaciones',
         slugs: {
             view: 'referrers.view',
             create: 'referrers.create',
@@ -274,6 +324,7 @@ const permissionRows: PermissionRow[] = [
         label: 'Tipos de Remitente',
         description:
             'Clasificación de orígenes (ej. Hospital, Consulta Privada).',
+        module: 'Directorio y Ubicaciones',
         slugs: {
             view: 'referrer_types.view',
             create: 'referrer_types.create',
@@ -284,6 +335,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Sucursales / Laboratorios',
         description: 'Sedes y ubicaciones de recolección de Patolab.',
+        module: 'Configuración General',
         slugs: {
             view: 'locations.view',
             create: 'locations.create',
@@ -294,6 +346,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Rangos de Facturación (SAR/CAI)',
         description: 'Autorizaciones tributarias y límites de facturas.',
+        module: 'Facturación y Créditos',
         slugs: {
             view: 'cai_ranges.view',
             create: 'cai_ranges.create',
@@ -304,6 +357,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Facturas Emitidas',
         description: 'Visualización de comprobantes fiscales generados.',
+        module: 'Facturación y Créditos',
         slugs: {
             view: 'invoices.view',
             manage: 'invoices.manage',
@@ -312,6 +366,7 @@ const permissionRows: PermissionRow[] = [
     {
         label: 'Créditos y Cuentas por Cobrar',
         description: 'Estados de cuenta de clientes corporativos y abonos.',
+        module: 'Facturación y Créditos',
         slugs: {
             view: 'credits.view',
             manage: 'credits.manage',
@@ -329,6 +384,33 @@ export default function RolesIndex({
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredRows = useMemo(() => {
+        const lowerQuery = searchQuery.trim().toLowerCase();
+        if (!lowerQuery) return permissionRows;
+        return permissionRows.filter(
+            (row) =>
+                row.label.toLowerCase().includes(lowerQuery) ||
+                row.description.toLowerCase().includes(lowerQuery) ||
+                row.module.toLowerCase().includes(lowerQuery) ||
+                Object.values(row.slugs).some(
+                    (slug) => slug && slug.toLowerCase().includes(lowerQuery),
+                ),
+        );
+    }, [searchQuery]);
+
+    const groupedRows = useMemo(() => {
+        const groups: Record<string, PermissionRow[]> = {};
+        filteredRows.forEach((row) => {
+            const mod = row.module;
+            if (!groups[mod]) {
+                groups[mod] = [];
+            }
+            groups[mod].push(row);
+        });
+        return groups;
+    }, [filteredRows]);
 
     const createForm = useForm({
         name: '',
@@ -480,32 +562,49 @@ export default function RolesIndex({
 
                 <div className="flex flex-col gap-4 rounded-lg border bg-card p-4">
                     <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-                        <div className="w-full max-w-sm space-y-2">
-                            <Label
-                                htmlFor="role-select"
-                                className="text-sm font-semibold"
-                            >
-                                Seleccionar Rol a Gestionar
-                            </Label>
-                            {roles.length > 0 && selectedRoleId && (
-                                <Select
-                                    value={selectedRoleId.toString()}
-                                    onValueChange={handleRoleChange}
+                        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
+                            <div className="w-full max-w-sm space-y-2">
+                                <Label
+                                    htmlFor="role-select"
+                                    className="text-sm font-semibold"
                                 >
-                                    <SelectTrigger id="role-select">
-                                        <SelectValue placeholder="Seleccione un rol" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {roles.map((role) => (
-                                            <SelectItem
-                                                key={role.id}
-                                                value={role.id.toString()}
-                                            >
-                                                {role.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                    Seleccionar Rol a Gestionar
+                                </Label>
+                                {roles.length > 0 && selectedRoleId && (
+                                    <Select
+                                        value={selectedRoleId.toString()}
+                                        onValueChange={handleRoleChange}
+                                    >
+                                        <SelectTrigger id="role-select">
+                                            <SelectValue placeholder="Seleccione un rol" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {roles.map((role) => (
+                                                <SelectItem
+                                                    key={role.id}
+                                                    value={role.id.toString()}
+                                                >
+                                                    {role.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            </div>
+
+                            {selectedRole && (
+                                <div className="relative w-full max-w-xs shrink-0">
+                                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Buscar permiso o módulo..."
+                                        className="h-10 w-full bg-background pl-9"
+                                        value={searchQuery}
+                                        onChange={(e) =>
+                                            setSearchQuery(e.target.value)
+                                        }
+                                    />
+                                </div>
                             )}
                         </div>
 
@@ -570,91 +669,125 @@ export default function RolesIndex({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {permissionRows.map((row) => (
-                                    <TableRow
-                                        key={row.label}
-                                        className="hover:bg-muted/20"
-                                    >
-                                        <TableCell className="py-4 font-medium">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-semibold">
-                                                    {row.label}
-                                                </span>
-                                                <span className="mt-0.5 text-xs leading-relaxed font-normal text-muted-foreground">
-                                                    {row.description}
-                                                </span>
-                                            </div>
-                                        </TableCell>
-                                        {(
-                                            [
-                                                'view',
-                                                'create',
-                                                'edit',
-                                                'delete',
-                                                'manage',
-                                            ] as const
-                                        ).map((action) => {
-                                            const permSlug = row.slugs[action];
-                                            const perm =
-                                                findPermissionBySlug(permSlug);
+                                {Object.keys(groupedRows).length > 0 ? (
+                                    Object.entries(groupedRows).map(
+                                        ([moduleName, rows]) => (
+                                            <React.Fragment key={moduleName}>
+                                                {/* Divider/Subheader row for module name */}
+                                                <TableRow className="border-y bg-muted/30 select-none hover:bg-muted/30">
+                                                    <TableCell
+                                                        colSpan={6}
+                                                        className="px-4 py-2.5 text-xs font-bold tracking-wider text-muted-foreground uppercase"
+                                                    >
+                                                        {moduleName}
+                                                    </TableCell>
+                                                </TableRow>
+                                                {rows.map((row) => (
+                                                    <TableRow
+                                                        key={row.label}
+                                                        className="border-border/40 transition-colors hover:bg-muted/10"
+                                                    >
+                                                        <TableCell className="py-4 font-medium">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-semibold text-foreground">
+                                                                    {row.label}
+                                                                </span>
+                                                                <span className="mt-0.5 text-xs leading-relaxed font-normal text-muted-foreground">
+                                                                    {
+                                                                        row.description
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        </TableCell>
+                                                        {(
+                                                            [
+                                                                'view',
+                                                                'create',
+                                                                'edit',
+                                                                'delete',
+                                                                'manage',
+                                                            ] as const
+                                                        ).map((action) => {
+                                                            const permSlug =
+                                                                row.slugs[
+                                                                    action
+                                                                ];
+                                                            const perm =
+                                                                findPermissionBySlug(
+                                                                    permSlug,
+                                                                );
 
-                                            return (
-                                                <TableCell
-                                                    key={action}
-                                                    className="py-4 text-center"
-                                                >
-                                                    {perm ? (
-                                                        <div className="flex items-center justify-center">
-                                                            <TooltipProvider>
-                                                                <Tooltip>
-                                                                    <TooltipTrigger
-                                                                        asChild
-                                                                    >
-                                                                        <div>
-                                                                            <Switch
-                                                                                checked={hasPermission(
-                                                                                    perm.id,
-                                                                                )}
-                                                                                onCheckedChange={() =>
-                                                                                    handleTogglePermission(
-                                                                                        perm.id,
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    selectedRole.id ===
-                                                                                        1 ||
-                                                                                    !auth.permissions?.includes(
-                                                                                        'roles.edit',
-                                                                                    )
-                                                                                }
-                                                                            />
+                                                            return (
+                                                                <TableCell
+                                                                    key={action}
+                                                                    className="py-4 text-center"
+                                                                >
+                                                                    {perm ? (
+                                                                        <div className="flex items-center justify-center">
+                                                                            <TooltipProvider>
+                                                                                <Tooltip>
+                                                                                    <TooltipTrigger
+                                                                                        asChild
+                                                                                    >
+                                                                                        <div>
+                                                                                            <Switch
+                                                                                                checked={hasPermission(
+                                                                                                    perm.id,
+                                                                                                )}
+                                                                                                onCheckedChange={() =>
+                                                                                                    handleTogglePermission(
+                                                                                                        perm.id,
+                                                                                                    )
+                                                                                                }
+                                                                                                disabled={
+                                                                                                    selectedRole.id ===
+                                                                                                        1 ||
+                                                                                                    !auth.permissions?.includes(
+                                                                                                        'roles.edit',
+                                                                                                    )
+                                                                                                }
+                                                                                            />
+                                                                                        </div>
+                                                                                    </TooltipTrigger>
+                                                                                    <TooltipContent>
+                                                                                        <p className="text-xs">
+                                                                                            {
+                                                                                                perm.name
+                                                                                            }
+                                                                                        </p>
+                                                                                        <p className="font-mono text-[10px] text-muted-foreground">
+                                                                                            {
+                                                                                                perm.slug
+                                                                                            }
+                                                                                        </p>
+                                                                                    </TooltipContent>
+                                                                                </Tooltip>
+                                                                            </TooltipProvider>
                                                                         </div>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        <p className="text-xs">
-                                                                            {
-                                                                                perm.name
-                                                                            }
-                                                                        </p>
-                                                                        <p className="font-mono text-[10px] text-muted-foreground">
-                                                                            {
-                                                                                perm.slug
-                                                                            }
-                                                                        </p>
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                            </TooltipProvider>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="font-light text-muted-foreground/35 select-none">
-                                                            —
-                                                        </span>
-                                                    )}
-                                                </TableCell>
-                                            );
-                                        })}
+                                                                    ) : (
+                                                                        <span className="font-light text-muted-foreground/35 select-none">
+                                                                            —
+                                                                        </span>
+                                                                    )}
+                                                                </TableCell>
+                                                            );
+                                                        })}
+                                                    </TableRow>
+                                                ))}
+                                            </React.Fragment>
+                                        ),
+                                    )
+                                ) : (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={6}
+                                            className="h-24 text-center text-sm text-muted-foreground/60"
+                                        >
+                                            No se encontraron permisos que
+                                            coincidan con la búsqueda.
+                                        </TableCell>
                                     </TableRow>
-                                ))}
+                                )}
                             </TableBody>
                         </Table>
                         {selectedRole.id === 1 && (

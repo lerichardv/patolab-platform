@@ -37,6 +37,8 @@ class SpecimenCategoryController extends Controller
             'name' => 'required|string|max:255',
             'unit' => 'required|in:minutes,hours,days,weeks',
             'quantity' => 'required|integer|min:0',
+            'intern_unit' => 'required|in:minutes,hours,days,weeks',
+            'intern_quantity' => 'required|integer|min:0',
         ]);
 
         SpecimenCategory::create($validated);
@@ -51,6 +53,8 @@ class SpecimenCategoryController extends Controller
             'name' => 'required|string|max:255',
             'unit' => 'required|in:minutes,hours,days,weeks',
             'quantity' => 'required|integer|min:0',
+            'intern_unit' => 'required|in:minutes,hours,days,weeks',
+            'intern_quantity' => 'required|integer|min:0',
         ]);
 
         $specimenCategory->update($validated);

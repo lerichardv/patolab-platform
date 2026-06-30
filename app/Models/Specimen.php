@@ -167,4 +167,12 @@ class Specimen extends Model
     {
         return $this->hasOne(InvoiceGroupSpecimen::class, 'specimen_id');
     }
+
+    /**
+     * Obtiene las órdenes de trabajo asociadas al espécimen.
+     */
+    public function workOrders(): HasMany
+    {
+        return $this->hasMany(WorkOrder::class, 'specimen_id');
+    }
 }

@@ -77,8 +77,6 @@ class InvoiceController extends Controller
         // Resolve user cookies and query parameters
         $userId = auth()->id();
 
-
-
         // 4. Date Range Filter
         $dateCookie = $request->cookie("date_filter_invoices_user_{$userId}");
         $dateFrom = $request->get('date_from');
@@ -118,8 +116,6 @@ class InvoiceController extends Controller
         if ($request->filled('customer_id') && $request->get('customer_id') !== 'all') {
             $query->where('customer_id', $request->get('customer_id'));
         }
-
-
 
         // Filter by credit status
         if ($request->filled('has_credit') && $request->get('has_credit') !== 'all') {
@@ -285,8 +281,6 @@ class InvoiceController extends Controller
         if ($request->filled('customer_id') && $request->get('customer_id') !== 'all') {
             $query->where('customer_id', $request->get('customer_id'));
         }
-
-
 
         // Filter by credit status
         if ($request->filled('has_credit') && $request->get('has_credit') !== 'all') {

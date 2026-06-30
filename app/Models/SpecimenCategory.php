@@ -21,11 +21,15 @@ class SpecimenCategory extends Model
         'name',
         'unit',
         'quantity',
+        'intern_unit',
+        'intern_quantity',
         'active',
     ];
 
     protected $casts = [
         'active' => 'boolean',
+        'quantity' => 'integer',
+        'intern_quantity' => 'integer',
     ];
 
     public function specimens(): HasMany

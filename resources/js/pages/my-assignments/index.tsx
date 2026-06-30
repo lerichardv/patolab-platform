@@ -16,9 +16,19 @@ import {
     Check,
     Search,
     RefreshCw,
+    EllipsisVertical,
+    Plus,
+    Layers,
 } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import WorkOrderSheet from './work-order-sheet';
 import {
     DateRangePicker,
     getCookie,
@@ -28,6 +38,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 import {
     Command,
     CommandEmpty,
@@ -51,6 +63,12 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 
@@ -78,6 +96,8 @@ interface Specimen {
         name: string;
         unit: string;
         quantity: number;
+        intern_unit: string;
+        intern_quantity: number;
     };
     priority?: {
         id: number;
@@ -90,6 +110,7 @@ interface Specimen {
     created_at: string;
     invoice_relation?: any;
     users?: any[];
+    work_orders?: any[];
 }
 
 interface Priority {
@@ -104,6 +125,8 @@ interface Props {
     priorities: Priority[];
     specimenTypes: any[];
     examinations: any[];
+    workOrderTypes: any[];
+    usersList: any[];
     filters: {
         status?: string[];
         specimen_type_id?: string;
@@ -139,8 +162,8 @@ const getDueDate = (specimen: Specimen): Date => {
 
     if (
         !specimen.category ||
-        !specimen.category.unit ||
-        !specimen.category.quantity
+        !specimen.category.intern_unit ||
+        !specimen.category.intern_quantity
     ) {
         return createdAt;
     }
@@ -153,7 +176,8 @@ const getDueDate = (specimen: Specimen): Date => {
     };
 
     const duration = {
-        [unitMap[specimen.category.unit] || 'days']: specimen.category.quantity,
+        [unitMap[specimen.category.intern_unit] || 'days']:
+            specimen.category.intern_quantity,
     };
 
     return add(createdAt, duration);
@@ -197,14 +221,32 @@ export default function MyAssignmentsIndex({
     priorities,
     specimenTypes,
     examinations,
+    workOrderTypes,
+    usersList,
     filters,
 }: Props) {
     const { props } = usePage() as any;
     const [selectedSpecimen, setSelectedSpecimen] = useState<Specimen | null>(
         null,
     );
+    const [
+        selectedSpecimenForWorkOrdersList,
+        setSelectedSpecimenForWorkOrdersList,
+    ] = useState<Specimen | null>(null);
     const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
     const [isReloading, setIsReloading] = useState(false);
+    const [selectedSpecimenForWorkOrder, setSelectedSpecimenForWorkOrder] =
+        useState<number | null>(null);
+    const [isWorkOrderSheetOpen, setIsWorkOrderSheetOpen] = useState(false);
+
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+    const toggleSelectSpecimen = (id: number) => {
+        setSelectedIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+        );
+    };
 
     const handleReload = () => {
         setIsReloading(true);
@@ -363,6 +405,27 @@ export default function MyAssignmentsIndex({
         selectedSpecimenTypeId,
         selectedExaminationId,
     ]);
+
+    const visibleSpecimenIds = useMemo(() => {
+        return filteredSpecimens.map((s) => s.id);
+    }, [filteredSpecimens]);
+
+    const isAllVisibleSelected = useMemo(() => {
+        if (visibleSpecimenIds.length === 0) return false;
+        return visibleSpecimenIds.every((id) => selectedIds.includes(id));
+    }, [visibleSpecimenIds, selectedIds]);
+
+    const handleSelectAllVisible = () => {
+        if (isAllVisibleSelected) {
+            setSelectedIds((prev) =>
+                prev.filter((id) => !visibleSpecimenIds.includes(id)),
+            );
+        } else {
+            setSelectedIds((prev) =>
+                Array.from(new Set([...prev, ...visibleSpecimenIds])),
+            );
+        }
+    };
 
     // Group and sort filtered specimens by priority and due date desc
     const groupedSpecimens = useMemo(() => {
@@ -899,7 +962,86 @@ export default function MyAssignmentsIndex({
                             </Command>
                         </PopoverContent>
                     </Popover>
+
+                    {/* Selección Múltiple Switch */}
+                    <div
+                        className="flex h-10 cursor-pointer items-center gap-2 rounded-md border bg-card px-3 shadow-xs transition-colors select-none hover:bg-accent/45"
+                        onClick={() => {
+                            setIsSelectionMode((prev) => {
+                                const next = !prev;
+                                if (!next) {
+                                    setSelectedIds([]);
+                                }
+                                return next;
+                            });
+                        }}
+                    >
+                        <span className="text-sm font-medium">Seleccionar</span>
+                        <Switch
+                            checked={isSelectionMode}
+                            onCheckedChange={(checked) => {
+                                setIsSelectionMode(checked);
+                                if (!checked) {
+                                    setSelectedIds([]);
+                                }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
                 </div>
+
+                {isSelectionMode && (
+                    <div className="flex w-full animate-in flex-col justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2 px-3 duration-200 select-none fade-in slide-in-from-top-2 sm:flex-row sm:items-center sm:p-0 sm:py-2 sm:pr-2 sm:pl-3 dark:border-border/60 dark:bg-muted/10">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:flex-nowrap sm:text-sm">
+                            <span>
+                                <span className="font-semibold text-primary">
+                                    {selectedIds.length}
+                                </span>{' '}
+                                <span>
+                                    {selectedIds.length === 1
+                                        ? 'muestra seleccionada'
+                                        : 'muestras seleccionadas'}
+                                </span>
+                            </span>
+                            {visibleSpecimenIds.length > 0 && (
+                                <>
+                                    <span className="text-muted-foreground/30">
+                                        |
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        onClick={handleSelectAllVisible}
+                                        className="h-auto p-0 text-xs font-semibold text-primary transition-colors hover:text-primary/80 sm:text-sm"
+                                    >
+                                        <span className="sm:hidden">
+                                            {isAllVisibleSelected
+                                                ? 'Deseleccionar'
+                                                : 'Seleccionar todas'}
+                                        </span>
+                                        <span className="hidden sm:inline">
+                                            {isAllVisibleSelected
+                                                ? 'Deseleccionar todas'
+                                                : 'Seleccionar todas'}
+                                        </span>
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <Button
+                                disabled={selectedIds.length === 0}
+                                onClick={() => {
+                                    setSelectedSpecimenForWorkOrder(null);
+                                    setIsWorkOrderSheetOpen(true);
+                                }}
+                                className="flex h-8 w-full items-center gap-2 bg-emerald-600 px-3 text-xs text-white transition-colors hover:bg-emerald-700 sm:w-auto sm:px-4"
+                            >
+                                <Plus className="h-4 w-4" /> Crear Orden en Lote
+                            </Button>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex flex-col gap-8">
                     {priorities.map((priority) => {
@@ -941,6 +1083,66 @@ export default function MyAssignmentsIndex({
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
+                                                    {isSelectionMode && (
+                                                        <TableHead className="w-[50px] text-center">
+                                                            <Checkbox
+                                                                checked={
+                                                                    list.length >
+                                                                        0 &&
+                                                                    list.every(
+                                                                        (s) =>
+                                                                            selectedIds.includes(
+                                                                                s.id,
+                                                                            ),
+                                                                    )
+                                                                }
+                                                                onCheckedChange={(
+                                                                    checked,
+                                                                ) => {
+                                                                    const listIds =
+                                                                        list.map(
+                                                                            (
+                                                                                s,
+                                                                            ) =>
+                                                                                s.id,
+                                                                        );
+                                                                    if (
+                                                                        checked
+                                                                    ) {
+                                                                        setSelectedIds(
+                                                                            (
+                                                                                prev,
+                                                                            ) => [
+                                                                                ...prev,
+                                                                                ...listIds.filter(
+                                                                                    (
+                                                                                        id,
+                                                                                    ) =>
+                                                                                        !prev.includes(
+                                                                                            id,
+                                                                                        ),
+                                                                                ),
+                                                                            ],
+                                                                        );
+                                                                    } else {
+                                                                        setSelectedIds(
+                                                                            (
+                                                                                prev,
+                                                                            ) =>
+                                                                                prev.filter(
+                                                                                    (
+                                                                                        id,
+                                                                                    ) =>
+                                                                                        !listIds.includes(
+                                                                                            id,
+                                                                                        ),
+                                                                                ),
+                                                                        );
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </TableHead>
+                                                    )}
                                                     <TableHead className="w-[100px] font-semibold">
                                                         Código
                                                     </TableHead>
@@ -985,15 +1187,53 @@ export default function MyAssignmentsIndex({
                                                                 key={
                                                                     specimen.id
                                                                 }
-                                                                className="group cursor-pointer border-border/40 transition-colors hover:bg-muted/30"
-                                                                onClick={() =>
-                                                                    router.get(
-                                                                        `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
-                                                                    )
-                                                                }
+                                                                className={cn(
+                                                                    'group cursor-pointer border-border/40 transition-colors hover:bg-muted/30',
+                                                                    selectedIds.includes(
+                                                                        specimen.id,
+                                                                    ) &&
+                                                                        'border-primary/20 bg-primary/[0.04] hover:bg-primary/[0.06]',
+                                                                )}
+                                                                onClick={(
+                                                                    e,
+                                                                ) => {
+                                                                    if (
+                                                                        isSelectionMode
+                                                                    ) {
+                                                                        e.stopPropagation();
+                                                                        toggleSelectSpecimen(
+                                                                            specimen.id,
+                                                                        );
+                                                                    } else {
+                                                                        router.get(
+                                                                            `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
+                                                                        );
+                                                                    }
+                                                                }}
                                                             >
+                                                                {isSelectionMode && (
+                                                                    <TableCell
+                                                                        className="w-[50px] py-2.5 text-center"
+                                                                        onClick={(
+                                                                            e,
+                                                                        ) =>
+                                                                            e.stopPropagation()
+                                                                        }
+                                                                    >
+                                                                        <Checkbox
+                                                                            checked={selectedIds.includes(
+                                                                                specimen.id,
+                                                                            )}
+                                                                            onCheckedChange={() =>
+                                                                                toggleSelectSpecimen(
+                                                                                    specimen.id,
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    </TableCell>
+                                                                )}
                                                                 <TableCell className="font-mono text-xs font-semibold text-primary">
-                                                                    <div className="flex min-h-[24px] items-center gap-1.5">
+                                                                    <div className="flex min-h-[24px] flex-wrap items-center gap-1.5">
                                                                         <span>
                                                                             {specimen.sequence_code ||
                                                                                 `#${specimen.id}`}
@@ -1004,6 +1244,32 @@ export default function MyAssignmentsIndex({
                                                                                 `#${specimen.id}`
                                                                             }
                                                                         />
+                                                                        {specimen.work_orders &&
+                                                                            specimen
+                                                                                .work_orders
+                                                                                .length >
+                                                                                0 && (
+                                                                                <Badge
+                                                                                    variant="secondary"
+                                                                                    className="animate-in cursor-pointer rounded-full border bg-primary/5 px-1.5 py-0.5 text-[10px] font-bold text-primary select-none fade-in hover:bg-primary/10"
+                                                                                    onClick={(
+                                                                                        e,
+                                                                                    ) => {
+                                                                                        e.stopPropagation();
+                                                                                        setSelectedSpecimenForWorkOrdersList(
+                                                                                            specimen,
+                                                                                        );
+                                                                                    }}
+                                                                                    title={`${specimen.work_orders.length} órdenes de trabajo creadas. Haga clic para ver detalles.`}
+                                                                                >
+                                                                                    <Layers className="mr-0.5 h-3 w-3 text-primary" />
+                                                                                    {
+                                                                                        specimen
+                                                                                            .work_orders
+                                                                                            .length
+                                                                                    }
+                                                                                </Badge>
+                                                                            )}
                                                                     </div>
                                                                 </TableCell>
                                                                 {/* Visual Day Calendar Tear-off Widget */}
@@ -1106,15 +1372,19 @@ export default function MyAssignmentsIndex({
                                                                           )
                                                                         : 'N/A'}
                                                                 </TableCell>
-                                                                <TableCell className="flex items-center justify-end gap-1 text-right">
+                                                                <TableCell
+                                                                    className="flex items-center justify-end gap-1 text-right"
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) =>
+                                                                        e.stopPropagation()
+                                                                    }
+                                                                >
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
                                                                         className="h-8 w-8 hover:bg-accent hover:text-accent-foreground"
-                                                                        onClick={(
-                                                                            e,
-                                                                        ) => {
-                                                                            e.stopPropagation();
+                                                                        onClick={() => {
                                                                             handleViewSpecimen(
                                                                                 specimen,
                                                                             );
@@ -1123,22 +1393,59 @@ export default function MyAssignmentsIndex({
                                                                     >
                                                                         <Eye className="h-4 w-4" />
                                                                     </Button>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 text-primary/80 hover:bg-accent hover:text-accent-foreground hover:text-primary"
-                                                                        onClick={(
-                                                                            e,
-                                                                        ) => {
-                                                                            e.stopPropagation();
-                                                                            router.get(
-                                                                                `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
-                                                                            );
-                                                                        }}
-                                                                        title="Editor de reporte"
-                                                                    >
-                                                                        <FileText className="h-4 w-4" />
-                                                                    </Button>
+                                                                    <DropdownMenu>
+                                                                        <DropdownMenuTrigger
+                                                                            asChild
+                                                                        >
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-8 w-8 hover:bg-accent hover:text-accent-foreground"
+                                                                                title="Acciones"
+                                                                            >
+                                                                                <EllipsisVertical className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </DropdownMenuTrigger>
+                                                                        <DropdownMenuContent
+                                                                            align="end"
+                                                                            className="w-52"
+                                                                        >
+                                                                            <DropdownMenuItem
+                                                                                onClick={() => {
+                                                                                    router.get(
+                                                                                        `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
+                                                                                    );
+                                                                                }}
+                                                                                className="group cursor-pointer"
+                                                                            >
+                                                                                <FileText className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                                                                <span>
+                                                                                    Editor
+                                                                                    de
+                                                                                    Reporte
+                                                                                </span>
+                                                                            </DropdownMenuItem>
+                                                                            <DropdownMenuItem
+                                                                                onClick={() => {
+                                                                                    setSelectedSpecimenForWorkOrder(
+                                                                                        specimen.id,
+                                                                                    );
+                                                                                    setIsWorkOrderSheetOpen(
+                                                                                        true,
+                                                                                    );
+                                                                                }}
+                                                                                className="group cursor-pointer"
+                                                                            >
+                                                                                <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                                                                <span>
+                                                                                    Crear
+                                                                                    Orden
+                                                                                    de
+                                                                                    Trabajo
+                                                                                </span>
+                                                                            </DropdownMenuItem>
+                                                                        </DropdownMenuContent>
+                                                                    </DropdownMenu>
                                                                 </TableCell>
                                                             </TableRow>
                                                         );
@@ -1181,6 +1488,146 @@ export default function MyAssignmentsIndex({
                     }
                 }}
             />
+
+            <WorkOrderSheet
+                specimenId={selectedSpecimenForWorkOrder}
+                specimenIds={selectedSpecimenForWorkOrder ? null : selectedIds}
+                workOrderTypes={workOrderTypes}
+                usersList={usersList}
+                open={isWorkOrderSheetOpen}
+                onOpenChange={(open) => {
+                    setIsWorkOrderSheetOpen(open);
+                    if (!open) {
+                        setSelectedIds([]);
+                        setIsSelectionMode(false);
+                    }
+                }}
+            />
+
+            <Dialog
+                open={selectedSpecimenForWorkOrdersList !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setSelectedSpecimenForWorkOrdersList(null);
+                    }
+                }}
+            >
+                <DialogContent className="max-h-[85vh] w-full overflow-y-auto sm:max-w-[600px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-lg font-bold text-primary">
+                            <ClipboardList className="h-5 w-5 text-primary" />
+                            Órdenes de Trabajo
+                        </DialogTitle>
+                        <p className="text-xs text-muted-foreground">
+                            Detalles de las órdenes generadas para la muestra{' '}
+                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono font-semibold text-foreground">
+                                {selectedSpecimenForWorkOrdersList?.sequence_code ||
+                                    `#${selectedSpecimenForWorkOrdersList?.id}`}
+                            </span>
+                        </p>
+                    </DialogHeader>
+                    <Separator className="my-2" />
+                    <div className="flex flex-col gap-4 py-2 select-none">
+                        {selectedSpecimenForWorkOrdersList?.work_orders &&
+                        selectedSpecimenForWorkOrdersList.work_orders.length >
+                            0 ? (
+                            selectedSpecimenForWorkOrdersList.work_orders.map(
+                                (order: any) => {
+                                    const priorityLabel =
+                                        order.priority === 1
+                                            ? 'Alta'
+                                            : order.priority === 2
+                                              ? 'Media'
+                                              : 'Baja';
+
+                                    const priorityColor =
+                                        order.priority === 1
+                                            ? 'bg-orange-500 text-white animate-pulse'
+                                            : order.priority === 2
+                                              ? 'bg-yellow-500 text-black'
+                                              : 'bg-green-500 text-white';
+
+                                    return (
+                                        <div
+                                            key={order.id}
+                                            className="flex flex-col gap-3 rounded-lg border border-border/80 bg-card p-4 transition-colors hover:bg-muted/10"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div>
+                                                    <p className="text-sm font-semibold text-foreground">
+                                                        {order.type?.name ||
+                                                            'Tipo Desconocido'}
+                                                    </p>
+                                                    {order.due_date && (
+                                                        <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                            <Clock className="h-3 w-3" />
+                                                            Vence:{' '}
+                                                            {format(
+                                                                new Date(
+                                                                    order.due_date,
+                                                                ),
+                                                                'dd/MM/yyyy HH:mm',
+                                                                { locale: es },
+                                                            )}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                                    <span className="inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary uppercase">
+                                                        {order.status}
+                                                    </span>
+                                                    <span
+                                                        className={cn(
+                                                            'inline-block rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase',
+                                                            priorityColor,
+                                                        )}
+                                                    >
+                                                        {priorityLabel}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {order.comments && (
+                                                <p className="rounded bg-muted/40 p-2.5 text-xs text-muted-foreground italic">
+                                                    "{order.comments}"
+                                                </p>
+                                            )}
+
+                                            {order.users &&
+                                                order.users.length > 0 && (
+                                                    <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
+                                                        <span className="text-[10px] font-medium text-muted-foreground">
+                                                            Técnicos Asignados:
+                                                        </span>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {order.users.map(
+                                                                (u: any) => (
+                                                                    <span
+                                                                        key={
+                                                                            u.id
+                                                                        }
+                                                                        className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[9px] font-medium text-secondary-foreground"
+                                                                    >
+                                                                        {u.name}
+                                                                    </span>
+                                                                ),
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                        </div>
+                                    );
+                                },
+                            )
+                        ) : (
+                            <p className="py-4 text-center text-sm text-muted-foreground">
+                                No hay órdenes de trabajo asignadas a esta
+                                muestra.
+                            </p>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

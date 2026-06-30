@@ -75,6 +75,32 @@ class User extends Authenticatable
     }
 
     /**
+     * Obtiene las órdenes de trabajo asignadas al usuario como técnico.
+     */
+    public function assignedWorkOrders(): HasMany
+    {
+        return $this->hasMany(WorkOrder::class, 'user_id');
+    }
+
+    /**
+     * Obtiene las órdenes de trabajo finalizadas por el usuario.
+     */
+    public function completedWorkOrders(): HasMany
+    {
+        return $this->hasMany(WorkOrder::class, 'completed_by_id');
+    }
+
+    /**
+     * Obtiene las órdenes de trabajo a las que el usuario está asociado (muchos a muchos).
+     */
+    public function workOrders(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkOrder::class, 'work_orders_users', 'user_id', 'work_order_id')
+            ->using(WorkOrderUser::class)
+            ->withTimestamps();
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

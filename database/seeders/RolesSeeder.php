@@ -41,6 +41,7 @@ class RolesSeeder extends Seeder
             'specimens.create',
             'specimens.edit',
             'specimens.delete',
+            'my_assignments.view',
 
             // Patients (view, create, edit)
             'patients.view',
@@ -75,5 +76,22 @@ class RolesSeeder extends Seeder
 
         $permissionIds = Permission::whereIn('slug', $pathologistPermissions)->pluck('id');
         $pathologist->permissions()->sync($permissionIds);
+
+        // 3. Create Técnico Patólogo Role
+        $techPathologist = Role::updateOrCreate(
+            ['slug' => 'technician_pathologist'],
+            ['name' => 'Técnico Patólogo']
+        );
+
+        $techPermissions = [
+            'my_work_orders.view',
+            'work_orders.view',
+            'work_orders.create',
+            'work_orders.edit',
+            'work_orders.delete',
+        ];
+
+        $techPermissionIds = Permission::whereIn('slug', $techPermissions)->pluck('id');
+        $techPathologist->permissions()->sync($techPermissionIds);
     }
 }

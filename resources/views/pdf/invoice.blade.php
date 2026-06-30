@@ -304,27 +304,7 @@
             display: inline-block;
         }
 
-        .credit-info-box {
-            margin-top: 8px;
-            padding: 6px;
-            border: 1px dashed #3b82f6;
-            border-radius: 6px;
-            background-color: #f0f7ff;
-            font-size: 9.5px;
-        }
 
-        .credit-info-title {
-            font-weight: 700;
-            color: #1e3a8a;
-            margin-bottom: 3px;
-            text-transform: uppercase;
-        }
-
-        .credit-info-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 2px;
-        }
     </style>
 </head>
 <body>
@@ -627,30 +607,7 @@
         <div class="totals-left">
             {{ $totalWords }}
 
-            @if($invoice->payment_type === 'credit' && $invoice->creditRelation)
-                @php
-                    $credit = $invoice->creditRelation;
-                @endphp
-                <div class="credit-info-box">
-                    <div class="credit-info-title">Estado de Cuenta de Crédito</div>
-                    <div class="credit-info-row">
-                        <span>Monto de Crédito Original:</span>
-                        <strong>L. {{ number_format($credit->credit_amount, 2) }}</strong>
-                    </div>
-                    <div class="credit-info-row">
-                        <span>Abono realizado en esta Transacción:</span>
-                        <strong style="color: #10b981;">L. {{ number_format($credit->amount_paid, 2) }}</strong>
-                    </div>
-                    <div class="credit-info-row">
-                        <span>Abonos anteriores acumulados:</span>
-                        <strong>L. 0.00</strong>
-                    </div>
-                    <div class="credit-info-row" style="border-top: 1px dashed #3b82f6; margin-top: 4px; padding-top: 4px;">
-                        <span>Nuevo Saldo Pendiente:</span>
-                        <strong style="color: {{ $credit->amount_remaining > 0 ? '#ef4444' : '#10b981' }};">L. {{ number_format($credit->amount_remaining, 2) }}</strong>
-                    </div>
-                </div>
-            @endif
+
         </div>
         <div class="totals-right">
             <div class="total-row">

@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     Beaker,
+    Briefcase,
     BookOpen,
     Contact,
     FolderGit2,
@@ -29,6 +30,7 @@ import { index as inventoryMovementsIndex } from '@/actions/App/Http/Controllers
 import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
 import { index as locationsIndex } from '@/actions/App/Http/Controllers/LocationController';
 import { index as myAssignmentsIndex } from '@/actions/App/Http/Controllers/MyAssignmentController';
+import { index as myWorkOrdersIndex } from '@/actions/App/Http/Controllers/MyWorkOrderController';
 import { index as productsIndex } from '@/actions/App/Http/Controllers/ProductController';
 import { index as referrersIndex } from '@/actions/App/Http/Controllers/ReferrerController';
 import { index as referrerTypesIndex } from '@/actions/App/Http/Controllers/ReferrerTypeController';
@@ -41,6 +43,8 @@ import { index as specimensIndex } from '@/actions/App/Http/Controllers/Specimen
 import { index as specimenTypesIndex } from '@/actions/App/Http/Controllers/SpecimenTypeController';
 import { index as specimenTypeExaminationsIndex } from '@/actions/App/Http/Controllers/SpecimenTypeExaminationController';
 import { index as specimenTypeTemplatesIndex } from '@/actions/App/Http/Controllers/SpecimenTypeTemplateController';
+import { index as workOrdersIndex } from '@/actions/App/Http/Controllers/WorkOrderTypeController';
+import { index as adminWorkOrdersIndex } from '@/actions/App/Http/Controllers/WorkOrderController';
 import { index as storagesIndex } from '@/actions/App/Http/Controllers/StorageController';
 import { index as userCommissionsIndex } from '@/actions/App/Http/Controllers/UserCommissionController';
 import { index as userCommissionRulesIndex } from '@/actions/App/Http/Controllers/UserCommissionRuleController';
@@ -84,6 +88,14 @@ const mainNavItems: NavItem[] = [
         title: 'Mis Asignaciones',
         href: myAssignmentsIndex(),
         icon: ClipboardList,
+        permission: 'my_assignments.view',
+        prefetch: false,
+    },
+    {
+        title: 'Mis Órdenes de Trabajo',
+        href: myWorkOrdersIndex(),
+        icon: Briefcase,
+        permission: 'my_work_orders.view',
         prefetch: false,
     },
     {
@@ -166,6 +178,23 @@ const adminNavItems: NavItem[] = [
                         title: 'Plantillas',
                         href: specimenTypeTemplatesIndex(),
                         permission: 'specimen_type_templates.view',
+                    },
+                ],
+            },
+            {
+                title: 'Órdenes de Trabajo',
+                href: '#',
+                icon: Briefcase,
+                items: [
+                    {
+                        title: 'Tipos de Órdenes',
+                        href: workOrdersIndex(),
+                        permission: 'work_orders.view',
+                    },
+                    {
+                        title: 'Ver Todas',
+                        href: adminWorkOrdersIndex(),
+                        permission: 'work_orders.admin_view',
                     },
                 ],
             },

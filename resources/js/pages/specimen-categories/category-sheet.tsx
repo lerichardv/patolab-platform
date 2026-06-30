@@ -7,6 +7,8 @@ interface Category {
     name: string;
     unit: string | null;
     quantity: number | null;
+    intern_unit: string | null;
+    intern_quantity: number | null;
 }
 
 interface Props {
