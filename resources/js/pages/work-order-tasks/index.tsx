@@ -1,12 +1,12 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
-import { Edit2, FlaskConical, Plus, Search, Trash2 } from 'lucide-react';
-import { useState, useCallback, useEffect } from 'react';
+import { Edit2, ClipboardList, Plus, Search, Trash2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
-    index as examinationsIndex,
-    destroy as destroyExamination,
-} from '@/actions/App/Http/Controllers/SpecimenTypeExaminationController';
+    index as workOrderTasksIndex,
+    destroy as destroyWorkOrderTask,
+} from '@/actions/App/Http/Controllers/WorkOrderTaskController';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -18,16 +18,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -36,31 +28,18 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import SpecimenTypeExaminationSheet from './specimen-type-examination-sheet';
+import TaskSheet from './task-sheet';
 
-interface SpecimenType {
+interface Task {
     id: number;
-    name: string;
-}
-
-interface Price {
-    id?: number;
-    amount: number | string;
-}
-
-interface Examination {
-    id: number;
-    specimen_type: number;
     name: string;
     description: string;
-    type?: SpecimenType;
     created_at: string;
-    prices?: Price[];
 }
 
 interface Props {
-    examinations: {
-        data: Examination[];
+    tasks: {
+        data: Task[];
         links: {
             url: string | null;
             label: string;
@@ -72,83 +51,70 @@ interface Props {
         from: number;
         to: number;
     };
-    specimenTypes: SpecimenType[];
     filters: {
         search?: string;
-        specimen_type?: string;
     };
 }
 
-export default function SpecimenTypeExaminationsIndex({
-    examinations,
-    specimenTypes,
-    filters,
-}: Props) {
+export default function TasksIndex({ tasks, filters }: Props) {
     const { auth } = usePage<any>().props;
-    const canCreate = auth.permissions?.includes(
-        'specimen_type_examinations.create',
-    );
-    const canEdit = auth.permissions?.includes(
-        'specimen_type_examinations.edit',
-    );
-    const canDelete = auth.permissions?.includes(
-        'specimen_type_examinations.delete',
-    );
+    const canCreate = auth.permissions?.includes('work_order_tasks.create');
+    const canEdit = auth.permissions?.includes('work_order_tasks.edit');
+    const canDelete = auth.permissions?.includes('work_order_tasks.delete');
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [selectedExamination, setSelectedExamination] =
-        useState<Examination | null>(null);
-    const [examinationToDelete, setExaminationToDelete] =
-        useState<Examination | null>(null);
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
     const [search, setSearch] = useState(filters.search || '');
 
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
 
-        if (value === 'all' || value === '') {
+        if (value === '') {
             delete newFilters[key as keyof typeof filters];
         }
 
-        router.get(examinationsIndex().url, newFilters, {
+        router.get(workOrderTasksIndex().url, newFilters, {
             preserveState: true,
             replace: true,
         });
     };
 
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            handleFilterChange('search', value);
-        }, 300),
-        [filters],
+    const debouncedSearch = useMemo(
+        () =>
+            debounce((value: string) => {
+                handleFilterChange('search', value);
+            }, 300),
+        [filters, handleFilterChange],
     );
 
     useEffect(() => {
         if (search !== filters.search) {
             debouncedSearch(search);
         }
-    }, [search]);
+    }, [search, filters.search, debouncedSearch]);
 
-    const handleEdit = (examination: Examination) => {
-        setSelectedExamination(examination);
+    const handleEdit = (task: Task) => {
+        setSelectedTask(task);
         setIsSheetOpen(true);
     };
 
     const handleCreate = () => {
-        setSelectedExamination(null);
+        setSelectedTask(null);
         setIsSheetOpen(true);
     };
 
-    const handleDeleteClick = (examination: Examination) => {
-        setExaminationToDelete(examination);
+    const handleDeleteClick = (task: Task) => {
+        setTaskToDelete(task);
         setIsDeleteDialogOpen(true);
     };
 
     const confirmDelete = () => {
-        if (examinationToDelete) {
-            router.delete(destroyExamination(examinationToDelete.id).url, {
+        if (taskToDelete) {
+            router.delete(destroyWorkOrderTask(taskToDelete.id).url, {
                 onSuccess: () => {
-                    toast.success('Tipo de análisis eliminado correctamente');
+                    toast.success('Tarea eliminada correctamente');
                     setIsDeleteDialogOpen(false);
                 },
             });
@@ -157,19 +123,18 @@ export default function SpecimenTypeExaminationsIndex({
 
     return (
         <>
-            <Head title="Gestión de Tipos de Análisis" />
+            <Head title="Gestión de Tareas" />
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                         <div className="flex items-center gap-2">
-                            <FlaskConical className="h-6 w-6 text-primary" />
+                            <ClipboardList className="h-6 w-6 text-primary" />
                             <h1 className="text-2xl font-bold tracking-tight">
-                                Tipos de Análisis
+                                Tareas
                             </h1>
                         </div>
                         <p className="text-muted-foreground">
-                            Administre los diferentes análisis disponibles por
-                            tipo de muestra.
+                            Administre las tareas para las órdenes de trabajo.
                         </p>
                     </div>
                     {canCreate && (
@@ -178,110 +143,44 @@ export default function SpecimenTypeExaminationsIndex({
                                 onClick={handleCreate}
                                 className="h-10 w-full px-5 text-sm md:w-auto"
                             >
-                                <Plus className="mr-2 h-4 w-4" /> Nuevo Análisis
+                                <Plus className="mr-2 h-4 w-4" /> Nueva Tarea
                             </Button>
                         </div>
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <div className="relative">
                         <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Buscar por nombre..."
+                            placeholder="Buscar por nombre o descripción..."
                             className="pl-8"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <Select
-                        value={filters.specimen_type || 'all'}
-                        onValueChange={(v) =>
-                            handleFilterChange('specimen_type', v)
-                        }
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Tipo de Muestra" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">
-                                Todos los tipos de muestra
-                            </SelectItem>
-                            {specimenTypes.map((type) => (
-                                <SelectItem
-                                    key={type.id}
-                                    value={type.id.toString()}
-                                >
-                                    {type.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
                 </div>
 
                 <div className="rounded-md border bg-card">
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Tipo de Muestra</TableHead>
-                                <TableHead>Análisis</TableHead>
+                                <TableHead>Nombre</TableHead>
                                 <TableHead>Descripción</TableHead>
-                                <TableHead>Precios</TableHead>
-                                <TableHead>Fecha Creación</TableHead>
                                 <TableHead className="text-right">
                                     {(canEdit || canDelete) && 'Acciones'}
                                 </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {examinations.data.length > 0 ? (
-                                examinations.data.map((exam) => (
-                                    <TableRow key={exam.id}>
-                                        <TableCell>
-                                            <span className="font-semibold text-primary">
-                                                {exam.type?.name ||
-                                                    'Cargando...'}
-                                            </span>
-                                        </TableCell>
+                            {tasks.data.length > 0 ? (
+                                tasks.data.map((task) => (
+                                    <TableRow key={task.id}>
                                         <TableCell className="font-medium">
-                                            {exam.name}
-                                        </TableCell>
-                                        <TableCell className="max-w-xs truncate text-muted-foreground">
-                                            {exam.description}
+                                            {task.name}
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex max-w-xs flex-wrap gap-1">
-                                                {exam.prices &&
-                                                exam.prices.length > 0 ? (
-                                                    exam.prices.map((price) => (
-                                                        <Badge
-                                                            key={price.id}
-                                                            variant="secondary"
-                                                            className="font-mono"
-                                                        >
-                                                            L.{' '}
-                                                            {parseFloat(
-                                                                String(
-                                                                    price.amount,
-                                                                ),
-                                                            ).toFixed(2)}
-                                                        </Badge>
-                                                    ))
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        Sin precio
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">
-                                            {new Date(
-                                                exam.created_at,
-                                            ).toLocaleDateString('es-ES', {
-                                                day: '2-digit',
-                                                month: '2-digit',
-                                                year: 'numeric',
-                                            })}
+                                            {task.description}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {(canEdit || canDelete) && (
@@ -291,7 +190,7 @@ export default function SpecimenTypeExaminationsIndex({
                                                             variant="ghost"
                                                             size="icon"
                                                             onClick={() =>
-                                                                handleEdit(exam)
+                                                                handleEdit(task)
                                                             }
                                                         >
                                                             <Edit2 className="h-4 w-4" />
@@ -304,7 +203,7 @@ export default function SpecimenTypeExaminationsIndex({
                                                             className="text-destructive"
                                                             onClick={() =>
                                                                 handleDeleteClick(
-                                                                    exam,
+                                                                    task,
                                                                 )
                                                             }
                                                         >
@@ -319,7 +218,7 @@ export default function SpecimenTypeExaminationsIndex({
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={5}
+                                        colSpan={3}
                                         className="h-24 text-center"
                                     >
                                         No se encontraron resultados.
@@ -331,18 +230,17 @@ export default function SpecimenTypeExaminationsIndex({
                 </div>
 
                 <Pagination
-                    links={examinations.links}
+                    links={tasks.links}
                     meta={{
-                        from: examinations.from,
-                        to: examinations.to,
-                        total: examinations.total,
+                        from: tasks.from,
+                        to: tasks.to,
+                        total: tasks.total,
                     }}
                 />
             </div>
 
-            <SpecimenTypeExaminationSheet
-                examination={selectedExamination}
-                specimenTypes={specimenTypes}
+            <TaskSheet
+                task={selectedTask}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
             />
@@ -357,9 +255,9 @@ export default function SpecimenTypeExaminationsIndex({
                             ¿Está completamente seguro?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción desactivará el tipo de análisis{' '}
-                            <strong>{examinationToDelete?.name}</strong>. Ya no
-                            aparecerá en la lista activa.
+                            Esta acción eliminará la tarea{' '}
+                            <strong>{taskToDelete?.name}</strong> de forma
+                            permanente.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -368,7 +266,7 @@ export default function SpecimenTypeExaminationsIndex({
                             onClick={confirmDelete}
                             className="bg-destructive text-white hover:bg-destructive/90"
                         >
-                            Desactivar
+                            Eliminar
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

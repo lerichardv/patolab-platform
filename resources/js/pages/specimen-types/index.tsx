@@ -18,7 +18,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -31,17 +30,11 @@ import {
 } from '@/components/ui/table';
 import SpecimenTypeSheet from './specimen-type-sheet';
 
-interface Price {
-    id?: number;
-    amount: number | string;
-}
-
 interface SpecimenType {
     id: number;
     name: string;
     description: string | null;
     created_at: string;
-    prices?: Price[];
 }
 
 interface Props {
@@ -176,7 +169,6 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                             <TableRow>
                                 <TableHead>Nombre</TableHead>
                                 <TableHead>Descripción</TableHead>
-                                <TableHead>Precios</TableHead>
                                 <TableHead>Fecha Creación</TableHead>
                                 <TableHead className="text-right">
                                     {(canEdit || canDelete) && 'Acciones'}
@@ -193,31 +185,6 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                                         <TableCell className="max-w-md truncate text-muted-foreground">
                                             {type.description ||
                                                 'Sin descripción'}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex max-w-xs flex-wrap gap-1">
-                                                {type.prices &&
-                                                type.prices.length > 0 ? (
-                                                    type.prices.map((price) => (
-                                                        <Badge
-                                                            key={price.id}
-                                                            variant="secondary"
-                                                            className="font-mono"
-                                                        >
-                                                            L.{' '}
-                                                            {parseFloat(
-                                                                String(
-                                                                    price.amount,
-                                                                ),
-                                                            ).toFixed(2)}
-                                                        </Badge>
-                                                    ))
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        Sin precio
-                                                    </span>
-                                                )}
-                                            </div>
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
                                             {new Date(
@@ -264,7 +231,7 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={5}
+                                        colSpan={4}
                                         className="h-24 text-center"
                                     >
                                         No se encontraron resultados.

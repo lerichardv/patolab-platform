@@ -60,6 +60,11 @@ class MorePermissionsSeeder extends Seeder
             ['name' => 'Editar Tipo de Orden de trabajo', 'slug' => 'work_orders.edit'],
             ['name' => 'Eliminar Tipo de Orden de trabajo', 'slug' => 'work_orders.delete'],
 
+            ['name' => 'Ver Tareas de Órdenes de trabajo', 'slug' => 'work_order_tasks.view'],
+            ['name' => 'Crear Tarea de Orden de trabajo', 'slug' => 'work_order_tasks.create'],
+            ['name' => 'Editar Tarea de Orden de trabajo', 'slug' => 'work_order_tasks.edit'],
+            ['name' => 'Eliminar Tarea de Orden de trabajo', 'slug' => 'work_order_tasks.delete'],
+
             /*
             |--------------------------------------------------------------------------
             | Remittances

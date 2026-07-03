@@ -18,6 +18,8 @@ class WorkOrder extends Model
     protected $fillable = [
         'specimen_id',
         'work_order_type_id',
+        'work_order_task_id',
+        'quantity',
         'user_id',
         'completed_by_id',
         'status',
@@ -28,10 +30,20 @@ class WorkOrder extends Model
     ];
 
     protected $casts = [
+        'work_order_task_id' => 'integer',
+        'quantity' => 'integer',
         'priority' => 'integer',
         'due_date' => 'datetime',
         'completed_at' => 'datetime',
     ];
+
+    /**
+     * Obtiene la tarea asociada a la orden de trabajo.
+     */
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(WorkOrderTask::class, 'work_order_task_id');
+    }
 
     /**
      * Obtiene el espécimen asociado a la orden de trabajo.

@@ -7,11 +7,17 @@ interface SpecimenType {
     name: string;
 }
 
+interface Price {
+    id?: number;
+    amount: number | string;
+}
+
 interface Examination {
     id: number;
     specimen_type: number;
     name: string;
     description: string;
+    prices?: Price[];
 }
 
 interface Props {

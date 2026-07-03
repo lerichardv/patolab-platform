@@ -1,11 +1,12 @@
-import * as React from 'react';
 import { useForm, usePage } from '@inertiajs/react';
-import { toast } from 'sonner';
 import { Check, ChevronsUpDown, X, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import * as React from 'react';
+import { toast } from 'sonner';
+import { store as storeWorkOrder } from '@/actions/App/Http/Controllers/WorkOrderController';
+import HeadingSheet from '@/components/heading-sheet';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Command,
     CommandEmpty,
@@ -14,6 +15,8 @@ import {
     CommandItem,
     CommandList,
 } from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Popover,
     PopoverContent,
@@ -26,12 +29,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { store as storeWorkOrder } from '@/actions/App/Http/Controllers/WorkOrderController';
-import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import WorkOrderTypeForm from '../work-orders/work-order-type-form';
-
-import { Badge } from '@/components/ui/badge';
+import TaskForm from '../work-order-tasks/task-form';
 
 interface WorkOrderType {
     id: number;
@@ -43,10 +45,16 @@ interface User {
     name: string;
 }
 
+interface WorkOrderTask {
+    id: number;
+    name: string;
+}
+
 interface Props {
     specimenId?: number | null;
     specimenIds?: number[] | null;
     workOrderTypes: WorkOrderType[];
+    workOrderTasks: WorkOrderTask[];
     usersList: User[];
     onSuccess: () => void;
 }
@@ -177,6 +185,7 @@ function FormCombobox({
                                             if (option.disabled) {
                                                 return;
                                             }
+
                                             if (multiple) {
                                                 const newValue = isSelected
                                                     ? selectedValues.filter(
@@ -249,16 +258,20 @@ export default function WorkOrderForm({
     specimenId,
     specimenIds,
     workOrderTypes,
+    workOrderTasks,
     usersList,
     onSuccess,
 }: Props) {
     const { auth } = usePage<any>().props;
     const canCreateType = auth.permissions?.includes('work_orders.create');
+    const canCreateTask = auth.permissions?.includes('work_order_tasks.create');
 
     const { data, setData, post, processing, errors } = useForm({
         specimen_id: specimenId || null,
         specimen_ids: specimenIds || [],
         work_order_type_id: '',
+        work_order_task_id: '',
+        quantity: 1,
         user_ids: [] as string[],
         status: 'Enviada',
         priority: '3', // 3 = Baja (default)
@@ -266,6 +279,20 @@ export default function WorkOrderForm({
     });
 
     const [isTypeSheetOpen, setIsTypeSheetOpen] = React.useState(false);
+    const [isTaskSheetOpen, setIsTaskSheetOpen] = React.useState(false);
+
+    const prevTasksRef = React.useRef(workOrderTasks);
+    React.useEffect(() => {
+        if (workOrderTasks.length > prevTasksRef.current.length) {
+            const newTasks = workOrderTasks.filter(
+                (t) => !prevTasksRef.current.some((pt) => pt.id === t.id)
+            );
+            if (newTasks.length > 0) {
+                setData('work_order_task_id', newTasks[0].id.toString());
+            }
+        }
+        prevTasksRef.current = workOrderTasks;
+    }, [workOrderTasks, setData]);
 
     const PRIORITY_OPTIONS = [
         { label: 'Alta', value: '1', color: 'orange' },
@@ -276,13 +303,21 @@ export default function WorkOrderForm({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (!data.work_order_task_id) {
+            toast.error('Debe seleccionar una tarea.');
+
+            return;
+        }
+
         if (!data.work_order_type_id) {
             toast.error('Debe seleccionar un tipo de orden de trabajo.');
+
             return;
         }
 
         if (data.user_ids.length === 0) {
             toast.error('Debe seleccionar al menos un técnico asignado.');
+
             return;
         }
 
@@ -295,6 +330,7 @@ export default function WorkOrderForm({
                 } else {
                     toast.success('Orden de trabajo creada correctamente.');
                 }
+
                 onSuccess();
             },
         });
@@ -302,47 +338,112 @@ export default function WorkOrderForm({
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6 px-5 py-4">
-            {/* Tipo de Orden de Trabajo */}
+            {/* Tarea */}
             <div className="grid gap-2">
                 <div className="flex items-center justify-between">
-                    <Label htmlFor="work_order_type_id">Tipo de Orden</Label>
+                    <Label htmlFor="work_order_task_id">Tarea</Label>
                     <button
                         type="button"
                         onClick={() => {
-                            if (canCreateType) {
-                                setIsTypeSheetOpen(true);
+                            if (canCreateTask) {
+                                setIsTaskSheetOpen(true);
                             }
                         }}
-                        disabled={!canCreateType}
+                        disabled={!canCreateTask}
                         className={cn(
                             'text-xs font-medium transition-colors select-none',
-                            canCreateType
+                            canCreateTask
                                 ? 'cursor-pointer text-primary hover:underline'
                                 : 'cursor-not-allowed text-muted-foreground opacity-50',
                         )}
                         title={
-                            canCreateType
-                                ? 'Crear nuevo tipo de orden'
-                                : 'No tiene permisos para crear tipos de orden'
+                            canCreateTask
+                                ? 'Crear nueva tarea'
+                                : 'No tiene permisos para crear tareas'
                         }
                     >
                         Nuevo
                     </button>
                 </div>
                 <FormCombobox
-                    placeholder="Seleccionar tipo de orden"
-                    value={data.work_order_type_id}
-                    onChange={(val) => setData('work_order_type_id', val)}
-                    options={workOrderTypes.map((t) => ({
+                    placeholder="Seleccionar tarea"
+                    value={data.work_order_task_id}
+                    onChange={(val) => setData('work_order_task_id', val)}
+                    options={workOrderTasks.map((t) => ({
                         label: t.name,
                         value: t.id.toString(),
                     }))}
                 />
-                {errors.work_order_type_id && (
+                {errors.work_order_task_id && (
                     <p className="text-sm text-destructive">
-                        {errors.work_order_type_id}
+                        {errors.work_order_task_id}
                     </p>
                 )}
+            </div>
+
+            {/* Tipo de Orden de Trabajo y Cantidad */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="grid gap-2 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="work_order_type_id">
+                            Tipo de Orden
+                        </Label>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (canCreateType) {
+                                    setIsTypeSheetOpen(true);
+                                }
+                            }}
+                            disabled={!canCreateType}
+                            className={cn(
+                                'text-xs font-medium transition-colors select-none',
+                                canCreateType
+                                    ? 'cursor-pointer text-primary hover:underline'
+                                    : 'cursor-not-allowed text-muted-foreground opacity-50',
+                            )}
+                            title={
+                                canCreateType
+                                    ? 'Crear nuevo tipo de orden'
+                                    : 'No tiene permisos para crear tipos de orden'
+                            }
+                        >
+                            Nuevo
+                        </button>
+                    </div>
+                    <FormCombobox
+                        placeholder="Seleccionar tipo de orden"
+                        value={data.work_order_type_id}
+                        onChange={(val) => setData('work_order_type_id', val)}
+                        options={workOrderTypes.map((t) => ({
+                            label: t.name,
+                            value: t.id.toString(),
+                        }))}
+                    />
+                    {errors.work_order_type_id && (
+                        <p className="text-sm text-destructive">
+                            {errors.work_order_type_id}
+                        </p>
+                    )}
+                </div>
+
+                <div className="grid gap-2">
+                    <Label htmlFor="quantity">Cantidad</Label>
+                    <Input
+                        id="quantity"
+                        type="number"
+                        min="1"
+                        value={data.quantity}
+                        onChange={(e) =>
+                            setData('quantity', parseInt(e.target.value) || 1)
+                        }
+                    />
+                    {errors.quantity && (
+                        <p className="text-sm text-destructive">
+                            {errors.quantity}
+                        </p>
+                    )}
+                </div>
             </div>
 
             {/* Técnico Asignado */}
@@ -455,6 +556,22 @@ export default function WorkOrderForm({
                         <WorkOrderTypeForm
                             workOrderType={null}
                             onSuccess={() => setIsTypeSheetOpen(false)}
+                        />
+                    )}
+                </SheetContent>
+            </Sheet>
+
+            {/* Stacked Sheet to create a new Tarea */}
+            <Sheet open={isTaskSheetOpen} onOpenChange={setIsTaskSheetOpen}>
+                <SheetContent className="sm:max-w-[540px]">
+                    <HeadingSheet
+                        title="Nueva Tarea"
+                        description="Complete el formulario para definir una nueva tarea."
+                    />
+                    {isTaskSheetOpen && (
+                        <TaskForm
+                            task={null}
+                            onSuccess={() => setIsTaskSheetOpen(false)}
                         />
                     )}
                 </SheetContent>

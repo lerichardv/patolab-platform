@@ -43,7 +43,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import SpecimenViewSheet from '../specimens/specimen-view-sheet';
+import WorkOrderViewSheet from '../my-work-orders/work-order-view-sheet';
 
 interface WorkOrder {
     id: number;
@@ -92,7 +92,7 @@ export default function WorkOrdersAdminIndex({
     filters,
 }: Props) {
     const { auth } = usePage<any>().props;
-    const [selectedSpecimen, setSelectedSpecimen] = useState<any | null>(null);
+    const [selectedWorkOrder, setSelectedWorkOrder] = useState<any | null>(null);
     const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
     const [search, setSearch] = useState(filters.search || '');
 
@@ -167,8 +167,8 @@ export default function WorkOrdersAdminIndex({
         );
     };
 
-    const handleViewSpecimen = (specimen: any) => {
-        setSelectedSpecimen(specimen);
+    const handleViewWorkOrder = (order: any) => {
+        setSelectedWorkOrder(order);
         setIsViewSheetOpen(true);
     };
 
@@ -454,20 +454,17 @@ export default function WorkOrdersAdminIndex({
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {order.specimen && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        title="Ver detalles de la muestra"
-                                                        onClick={() =>
-                                                            handleViewSpecimen(
-                                                                order.specimen,
-                                                            )
-                                                        }
-                                                    >
-                                                        <Eye className="h-4 w-4" />
-                                                    </Button>
-                                                )}
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    title="Ver detalles de la orden"
+                                                    onClick={() =>
+                                                        handleViewWorkOrder(order)
+                                                    }
+                                                >
+                                                    <Eye className="h-4 w-4" />
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -498,20 +495,11 @@ export default function WorkOrdersAdminIndex({
             </div>
 
             {/* Specimen Details Sheet */}
-            <SpecimenViewSheet
-                specimen={selectedSpecimen}
+            {/* Work Order Details Sheet */}
+            <WorkOrderViewSheet
+                workOrder={selectedWorkOrder}
                 open={isViewSheetOpen}
                 onOpenChange={setIsViewSheetOpen}
-                onEditClick={() => {
-                    if (selectedSpecimen) {
-                        router.get('/specimens', {
-                            specimen:
-                                selectedSpecimen.sequence_code ||
-                                String(selectedSpecimen.id),
-                            action: 'view',
-                        });
-                    }
-                }}
             />
         </>
     );

@@ -3054,9 +3054,9 @@ function PatientMetadataCard({ specimen }: { specimen: Specimen }) {
                         {specimen.referrer_relation.name}
                         <br />
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
-                            Diagnóstico Clínico:
+                            Tipo de muestra:
                         </strong>{' '}
-                        {specimen.diagnosis || 'N/A'}
+                        {(specimen.type?.name || 'N/A') + ' - ' + (specimen.examination?.name || 'N/A')}
                     </td>
                     <td
                         style={{
@@ -3069,14 +3069,14 @@ function PatientMetadataCard({ specimen }: { specimen: Specimen }) {
                         }}
                     >
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+                            Diagnóstico Clínico:
+                        </strong>{' '}
+                        {specimen.diagnosis || 'N/A'}
+                        <br />
+                        <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Hospital/Clínica:
                         </strong>{' '}
                         {specimen.referrer_relation.notes || 'HDV'}
-                        <br />
-                        <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
-                            Sitio Preciso de la Muestra:
-                        </strong>{' '}
-                        {specimen.anatomic_site}
                         <br />
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Fecha de la Toma:
@@ -5201,6 +5201,8 @@ export default function ReportWorkspace({
                             ytext.insert(0, targetStatus);
                         });
                     }
+
+                    setSessionEditingEnabled(false);
                 },
                 onError: (errors) => {
                     if (errors && errors.error) {
@@ -5783,9 +5785,31 @@ export default function ReportWorkspace({
                                 </AlertDialog>
                             )}
                             {isFinished && sessionEditingEnabled && (
-                                <span className="animate-pulse rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-amber-600 uppercase dark:text-amber-400">
-                                    Edición Activa
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className="animate-pulse rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-amber-600 uppercase dark:text-amber-400">
+                                        Edición Activa
+                                    </span>
+                                    <Button
+                                        onClick={
+                                            handleStartMicroscopyFinalization
+                                        }
+                                        disabled={isGeneratingPdf}
+                                        size="sm"
+                                        className="cursor-pointer gap-2 bg-fuchsia-600 font-semibold text-white shadow-sm hover:bg-fuchsia-700"
+                                    >
+                                        {isGeneratingPdf ? (
+                                            <>
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <span>Generando...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Check className="h-4 w-4" />
+                                                <span>Finalizar Reporte</span>
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
                             )}
                             <div className="flex flex-col items-end gap-2">
                                 <div className="flex items-center gap-2">
@@ -6735,8 +6759,10 @@ export default function ReportWorkspace({
                                                                                 />
                                                                             )}
 
-                                                                            {specimen.status ===
-                                                                                'microscopic_review' && (
+                                                                            {(specimen.status ===
+                                                                                'microscopic_review' ||
+                                                                                (isFinished &&
+                                                                                    sessionEditingEnabled)) && (
                                                                                 <div className="flex justify-end pt-2">
                                                                                     <Button
                                                                                         onClick={
@@ -6757,212 +6783,12 @@ export default function ReportWorkspace({
                                                                                             </>
                                                                                         ) : (
                                                                                             <span>
-                                                                                                Completar
-                                                                                                Microscopía
+                                                                                                {isFinished
+                                                                                                    ? 'Finalizar Reporte'
+                                                                                                    : 'Completar Microscopía'}
                                                                                             </span>
                                                                                         )}
                                                                                     </Button>
-
-                                                                                    <AlertDialog
-                                                                                        open={
-                                                                                            showCompleteMicroscopyDialog
-                                                                                        }
-                                                                                        onOpenChange={
-                                                                                            setShowCompleteMicroscopyDialog
-                                                                                        }
-                                                                                    >
-                                                                                        <AlertDialogContent className="max-w-4xl">
-                                                                                            <AlertDialogHeader>
-                                                                                                <AlertDialogTitle>
-                                                                                                    ¿Confirmar
-                                                                                                    completado
-                                                                                                    de
-                                                                                                    microscopía
-                                                                                                    y
-                                                                                                    previsualizar
-                                                                                                    reporte?
-                                                                                                </AlertDialogTitle>
-                                                                                                <AlertDialogDescription>
-                                                                                                    Antes
-                                                                                                    de
-                                                                                                    finalizar,
-                                                                                                    verifique
-                                                                                                    el
-                                                                                                    formato
-                                                                                                    en
-                                                                                                    la
-                                                                                                    vista
-                                                                                                    previa
-                                                                                                    del
-                                                                                                    PDF
-                                                                                                    real.
-                                                                                                </AlertDialogDescription>
-                                                                                            </AlertDialogHeader>
-                                                                                            <div className="relative flex w-full flex-col">
-                                                                                                {/* Progress indicators */}
-                                                                                                <div className="mb-2 flex items-center justify-between px-1 text-xs">
-                                                                                                    <span className="font-medium text-muted-foreground">
-                                                                                                        Progreso
-                                                                                                        de
-                                                                                                        lectura
-                                                                                                        del
-                                                                                                        reporte
-                                                                                                    </span>
-                                                                                                    <span className="font-bold text-fuchsia-600 dark:text-fuchsia-400">
-                                                                                                        {
-                                                                                                            scrollPercentage
-                                                                                                        }
-
-                                                                                                        %
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                                <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                                                                                                    <div
-                                                                                                        className="h-full rounded-full bg-fuchsia-600 transition-all duration-200"
-                                                                                                        style={{
-                                                                                                            width: `${scrollPercentage}%`,
-                                                                                                        }}
-                                                                                                    />
-                                                                                                </div>
-
-                                                                                                {/* Scrollable Container */}
-                                                                                                <div
-                                                                                                    ref={
-                                                                                                        dialogPreviewContainerRef
-                                                                                                    }
-                                                                                                    className="relative flex max-h-[55vh] w-full scrollbar-thin scrollbar-thumb-slate-300 justify-center overflow-y-auto scroll-smooth rounded-lg border bg-slate-100/50 p-4 dark:scrollbar-thumb-slate-800 dark:bg-slate-950/50"
-                                                                                                    onScroll={(
-                                                                                                        e,
-                                                                                                    ) => {
-                                                                                                        const target =
-                                                                                                            e.currentTarget;
-                                                                                                        const totalScrollable =
-                                                                                                            target.scrollHeight -
-                                                                                                            target.clientHeight;
-
-                                                                                                        if (
-                                                                                                            totalScrollable >
-                                                                                                            0
-                                                                                                        ) {
-                                                                                                            const pct =
-                                                                                                                Math.min(
-                                                                                                                    100,
-                                                                                                                    Math.round(
-                                                                                                                        (target.scrollTop /
-                                                                                                                            totalScrollable) *
-                                                                                                                            100,
-                                                                                                                    ),
-                                                                                                                );
-                                                                                                            setScrollPercentage(
-                                                                                                                pct,
-                                                                                                            );
-
-                                                                                                            const isAtBottom =
-                                                                                                                totalScrollable -
-                                                                                                                    target.scrollTop <=
-                                                                                                                50;
-
-                                                                                                            if (
-                                                                                                                isAtBottom &&
-                                                                                                                !hasScrolledToEnd
-                                                                                                            ) {
-                                                                                                                setHasScrolledToEnd(
-                                                                                                                    true,
-                                                                                                                );
-                                                                                                            }
-                                                                                                        } else {
-                                                                                                            setScrollPercentage(
-                                                                                                                100,
-                                                                                                            );
-                                                                                                            setHasScrolledToEnd(
-                                                                                                                true,
-                                                                                                            );
-                                                                                                        }
-                                                                                                    }}
-                                                                                                >
-                                                                                                    {tempPdfUrl && (
-                                                                                                        <iframe
-                                                                                                            src={`${tempPdfUrl}#toolbar=0&navpanes=0&view=FitH`}
-                                                                                                            title="PDF Preview"
-                                                                                                            className="pointer-events-none w-full border-0 select-none"
-                                                                                                            style={{
-                                                                                                                height: `${tempPdfTotalPages * 1056}px`,
-                                                                                                                pointerEvents:
-                                                                                                                    'none',
-                                                                                                            }}
-                                                                                                        />
-                                                                                                    )}
-                                                                                                </div>
-
-                                                                                                {/* Floating bottom cue */}
-                                                                                                {!hasScrolledToEnd && (
-                                                                                                    <div className="pointer-events-none absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-900/90 px-4 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-sm transition-all duration-300 dark:bg-slate-50/90 dark:text-slate-900">
-                                                                                                        <ArrowDown className="h-3.5 w-3.5 animate-pulse" />
-                                                                                                        <span>{`Desplace para confirmar lectura (${scrollPercentage}%)`}</span>
-                                                                                                    </div>
-                                                                                                )}
-                                                                                            </div>
-
-                                                                                            {!hasScrolledToEnd && (
-                                                                                                <p className="mt-2 animate-pulse text-center text-[11px] font-medium text-muted-foreground">
-                                                                                                    {
-                                                                                                        'Desplace hasta el final de la previsualización para habilitar la finalización del reporte.'
-                                                                                                    }
-                                                                                                </p>
-                                                                                            )}
-                                                                                            <AlertDialogFooter className="mt-4">
-                                                                                                <AlertDialogCancel
-                                                                                                    onClick={() =>
-                                                                                                        setShowCompleteMicroscopyDialog(
-                                                                                                            false,
-                                                                                                        )
-                                                                                                    }
-                                                                                                >
-                                                                                                    {
-                                                                                                        'Cancelar'
-                                                                                                    }
-                                                                                                </AlertDialogCancel>
-                                                                                                <AlertDialogAction
-                                                                                                    onClick={() => {
-                                                                                                        setShowCompleteMicroscopyDialog(
-                                                                                                            false,
-                                                                                                        );
-                                                                                                        handleTransitionState(
-                                                                                                            'finalized',
-                                                                                                        );
-                                                                                                    }}
-                                                                                                    disabled={
-                                                                                                        !hasScrolledToEnd
-                                                                                                    }
-                                                                                                    className={cn(
-                                                                                                        'cursor-pointer gap-2 transition-all duration-300',
-                                                                                                        hasScrolledToEnd
-                                                                                                            ? 'bg-fuchsia-600 text-white shadow-md shadow-fuchsia-500/25 hover:bg-fuchsia-700 active:scale-[0.98]'
-                                                                                                            : 'pointer-events-none cursor-not-allowed bg-slate-200 text-slate-400 opacity-50 dark:bg-slate-800 dark:text-slate-500',
-                                                                                                    )}
-                                                                                                >
-                                                                                                    {hasScrolledToEnd ? (
-                                                                                                        <>
-                                                                                                            <Unlock className="h-4 w-4" />
-                                                                                                            <span>
-                                                                                                                {
-                                                                                                                    'Finalizar Reporte'
-                                                                                                                }
-                                                                                                            </span>
-                                                                                                        </>
-                                                                                                    ) : (
-                                                                                                        <>
-                                                                                                            <Lock className="h-4 w-4" />
-                                                                                                            <span>
-                                                                                                                Finalizar
-                                                                                                                Reporte
-                                                                                                            </span>
-                                                                                                        </>
-                                                                                                    )}
-                                                                                                </AlertDialogAction>
-                                                                                            </AlertDialogFooter>
-                                                                                        </AlertDialogContent>
-                                                                                    </AlertDialog>
                                                                                 </div>
                                                                             )}
                                                                         </>
@@ -7413,6 +7239,136 @@ export default function ReportWorkspace({
                             className="w-full cursor-pointer bg-amber-600 font-semibold text-white hover:bg-amber-700 sm:w-auto"
                         >
                             {'Entendido'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={showCompleteMicroscopyDialog}
+                onOpenChange={setShowCompleteMicroscopyDialog}
+            >
+                <AlertDialogContent className="max-w-4xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            ¿Confirmar completado de microscopía y previsualizar
+                            reporte?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Antes de finalizar, verifique el formato en la vista
+                            previa del PDF real.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="relative flex w-full flex-col">
+                        {/* Progress indicators */}
+                        <div className="mb-2 flex items-center justify-between px-1 text-xs">
+                            <span className="font-medium text-muted-foreground">
+                                Progreso de lectura del reporte
+                            </span>
+                            <span className="font-bold text-fuchsia-600 dark:text-fuchsia-400">
+                                {scrollPercentage}%
+                            </span>
+                        </div>
+                        <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                            <div
+                                className="h-full rounded-full bg-fuchsia-600 transition-all duration-200"
+                                style={{ width: `${scrollPercentage}%` }}
+                            />
+                        </div>
+
+                        {/* Scrollable Container */}
+                        <div
+                            ref={dialogPreviewContainerRef}
+                            className="relative flex max-h-[55vh] w-full scrollbar-thin scrollbar-thumb-slate-300 justify-center overflow-y-auto scroll-smooth rounded-lg border bg-slate-100/50 p-4 dark:scrollbar-thumb-slate-800 dark:bg-slate-950/50"
+                            onScroll={(e) => {
+                                const target = e.currentTarget;
+                                const totalScrollable =
+                                    target.scrollHeight - target.clientHeight;
+
+                                if (totalScrollable > 0) {
+                                    const pct = Math.min(
+                                        100,
+                                        Math.round(
+                                            (target.scrollTop /
+                                                totalScrollable) *
+                                                100,
+                                        ),
+                                    );
+                                    setScrollPercentage(pct);
+
+                                    const isAtBottom =
+                                        totalScrollable - target.scrollTop <=
+                                        50;
+
+                                    if (isAtBottom && !hasScrolledToEnd) {
+                                        setHasScrolledToEnd(true);
+                                    }
+                                } else {
+                                    setScrollPercentage(100);
+                                    setHasScrolledToEnd(true);
+                                }
+                            }}
+                        >
+                            {tempPdfUrl && (
+                                <iframe
+                                    src={`${tempPdfUrl}#toolbar=0&navpanes=0&view=FitH`}
+                                    title="PDF Preview"
+                                    className="pointer-events-none w-full border-0 select-none"
+                                    style={{
+                                        height: `${tempPdfTotalPages * 1056}px`,
+                                        pointerEvents: 'none',
+                                    }}
+                                />
+                            )}
+                        </div>
+
+                        {/* Floating bottom cue */}
+                        {!hasScrolledToEnd && (
+                            <div className="pointer-events-none absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-900/90 px-4 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-sm transition-all duration-300 dark:bg-slate-50/90 dark:text-slate-900">
+                                <ArrowDown className="h-3.5 w-3.5 animate-pulse" />
+                                <span>{`Desplace para confirmar lectura (${scrollPercentage}%)`}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {!hasScrolledToEnd && (
+                        <p className="mt-2 animate-pulse text-center text-[11px] font-medium text-muted-foreground">
+                            Desplace hasta el final de la previsualización para
+                            habilitar la finalización del reporte.
+                        </p>
+                    )}
+                    <AlertDialogFooter className="mt-4">
+                        <AlertDialogCancel
+                            onClick={() =>
+                                setShowCompleteMicroscopyDialog(false)
+                            }
+                        >
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setShowCompleteMicroscopyDialog(false);
+                                handleTransitionState('finalized');
+                            }}
+                            disabled={!hasScrolledToEnd}
+                            className={cn(
+                                'cursor-pointer gap-2 transition-all duration-300',
+                                hasScrolledToEnd
+                                    ? 'bg-fuchsia-600 text-white shadow-md shadow-fuchsia-500/25 hover:bg-fuchsia-700 active:scale-[0.98]'
+                                    : 'pointer-events-none cursor-not-allowed bg-slate-200 text-slate-400 opacity-50 dark:bg-slate-800 dark:text-slate-500',
+                            )}
+                        >
+                            {hasScrolledToEnd ? (
+                                <>
+                                    <Unlock className="h-4 w-4" />
+                                    <span>Finalizar Reporte</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Lock className="h-4 w-4" />
+                                    <span>Finalizar Reporte</span>
+                                </>
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

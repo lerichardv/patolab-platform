@@ -12,10 +12,16 @@ interface User {
     name: string;
 }
 
+interface WorkOrderTask {
+    id: number;
+    name: string;
+}
+
 interface Props {
     specimenId?: number | null;
     specimenIds?: number[] | null;
     workOrderTypes: WorkOrderType[];
+    workOrderTasks: WorkOrderTask[];
     usersList: User[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -25,6 +31,7 @@ export default function WorkOrderSheet({
     specimenId,
     specimenIds,
     workOrderTypes,
+    workOrderTasks,
     usersList,
     open,
     onOpenChange,
@@ -51,6 +58,7 @@ export default function WorkOrderSheet({
                         specimenId={specimenId}
                         specimenIds={specimenIds}
                         workOrderTypes={workOrderTypes}
+                        workOrderTasks={workOrderTasks}
                         usersList={usersList}
                         onSuccess={() => onOpenChange(false)}
                     />

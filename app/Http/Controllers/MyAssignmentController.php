@@ -6,6 +6,7 @@ use App\Models\Priority;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Models\User;
+use App\Models\WorkOrderTask;
 use App\Models\WorkOrderType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -117,13 +118,14 @@ class MyAssignmentController extends Controller
             ->select('specimen.*')
             ->orderBy('priorities.order', 'asc')
             ->orderBy('specimen.created_at', 'desc')
-            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'workOrders.type', 'workOrders.users'])
+            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'workOrders.type', 'workOrders.task', 'workOrders.users'])
             ->get();
 
         $priorities = Priority::orderBy('order', 'asc')->get();
         $specimenTypes = SpecimenType::where('active', true)->get();
         $examinations = SpecimenTypeExamination::where('active', true)->get();
         $workOrderTypes = WorkOrderType::orderBy('name')->get();
+        $workOrderTasks = WorkOrderTask::orderBy('name')->get();
         $usersList = User::where('active', true)->orderBy('name')->get();
 
         return Inertia::render('my-assignments/index', [
@@ -132,6 +134,7 @@ class MyAssignmentController extends Controller
             'specimenTypes' => $specimenTypes,
             'examinations' => $examinations,
             'workOrderTypes' => $workOrderTypes,
+            'workOrderTasks' => $workOrderTasks,
             'usersList' => $usersList,
             'filters' => [
                 'status' => $statuses,

@@ -40,21 +40,18 @@ class InvoiceController extends Controller
         $query = Invoice::with([
             'customer',
             'caiRange',
-            'specimen.type.prices',
-            'specimen.examination',
+            'specimen.examination.prices',
             'specimen.category',
             'specimen.referrerRelation',
             'specimen.priority',
             'creditRelation',
             'rental',
             'group.specimens.customerRelation',
-            'group.specimens.type.prices',
-            'group.specimens.examination',
+            'group.specimens.examination.prices',
             'group.specimens.category',
             'group.specimens.referrerRelation',
             'group.specimens.priority',
-            'groupSpecimens.specimen.type.prices',
-            'groupSpecimens.specimen.examination',
+            'groupSpecimens.specimen.examination.prices',
             'groupSpecimens.specimen.customerRelation',
             'groupSpecimens.specimen.products',
         ]);
@@ -182,10 +179,10 @@ class InvoiceController extends Controller
         $invoices = $query->paginate(10)->withQueryString();
 
         $customers = Customer::where('active', true)->orderBy('name', 'asc')->get();
-        $specimenTypes = SpecimenType::where('active', true)->orderBy('name', 'asc')->with('prices')->get();
+        $specimenTypes = SpecimenType::where('active', true)->orderBy('name', 'asc')->get();
         $banks = Bank::all();
 
-        $examinations = SpecimenTypeExamination::where('active', true)->get();
+        $examinations = SpecimenTypeExamination::where('active', true)->with('prices')->get();
         $categories = SpecimenCategory::where('active', true)->get();
         $referrers = Referrer::where('active', true)->get();
         $referrerTypes = ReferrerType::where('active', true)->get();
@@ -255,8 +252,7 @@ class InvoiceController extends Controller
         Gate::authorize('invoices.view');
         $query = Invoice::with([
             'customer',
-            'specimen.type.prices',
-            'specimen.examination',
+            'specimen.examination.prices',
             'creditRelation',
         ]);
 
@@ -519,14 +515,14 @@ class InvoiceController extends Controller
 
         if ($groupSpecimensData) {
             foreach ($groupSpecimensData as $item) {
-                $igs = InvoiceGroupSpecimen::with('specimen.type.prices')->findOrFail($item['id']);
+                $igs = InvoiceGroupSpecimen::with('specimen.examination.prices')->findOrFail($item['id']);
 
                 $qty = (int) ($item['quantity'] ?? 1);
                 $priceVal = $item['selected_price'] === 'custom'
                     ? (float) $item['custom_specimen_price']
                     : (float) $item['selected_price'];
 
-                $prices = $igs->specimen->type->prices ?? collect();
+                $prices = $igs->specimen->examination->prices ?? collect();
                 $priceAmounts = $prices->map(fn ($p) => (float) $p->amount)->toArray();
                 $maxPrice = count($priceAmounts) > 0 ? max($priceAmounts) : 0.0;
                 $maxPrice = max($maxPrice, $priceVal);
@@ -613,7 +609,7 @@ class InvoiceController extends Controller
 
         if ($request->boolean('regenerate_pdf', true)) {
             try {
-                $invoice->load(['specimen.products', 'creditRelation', 'customer', 'caiRange', 'groupSpecimens.specimen.examination', 'groupSpecimens.specimen.customerRelation', 'groupSpecimens.specimen.type.prices', 'groupSpecimens.specimen.products']);
+                $invoice->load(['specimen.products', 'specimen.examination.prices', 'creditRelation', 'customer', 'caiRange', 'groupSpecimens.specimen.examination', 'groupSpecimens.specimen.customerRelation', 'groupSpecimens.specimen.examination.prices', 'groupSpecimens.specimen.products']);
                 $totalWords = $this->numberToSpanishWords($invoice->total);
 
                 $customer = $invoice->customer;

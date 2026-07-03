@@ -384,6 +384,7 @@ export default function InvoicesIndex({
         }
 
         const userId = auth?.user?.id;
+
         if (userId) {
             if (key === 'status') {
                 setCookie(`status_filter_invoices_user_${userId}`, value);
@@ -393,12 +394,14 @@ export default function InvoicesIndex({
                     value,
                 );
                 const examId = filters.examination_id || 'all';
+
                 if (value !== 'all' && examId !== 'all') {
                     const hasValidExam = examinations.some(
                         (exam) =>
                             exam.id.toString() === examId &&
                             exam.specimen_type?.toString() === value,
                     );
+
                     if (!hasValidExam) {
                         delete newFilters.examination_id;
                         setCookie(
@@ -632,6 +635,7 @@ export default function InvoicesIndex({
                             className="h-10 gap-2"
                             onClick={() => {
                                 const userId = auth?.user?.id;
+
                                 if (userId) {
                                     const defaultRange = getLast2WeeksRange();
                                     setCookie(
@@ -651,6 +655,7 @@ export default function InvoicesIndex({
                                         JSON.stringify(defaultRange),
                                     );
                                 }
+
                                 router.get(
                                     invoicesIndex().url,
                                     {},

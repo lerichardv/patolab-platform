@@ -33,9 +33,13 @@ export default function InvoiceSheet({
     specimenTypes,
     settings,
 }: Props) {
-    const { specimenTypes: pageSpecimenTypes, settings: pageSettings } =
-        usePage<any>().props;
+    const {
+        specimenTypes: pageSpecimenTypes,
+        settings: pageSettings,
+        examinations: pageExaminations,
+    } = usePage<any>().props;
     const finalSpecimenTypes = specimenTypes || pageSpecimenTypes || [];
+    const finalExaminations = pageExaminations || [];
     const finalSettings = settings || pageSettings || {};
 
     const [isFormDirty, setIsFormDirty] = useState(false);
@@ -83,6 +87,7 @@ export default function InvoiceSheet({
                             customers={customers}
                             banks={banks}
                             specimenTypes={finalSpecimenTypes}
+                            examinations={finalExaminations}
                             settings={finalSettings}
                             onSuccess={() => onOpenChange(false)}
                             setIsDirty={setIsFormDirty}

@@ -12,11 +12,17 @@ import {
     Filter,
     ChevronDown,
     RefreshCw,
+    Eye,
 } from 'lucide-react';
 import * as React from 'react';
 import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import { updateStatus as updateWorkOrderStatus } from '@/actions/App/Http/Controllers/MyWorkOrderController';
+import {
+    DateRangePicker,
+    setCookie,
+    getLast2WeeksRange,
+} from '@/components/date-range-picker';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -50,11 +56,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-    DateRangePicker,
-    setCookie,
-    getLast2WeeksRange,
-} from '@/components/date-range-picker';
+import WorkOrderViewSheet from './work-order-view-sheet';
 
 interface Specimen {
     id: number;
@@ -79,6 +81,8 @@ interface WorkOrder {
     id: number;
     specimen_id: number;
     work_order_type_id: number;
+    work_order_task_id: number | null;
+    quantity: number;
     user_id: number;
     completed_by_id: number | null;
     status: 'Enviada' | 'En Proceso' | 'Finalizada';
@@ -89,6 +93,10 @@ interface WorkOrder {
     created_at: string;
     specimen?: Specimen;
     type?: WorkOrderType;
+    task?: {
+        name: string;
+        description: string;
+    } | null;
     completed_by?: {
         name: string;
     };
@@ -146,6 +154,8 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
     );
     const [searchQuery, setSearchQuery] = useState('');
     const [isReloading, setIsReloading] = useState(false);
+    const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
+    const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
     const [confirmAction, setConfirmAction] = useState<{
         workOrderId: number;
         nextStatus: 'En Proceso' | 'Finalizada';
@@ -487,7 +497,13 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                         Paciente
                                     </TableHead>
                                     <TableHead className="min-w-[120px] font-semibold">
+                                        Tarea
+                                    </TableHead>
+                                    <TableHead className="min-w-[120px] font-semibold">
                                         Tipo de Orden
+                                    </TableHead>
+                                    <TableHead className="w-[80px] text-center font-semibold">
+                                        Cantidad
                                     </TableHead>
                                     <TableHead className="w-[100px] text-center font-semibold">
                                         Prioridad
@@ -498,7 +514,7 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                     <TableHead className="w-[100px] text-center font-semibold">
                                         Comentarios
                                     </TableHead>
-                                    <TableHead className="w-[150px] text-right font-semibold">
+                                    <TableHead className="z-10 w-[150px] min-w-[150px] bg-card text-right border-l border-border font-semibold sticky right-0">
                                         Acción
                                     </TableHead>
                                 </TableRow>
@@ -513,11 +529,20 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                             STATUS_METADATA[wo.status] ||
                                             STATUS_METADATA.Enviada;
                                         const hasComments = !!wo.comments;
+                                        const isOverdue = !!(
+                                            wo.due_date &&
+                                            wo.status !== 'Finalizada' &&
+                                            new Date(wo.due_date) <= new Date()
+                                        );
 
                                         return (
                                             <TableRow
                                                 key={wo.id}
-                                                className="border-border/40 transition-colors hover:bg-muted/30"
+                                                className={`border-border/40 transition-colors ${
+                                                    isOverdue
+                                                        ? 'bg-red-50/50 hover:bg-red-100/50 dark:bg-red-950/20 dark:hover:bg-red-950/30'
+                                                        : 'hover:bg-muted/30'
+                                                }`}
                                             >
                                                 <TableCell className="font-mono text-xs font-semibold text-muted-foreground">
                                                     #{wo.id}
@@ -580,7 +605,36 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                         ?.name || 'N/A'}
                                                 </TableCell>
                                                 <TableCell className="text-sm font-medium text-foreground">
-                                                    {wo.type?.name || 'N/A'}
+                                                    {wo.task?.name || 'N/A'}
+                                                </TableCell>
+                                                <TableCell className="text-sm font-medium text-foreground">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span>
+                                                            {wo.type?.name ||
+                                                                'N/A'}
+                                                        </span>
+                                                        {isOverdue && (
+                                                            <Tooltip>
+                                                                <TooltipTrigger
+                                                                    asChild
+                                                                >
+                                                                    <AlertCircle className="h-4 w-4 shrink-0 cursor-help text-red-500" />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p className="text-xs">
+                                                                        La orden
+                                                                        de
+                                                                        trabajo
+                                                                        está
+                                                                        vencida
+                                                                    </p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-center font-semibold text-foreground">
+                                                    {wo.quantity}
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     <div className="flex items-center justify-center gap-1.5">
@@ -632,72 +686,75 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                         </span>
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="text-right">
-                                                    {wo.status ===
-                                                        'Enviada' && (
+                                                <TableCell className="z-10 w-[150px] min-w-[150px] bg-card text-right border-l border-border transition-colors group-hover:bg-muted sticky right-0">
+                                                    <div className="flex items-center justify-end gap-2">
                                                         <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-8 gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:border-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
-                                                            onClick={() =>
-                                                                setConfirmAction(
-                                                                    {
-                                                                        workOrderId:
-                                                                            wo.id,
-                                                                        nextStatus:
-                                                                            'En Proceso',
-                                                                    },
-                                                                )
-                                                            }
+                                                            type="button"
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-8 w-8 text-primary"
+                                                            onClick={() => {
+                                                                setSelectedWorkOrder(wo);
+                                                                setIsViewSheetOpen(true);
+                                                            }}
+                                                            title="Ver detalles de la orden"
                                                         >
-                                                            <Play className="h-3 w-3" />
-                                                            <span>Iniciar</span>
+                                                            <Eye className="h-4 w-4" />
                                                         </Button>
-                                                    )}
-                                                    {wo.status ===
-                                                        'En Proceso' && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-8 gap-1 border-blue-500/30 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/10"
-                                                            onClick={() =>
-                                                                setConfirmAction(
-                                                                    {
-                                                                        workOrderId:
-                                                                            wo.id,
-                                                                        nextStatus:
-                                                                            'Finalizada',
-                                                                    },
-                                                                )
-                                                            }
-                                                        >
-                                                            <CheckCircle className="h-3 w-3" />
-                                                            <span>
-                                                                Finalizar
-                                                            </span>
-                                                        </Button>
-                                                    )}
-                                                    {wo.status ===
-                                                        'Finalizada' && (
-                                                        <div className="flex flex-col items-end gap-0.5 text-right">
-                                                            <span className="text-[10px] leading-none text-muted-foreground">
-                                                                Por:{' '}
-                                                                {wo.completed_by
-                                                                    ?.name ||
-                                                                    'N/A'}
-                                                            </span>
-                                                            <span className="text-[9px] leading-none text-muted-foreground/60">
-                                                                {wo.completed_at
-                                                                    ? format(
-                                                                          new Date(
-                                                                              wo.completed_at,
-                                                                          ),
-                                                                          'dd/MM/yyyy h:mm a',
-                                                                      )
-                                                                    : ''}
-                                                            </span>
-                                                        </div>
-                                                    )}
+
+                                                        {wo.status === 'Enviada' && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-8 gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:border-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                                                                onClick={() =>
+                                                                    setConfirmAction({
+                                                                        workOrderId: wo.id,
+                                                                        nextStatus: 'En Proceso',
+                                                                    })
+                                                                }
+                                                            >
+                                                                <Play className="h-3 w-3" />
+                                                                <span>Iniciar</span>
+                                                            </Button>
+                                                        )}
+                                                        {wo.status === 'En Proceso' && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-8 gap-1 border-blue-500/30 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/10"
+                                                                onClick={() =>
+                                                                    setConfirmAction({
+                                                                        workOrderId: wo.id,
+                                                                        nextStatus: 'Finalizada',
+                                                                    })
+                                                                }
+                                                            >
+                                                                <CheckCircle className="h-3 w-3" />
+                                                                <span>Finalizar</span>
+                                                            </Button>
+                                                        )}
+                                                        {wo.status === 'Finalizada' && (
+                                                            <div className="flex flex-col items-end gap-0.5 text-right">
+                                                                <span className="text-[10px] leading-none text-muted-foreground font-medium">
+                                                                    Por:{' '}
+                                                                    {wo.completed_by
+                                                                        ?.name ||
+                                                                        'N/A'}
+                                                                </span>
+                                                                <span className="text-[9px] leading-none text-muted-foreground/60">
+                                                                    {wo.completed_at
+                                                                        ? format(
+                                                                              new Date(
+                                                                                  wo.completed_at,
+                                                                              ),
+                                                                              'dd/MM/yyyy h:mm a',
+                                                                          )
+                                                                        : ''}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -722,7 +779,9 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
             <AlertDialog
                 open={confirmAction !== null}
                 onOpenChange={(open) => {
-                    if (!open) setConfirmAction(null);
+                    if (!open) {
+                        setConfirmAction(null);
+                    }
                 }}
             >
                 <AlertDialogContent>
@@ -761,6 +820,12 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <WorkOrderViewSheet
+                workOrder={selectedWorkOrder}
+                open={isViewSheetOpen}
+                onOpenChange={setIsViewSheetOpen}
+            />
         </TooltipProvider>
     );
 }

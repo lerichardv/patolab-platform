@@ -13,7 +13,7 @@ class SpecimenTypeExaminationController extends Controller
     public function index(Request $request)
     {
         Gate::authorize('specimen_type_examinations.view');
-        $query = SpecimenTypeExamination::query()->with('type')->where('active', true)->orderBy('created_at', 'desc');
+        $query = SpecimenTypeExamination::query()->with(['type', 'prices'])->where('active', true)->orderBy('created_at', 'desc');
 
         if ($request->has('search')) {
             $search = $request->get('search');
@@ -43,9 +43,23 @@ class SpecimenTypeExaminationController extends Controller
             'specimen_type' => 'required|exists:specimen_type,id',
             'name' => 'required|string|max:255',
             'description' => 'required|string',
+            'prices' => 'nullable|array',
+            'prices.*.amount' => 'required|numeric|min:0',
         ]);
 
-        SpecimenTypeExamination::create($validated);
+        $examination = SpecimenTypeExamination::create([
+            'specimen_type' => $validated['specimen_type'],
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+        ]);
+
+        if (! empty($validated['prices'])) {
+            foreach ($validated['prices'] as $priceData) {
+                $examination->prices()->create([
+                    'amount' => $priceData['amount'],
+                ]);
+            }
+        }
 
         return redirect()->back();
     }
@@ -57,9 +71,35 @@ class SpecimenTypeExaminationController extends Controller
             'specimen_type' => 'required|exists:specimen_type,id',
             'name' => 'required|string|max:255',
             'description' => 'required|string',
+            'prices' => 'nullable|array',
+            'prices.*.id' => 'nullable|integer',
+            'prices.*.amount' => 'required|numeric|min:0',
         ]);
 
-        $specimenTypeExamination->update($validated);
+        $specimenTypeExamination->update([
+            'specimen_type' => $validated['specimen_type'],
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+        ]);
+
+        $priceIdsToKeep = [];
+
+        if (isset($validated['prices'])) {
+            foreach ($validated['prices'] as $priceData) {
+                if (isset($priceData['id'])) {
+                    $price = $specimenTypeExamination->prices()->find($priceData['id']);
+                    if ($price) {
+                        $price->update(['amount' => $priceData['amount']]);
+                        $priceIdsToKeep[] = $price->id;
+                    }
+                } else {
+                    $price = $specimenTypeExamination->prices()->create(['amount' => $priceData['amount']]);
+                    $priceIdsToKeep[] = $price->id;
+                }
+            }
+        }
+
+        $specimenTypeExamination->prices()->whereNotIn('id', $priceIdsToKeep)->delete();
 
         return redirect()->back();
     }

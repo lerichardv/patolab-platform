@@ -581,6 +581,71 @@ app.post('/api/fix-grammar', express.json(), async (req, res) => {
 	}
 });
 
+app.post('/api/suggest-improvements', express.json(), async (req, res) => {
+	const { text, messages } = req.body;
+
+	if (!text || text.trim() === '') {
+		return res.status(400).json({ error: 'No se proporcionó texto para mejorar.' });
+	}
+
+	if (text.length > 3000) {
+		return res.status(400).json({ error: 'El texto no debe superar los 3000 caracteres.' });
+	}
+
+	try {
+		console.log('[OpenAI Suggestions Chat] Sending request to OpenAI API...');
+
+		const systemInstruction = `Eres un patólogo y asesor de redacción científica de primer nivel en un laboratorio de patología médica.
+Tu tarea es ayudar al usuario a refactorizar, corregir y pulir el texto seleccionado de un informe de patología en español a través de una conversación de chat interactiva.
+
+El texto original seleccionado por el usuario es:
+"""
+${text}
+"""
+
+Instrucciones:
+- Analiza y corrige conceptos médicos erróneos, mejora la redacción, utiliza la terminología estándar y más adecuada para laboratorios clínicos y de patología, y optimiza la claridad sin perder información clínica clave.
+- Cuando el usuario te pida cambios o refactorizaciones, genera el texto completo mejorado.
+- Devuelve ÚNICAMENTE tu respuesta o sugerencia de redacción en español, manteniendo los mismos saltos de línea y párrafos siempre que sea posible.
+- No agregues introducciones, explicaciones, ni uses bloques de código ni formatos adicionales. Tu respuesta debe ser exclusivamente el texto del mensaje con la propuesta mejorada para que pueda ser copiado y aplicado directamente.`;
+
+		const apiMessages = [
+			{ role: "system", content: systemInstruction },
+			...(messages || [])
+		];
+
+		const response = await fetch("https://api.openai.com/v1/chat/completions", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+			},
+			body: JSON.stringify({
+				model: "gpt-4o",
+				messages: apiMessages,
+				temperature: 0.3
+			})
+		});
+
+		if (!response.ok) {
+			const errText = await response.text();
+
+			throw new Error(`OpenAI suggestion chat error ${response.status}: ${errText}`);
+		}
+
+		const resData = await response.json();
+		const replyText = resData.choices[0].message.content.trim();
+
+		console.log('[OpenAI Suggestions Chat] Reply generated successfully.');
+
+		return res.json({ success: true, text: replyText });
+	} catch (error) {
+		console.error('Error en Sugerencias OpenAI Chat:', error);
+
+		return res.status(500).json({ error: 'Error en el servidor de chat de IA', details: error.message });
+	}
+});
+
 app.post('/api/refresh-insumos', express.json(), (req, res) => {
 	const { reportId } = req.body;
 

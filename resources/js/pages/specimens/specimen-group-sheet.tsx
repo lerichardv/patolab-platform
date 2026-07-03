@@ -84,6 +84,7 @@ import CustomerForm from '../customers/customer-form';
 import ReferrerForm from '../referrers/referrer-form';
 import SequenceForm from '../sequences/sequence-form';
 import CategorySheet from '../specimen-categories/category-sheet';
+import ExaminationPricesForm from '../specimen-type-examinations/examination-prices-form';
 import SpecimenTypeExaminationSheet from '../specimen-type-examinations/specimen-type-examination-sheet';
 import SpecimenTypeForm from '../specimen-types/specimen-type-form';
 
@@ -280,6 +281,9 @@ export default function SpecimenGroupSheet({
         useState(false);
     const [isExaminationSheetOpen, setIsExaminationSheetOpen] = useState(false);
     const [isCategorySheetOpen, setIsCategorySheetOpen] = useState(false);
+    const [isEditPricesSheetOpen, setIsEditPricesSheetOpen] = useState(false);
+    const [selectedExaminationForPrices, setSelectedExaminationForPrices] =
+        useState<any | null>(null);
 
     // Global billing fields (Step 2)
     const [paymentType, setPaymentType] = useState('');
@@ -569,11 +573,11 @@ export default function SpecimenGroupSheet({
             return;
         }
 
-        // Get prices list from chosen specimen type to populate default pricing structure in Step 2
-        const selectedType = specimenTypes.find(
-            (t) => t.id.toString() === nestedSpecimenType,
+        // Get prices list from chosen examination to populate default pricing structure in Step 2
+        const selectedExam = examinations.find(
+            (e) => e.id.toString() === nestedExamination,
         );
-        const prices = selectedType?.prices || [];
+        const prices = selectedExam?.prices || [];
         const sortedPrices = [...prices].sort(
             (a, b) => parseFloat(b.amount) - parseFloat(a.amount),
         );
@@ -593,7 +597,10 @@ export default function SpecimenGroupSheet({
                 customers.find((c) => c.id.toString() === nestedCustomer)
                     ?.name || 'Desconocido',
             specimen_type: parseInt(nestedSpecimenType),
-            specimen_type_name: selectedType?.name || '',
+            specimen_type_name:
+                specimenTypes.find(
+                    (t) => t.id.toString() === nestedSpecimenType,
+                )?.name || '',
             specimen_type_examination: parseInt(nestedExamination),
             specimen_type_examination_name:
                 examinations.find((e) => e.id.toString() === nestedExamination)
@@ -785,8 +792,8 @@ export default function SpecimenGroupSheet({
         return specimens.reduce((sum, s) => {
             const qty = s.quantity ?? 1;
             const prices =
-                specimenTypes.find((t) => t.id === s.specimen_type)?.prices ||
-                [];
+                examinations.find((e) => e.id === s.specimen_type_examination)
+                    ?.prices || [];
             const maxVal =
                 prices.length > 0
                     ? Math.max(
@@ -802,14 +809,14 @@ export default function SpecimenGroupSheet({
 
             return sum + basePrice * qty;
         }, 0);
-    }, [specimens, specimenTypes]);
+    }, [specimens, examinations]);
 
     const specimensAutoDiscount = useMemo(() => {
         return specimens.reduce((sum, s) => {
             const qty = s.quantity ?? 1;
             const prices =
-                specimenTypes.find((t) => t.id === s.specimen_type)?.prices ||
-                [];
+                examinations.find((e) => e.id === s.specimen_type_examination)
+                    ?.prices || [];
             const maxVal =
                 prices.length > 0
                     ? Math.max(
@@ -826,7 +833,7 @@ export default function SpecimenGroupSheet({
 
             return sum + (diff + ageDisc) * qty;
         }, 0);
-    }, [specimens, specimenTypes]);
+    }, [specimens, examinations]);
 
     const specimensAdditionalDiscount = useMemo(() => {
         return specimens.reduce((sum, s) => {
@@ -1720,10 +1727,10 @@ export default function SpecimenGroupSheet({
                                         </h4>
                                         {specimens.map((spec, specIdx) => {
                                             const prices =
-                                                specimenTypes.find(
-                                                    (t) =>
-                                                        t.id ===
-                                                        spec.specimen_type,
+                                                examinations.find(
+                                                    (e) =>
+                                                        e.id ===
+                                                        spec.specimen_type_examination,
                                                 )?.prices || [];
                                             const maxVal =
                                                 prices.length > 0
@@ -1804,10 +1811,37 @@ export default function SpecimenGroupSheet({
                                                     <CardContent className="space-y-4 p-4">
                                                         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                                             <div className="grid gap-2">
-                                                                <Label className="text-xs font-semibold">
-                                                                    Seleccionar
-                                                                    Precio (L.)
-                                                                </Label>
+                                                                <div className="flex items-center justify-between">
+                                                                    <Label className="text-xs font-semibold">
+                                                                        Seleccionar
+                                                                        Precio
+                                                                        (L.)
+                                                                    </Label>
+                                                                    {spec.specimen_type_examination && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setSelectedExaminationForPrices(
+                                                                                    examinations.find(
+                                                                                        (
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            e.id ===
+                                                                                            spec.specimen_type_examination,
+                                                                                    ) ||
+                                                                                        null,
+                                                                                );
+                                                                                setIsEditPricesSheetOpen(
+                                                                                    true,
+                                                                                );
+                                                                            }}
+                                                                            className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                                                        >
+                                                                            <Plus className="h-3 w-3" />{' '}
+                                                                            Gestionar
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                                 <Select
                                                                     value={
                                                                         spec.selected_price
@@ -4009,6 +4043,31 @@ export default function SpecimenGroupSheet({
             </Sheet>
 
             {/* On-the-fly sheets for nested creation */}
+            <Sheet
+                open={isEditPricesSheetOpen}
+                onOpenChange={setIsEditPricesSheetOpen}
+            >
+                <SheetContent
+                    side="right"
+                    className="z-[120] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                >
+                    <HeadingSheet
+                        title="Gestionar Precios"
+                        description="Modifique la lista de precios para este análisis."
+                    />
+                    <div className="-mx-5 mt-4 px-5">
+                        {selectedExaminationForPrices && (
+                            <ExaminationPricesForm
+                                examination={selectedExaminationForPrices}
+                                onSuccess={() =>
+                                    setIsEditPricesSheetOpen(false)
+                                }
+                            />
+                        )}
+                    </div>
+                </SheetContent>
+            </Sheet>
+
             <Sheet
                 open={isCustomerSheetOpen}
                 onOpenChange={setIsCustomerSheetOpen}

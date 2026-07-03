@@ -6,6 +6,7 @@ use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * Representa un tipo específico de muestra o examen.
@@ -31,5 +32,10 @@ class SpecimenTypeExamination extends Model
     public function type(): BelongsTo
     {
         return $this->belongsTo(SpecimenType::class, 'specimen_type');
+    }
+
+    public function prices(): MorphMany
+    {
+        return $this->morphMany(PriceList::class, 'source', 'pricing_source', 'source_id');
     }
 }

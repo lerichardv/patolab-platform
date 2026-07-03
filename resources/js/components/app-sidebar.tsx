@@ -43,12 +43,13 @@ import { index as specimensIndex } from '@/actions/App/Http/Controllers/Specimen
 import { index as specimenTypesIndex } from '@/actions/App/Http/Controllers/SpecimenTypeController';
 import { index as specimenTypeExaminationsIndex } from '@/actions/App/Http/Controllers/SpecimenTypeExaminationController';
 import { index as specimenTypeTemplatesIndex } from '@/actions/App/Http/Controllers/SpecimenTypeTemplateController';
-import { index as workOrdersIndex } from '@/actions/App/Http/Controllers/WorkOrderTypeController';
-import { index as adminWorkOrdersIndex } from '@/actions/App/Http/Controllers/WorkOrderController';
 import { index as storagesIndex } from '@/actions/App/Http/Controllers/StorageController';
 import { index as userCommissionsIndex } from '@/actions/App/Http/Controllers/UserCommissionController';
 import { index as userCommissionRulesIndex } from '@/actions/App/Http/Controllers/UserCommissionRuleController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
+import { index as adminWorkOrdersIndex } from '@/actions/App/Http/Controllers/WorkOrderController';
+import { index as workOrderTasksIndex } from '@/actions/App/Http/Controllers/WorkOrderTaskController';
+import { index as workOrdersIndex } from '@/actions/App/Http/Controllers/WorkOrderTypeController';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -190,6 +191,11 @@ const adminNavItems: NavItem[] = [
                         title: 'Tipos de Órdenes',
                         href: workOrdersIndex(),
                         permission: 'work_orders.view',
+                    },
+                    {
+                        title: 'Tareas',
+                        href: workOrderTasksIndex(),
+                        permission: 'work_order_tasks.view',
                     },
                     {
                         title: 'Ver Todas',

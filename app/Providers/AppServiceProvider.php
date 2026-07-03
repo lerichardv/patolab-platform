@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Product;
 use App\Models\SpecimenType;
+use App\Models\SpecimenTypeExamination;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Date;
@@ -32,6 +33,7 @@ class AppServiceProvider extends ServiceProvider
         Relation::morphMap([
             'product' => Product::class,
             'specimen type' => SpecimenType::class,
+            'specimen type examination' => SpecimenTypeExamination::class,
         ]);
 
         Gate::before(function ($user, $ability) {

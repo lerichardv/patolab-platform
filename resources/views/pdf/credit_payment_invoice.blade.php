@@ -384,8 +384,8 @@
                 </div>
                 <div style="text-align: right; align-self: center; display: flex; flex-direction: column; align-items: flex-end;">
                     <span class="specimen-title">Fecha estimada del resultado</span>
-                    <span class="specimen-value" style="font-size: 13px; font-weight: 800; color: #1e3a8a;">
-                        {{ $originalInvoice->specimen->expected_finalization_date ? $originalInvoice->specimen->expected_finalization_date->format('d/m/Y h:i a') : 'N/A' }}
+                    <span class="specimen-value" style="font-size: 13px; font-weight: 800; color: #1e3a8a; background-color: #fef08a; padding: 2px 6px; border-radius: 4px; display: inline-block; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                        {{ $originalInvoice->specimen->expected_finalization_date ? $originalInvoice->specimen->expected_finalization_date->format('d/m/Y') : 'N/A' }}
                     </span>
                 </div>
                 <div style="grid-column: span 3; border-top: 1px solid #bfdbfe; margin: 4px 0;"></div>
@@ -494,7 +494,7 @@
         <div class="totals-left">
             {{ $totalWords }}
 
-            <div class="credit-info-box">
+            {{-- <div class="credit-info-box">
                 <div class="credit-info-title">Estado de Cuenta de Crédito</div>
                 <div class="credit-info-row">
                     <span>Monto de Crédito Original:</span>
@@ -512,7 +512,7 @@
                     <span>Nuevo Saldo Pendiente:</span>
                     <strong style="color: {{ $credit->amount_remaining > 0 ? '#ef4444' : '#10b981' }};">L. {{ number_format($credit->amount_remaining, 2) }}</strong>
                 </div>
-            </div>
+            </div> --}}
         </div>
         <div class="totals-right">
             <div class="total-row">

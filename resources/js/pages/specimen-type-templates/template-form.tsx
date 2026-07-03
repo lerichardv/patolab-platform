@@ -6,9 +6,9 @@ import {
     Check,
     ChevronsUpDown,
     Microscope,
-    ChevronDown,
     FileText,
     GripVertical,
+    X,
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -92,17 +92,24 @@ function FormCombobox({
     placeholder,
     emptyMessage = 'No se encontraron resultados.',
     disabled = false,
+    multiple = false,
+    icon,
 }: {
     options: { label: string; value: string }[];
-    value: string;
-    onChange: (value: string) => void;
+    value: string | string[];
+    onChange: (value: any) => void;
     placeholder: string;
     emptyMessage?: string;
     disabled?: boolean;
+    multiple?: boolean;
+    icon?: React.ReactNode;
 }) {
     const [open, setOpen] = useState(false);
 
-    const selectedOption = options.find((opt) => opt.value === value);
+    const selectedValues = Array.isArray(value) ? value : value ? [value] : [];
+    const selectedOptions = options.filter((opt) =>
+        selectedValues.includes(opt.value),
+    );
 
     return (
         <Popover open={open} onOpenChange={setOpen} modal={true}>
@@ -111,17 +118,43 @@ function FormCombobox({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="h-10 w-full justify-between px-3 text-left font-normal"
+                    className="h-auto min-h-10 w-full justify-between px-3 py-1.5 text-left font-normal"
                     disabled={disabled}
                 >
-                    <span
-                        className={cn(
-                            'truncate',
-                            !selectedOption && 'text-muted-foreground',
+                    <div className="flex max-h-24 max-w-[90%] flex-wrap items-center gap-1.5 overflow-y-auto pr-1">
+                        {icon && (
+                            <span className="mr-1.5 shrink-0">{icon}</span>
                         )}
-                    >
-                        {selectedOption ? selectedOption.label : placeholder}
-                    </span>
+                        {selectedOptions.length > 0 ? (
+                            selectedOptions.map((opt) => (
+                                <span
+                                    key={opt.value}
+                                    className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
+                                >
+                                    {opt.label}
+                                    {multiple && (
+                                        <span
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const newValue =
+                                                    selectedValues.filter(
+                                                        (v) => v !== opt.value,
+                                                    );
+                                                onChange(newValue);
+                                            }}
+                                            className="ml-1 cursor-pointer rounded-full p-0.5 hover:bg-muted-foreground/20"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </span>
+                                    )}
+                                </span>
+                            ))
+                        ) : (
+                            <span className="text-muted-foreground">
+                                {placeholder}
+                            </span>
+                        )}
+                    </div>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
@@ -132,28 +165,79 @@ function FormCombobox({
                 <Command>
                     <CommandInput placeholder="Buscar..." />
                     <CommandList>
+                        {multiple && options.length > 0 && (
+                            <div className="flex items-center justify-between border-b border-border/60 bg-muted/40 px-3 py-2 text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onChange(options.map((o) => o.value));
+                                    }}
+                                    className="cursor-pointer font-medium text-primary transition-all hover:underline"
+                                >
+                                    Seleccionar todos
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onChange([]);
+                                    }}
+                                    className="cursor-pointer font-medium text-muted-foreground transition-all hover:text-destructive hover:underline"
+                                >
+                                    Deseleccionar todos
+                                </button>
+                            </div>
+                        )}
                         <CommandEmpty>{emptyMessage}</CommandEmpty>
                         <CommandGroup>
                             {options.map((option) => {
-                                const isSelected = option.value === value;
+                                const isSelected = selectedValues.includes(
+                                    option.value,
+                                );
 
                                 return (
                                     <CommandItem
                                         key={option.value}
                                         value={option.label}
                                         onSelect={() => {
-                                            onChange(option.value);
-                                            setOpen(false);
+                                            if (multiple) {
+                                                const newValue = isSelected
+                                                    ? selectedValues.filter(
+                                                          (v) =>
+                                                              v !==
+                                                              option.value,
+                                                      )
+                                                    : [
+                                                          ...selectedValues,
+                                                          option.value,
+                                                      ];
+                                                onChange(newValue);
+                                            } else {
+                                                onChange(option.value);
+                                                setOpen(false);
+                                            }
                                         }}
                                     >
-                                        <Check
-                                            className={cn(
-                                                'mr-2 h-4 w-4 shrink-0',
-                                                isSelected
-                                                    ? 'opacity-100'
-                                                    : 'opacity-0',
-                                            )}
-                                        />
+                                        {multiple ? (
+                                            <div
+                                                className={cn(
+                                                    'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-all',
+                                                    isSelected
+                                                        ? 'bg-primary text-primary-foreground'
+                                                        : 'opacity-50',
+                                                )}
+                                            >
+                                                <Check className="h-3 w-3 stroke-[3]" />
+                                            </div>
+                                        ) : (
+                                            <Check
+                                                className={cn(
+                                                    'mr-2 h-4 w-4 shrink-0',
+                                                    isSelected
+                                                        ? 'opacity-100'
+                                                        : 'opacity-0',
+                                                )}
+                                            />
+                                        )}
                                         <span className="truncate">
                                             {option.label}
                                         </span>
@@ -184,11 +268,18 @@ export default function TemplateForm({
         { key: 'legend_html', order: 7, active: true },
     ];
 
+    const isEditMode = !!template;
+
     const { data, setData, post, put, processing, errors } = useForm({
         user_id: template?.user_id?.toString() || '',
-        specimen_type_id: template?.specimen_type_id?.toString() || '',
-        specimen_type_examination_id:
-            template?.specimen_type_examination_id?.toString() || '',
+        specimen_type_id: isEditMode
+            ? template?.specimen_type_id?.toString() || ''
+            : '',
+        specimen_type_examination_id: isEditMode
+            ? template?.specimen_type_examination_id?.toString() || ''
+            : '',
+        specimen_type_ids: [] as string[],
+        specimen_type_examination_ids: [] as string[],
         clinical_details_html: template?.clinical_details_html || '',
         diagnosis_html: template?.diagnosis_html || '',
         macroscopy_html: template?.macroscopy_html || '',
@@ -218,9 +309,14 @@ export default function TemplateForm({
     useEffect(() => {
         setData({
             user_id: template?.user_id?.toString() || '',
-            specimen_type_id: template?.specimen_type_id?.toString() || '',
-            specimen_type_examination_id:
-                template?.specimen_type_examination_id?.toString() || '',
+            specimen_type_id: isEditMode
+                ? template?.specimen_type_id?.toString() || ''
+                : '',
+            specimen_type_examination_id: isEditMode
+                ? template?.specimen_type_examination_id?.toString() || ''
+                : '',
+            specimen_type_ids: [] as string[],
+            specimen_type_examination_ids: [] as string[],
             clinical_details_html: template?.clinical_details_html || '',
             diagnosis_html: template?.diagnosis_html || '',
             macroscopy_html: template?.macroscopy_html || '',
@@ -265,9 +361,6 @@ export default function TemplateForm({
     };
 
     const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
-    const [isSpecimenTypeOpen, setIsSpecimenTypeOpen] = useState(false);
-    const [isExaminationOpen, setIsExaminationOpen] = useState(false);
-    const [isLoadingExaminations, setIsLoadingExaminations] = useState(false);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -298,11 +391,32 @@ export default function TemplateForm({
         value: u.id.toString(),
     }));
 
-    // Filter examinations based on selected specimen type
-    const selectedType = specimenTypes.find(
-        (type) => type.id.toString() === data.specimen_type_id,
-    );
-    const filteredExaminations = selectedType ? selectedType.examinations : [];
+    const specimenTypeOptions = specimenTypes.map((st) => ({
+        label: st.name,
+        value: st.id.toString(),
+    }));
+
+    // Filter examinations based on selected specimen type(s)
+    const filteredExaminations = isEditMode
+        ? (() => {
+              const selectedType = specimenTypes.find(
+                  (type) => type.id.toString() === data.specimen_type_id,
+              );
+
+              return selectedType ? selectedType.examinations : [];
+          })()
+        : (() => {
+              const selectedTypes = specimenTypes.filter((type) =>
+                  data.specimen_type_ids.includes(type.id.toString()),
+              );
+
+              return selectedTypes.flatMap((type) => type.examinations);
+          })();
+
+    const examinationOptions = filteredExaminations.map((e) => ({
+        label: e.name,
+        value: e.id.toString(),
+    }));
 
     return (
         <>
@@ -328,213 +442,146 @@ export default function TemplateForm({
                                 {errors.user_id}
                             </p>
                         )}
-                    </div>
-                    <div className="flex flex-col items-start gap-4 md:flex-row md:items-center">
+                    </div>{' '}
+                    <div className="flex w-full flex-col items-start gap-4 md:flex-row md:items-center">
                         {/* Specimen Type Select */}
-                        <div className="space-y-2">
+                        <div className="w-full space-y-2 md:flex-1">
                             <Label htmlFor="specimen_type_id">
                                 Tipo de Muestra *
                             </Label>
-                            <Popover
-                                open={isSpecimenTypeOpen}
-                                onOpenChange={setIsSpecimenTypeOpen}
-                            >
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        id="specimen_type_id"
-                                        variant="outline"
-                                        role="combobox"
-                                        aria-expanded={isSpecimenTypeOpen}
-                                        className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
-                                    >
-                                        <div className="flex items-center gap-2 truncate">
-                                            <Microscope className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                            <span className="truncate">
-                                                {data.specimen_type_id
-                                                    ? (() => {
-                                                          const t =
-                                                              specimenTypes.find(
-                                                                  (t) =>
-                                                                      t.id.toString() ===
-                                                                      data.specimen_type_id,
-                                                              );
+                            {isEditMode ? (
+                                <FormCombobox
+                                    options={specimenTypeOptions}
+                                    value={data.specimen_type_id}
+                                    onChange={(val) => {
+                                        setData((prev) => ({
+                                            ...prev,
+                                            specimen_type_id: val,
+                                            specimen_type_examination_id: '', // Reset on change
+                                        }));
+                                    }}
+                                    placeholder="Seleccione un tipo de muestra"
+                                    emptyMessage="No se encontraron tipos de muestra."
+                                    icon={
+                                        <Microscope className="h-4 w-4 text-muted-foreground" />
+                                    }
+                                />
+                            ) : (
+                                <FormCombobox
+                                    options={specimenTypeOptions}
+                                    value={data.specimen_type_ids}
+                                    multiple={true}
+                                    onChange={(val) => {
+                                        setData((prev) => {
+                                            const newSpecimenTypeIds =
+                                                val as string[];
+                                            const activeTypes =
+                                                specimenTypes.filter((t) =>
+                                                    newSpecimenTypeIds.includes(
+                                                        t.id.toString(),
+                                                    ),
+                                                );
+                                            const validExaminations =
+                                                activeTypes.flatMap(
+                                                    (t) => t.examinations,
+                                                );
+                                            const newExamIds =
+                                                prev.specimen_type_examination_ids.filter(
+                                                    (id) =>
+                                                        validExaminations.some(
+                                                            (e) =>
+                                                                e.id.toString() ===
+                                                                id,
+                                                        ),
+                                                );
 
-                                                          return t
-                                                              ? t.name
-                                                              : 'Tipo seleccionado';
-                                                      })()
-                                                    : 'Seleccione tipo de muestra'}
-                                            </span>
-                                        </div>
-                                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                    className="w-[var(--radix-popover-trigger-width)] p-0"
-                                    align="start"
-                                >
-                                    <Command>
-                                        <CommandInput placeholder="Buscar tipo..." />
-                                        <CommandList>
-                                            <CommandEmpty>
-                                                No se encontraron tipos.
-                                            </CommandEmpty>
-                                            <CommandGroup>
-                                                {specimenTypes.map((type) => (
-                                                    <CommandItem
-                                                        key={type.id}
-                                                        value={type.name}
-                                                        onSelect={() => {
-                                                            setIsLoadingExaminations(
-                                                                true,
-                                                            );
-                                                            setData((prev) => ({
-                                                                ...prev,
-                                                                specimen_type_id:
-                                                                    type.id.toString(),
-                                                                specimen_type_examination_id:
-                                                                    '',
-                                                            }));
-                                                            setTimeout(() => {
-                                                                setIsLoadingExaminations(
-                                                                    false,
-                                                                );
-                                                            }, 300);
-                                                            setIsSpecimenTypeOpen(
-                                                                false,
-                                                            );
-                                                        }}
-                                                    >
-                                                        <Check
-                                                            className={cn(
-                                                                'mr-2 h-4 w-4',
-                                                                data.specimen_type_id ===
-                                                                    type.id.toString()
-                                                                    ? 'opacity-100'
-                                                                    : 'opacity-0',
-                                                            )}
-                                                        />
-                                                        {type.name}
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                            {errors.specimen_type_id && (
+                                            return {
+                                                ...prev,
+                                                specimen_type_ids:
+                                                    newSpecimenTypeIds,
+                                                specimen_type_examination_ids:
+                                                    newExamIds,
+                                            };
+                                        });
+                                    }}
+                                    placeholder="Seleccione tipos de muestra"
+                                    emptyMessage="No se encontraron tipos de muestra."
+                                    icon={
+                                        <Microscope className="h-4 w-4 text-muted-foreground" />
+                                    }
+                                />
+                            )}
+                            {(errors.specimen_type_id ||
+                                errors.specimen_type_ids) && (
                                 <p className="text-sm text-destructive">
-                                    {errors.specimen_type_id}
+                                    {errors.specimen_type_id ||
+                                        errors.specimen_type_ids}
                                 </p>
                             )}
                         </div>
 
                         {/* Specimen Type Examination Select */}
-                        <div className="space-y-2">
+                        <div className="w-full space-y-2 md:flex-1">
                             <Label htmlFor="specimen_type_examination_id">
                                 Examen *
                             </Label>
-                            <Popover
-                                open={isExaminationOpen}
-                                onOpenChange={setIsExaminationOpen}
-                            >
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        id="specimen_type_examination_id"
-                                        variant="outline"
-                                        role="combobox"
-                                        aria-expanded={isExaminationOpen}
-                                        className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
-                                        disabled={
-                                            !data.specimen_type_id ||
-                                            isLoadingExaminations
-                                        }
-                                    >
-                                        <div className="flex items-center gap-2 truncate">
-                                            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                            <span className="truncate">
-                                                {isLoadingExaminations ? (
-                                                    <span className="flex items-center gap-2">
-                                                        <Spinner className="h-3 w-3 animate-spin" />
-                                                        Cargando exámenes...
-                                                    </span>
-                                                ) : !data.specimen_type_id ? (
-                                                    'Seleccione tipo primero'
-                                                ) : data.specimen_type_examination_id ? (
-                                                    (() => {
-                                                        const e =
-                                                            filteredExaminations.find(
-                                                                (e) =>
-                                                                    e.id.toString() ===
-                                                                    data.specimen_type_examination_id,
-                                                            );
-
-                                                        return e
-                                                            ? e.name
-                                                            : 'Examen seleccionado';
-                                                    })()
-                                                ) : (
-                                                    'Seleccione un examen'
-                                                )}
-                                            </span>
-                                        </div>
-                                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                    className="w-[var(--radix-popover-trigger-width)] p-0"
-                                    align="start"
-                                >
-                                    <Command>
-                                        <CommandInput placeholder="Buscar examen..." />
-                                        <CommandList>
-                                            <CommandEmpty>
-                                                No se encontraron exámenes.
-                                            </CommandEmpty>
-                                            <CommandGroup>
-                                                {filteredExaminations.map(
-                                                    (exam) => (
-                                                        <CommandItem
-                                                            key={exam.id}
-                                                            value={exam.name}
-                                                            onSelect={() => {
-                                                                setData(
-                                                                    'specimen_type_examination_id',
-                                                                    exam.id.toString(),
-                                                                );
-                                                                setIsExaminationOpen(
-                                                                    false,
-                                                                );
-                                                            }}
-                                                        >
-                                                            <Check
-                                                                className={cn(
-                                                                    'mr-2 h-4 w-4',
-                                                                    data.specimen_type_examination_id ===
-                                                                        exam.id.toString()
-                                                                        ? 'opacity-100'
-                                                                        : 'opacity-0',
-                                                                )}
-                                                            />
-                                                            {exam.name}
-                                                        </CommandItem>
-                                                    ),
-                                                )}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                            {errors.specimen_type_examination_id && (
+                            {isEditMode ? (
+                                <FormCombobox
+                                    options={examinationOptions}
+                                    value={data.specimen_type_examination_id}
+                                    onChange={(val) =>
+                                        setData(
+                                            'specimen_type_examination_id',
+                                            val,
+                                        )
+                                    }
+                                    placeholder={
+                                        data.specimen_type_id
+                                            ? 'Seleccione un examen'
+                                            : 'Seleccione primero un tipo de muestra'
+                                    }
+                                    disabled={!data.specimen_type_id}
+                                    emptyMessage="No se encontraron exámenes."
+                                    icon={
+                                        <FileText className="h-4 w-4 text-muted-foreground" />
+                                    }
+                                />
+                            ) : (
+                                <FormCombobox
+                                    options={examinationOptions}
+                                    value={data.specimen_type_examination_ids}
+                                    multiple={true}
+                                    onChange={(val) =>
+                                        setData(
+                                            'specimen_type_examination_ids',
+                                            val,
+                                        )
+                                    }
+                                    placeholder={
+                                        data.specimen_type_ids.length > 0
+                                            ? 'Seleccione exámenes'
+                                            : 'Seleccione primero tipos de muestra'
+                                    }
+                                    disabled={
+                                        data.specimen_type_ids.length === 0
+                                    }
+                                    emptyMessage="No se encontraron exámenes."
+                                    icon={
+                                        <FileText className="h-4 w-4 text-muted-foreground" />
+                                    }
+                                />
+                            )}
+                            {(errors.specimen_type_examination_id ||
+                                errors.specimen_type_examination_ids) && (
                                 <p className="text-sm text-destructive">
-                                    {errors.specimen_type_examination_id}
+                                    {errors.specimen_type_examination_id ||
+                                        errors.specimen_type_examination_ids}
                                 </p>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Shared Toolbar */}
                 <div className="sticky top-0 z-10 shrink-0 border-b border-border bg-card">
                     <EditorToolbar editor={activeEditor} />
                 </div>

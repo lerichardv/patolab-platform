@@ -12,7 +12,7 @@ class SpecimenTypeController extends Controller
     public function index(Request $request)
     {
         Gate::authorize('specimen_types.view');
-        $query = SpecimenType::query()->with('prices')->where('active', true)->orderBy('created_at', 'desc');
+        $query = SpecimenType::query()->where('active', true)->orderBy('created_at', 'desc');
 
         if ($request->has('search')) {
             $search = $request->get('search');
@@ -36,22 +36,12 @@ class SpecimenTypeController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'prices' => 'nullable|array',
-            'prices.*.amount' => 'required|numeric|min:0',
         ]);
 
-        $specimenType = SpecimenType::create([
+        SpecimenType::create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
         ]);
-
-        if (! empty($validated['prices'])) {
-            foreach ($validated['prices'] as $priceData) {
-                $specimenType->prices()->create([
-                    'amount' => $priceData['amount'],
-                ]);
-            }
-        }
 
         return redirect()->back();
     }
@@ -62,34 +52,12 @@ class SpecimenTypeController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'prices' => 'nullable|array',
-            'prices.*.id' => 'nullable|integer',
-            'prices.*.amount' => 'required|numeric|min:0',
         ]);
 
         $specimenType->update([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
         ]);
-
-        $priceIdsToKeep = [];
-
-        if (isset($validated['prices'])) {
-            foreach ($validated['prices'] as $priceData) {
-                if (isset($priceData['id'])) {
-                    $price = $specimenType->prices()->find($priceData['id']);
-                    if ($price) {
-                        $price->update(['amount' => $priceData['amount']]);
-                        $priceIdsToKeep[] = $price->id;
-                    }
-                } else {
-                    $price = $specimenType->prices()->create(['amount' => $priceData['amount']]);
-                    $priceIdsToKeep[] = $price->id;
-                }
-            }
-        }
-
-        $specimenType->prices()->whereNotIn('id', $priceIdsToKeep)->delete();
 
         return redirect()->back();
     }

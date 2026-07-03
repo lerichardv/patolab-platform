@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SpecimenType;
+use App\Models\SpecimenTypeExamination;
 use App\Models\SpecimenTypeTemplate;
 use App\Services\ImageOptimizerService;
 use Illuminate\Http\Request;
@@ -69,14 +70,10 @@ class MySpecimenTypeTemplateController extends Controller
         $userId = Auth::id();
 
         $validated = $request->validate([
-            'specimen_type_id' => 'required|exists:specimen_type,id',
-            'specimen_type_examination_id' => [
-                'required',
-                'exists:specimen_type_examination,id',
-                Rule::unique('specimen_type_templates')
-                    ->where('user_id', $userId)
-                    ->where('specimen_type_examination_id', $request->specimen_type_examination_id),
-            ],
+            'specimen_type_ids' => 'required|array|min:1',
+            'specimen_type_ids.*' => 'exists:specimen_type,id',
+            'specimen_type_examination_ids' => 'required|array|min:1',
+            'specimen_type_examination_ids.*' => 'exists:specimen_type_examination,id',
             'clinical_details_html' => 'nullable|string',
             'diagnosis_html' => 'nullable|string',
             'macroscopy_html' => 'nullable|string',
@@ -90,8 +87,7 @@ class MySpecimenTypeTemplateController extends Controller
             'sections_order.*.active' => 'required|boolean',
         ]);
 
-        $validated['user_id'] = $userId;
-        $validated['sections_order'] = $request->input('sections_order', [
+        $sectionsOrder = $request->input('sections_order', [
             ['key' => 'clinical_details_html', 'order' => 1, 'active' => true],
             ['key' => 'diagnosis_html', 'order' => 2, 'active' => true],
             ['key' => 'macroscopy_html', 'order' => 3, 'active' => true],
@@ -101,7 +97,50 @@ class MySpecimenTypeTemplateController extends Controller
             ['key' => 'legend_html', 'order' => 7, 'active' => true],
         ]);
 
-        SpecimenTypeTemplate::create($validated);
+        $examinations = SpecimenTypeExamination::whereIn('id', $validated['specimen_type_examination_ids'])
+            ->whereIn('specimen_type', $validated['specimen_type_ids'])
+            ->get();
+
+        if ($examinations->isEmpty()) {
+            return redirect()->back()->withErrors([
+                'specimen_type_examination_ids' => 'Ninguno de los exámenes seleccionados pertenece a los tipos de muestra seleccionados.',
+            ]);
+        }
+
+        $createdCount = 0;
+
+        foreach ($examinations as $exam) {
+            $exists = SpecimenTypeTemplate::where('user_id', $userId)
+                ->where('specimen_type_id', $exam->specimen_type)
+                ->where('specimen_type_examination_id', $exam->id)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            SpecimenTypeTemplate::create([
+                'user_id' => $userId,
+                'specimen_type_id' => $exam->specimen_type,
+                'specimen_type_examination_id' => $exam->id,
+                'clinical_details_html' => $validated['clinical_details_html'] ?? null,
+                'diagnosis_html' => $validated['diagnosis_html'] ?? null,
+                'macroscopy_html' => $validated['macroscopy_html'] ?? null,
+                'microscopy_html' => $validated['microscopy_html'] ?? null,
+                'comments_notes_html' => $validated['comments_notes_html'] ?? null,
+                'protocols_html' => $validated['protocols_html'] ?? null,
+                'legend_html' => $validated['legend_html'] ?? null,
+                'sections_order' => $sectionsOrder,
+            ]);
+
+            $createdCount++;
+        }
+
+        if ($createdCount === 0) {
+            return redirect()->back()->withErrors([
+                'specimen_type_examination_ids' => 'Ya existen plantillas para todas las combinaciones de tipo de muestra y examen seleccionadas.',
+            ]);
+        }
 
         return redirect()->back();
     }

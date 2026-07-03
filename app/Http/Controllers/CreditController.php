@@ -542,11 +542,6 @@ class CreditController extends Controller
             ]);
             $credit->refresh();
 
-            // Update original invoice total_paid
-            $originalInvoice->update([
-                'total_paid' => $credit->amount_paid,
-            ]);
-
             // Increment CAI Range
             $caiRange->increment('last_used_number');
             if ($caiRange->last_used_number >= $caiRange->end_number) {

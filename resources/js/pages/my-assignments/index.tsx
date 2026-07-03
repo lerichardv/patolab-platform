@@ -23,13 +23,6 @@ import {
 import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import WorkOrderSheet from './work-order-sheet';
-import {
     DateRangePicker,
     getCookie,
     setCookie,
@@ -38,8 +31,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import {
     Command,
     CommandEmpty,
@@ -48,6 +39,18 @@ import {
     CommandItem,
     CommandList,
 } from '@/components/ui/command';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -55,6 +58,8 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import {
     Table,
     TableBody,
@@ -63,13 +68,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 
 interface Specimen {
@@ -126,6 +126,7 @@ interface Props {
     specimenTypes: any[];
     examinations: any[];
     workOrderTypes: any[];
+    workOrderTasks: any[];
     usersList: any[];
     filters: {
         status?: string[];
@@ -222,6 +223,7 @@ export default function MyAssignmentsIndex({
     specimenTypes,
     examinations,
     workOrderTypes,
+    workOrderTasks,
     usersList,
     filters,
 }: Props) {
@@ -411,7 +413,10 @@ export default function MyAssignmentsIndex({
     }, [filteredSpecimens]);
 
     const isAllVisibleSelected = useMemo(() => {
-        if (visibleSpecimenIds.length === 0) return false;
+        if (visibleSpecimenIds.length === 0) {
+            return false;
+        }
+
         return visibleSpecimenIds.every((id) => selectedIds.includes(id));
     }, [visibleSpecimenIds, selectedIds]);
 
@@ -969,9 +974,11 @@ export default function MyAssignmentsIndex({
                         onClick={() => {
                             setIsSelectionMode((prev) => {
                                 const next = !prev;
+
                                 if (!next) {
                                     setSelectedIds([]);
                                 }
+
                                 return next;
                             });
                         }}
@@ -981,6 +988,7 @@ export default function MyAssignmentsIndex({
                             checked={isSelectionMode}
                             onCheckedChange={(checked) => {
                                 setIsSelectionMode(checked);
+
                                 if (!checked) {
                                     setSelectedIds([]);
                                 }
@@ -1106,6 +1114,7 @@ export default function MyAssignmentsIndex({
                                                                             ) =>
                                                                                 s.id,
                                                                         );
+
                                                                     if (
                                                                         checked
                                                                     ) {
@@ -1493,10 +1502,12 @@ export default function MyAssignmentsIndex({
                 specimenId={selectedSpecimenForWorkOrder}
                 specimenIds={selectedSpecimenForWorkOrder ? null : selectedIds}
                 workOrderTypes={workOrderTypes}
+                workOrderTasks={workOrderTasks}
                 usersList={usersList}
                 open={isWorkOrderSheetOpen}
                 onOpenChange={(open) => {
                     setIsWorkOrderSheetOpen(open);
+
                     if (!open) {
                         setSelectedIds([]);
                         setIsSelectionMode(false);
@@ -1512,7 +1523,7 @@ export default function MyAssignmentsIndex({
                     }
                 }}
             >
-                <DialogContent className="max-h-[85vh] w-full overflow-y-auto sm:max-w-[600px]">
+                <DialogContent className="max-h-[85vh] w-full overflow-y-auto sm:max-w-[750px]">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-lg font-bold text-primary">
                             <ClipboardList className="h-5 w-5 text-primary" />
@@ -1547,17 +1558,45 @@ export default function MyAssignmentsIndex({
                                               ? 'bg-yellow-500 text-black'
                                               : 'bg-green-500 text-white';
 
+                                    const statusColor =
+                                        order.status === 'Finalizada'
+                                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'
+                                            : order.status === 'En Proceso'
+                                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300'
+                                              : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300';
+
                                     return (
                                         <div
                                             key={order.id}
                                             className="flex flex-col gap-3 rounded-lg border border-border/80 bg-card p-4 transition-colors hover:bg-muted/10"
                                         >
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div>
-                                                    <p className="text-sm font-semibold text-foreground">
-                                                        {order.type?.name ||
-                                                            'Tipo Desconocido'}
-                                                    </p>
+                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                <div className="space-y-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="text-xs font-semibold text-primary">
+                                                            #{order.id}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground">|</span>
+                                                        <span className="text-sm font-semibold text-foreground">
+                                                            {order.type?.name || 'Tipo Desconocido'}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground">|</span>
+                                                        <span className="text-xs font-medium text-foreground">
+                                                            Cantidad: {order.quantity}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="rounded-md bg-muted/40 p-2.5 space-y-1">
+                                                        <p className="text-xs font-semibold text-foreground">
+                                                            Tarea: {order.task?.name || 'N/A'}
+                                                        </p>
+                                                        {order.task?.description && (
+                                                            <p className="text-[11px] text-muted-foreground">
+                                                                {order.task.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+
                                                     {order.due_date && (
                                                         <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
                                                             <Clock className="h-3 w-3" />
@@ -1572,8 +1611,11 @@ export default function MyAssignmentsIndex({
                                                         </p>
                                                     )}
                                                 </div>
-                                                <div className="flex shrink-0 flex-col items-end gap-1.5">
-                                                    <span className="inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary uppercase">
+                                                <div className="flex shrink-0 flex-row items-center gap-1.5 sm:flex-col sm:items-end">
+                                                    <span className={cn(
+                                                        "inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase",
+                                                        statusColor
+                                                    )}>
                                                         {order.status}
                                                     </span>
                                                     <span
@@ -1618,7 +1660,7 @@ export default function MyAssignmentsIndex({
                                         </div>
                                     );
                                 },
-                            )
+                             )
                         ) : (
                             <p className="py-4 text-center text-sm text-muted-foreground">
                                 No hay órdenes de trabajo asignadas a esta

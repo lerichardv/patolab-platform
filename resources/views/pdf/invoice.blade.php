@@ -386,8 +386,8 @@
                 </div>
                 <div style="text-align: right; align-self: center; display: flex; flex-direction: column; align-items: flex-end;">
                     <span class="specimen-title">Fecha estimada del resultado</span>
-                    <span class="specimen-value" style="font-size: 13px; font-weight: 800; color: #1e3a8a;">
-                        {{ $invoice->specimen->expected_finalization_date ? $invoice->specimen->expected_finalization_date->format('d/m/Y h:i a') : 'N/A' }}
+                    <span class="specimen-value" style="font-size: 13px; font-weight: 800; color: #1e3a8a; background-color: #fff5a8ff; padding: 1px 4px; border-radius: 4px; display: inline-block; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                        {{ $invoice->specimen->expected_finalization_date ? $invoice->specimen->expected_finalization_date->format('d/m/Y') : 'N/A' }}
                     </span>
                 </div>
                 <div style="grid-column: span 3; border-top: 1px solid #bfdbfe; margin: 4px 0;"></div>
@@ -474,8 +474,8 @@
                                     $ageDiscountAmount = (float)$igs->age_discount_amount;
                                     $additionalDiscountEnabled = (bool)$igs->additional_discount_enabled;
                                     $additionalDiscount = (float)$igs->additional_discount;
-                                } else if ($specimen->type && $specimen->type->prices->isNotEmpty()) {
-                                    $price = (float)$specimen->type->prices->first()->amount;
+                                } else if ($specimen->examination && $specimen->examination->prices->isNotEmpty()) {
+                                    $price = (float)$specimen->examination->prices->first()->amount;
                                 }
                                 
                                 $typeName = $specimen->type->name ?? '';
@@ -605,9 +605,18 @@
 
     <div class="totals-section">
         <div class="totals-left">
-            {{ $totalWords }}
+            <div style="margin-bottom: 12px;">{{ $totalWords }}</div>
 
+            <div style="font-size: 7.5px; font-weight: normal; color: #4b5563; line-height: 1.25; text-align: justify; margin-bottom: 20px;">
+                <strong>Autorización para el tratamiento y divulgación de información médica*:</strong> El paciente o su representante autoriza a PatoLab a registrar y utilizar la información proporcionada para fines diagnósticos y administrativos, así como a entregar los informes y/o material biológico únicamente a las personas o instituciones autorizadas y registradas en el sistema al momento del ingreso de la muestra, de conformidad con las normas de confidencialidad y protección de datos aplicables.
+            </div>
 
+            <div style="margin-top: 25px; text-align: left;">
+                <div style="border-top: 1px solid #9ca3af; width: 220px; display: inline-block; margin-bottom: 3px;"></div>
+                <div style="font-size: 8.5px; font-weight: 600; color: #374151;">
+                    Firma Paciente/Representante: {{ $customer->name }}
+                </div>
+            </div>
         </div>
         <div class="totals-right">
             <div class="total-row">

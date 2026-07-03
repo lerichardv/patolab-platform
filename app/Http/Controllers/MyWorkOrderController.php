@@ -85,6 +85,7 @@ class MyWorkOrderController extends Controller
             'specimen.type',
             'specimen.examination',
             'type',
+            'task',
             'completedBy',
         ])
             ->orderBy('priority', 'asc') // 1 = Alta, 2 = Media, 3 = Baja

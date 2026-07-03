@@ -464,11 +464,11 @@
                                     <strong>Nombre:</strong> {{ $customer->name ?? 'N/A' }}<br>
                                     <strong>Edad:</strong> {{ $customer->age ?? 'N/A' }} años &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ $customer->gender === 'M' || $customer->gender === 'masculino' || $customer->gender === 'Masculino' ? 'M' : 'F' }}<br>
                                     <strong>Médico Remitente:</strong> {{ $referrer->name ?? 'N/A' }}<br>
-                                    <strong>Diagnóstico Clínico:</strong> {{ $specimen->diagnosis ?? 'N/A' }}
+									<strong>Tipo de muestra:</strong> {{ ($specimen->type->name ?? 'N/A') . ' - ' . ($specimen->examination->name ?? 'N/A') }}<br>
                                 </td>
                                 <td style="width: 45%; padding-left: 12px;">
+									<strong>Diagnóstico Clínico:</strong> {{ $specimen->diagnosis ?? 'N/A' }}
                                     <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? 'HDV' }}<br>
-                                    <strong>Sitio Preciso de la Muestra:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}<br>
                                     <strong>Fecha de la Toma:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }}<br>
                                     <strong>Fecha de Recibo:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }}
                                 </td>

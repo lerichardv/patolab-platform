@@ -246,6 +246,18 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Tareas de Órdenes de Trabajo',
+        description:
+            'Gestión de las tareas específicas para las órdenes de trabajo.',
+        module: 'Órdenes de Trabajo',
+        slugs: {
+            view: 'work_order_tasks.view',
+            create: 'work_order_tasks.create',
+            edit: 'work_order_tasks.edit',
+            delete: 'work_order_tasks.delete',
+        },
+    },
+    {
         label: 'Mis Órdenes de Trabajo',
         description:
             'Visualización de las órdenes de trabajo asignadas al técnico.',
@@ -388,7 +400,11 @@ export default function RolesIndex({
 
     const filteredRows = useMemo(() => {
         const lowerQuery = searchQuery.trim().toLowerCase();
-        if (!lowerQuery) return permissionRows;
+
+        if (!lowerQuery) {
+            return permissionRows;
+        }
+
         return permissionRows.filter(
             (row) =>
                 row.label.toLowerCase().includes(lowerQuery) ||
@@ -404,11 +420,14 @@ export default function RolesIndex({
         const groups: Record<string, PermissionRow[]> = {};
         filteredRows.forEach((row) => {
             const mod = row.module;
+
             if (!groups[mod]) {
                 groups[mod] = [];
             }
+
             groups[mod].push(row);
         });
+
         return groups;
     }, [filteredRows]);
 

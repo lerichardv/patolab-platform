@@ -29,6 +29,7 @@ use App\Http\Controllers\UserCommissionController;
 use App\Http\Controllers\UserCommissionRuleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkOrderController;
+use App\Http\Controllers\WorkOrderTaskController;
 use App\Http\Controllers\WorkOrderTypeController;
 use App\Models\Customer;
 use App\Models\Department;
@@ -151,6 +152,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('work-orders', WorkOrderTypeController::class)->parameters([
         'work-orders' => 'work_order_type',
     ]);
+    Route::resource('work-order-tasks', WorkOrderTaskController::class);
     Route::post('work-order-records', [WorkOrderController::class, 'store'])->name('work-order-records.store');
     Route::get('admin-work-orders', [WorkOrderController::class, 'index'])->name('admin-work-orders.index');
     Route::get('my-work-orders', [MyWorkOrderController::class, 'index'])->name('my-work-orders.index');

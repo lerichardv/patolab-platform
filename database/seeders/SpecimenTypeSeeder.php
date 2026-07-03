@@ -10,10 +10,6 @@ class SpecimenTypeSeeder extends Seeder
 {
     public function run(): void
     {
-        // Truncate only the examinations to avoid re-creating specimen types if they exist,
-        // or just use updateOrCreate for everything.
-        SpecimenTypeExamination::query()->delete();
-
         $types = [
             'Biopsia' => [
                 'Apendicectomía',
@@ -65,47 +61,62 @@ class SpecimenTypeSeeder extends Seeder
                 ]
             );
 
-            // Seed 1 to 4 prices (first is biggest, subsequent are cheaper)
-            $type->prices()->delete();
-            $numPrices = rand(1, 4);
-            $basePrice = rand(500, 2000);
-            $previousPrice = $basePrice;
-
-            for ($i = 0; $i < $numPrices; $i++) {
-                if ($i === 0) {
-                    $amount = $basePrice;
-                } else {
-                    $discountPercent = rand(10, 25);
-                    $amount = $previousPrice * (1 - $discountPercent / 100);
-                }
-
-                $amount = round($amount, 2);
-                $type->prices()->create(['amount' => $amount]);
-                $previousPrice = $amount;
-            }
-
             $exams = $types[$typeName] ?? [];
 
             if (empty($exams)) {
                 // Default generic exams if none specified
                 for ($i = 1; $i <= 3; $i++) {
-                    SpecimenTypeExamination::create([
-                        'specimen_type' => $type->id,
-                        'name' => "Análisis General $i de $typeName",
-                        'description' => "Descripción automática para $typeName.",
-                        'active' => true,
-                    ]);
+                    $exam = SpecimenTypeExamination::updateOrCreate(
+                        [
+                            'specimen_type' => $type->id,
+                            'name' => "Análisis General $i de $typeName",
+                        ],
+                        [
+                            'description' => "Descripción automática para $typeName.",
+                            'active' => true,
+                        ]
+                    );
+                    $this->seedPrices($exam);
                 }
             } else {
                 foreach ($exams as $examName) {
-                    SpecimenTypeExamination::create([
-                        'specimen_type' => $type->id,
-                        'name' => $examName,
-                        'description' => "Análisis especializado de $examName para $typeName.",
-                        'active' => true,
-                    ]);
+                    $exam = SpecimenTypeExamination::updateOrCreate(
+                        [
+                            'specimen_type' => $type->id,
+                            'name' => $examName,
+                        ],
+                        [
+                            'description' => "Análisis especializado de $examName para $typeName.",
+                            'active' => true,
+                        ]
+                    );
+                    $this->seedPrices($exam);
                 }
             }
+        }
+    }
+
+    private function seedPrices(SpecimenTypeExamination $exam): void
+    {
+        $exam->prices()->delete();
+        $numPrices = rand(2, 4);
+        $basePrice = rand(5, 20) * 100;
+        $previousPrice = $basePrice;
+
+        for ($i = 0; $i < $numPrices; $i++) {
+            if ($i === 0) {
+                $amount = $basePrice;
+            } else {
+                $discountPercent = rand(10, 25);
+                $amount = $previousPrice * (1 - $discountPercent / 100);
+            }
+
+            $amount = round($amount / 100) * 100;
+            if ($amount < 100) {
+                $amount = 100;
+            }
+            $exam->prices()->create(['amount' => $amount]);
+            $previousPrice = $amount;
         }
     }
 }

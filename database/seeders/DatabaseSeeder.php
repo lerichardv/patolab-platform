@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             PrioritySeeder::class,
             SpecimenCategorySeeder::class,
             WorkOrderTypeSeeder::class,
+            WorkOrderTaskSeeder::class,
             CustomerSeeder::class,
             BanksSeeder::class,
             UsersSeeder::class,

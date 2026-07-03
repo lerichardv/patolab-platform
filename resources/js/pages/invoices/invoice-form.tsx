@@ -64,6 +64,7 @@ interface Props {
     customers: any[];
     banks: any[];
     specimenTypes: any[];
+    examinations: any[];
     settings?: Record<string, string>;
     onSuccess: () => void;
     setIsDirty?: (dirty: boolean) => void;
@@ -149,6 +150,7 @@ export default function InvoiceForm({
     customers,
     banks,
     specimenTypes,
+    examinations,
     settings,
     onSuccess,
     setIsDirty,
@@ -451,12 +453,14 @@ export default function InvoiceForm({
 
     const hasSpecimen = !!invoice?.specimen;
     const isGroupInvoice = !!invoice?.is_group;
-    const selectedType = hasSpecimen
-        ? specimenTypes.find((t) => t.id === invoice.specimen.specimen_type)
+    const selectedExamination = hasSpecimen
+        ? examinations.find(
+              (e) => e.id === invoice.specimen.specimen_type_examination,
+          )
         : null;
     const availablePrices = React.useMemo(
-        () => selectedType?.prices || [],
-        [selectedType],
+        () => selectedExamination?.prices || [],
+        [selectedExamination],
     );
     const maxSpecimenPriceVal = React.useMemo(() => {
         if (availablePrices.length === 0) {
@@ -519,7 +523,7 @@ export default function InvoiceForm({
                 const loadedGroupSpecimens = rawGroupSpecimens.map(
                     (gs: any) => {
                         const spec = gs.specimen;
-                        const availablePrices = spec?.type?.prices || [];
+                        const availablePrices = spec?.examination?.prices || [];
                         const sortedPrices = [...availablePrices].sort(
                             (a: any, b: any) =>
                                 parseFloat(b.amount) - parseFloat(a.amount),

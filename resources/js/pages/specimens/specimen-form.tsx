@@ -15,6 +15,7 @@ import {
     Landmark,
     Receipt,
     Calendar,
+    Edit2,
 } from 'lucide-react';
 import React from 'react';
 import { createPortal } from 'react-dom';
@@ -73,6 +74,7 @@ import CustomerForm from '../customers/customer-form';
 import ReferrerForm from '../referrers/referrer-form';
 import SequenceForm from '../sequences/sequence-form';
 import CategorySheet from '../specimen-categories/category-sheet';
+import ExaminationPricesForm from '../specimen-type-examinations/examination-prices-form';
 import SpecimenTypeExaminationSheet from '../specimen-type-examinations/specimen-type-examination-sheet';
 import SpecimenTypeForm from '../specimen-types/specimen-type-form';
 
@@ -230,6 +232,8 @@ export default function SpecimenForm({
     const [isExaminationSheetOpen, setIsExaminationSheetOpen] =
         React.useState(false);
     const [isCategorySheetOpen, setIsCategorySheetOpen] = React.useState(false);
+    const [isEditPricesSheetOpen, setIsEditPricesSheetOpen] =
+        React.useState(false);
     const prevSpecimenTypesRef = React.useRef<any[]>(specimenTypes);
     const prevExaminationsRef = React.useRef<any[]>(examinations);
     const prevCategoriesRef = React.useRef<any[]>(categories);
@@ -649,19 +653,25 @@ export default function SpecimenForm({
         );
     }, [data.specimen_type, specimenTypes]);
 
+    const selectedExamination = React.useMemo(() => {
+        return examinations.find(
+            (e) => e.id.toString() === data.specimen_type_examination,
+        );
+    }, [data.specimen_type_examination, examinations]);
+
     const availablePrices = React.useMemo(() => {
-        return selectedType?.prices || [];
-    }, [selectedType]);
+        return selectedExamination?.prices || [];
+    }, [selectedExamination]);
 
     React.useEffect(() => {
-        if (!data.specimen_type) {
+        if (!data.specimen_type_examination) {
             setData('selected_price', '');
 
             return;
         }
 
-        const selected = specimenTypes.find(
-            (t) => t.id.toString() === data.specimen_type,
+        const selected = examinations.find(
+            (e) => e.id.toString() === data.specimen_type_examination,
         );
         const prices = selected?.prices || [];
 
@@ -673,7 +683,7 @@ export default function SpecimenForm({
         } else {
             setData('selected_price', '');
         }
-    }, [data.specimen_type, specimenTypes]);
+    }, [data.specimen_type_examination, examinations]);
 
     const sortedSpecimenTypes = React.useMemo(() => {
         return [...specimenTypes].sort((a, b) =>
@@ -2814,13 +2824,27 @@ export default function SpecimenForm({
                                 <div className="flex flex-col gap-5 lg:col-span-8">
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                         <div className="grid gap-2">
-                                            <div className="flex flex-col gap-0.5">
-                                                <Label htmlFor="selected_price">
-                                                    Importe / Precio Base (L.){' '}
-                                                    <span className="text-destructive">
-                                                        *
-                                                    </span>
+                                            <div className="flex items-center justify-between">
+                                                <Label
+                                                    htmlFor="selected_price"
+                                                    className="text-xs font-semibold"
+                                                >
+                                                    Importe / Precio Base (L.) *
                                                 </Label>
+                                                {data.specimen_type_examination && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setIsEditPricesSheetOpen(
+                                                                true,
+                                                            )
+                                                        }
+                                                        className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                                    >
+                                                        <Edit2 className="h-3 w-3" />{' '}
+                                                        Precios
+                                                    </button>
+                                                )}
                                             </div>
                                             <Select
                                                 value={data.selected_price}
@@ -2864,7 +2888,7 @@ export default function SpecimenForm({
                                                         >
                                                             No hay precios
                                                             configurados para
-                                                            este tipo de muestra
+                                                            este análisis
                                                         </SelectItem>
                                                     )}
                                                 </SelectContent>
@@ -4621,6 +4645,31 @@ export default function SpecimenForm({
                                 Guardar Detalles
                             </Button>
                         </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
+
+            <Sheet
+                open={isEditPricesSheetOpen}
+                onOpenChange={setIsEditPricesSheetOpen}
+            >
+                <SheetContent
+                    side="right"
+                    className="z-[120] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                >
+                    <HeadingSheet
+                        title="Gestionar Precios"
+                        description="Modifique la lista de precios para este análisis."
+                    />
+                    <div className="-mx-5 mt-4 px-5">
+                        {selectedExamination && (
+                            <ExaminationPricesForm
+                                examination={selectedExamination}
+                                onSuccess={() =>
+                                    setIsEditPricesSheetOpen(false)
+                                }
+                            />
+                        )}
                     </div>
                 </SheetContent>
             </Sheet>

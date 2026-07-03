@@ -15,7 +15,7 @@ class WorkOrderController extends Controller
      */
     public function index(Request $request)
     {
-        $query = WorkOrder::with(['specimen.customerRelation', 'type', 'users']);
+        $query = WorkOrder::with(['specimen.customerRelation', 'type', 'task', 'users']);
 
         // Filter status
         if ($request->has('status') && $request->status !== 'all' && $request->status !== '') {
@@ -93,6 +93,8 @@ class WorkOrderController extends Controller
             'specimen_ids' => 'nullable|array',
             'specimen_ids.*' => 'exists:specimen,id',
             'work_order_type_id' => 'required|exists:work_order_types,id',
+            'work_order_task_id' => 'required|exists:work_order_tasks,id',
+            'quantity' => 'nullable|integer|min:1',
             'user_ids' => 'required|array|min:1',
             'user_ids.*' => 'exists:users,id',
             'status' => 'required|in:Enviada,En Proceso,Finalizada',
@@ -100,7 +102,7 @@ class WorkOrderController extends Controller
             'comments' => 'nullable|string',
         ]);
 
-        $specimenIds = $request->has('specimen_ids') ? $validated['specimen_ids'] : [$validated['specimen_id']];
+        $specimenIds = ($request->has('specimen_ids') && ! empty($request->input('specimen_ids'))) ? $validated['specimen_ids'] : [$validated['specimen_id']];
         $userIds = $validated['user_ids'];
         $primaryUserId = $userIds[0];
 
@@ -133,6 +135,8 @@ class WorkOrderController extends Controller
             $workOrder = WorkOrder::create([
                 'specimen_id' => $specimenId,
                 'work_order_type_id' => $validated['work_order_type_id'],
+                'work_order_task_id' => $validated['work_order_task_id'] ?? null,
+                'quantity' => $validated['quantity'] ?? 1,
                 'user_id' => $primaryUserId,
                 'status' => $validated['status'],
                 'priority' => $validated['priority'],

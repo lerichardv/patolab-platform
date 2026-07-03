@@ -2,16 +2,10 @@ import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import SpecimenTypeForm from './specimen-type-form';
 
-interface Price {
-    id?: number;
-    amount: number | string;
-}
-
 interface SpecimenType {
     id: number;
     name: string;
     description: string | null;
-    prices?: Price[];
 }
 
 interface Props {

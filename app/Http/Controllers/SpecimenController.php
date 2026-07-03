@@ -187,8 +187,8 @@ class SpecimenController extends Controller
         return Inertia::render('specimens/index', [
             'priorities' => $priorities,
             'customers' => Customer::where('active', true)->get(),
-            'specimenTypes' => SpecimenType::where('active', true)->with('prices')->get(),
-            'examinations' => SpecimenTypeExamination::where('active', true)->get(),
+            'specimenTypes' => SpecimenType::where('active', true)->get(),
+            'examinations' => SpecimenTypeExamination::where('active', true)->with('prices')->get(),
             'categories' => SpecimenCategory::where('active', true)->get(),
             'referrers' => Referrer::where('active', true)->get(),
             'referrerTypes' => ReferrerType::where('active', true)->get(),

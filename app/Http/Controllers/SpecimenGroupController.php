@@ -111,17 +111,17 @@ class SpecimenGroupController extends Controller
             $firstAgeDiscountType = null;
             $specimensData = $validated['specimens'];
 
-            // Preload specimen types with prices to optimize queries
-            $specimenTypeIds = collect($specimensData)->pluck('specimen_type')->unique()->toArray();
-            $specimenTypes = SpecimenType::with('prices')->whereIn('id', $specimenTypeIds)->get()->keyBy('id');
+            // Preload specimen type examinations with prices to optimize queries
+            $examinationIds = collect($specimensData)->pluck('specimen_type_examination')->unique()->toArray();
+            $examinations = SpecimenTypeExamination::with('prices')->whereIn('id', $examinationIds)->get()->keyBy('id');
 
             foreach ($specimensData as $specData) {
                 $qty = (int) ($specData['quantity'] ?? 1);
 
-                $specType = $specimenTypes->get($specData['specimen_type']);
+                $exam = $examinations->get($specData['specimen_type_examination']);
                 $maxPrice = 0.00;
-                if ($specType && $specType->prices->isNotEmpty()) {
-                    $maxPrice = (float) $specType->prices->max('amount');
+                if ($exam && $exam->prices->isNotEmpty()) {
+                    $maxPrice = (float) $exam->prices->max('amount');
                 }
 
                 $chosenPrice = $specData['selected_price'] === 'custom'
@@ -325,10 +325,10 @@ class SpecimenGroupController extends Controller
 
                 $qty = (int) ($specData['quantity'] ?? 1);
 
-                $specType = $specimenTypes->get($specData['specimen_type']);
+                $exam = $examinations->get($specData['specimen_type_examination']);
                 $maxPrice = 0.00;
-                if ($specType && $specType->prices->isNotEmpty()) {
-                    $maxPrice = (float) $specType->prices->max('amount');
+                if ($exam && $exam->prices->isNotEmpty()) {
+                    $maxPrice = (float) $exam->prices->max('amount');
                 }
 
                 $chosenPrice = $specData['selected_price'] === 'custom'
