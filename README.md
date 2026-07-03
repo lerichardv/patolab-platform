@@ -181,6 +181,14 @@ When deploying the project to a production server or container environment:
    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
    ```
 
+9. **Supervisor Configuration (for Collaboration Server)**:
+   Any time the `editor-collaboration-server` (or queue workers) is updated, you must reload/restart Supervisor to apply the changes. Open your terminal and run these commands:
+   ```bash
+   sudo supervisorctl reread
+   sudo supervisorctl update
+   sudo supervisorctl restart [process_name]
+   ```
+
 ---
 
 ## ⚠️ Database Restoration Rules (Crucial)
