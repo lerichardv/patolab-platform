@@ -463,21 +463,21 @@ app.post('/api/dictate-chunk', upload.single('audio'), async (req, res) => {
 	const inputPath = req.file.path;
 
 	try {
-		console.log('[Grok Dictate] Sending audio file to Grok STT API:', inputPath);
+		console.log('[OpenAI Dictate] Sending audio file to OpenAI Whisper API:', inputPath);
 
 		const fileBuffer = fs.readFileSync(inputPath);
 		const fileBlob = new Blob([fileBuffer]);
 
 		const formData = new FormData();
-		formData.append("format", "true");
+		formData.append("model", "whisper-1");
 		formData.append("language", "es");
-		formData.append("keyterm", "biopsia, macroscopía, microscopía, diagnóstico");
+		formData.append("prompt", "biopsia, macroscopía, microscopía, diagnóstico");
 		formData.append("file", fileBlob, req.file.originalname || "audio.webm");
 
-		const response = await fetch("https://api.x.ai/v1/stt", {
+		const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
 			method: "POST",
 			headers: {
-				Authorization: `Bearer ${process.env.GROK_API_KEY}`,
+				Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
 			},
 			body: formData,
 		});
@@ -491,14 +491,14 @@ app.post('/api/dictate-chunk', upload.single('audio'), async (req, res) => {
 		const result = await response.json();
 		const cleanText = (result.text || '').trim();
 
-		console.log('[Grok Dictate] Transcribed text:', cleanText);
+		console.log('[OpenAI Dictate] Transcribed text:', cleanText);
 
 		// Clean up files
 		fs.unlink(inputPath, () => {});
 
 		return res.json({ success: true, text: cleanText });
 	} catch (error) {
-		console.error('Error en Grok Dictado:', error);
+		console.error('Error en OpenAI Dictado:', error);
 		// Clean up files
 		fs.unlink(inputPath, () => {});
 
@@ -521,16 +521,16 @@ app.post('/api/fix-grammar', express.json(), async (req, res) => {
 	}
 
 	try {
-		console.log('[Grok Grammar] Sending request to Grok API...');
+		console.log('[OpenAI Grammar] Sending request to OpenAI API...');
 
-		const response = await fetch("https://api.x.ai/v1/chat/completions", {
+		const response = await fetch("https://api.openai.com/v1/chat/completions", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: `Bearer ${process.env.GROK_API_KEY}`,
+				Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
 			},
 			body: JSON.stringify({
-				model: "grok-4.3",
+				model: "gpt-4o",
 				messages: [
 					{
 						role: "system",
@@ -545,13 +545,13 @@ app.post('/api/fix-grammar', express.json(), async (req, res) => {
 		if (!response.ok) {
 			const errText = await response.text();
 
-			throw new Error(`Grok grammar correction error ${response.status}: ${errText}`);
+			throw new Error(`OpenAI grammar correction error ${response.status}: ${errText}`);
 		}
 
 		const resData = await response.json();
 		const correctedText = resData.choices[0].message.content.trim();
 
-		console.log('[Grok Grammar] Corrected text successfully.');
+		console.log('[OpenAI Grammar] Corrected text successfully.');
 
 		if (reportId && docName) {
 			const targetRoom = `report-${reportId}-${docName}`;
@@ -569,13 +569,13 @@ app.post('/api/fix-grammar', express.json(), async (req, res) => {
 					return res.json({ success: true, text: correctedText, injected: true });
 				}
 			} catch (err) {
-				console.error(`[Grok Grammar] Error updating Yjs document:`, err);
+				console.error(`[OpenAI Grammar] Error updating Yjs document:`, err);
 			}
 		}
 
 		return res.json({ success: true, text: correctedText, injected: false });
 	} catch (error) {
-		console.error('Error en Grok Corrector:', error);
+		console.error('Error en OpenAI Corrector:', error);
 
 		return res.status(500).json({ error: 'Error en el servidor de optimización de texto', details: error.message });
 	}

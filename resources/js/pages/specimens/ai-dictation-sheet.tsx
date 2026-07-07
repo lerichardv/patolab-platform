@@ -31,11 +31,11 @@ const SENDING_TEXTS = [
     'Comprimiendo archivo de audio...',
     'Optimizando señal de voz...',
     'Conectando de forma segura con el servidor...',
-    'Enviando paquete de datos a Grok API...',
+    'Enviando paquete de datos a OpenAI API...',
 ];
 
 const TRANSCRIBING_TEXTS = [
-    'El modelo Grok está procesando el audio...',
+    'El modelo Whisper está procesando el audio...',
     'Corrigiendo errores de fonética y puntuación...',
     'Analizando términos médicos y de patología...',
     'Generando informe estructurado...',
@@ -235,18 +235,24 @@ export default function AIDictationSheet({
 
             if (data.success && data.text) {
                 setTranscription((prev) => {
-                    const cleanPrev = prev ? prev.trim() : '';
                     const cleanNew = data.text ? data.text.trim() : '';
 
-                    if (!cleanPrev) {
+                    if (!prev) {
                         return cleanNew;
                     }
 
                     if (!cleanNew) {
-                        return cleanPrev;
+                        return prev;
                     }
 
-                    return cleanPrev + '\n\n' + cleanNew;
+                    const endsWithNewline =
+                        prev.endsWith('\n') || prev.endsWith('\r');
+
+                    if (endsWithNewline) {
+                        return prev + cleanNew;
+                    } else {
+                        return prev + ' ' + cleanNew;
+                    }
                 });
                 setStatus('success');
             } else {
@@ -514,8 +520,9 @@ export default function AIDictationSheet({
                             />
                             <p className="text-[10px] text-muted-foreground italic">
                                 * Puede editar el texto libremente. Las
-                                grabaciones adicionales se agregarán como nuevos
-                                párrafos.
+                                grabaciones adicionales continuarán el texto a
+                                menos que inserte explícitamente un salto de
+                                línea (Enter) al final.
                             </p>
                         </div>
                     )}

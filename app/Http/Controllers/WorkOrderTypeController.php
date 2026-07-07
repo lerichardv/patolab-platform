@@ -34,14 +34,16 @@ class WorkOrderTypeController extends Controller
         Gate::authorize('work_orders.create');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'duration_unit' => 'required|in:hours,days',
-            'duration_value' => 'required|integer|min:1',
-            'same_day_rule_enabled' => 'required|boolean',
+            'duration_unit' => 'nullable|in:hours,days',
+            'duration_value' => 'nullable|integer|min:1',
+            'same_day_rule_enabled' => 'nullable|boolean',
             'same_day_cutoff_start' => 'nullable|required_if:same_day_rule_enabled,true|date_format:H:i',
             'same_day_cutoff_end' => 'nullable|required_if:same_day_rule_enabled,true|date_format:H:i|after:same_day_cutoff_start',
         ], [
             'same_day_cutoff_end.after' => 'El rango fin (límite) debe ser posterior al rango inicio (entrada).',
         ]);
+
+        $validated['same_day_rule_enabled'] = (bool) ($validated['same_day_rule_enabled'] ?? false);
 
         if (! $validated['same_day_rule_enabled']) {
             $validated['same_day_cutoff_start'] = null;
@@ -58,14 +60,16 @@ class WorkOrderTypeController extends Controller
         Gate::authorize('work_orders.edit');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'duration_unit' => 'required|in:hours,days',
-            'duration_value' => 'required|integer|min:1',
-            'same_day_rule_enabled' => 'required|boolean',
+            'duration_unit' => 'nullable|in:hours,days',
+            'duration_value' => 'nullable|integer|min:1',
+            'same_day_rule_enabled' => 'nullable|boolean',
             'same_day_cutoff_start' => 'nullable|required_if:same_day_rule_enabled,true|date_format:H:i',
             'same_day_cutoff_end' => 'nullable|required_if:same_day_rule_enabled,true|date_format:H:i|after:same_day_cutoff_start',
         ], [
             'same_day_cutoff_end.after' => 'El rango fin (límite) debe ser posterior al rango inicio (entrada).',
         ]);
+
+        $validated['same_day_rule_enabled'] = (bool) ($validated['same_day_rule_enabled'] ?? false);
 
         if (! $validated['same_day_rule_enabled']) {
             $validated['same_day_cutoff_start'] = null;

@@ -30,12 +30,33 @@ class WorkOrder extends Model
     ];
 
     protected $casts = [
+        'work_order_type_id' => 'array',
         'work_order_task_id' => 'integer',
         'quantity' => 'integer',
         'priority' => 'integer',
         'due_date' => 'datetime',
         'completed_at' => 'datetime',
     ];
+
+    protected $appends = [
+        'type',
+        'types',
+    ];
+
+    public function getTypesAttribute()
+    {
+        $ids = $this->work_order_type_id;
+        if (! is_array($ids) || empty($ids)) {
+            return collect();
+        }
+
+        return WorkOrderType::whereIn('id', $ids)->get();
+    }
+
+    public function getTypeAttribute()
+    {
+        return $this->types->first();
+    }
 
     /**
      * Obtiene la tarea asociada a la orden de trabajo.
@@ -51,14 +72,6 @@ class WorkOrder extends Model
     public function specimen(): BelongsTo
     {
         return $this->belongsTo(Specimen::class, 'specimen_id');
-    }
-
-    /**
-     * Obtiene el tipo de orden de trabajo.
-     */
-    public function type(): BelongsTo
-    {
-        return $this->belongsTo(WorkOrderType::class, 'work_order_type_id', 'id');
     }
 
     /**

@@ -120,6 +120,15 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Asistente de IA',
+        description:
+            'Permite visualizar e interactuar con el asistente flotante de IA.',
+        module: 'Seguridad y Accesos',
+        slugs: {
+            view: 'ai_assistant.view',
+        },
+    },
+    {
         label: 'Pacientes',
         description: 'Visualización y gestión de expedientes de pacientes.',
         module: 'Operaciones del Laboratorio',

@@ -14,5 +14,15 @@ class WorkOrderTask extends Model
     protected $fillable = [
         'name',
         'description',
+        'duration_unit',
+        'duration_value',
+        'same_day_rule_enabled',
+        'same_day_cutoff_start',
+        'same_day_cutoff_end',
+    ];
+
+    protected $casts = [
+        'same_day_rule_enabled' => 'boolean',
+        'duration_value' => 'integer',
     ];
 }

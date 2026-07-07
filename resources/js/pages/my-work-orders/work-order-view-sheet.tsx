@@ -26,12 +26,17 @@ interface Specimen {
 interface WorkOrderType {
     id: number;
     name: string;
+    duration_unit?: 'hours' | 'days';
+    duration_value?: number;
+    same_day_rule_enabled?: boolean;
+    same_day_cutoff_start?: string | null;
+    same_day_cutoff_end?: string | null;
 }
 
 interface WorkOrder {
     id: number;
     specimen_id: number;
-    work_order_type_id: number;
+    work_order_type_id: number[];
     work_order_task_id: number | null;
     quantity: number;
     user_id: number;
@@ -44,9 +49,15 @@ interface WorkOrder {
     created_at: string;
     specimen?: Specimen;
     type?: WorkOrderType;
+    types?: WorkOrderType[];
     task?: {
         name: string;
         description: string;
+        duration_unit?: 'hours' | 'days';
+        duration_value?: number;
+        same_day_rule_enabled?: boolean;
+        same_day_cutoff_start?: string | null;
+        same_day_cutoff_end?: string | null;
     } | null;
     completed_by?: {
         name: string;
@@ -65,7 +76,11 @@ const PRIORITY_METADATA: Record<number, { label: string; color: string }> = {
     3: { label: 'Baja', color: '#22c55e' },
 };
 
-export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Props) {
+export default function WorkOrderViewSheet({
+    workOrder,
+    open,
+    onOpenChange,
+}: Props) {
     if (!workOrder) {
         return null;
     }
@@ -73,15 +88,23 @@ export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Pr
     const pMeta = PRIORITY_METADATA[workOrder.priority] || PRIORITY_METADATA[3];
 
     const formattedCreatedAt = workOrder.created_at
-        ? format(new Date(workOrder.created_at), "dd 'de' MMMM, yyyy - HH:mm", { locale: es })
+        ? format(new Date(workOrder.created_at), "dd 'de' MMMM, yyyy - HH:mm", {
+              locale: es,
+          })
         : 'N/A';
 
     const formattedDueDate = workOrder.due_date
-        ? format(new Date(workOrder.due_date), "dd 'de' MMMM, yyyy - HH:mm", { locale: es })
+        ? format(new Date(workOrder.due_date), "dd 'de' MMMM, yyyy - HH:mm", {
+              locale: es,
+          })
         : 'N/A';
 
     const formattedCompletedAt = workOrder.completed_at
-        ? format(new Date(workOrder.completed_at), "dd 'de' MMMM, yyyy - HH:mm", { locale: es })
+        ? format(
+              new Date(workOrder.completed_at),
+              "dd 'de' MMMM, yyyy - HH:mm",
+              { locale: es },
+          )
         : 'N/A';
 
     return (
@@ -101,14 +124,16 @@ export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Pr
                         {/* Info General Card */}
                         <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
                             <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
-                                <Briefcase className="h-5 w-5" /> Información de la Orden
+                                <Briefcase className="h-5 w-5" /> Información de
+                                la Orden
                             </h3>
                             <Separator />
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-1">
                                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Hash className="h-3.5 w-3.5" /> Número de Orden
+                                        <Hash className="h-3.5 w-3.5" /> Número
+                                        de Orden
                                     </span>
                                     <p className="text-sm font-semibold text-primary">
                                         #{workOrder.id}
@@ -117,25 +142,30 @@ export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Pr
 
                                 <div className="space-y-1">
                                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Tag className="h-3.5 w-3.5" /> Código de Muestra
+                                        <Tag className="h-3.5 w-3.5" /> Código
+                                        de Muestra
                                     </span>
                                     <p className="font-mono text-sm font-bold text-primary">
-                                        {workOrder.specimen?.sequence_code || 'N/A'}
+                                        {workOrder.specimen?.sequence_code ||
+                                            'N/A'}
                                     </p>
                                 </div>
 
                                 <div className="space-y-1 sm:col-span-2">
                                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <User className="h-3.5 w-3.5" /> Paciente
+                                        <User className="h-3.5 w-3.5" />{' '}
+                                        Paciente
                                     </span>
                                     <p className="text-sm font-medium">
-                                        {workOrder.specimen?.customer_relation?.name || 'N/A'}
+                                        {workOrder.specimen?.customer_relation
+                                            ?.name || 'N/A'}
                                     </p>
                                 </div>
 
                                 <div className="space-y-1">
                                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <ClipboardList className="h-3.5 w-3.5" /> Tarea
+                                        <ClipboardList className="h-3.5 w-3.5" />{' '}
+                                        Tarea
                                     </span>
                                     <p className="text-sm font-medium">
                                         {workOrder.task?.name || 'N/A'}
@@ -144,7 +174,8 @@ export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Pr
 
                                 <div className="space-y-1 sm:col-span-2">
                                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <ClipboardList className="h-3.5 w-3.5" /> Descripción de la Tarea
+                                        <ClipboardList className="h-3.5 w-3.5" />{' '}
+                                        Descripción de la Tarea
                                     </span>
                                     <p className="text-sm font-medium">
                                         {workOrder.task?.description || 'N/A'}
@@ -153,16 +184,32 @@ export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Pr
 
                                 <div className="space-y-1">
                                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Tag className="h-3.5 w-3.5" /> Tipo de Orden
+                                        <Tag className="h-3.5 w-3.5" /> Tipos de
+                                        Orden
                                     </span>
-                                    <p className="text-sm font-medium">
-                                        {workOrder.type?.name || 'N/A'}
-                                    </p>
+                                    <div className="flex flex-wrap gap-1">
+                                        {workOrder.types &&
+                                        workOrder.types.length > 0 ? (
+                                            workOrder.types.map((t) => (
+                                                <span
+                                                    key={t.id}
+                                                    className="inline-flex items-center rounded bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground"
+                                                >
+                                                    {t.name}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm font-medium">
+                                                {workOrder.type?.name || 'N/A'}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1">
                                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Hash className="h-3.5 w-3.5" /> Cantidad
+                                        <Hash className="h-3.5 w-3.5" />{' '}
+                                        Cantidad
                                     </span>
                                     <p className="text-sm font-medium">
                                         {workOrder.quantity}
@@ -171,12 +218,15 @@ export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Pr
 
                                 <div className="space-y-1">
                                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <AlertCircle className="h-3.5 w-3.5" /> Prioridad
+                                        <AlertCircle className="h-3.5 w-3.5" />{' '}
+                                        Prioridad
                                     </span>
                                     <div className="flex items-center gap-2">
                                         <div
                                             className="h-3 w-3 rounded-full"
-                                            style={{ backgroundColor: pMeta.color }}
+                                            style={{
+                                                backgroundColor: pMeta.color,
+                                            }}
                                         />
                                         <span className="text-sm font-medium">
                                             {pMeta.label}
@@ -196,16 +246,19 @@ export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Pr
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-1">
                                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Clock className="h-3.5 w-3.5" /> Estado Actual
+                                        <Clock className="h-3.5 w-3.5" /> Estado
+                                        Actual
                                     </span>
                                     <div>
                                         <span
                                             className="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
                                             style={{
                                                 backgroundColor:
-                                                    workOrder.status === 'Finalizada'
+                                                    workOrder.status ===
+                                                    'Finalizada'
                                                         ? '#22c55e'
-                                                        : workOrder.status === 'En Proceso'
+                                                        : workOrder.status ===
+                                                            'En Proceso'
                                                           ? '#3b82f6'
                                                           : '#cbd5e1',
                                             }}
@@ -217,7 +270,8 @@ export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Pr
 
                                 <div className="space-y-1">
                                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Calendar className="h-3.5 w-3.5" /> Fecha Límite
+                                        <Calendar className="h-3.5 w-3.5" />{' '}
+                                        Fecha Límite
                                     </span>
                                     <p className="text-sm font-medium">
                                         {formattedDueDate}
@@ -228,16 +282,19 @@ export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Pr
                                     <>
                                         <div className="space-y-1">
                                             <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                <User className="h-3.5 w-3.5" /> Completado Por
+                                                <User className="h-3.5 w-3.5" />{' '}
+                                                Completado Por
                                             </span>
                                             <p className="text-sm font-medium">
-                                                {workOrder.completed_by?.name || 'N/A'}
+                                                {workOrder.completed_by?.name ||
+                                                    'N/A'}
                                             </p>
                                         </div>
 
                                         <div className="space-y-1">
                                             <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                <Calendar className="h-3.5 w-3.5" /> Completado El
+                                                <Calendar className="h-3.5 w-3.5" />{' '}
+                                                Completado El
                                             </span>
                                             <p className="text-sm font-medium">
                                                 {formattedCompletedAt}
@@ -249,13 +306,15 @@ export default function WorkOrderViewSheet({ workOrder, open, onOpenChange }: Pr
                         </div>
 
                         {/* Comments Card */}
-                        <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                        <div className="mb-6 space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
                             <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
-                                <MessageSquare className="h-5 w-5" /> Comentarios
+                                <MessageSquare className="h-5 w-5" />{' '}
+                                Comentarios
                             </h3>
                             <Separator />
                             <p className="min-h-[60px] rounded bg-muted/40 p-3 text-sm whitespace-pre-wrap">
-                                {workOrder.comments || 'Sin comentarios u observaciones.'}
+                                {workOrder.comments ||
+                                    'Sin comentarios u observaciones.'}
                             </p>
                         </div>
                     </div>

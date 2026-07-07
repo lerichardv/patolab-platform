@@ -38,6 +38,11 @@ import TaskForm from '../work-order-tasks/task-form';
 interface WorkOrderType {
     id: number;
     name: string;
+    duration_unit?: 'hours' | 'days';
+    duration_value?: number;
+    same_day_rule_enabled?: boolean;
+    same_day_cutoff_start?: string | null;
+    same_day_cutoff_end?: string | null;
 }
 
 interface User {
@@ -48,6 +53,12 @@ interface User {
 interface WorkOrderTask {
     id: number;
     name: string;
+    description?: string;
+    duration_unit?: 'hours' | 'days';
+    duration_value?: number;
+    same_day_rule_enabled?: boolean;
+    same_day_cutoff_start?: string | null;
+    same_day_cutoff_end?: string | null;
 }
 
 interface Props {
@@ -269,7 +280,7 @@ export default function WorkOrderForm({
     const { data, setData, post, processing, errors } = useForm({
         specimen_id: specimenId || null,
         specimen_ids: specimenIds || [],
-        work_order_type_id: '',
+        work_order_type_id: [] as string[],
         work_order_task_id: '',
         quantity: 1,
         user_ids: [] as string[],
@@ -285,7 +296,7 @@ export default function WorkOrderForm({
     React.useEffect(() => {
         if (workOrderTasks.length > prevTasksRef.current.length) {
             const newTasks = workOrderTasks.filter(
-                (t) => !prevTasksRef.current.some((pt) => pt.id === t.id)
+                (t) => !prevTasksRef.current.some((pt) => pt.id === t.id),
             );
             if (newTasks.length > 0) {
                 setData('work_order_task_id', newTasks[0].id.toString());
@@ -309,8 +320,10 @@ export default function WorkOrderForm({
             return;
         }
 
-        if (!data.work_order_type_id) {
-            toast.error('Debe seleccionar un tipo de orden de trabajo.');
+        if (data.work_order_type_id.length === 0) {
+            toast.error(
+                'Debe seleccionar al menos un tipo de orden de trabajo.',
+            );
 
             return;
         }
@@ -386,7 +399,7 @@ export default function WorkOrderForm({
                 <div className="grid gap-2 md:col-span-2">
                     <div className="flex items-center justify-between">
                         <Label htmlFor="work_order_type_id">
-                            Tipo de Orden
+                            Tipos de Orden
                         </Label>
                         <button
                             type="button"
@@ -412,8 +425,9 @@ export default function WorkOrderForm({
                         </button>
                     </div>
                     <FormCombobox
-                        placeholder="Seleccionar tipo de orden"
+                        placeholder="Seleccionar tipo(s) de orden..."
                         value={data.work_order_type_id}
+                        multiple={true}
                         onChange={(val) => setData('work_order_type_id', val)}
                         options={workOrderTypes.map((t) => ({
                             label: t.name,

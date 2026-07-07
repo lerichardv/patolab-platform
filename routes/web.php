@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AiAssistantController;
 use App\Http\Controllers\CaiRangeController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerController;
@@ -170,6 +171,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('settings/system', [SettingController::class, 'index'])->name('settings.system.index');
     Route::put('settings/system', [SettingController::class, 'update'])->name('settings.system.update');
+    Route::post('ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai-assistant.chat');
 });
 
 require __DIR__.'/settings.php';

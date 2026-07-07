@@ -34,6 +34,7 @@ class Specimen extends Model
     protected $fillable = [
         'sequence_code',
         'customer',
+        'location_id',
         'specimen_type',
         'specimen_type_examination',
         'specimen_category',
@@ -69,6 +70,11 @@ class Specimen extends Model
     public function customerRelation(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer');
+    }
+
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class, 'location_id');
     }
 
     public function type(): BelongsTo

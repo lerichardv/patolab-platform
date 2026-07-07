@@ -49,8 +49,9 @@ interface WorkOrder {
     id: number;
     specimen_id: number;
     specimen: any;
-    work_order_type_id: number;
+    work_order_type_id: number[];
     type: any;
+    types?: any[];
     status: 'Enviada' | 'En Proceso' | 'Finalizada';
     priority: number;
     comments: string | null;
@@ -92,7 +93,9 @@ export default function WorkOrdersAdminIndex({
     filters,
 }: Props) {
     const { auth } = usePage<any>().props;
-    const [selectedWorkOrder, setSelectedWorkOrder] = useState<any | null>(null);
+    const [selectedWorkOrder, setSelectedWorkOrder] = useState<any | null>(
+        null,
+    );
     const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
     const [search, setSearch] = useState(filters.search || '');
 
@@ -405,7 +408,15 @@ export default function WorkOrdersAdminIndex({
                                                     'N/A'}
                                             </TableCell>
                                             <TableCell className="text-sm">
-                                                {order.type?.name || 'N/A'}
+                                                {order.types &&
+                                                order.types.length > 0
+                                                    ? order.types
+                                                          .map(
+                                                              (t: any) =>
+                                                                  t.name,
+                                                          )
+                                                          .join(', ')
+                                                    : order.type?.name || 'N/A'}
                                             </TableCell>
                                             <TableCell>
                                                 <span
@@ -460,7 +471,9 @@ export default function WorkOrdersAdminIndex({
                                                     size="icon"
                                                     title="Ver detalles de la orden"
                                                     onClick={() =>
-                                                        handleViewWorkOrder(order)
+                                                        handleViewWorkOrder(
+                                                            order,
+                                                        )
                                                     }
                                                 >
                                                     <Eye className="h-4 w-4" />

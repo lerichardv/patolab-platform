@@ -84,7 +84,6 @@ class MyWorkOrderController extends Controller
             'specimen.customerRelation',
             'specimen.type',
             'specimen.examination',
-            'type',
             'task',
             'completedBy',
         ])

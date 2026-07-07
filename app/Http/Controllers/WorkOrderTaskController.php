@@ -36,7 +36,19 @@ class WorkOrderTaskController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'required|string|max:255',
+            'duration_unit' => 'required|in:hours,days',
+            'duration_value' => 'required|integer|min:1',
+            'same_day_rule_enabled' => 'required|boolean',
+            'same_day_cutoff_start' => 'nullable|required_if:same_day_rule_enabled,true|date_format:H:i',
+            'same_day_cutoff_end' => 'nullable|required_if:same_day_rule_enabled,true|date_format:H:i|after:same_day_cutoff_start',
+        ], [
+            'same_day_cutoff_end.after' => 'El rango fin (límite) debe ser posterior al rango inicio (entrada).',
         ]);
+
+        if (! $validated['same_day_rule_enabled']) {
+            $validated['same_day_cutoff_start'] = null;
+            $validated['same_day_cutoff_end'] = null;
+        }
 
         WorkOrderTask::create($validated);
 
@@ -49,7 +61,19 @@ class WorkOrderTaskController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'required|string|max:255',
+            'duration_unit' => 'required|in:hours,days',
+            'duration_value' => 'required|integer|min:1',
+            'same_day_rule_enabled' => 'required|boolean',
+            'same_day_cutoff_start' => 'nullable|required_if:same_day_rule_enabled,true|date_format:H:i',
+            'same_day_cutoff_end' => 'nullable|required_if:same_day_rule_enabled,true|date_format:H:i|after:same_day_cutoff_start',
+        ], [
+            'same_day_cutoff_end.after' => 'El rango fin (límite) debe ser posterior al rango inicio (entrada).',
         ]);
+
+        if (! $validated['same_day_rule_enabled']) {
+            $validated['same_day_cutoff_start'] = null;
+            $validated['same_day_cutoff_end'] = null;
+        }
 
         $workOrderTask->update($validated);
 

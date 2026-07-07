@@ -57,6 +57,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import WorkOrderViewSheet from './work-order-view-sheet';
+import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 
 interface Specimen {
     id: number;
@@ -75,12 +76,17 @@ interface Specimen {
 interface WorkOrderType {
     id: number;
     name: string;
+    duration_unit?: 'hours' | 'days';
+    duration_value?: number;
+    same_day_rule_enabled?: boolean;
+    same_day_cutoff_start?: string | null;
+    same_day_cutoff_end?: string | null;
 }
 
 interface WorkOrder {
     id: number;
     specimen_id: number;
-    work_order_type_id: number;
+    work_order_type_id: number[];
     work_order_task_id: number | null;
     quantity: number;
     user_id: number;
@@ -93,9 +99,15 @@ interface WorkOrder {
     created_at: string;
     specimen?: Specimen;
     type?: WorkOrderType;
+    types?: WorkOrderType[];
     task?: {
         name: string;
         description: string;
+        duration_unit?: 'hours' | 'days';
+        duration_value?: number;
+        same_day_rule_enabled?: boolean;
+        same_day_cutoff_start?: string | null;
+        same_day_cutoff_end?: string | null;
     } | null;
     completed_by?: {
         name: string;
@@ -154,8 +166,13 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
     );
     const [searchQuery, setSearchQuery] = useState('');
     const [isReloading, setIsReloading] = useState(false);
-    const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
+    const [selectedWorkOrder, setSelectedWorkOrder] =
+        useState<WorkOrder | null>(null);
     const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
+    const [selectedSpecimenForView, setSelectedSpecimenForView] =
+        useState<any>(null);
+    const [isSpecimenViewSheetOpen, setIsSpecimenViewSheetOpen] =
+        useState(false);
     const [confirmAction, setConfirmAction] = useState<{
         workOrderId: number;
         nextStatus: 'En Proceso' | 'Finalizada';
@@ -217,6 +234,10 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                     wo.specimen.customer_relation.name
                         .toLowerCase()
                         .includes(searchLower)) ||
+                (wo.types &&
+                    wo.types.some((t) =>
+                        t.name.toLowerCase().includes(searchLower),
+                    )) ||
                 (wo.type?.name &&
                     wo.type.name.toLowerCase().includes(searchLower)) ||
                 (wo.comments &&
@@ -487,14 +508,17 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                     <TableHead className="w-[80px] font-semibold">
                                         N° Orden
                                     </TableHead>
-                                    <TableHead className="w-[100px] font-semibold">
-                                        Código
+                                    <TableHead className="w-[110px] text-center font-semibold">
+                                        Estado
+                                    </TableHead>
+                                    <TableHead className="w-[100px] text-center font-semibold">
+                                        Prioridad
                                     </TableHead>
                                     <TableHead className="w-[95px] text-center font-semibold">
                                         Vencimiento
                                     </TableHead>
-                                    <TableHead className="min-w-[150px] font-semibold">
-                                        Paciente
+                                    <TableHead className="w-[100px] font-semibold">
+                                        Muestra
                                     </TableHead>
                                     <TableHead className="min-w-[120px] font-semibold">
                                         Tarea
@@ -506,15 +530,9 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                         Cantidad
                                     </TableHead>
                                     <TableHead className="w-[100px] text-center font-semibold">
-                                        Prioridad
-                                    </TableHead>
-                                    <TableHead className="w-[110px] text-center font-semibold">
-                                        Estado
-                                    </TableHead>
-                                    <TableHead className="w-[100px] text-center font-semibold">
                                         Comentarios
                                     </TableHead>
-                                    <TableHead className="z-10 w-[150px] min-w-[150px] bg-card text-right border-l border-border font-semibold sticky right-0">
+                                    <TableHead className="sticky right-0 z-10 w-[150px] min-w-[150px] border-l border-border bg-card text-right font-semibold">
                                         Acción
                                     </TableHead>
                                 </TableRow>
@@ -547,10 +565,27 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                 <TableCell className="font-mono text-xs font-semibold text-muted-foreground">
                                                     #{wo.id}
                                                 </TableCell>
-                                                <TableCell className="font-mono text-xs font-semibold text-primary">
-                                                    {wo.specimen
-                                                        ?.sequence_code ||
-                                                        `#${wo.specimen_id}`}
+                                                <TableCell className="text-center">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={`rounded-full border px-2 py-0.5 text-xs font-medium ${sMeta.bg} ${sMeta.text} ${sMeta.border}`}
+                                                    >
+                                                        {sMeta.label}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        <div
+                                                            className="h-2 w-2 rounded-full"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    pMeta.color,
+                                                            }}
+                                                        />
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {pMeta.label}
+                                                        </span>
+                                                    </div>
                                                 </TableCell>
                                                 {/* Visual Day Calendar Tear-off Widget */}
                                                 <TableCell className="py-2.5">
@@ -599,10 +634,32 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                         </span>
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="font-medium text-foreground">
-                                                    {wo.specimen
-                                                        ?.customer_relation
-                                                        ?.name || 'N/A'}
+                                                <TableCell className="font-mono text-xs">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-max rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary dark:bg-primary/10">
+                                                            {wo.specimen
+                                                                ?.sequence_code ||
+                                                                `#${wo.specimen_id}`}
+                                                        </span>
+                                                        {wo.specimen && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-5 w-5 hover:bg-muted"
+                                                                onClick={() => {
+                                                                    setSelectedSpecimenForView(
+                                                                        wo.specimen,
+                                                                    );
+                                                                    setIsSpecimenViewSheetOpen(
+                                                                        true,
+                                                                    );
+                                                                }}
+                                                                title="Ver Muestra"
+                                                            >
+                                                                <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-sm font-medium text-foreground">
                                                     {wo.task?.name || 'N/A'}
@@ -610,8 +667,19 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                 <TableCell className="text-sm font-medium text-foreground">
                                                     <div className="flex items-center gap-1.5">
                                                         <span>
-                                                            {wo.type?.name ||
-                                                                'N/A'}
+                                                            {wo.types &&
+                                                            wo.types.length > 0
+                                                                ? wo.types
+                                                                      .map(
+                                                                          (t) =>
+                                                                              t.name,
+                                                                      )
+                                                                      .join(
+                                                                          ', ',
+                                                                      )
+                                                                : wo.type
+                                                                      ?.name ||
+                                                                  'N/A'}
                                                         </span>
                                                         {isOverdue && (
                                                             <Tooltip>
@@ -635,28 +703,6 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                 </TableCell>
                                                 <TableCell className="text-center font-semibold text-foreground">
                                                     {wo.quantity}
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    <div className="flex items-center justify-center gap-1.5">
-                                                        <div
-                                                            className="h-2 w-2 rounded-full"
-                                                            style={{
-                                                                backgroundColor:
-                                                                    pMeta.color,
-                                                            }}
-                                                        />
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {pMeta.label}
-                                                        </span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={`rounded-full border px-2 py-0.5 text-xs font-medium ${sMeta.bg} ${sMeta.text} ${sMeta.border}`}
-                                                    >
-                                                        {sMeta.label}
-                                                    </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     {hasComments ? (
@@ -686,7 +732,7 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                         </span>
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="z-10 w-[150px] min-w-[150px] bg-card text-right border-l border-border transition-colors group-hover:bg-muted sticky right-0">
+                                                <TableCell className="sticky right-0 z-10 w-[150px] min-w-[150px] border-l border-border bg-card text-right transition-colors group-hover:bg-muted">
                                                     <div className="flex items-center justify-end gap-2">
                                                         <Button
                                                             type="button"
@@ -694,51 +740,71 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                             variant="ghost"
                                                             className="h-8 w-8 text-primary"
                                                             onClick={() => {
-                                                                setSelectedWorkOrder(wo);
-                                                                setIsViewSheetOpen(true);
+                                                                setSelectedWorkOrder(
+                                                                    wo,
+                                                                );
+                                                                setIsViewSheetOpen(
+                                                                    true,
+                                                                );
                                                             }}
                                                             title="Ver detalles de la orden"
                                                         >
                                                             <Eye className="h-4 w-4" />
                                                         </Button>
 
-                                                        {wo.status === 'Enviada' && (
+                                                        {wo.status ===
+                                                            'Enviada' && (
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
                                                                 className="h-8 gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:border-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
                                                                 onClick={() =>
-                                                                    setConfirmAction({
-                                                                        workOrderId: wo.id,
-                                                                        nextStatus: 'En Proceso',
-                                                                    })
+                                                                    setConfirmAction(
+                                                                        {
+                                                                            workOrderId:
+                                                                                wo.id,
+                                                                            nextStatus:
+                                                                                'En Proceso',
+                                                                        },
+                                                                    )
                                                                 }
                                                             >
                                                                 <Play className="h-3 w-3" />
-                                                                <span>Iniciar</span>
+                                                                <span>
+                                                                    Iniciar
+                                                                </span>
                                                             </Button>
                                                         )}
-                                                        {wo.status === 'En Proceso' && (
+                                                        {wo.status ===
+                                                            'En Proceso' && (
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
                                                                 className="h-8 gap-1 border-blue-500/30 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/10"
                                                                 onClick={() =>
-                                                                    setConfirmAction({
-                                                                        workOrderId: wo.id,
-                                                                        nextStatus: 'Finalizada',
-                                                                    })
+                                                                    setConfirmAction(
+                                                                        {
+                                                                            workOrderId:
+                                                                                wo.id,
+                                                                            nextStatus:
+                                                                                'Finalizada',
+                                                                        },
+                                                                    )
                                                                 }
                                                             >
                                                                 <CheckCircle className="h-3 w-3" />
-                                                                <span>Finalizar</span>
+                                                                <span>
+                                                                    Finalizar
+                                                                </span>
                                                             </Button>
                                                         )}
-                                                        {wo.status === 'Finalizada' && (
+                                                        {wo.status ===
+                                                            'Finalizada' && (
                                                             <div className="flex flex-col items-end gap-0.5 text-right">
-                                                                <span className="text-[10px] leading-none text-muted-foreground font-medium">
+                                                                <span className="text-[10px] leading-none font-medium text-muted-foreground">
                                                                     Por:{' '}
-                                                                    {wo.completed_by
+                                                                    {wo
+                                                                        .completed_by
                                                                         ?.name ||
                                                                         'N/A'}
                                                                 </span>
@@ -825,6 +891,13 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                 workOrder={selectedWorkOrder}
                 open={isViewSheetOpen}
                 onOpenChange={setIsViewSheetOpen}
+            />
+
+            <SpecimenViewSheet
+                open={isSpecimenViewSheetOpen}
+                onOpenChange={setIsSpecimenViewSheetOpen}
+                specimen={selectedSpecimenForView}
+                onEditClick={() => {}}
             />
         </TooltipProvider>
     );

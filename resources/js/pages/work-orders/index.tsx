@@ -18,7 +18,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -180,8 +179,6 @@ export default function WorkOrderTypesIndex({
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Nombre</TableHead>
-                                <TableHead>Duración Estimada</TableHead>
-                                <TableHead>Entrega Mismo Día</TableHead>
                                 <TableHead>Fecha Creación</TableHead>
                                 <TableHead className="text-right">
                                     {(canEdit || canDelete) && 'Acciones'}
@@ -194,45 +191,6 @@ export default function WorkOrderTypesIndex({
                                     <TableRow key={type.id}>
                                         <TableCell className="font-medium">
                                             {type.name}
-                                        </TableCell>
-                                        <TableCell>
-                                            {type.duration_value}{' '}
-                                            {type.duration_unit === 'hours'
-                                                ? type.duration_value === 1
-                                                    ? 'Hora'
-                                                    : 'Horas'
-                                                : type.duration_value === 1
-                                                  ? 'Día'
-                                                  : 'Días'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {type.same_day_rule_enabled ? (
-                                                <div className="flex items-center gap-2">
-                                                    <Badge className="border-transparent bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
-                                                        Habilitado
-                                                    </Badge>
-                                                    {type.same_day_cutoff_start &&
-                                                        type.same_day_cutoff_end && (
-                                                            <span className="font-mono text-xs text-muted-foreground">
-                                                                (
-                                                                {type.same_day_cutoff_start.substring(
-                                                                    0,
-                                                                    5,
-                                                                )}{' '}
-                                                                -{' '}
-                                                                {type.same_day_cutoff_end.substring(
-                                                                    0,
-                                                                    5,
-                                                                )}
-                                                                )
-                                                            </span>
-                                                        )}
-                                                </div>
-                                            ) : (
-                                                <Badge variant="secondary">
-                                                    Deshabilitado
-                                                </Badge>
-                                            )}
                                         </TableCell>
                                         <TableCell className="text-sm text-muted-foreground">
                                             {new Date(
@@ -279,7 +237,7 @@ export default function WorkOrderTypesIndex({
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={5}
+                                        colSpan={3}
                                         className="h-24 text-center"
                                     >
                                         No se encontraron resultados.

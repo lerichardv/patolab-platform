@@ -5,6 +5,11 @@ import WorkOrderForm from './work-order-form';
 interface WorkOrderType {
     id: number;
     name: string;
+    duration_unit?: 'hours' | 'days';
+    duration_value?: number;
+    same_day_rule_enabled?: boolean;
+    same_day_cutoff_start?: string | null;
+    same_day_cutoff_end?: string | null;
 }
 
 interface User {
@@ -15,6 +20,11 @@ interface User {
 interface WorkOrderTask {
     id: number;
     name: string;
+    duration_unit?: 'hours' | 'days';
+    duration_value?: number;
+    same_day_rule_enabled?: boolean;
+    same_day_cutoff_start?: string | null;
+    same_day_cutoff_end?: string | null;
 }
 
 interface Props {

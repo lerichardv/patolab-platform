@@ -3056,7 +3056,9 @@ function PatientMetadataCard({ specimen }: { specimen: Specimen }) {
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Tipo de muestra:
                         </strong>{' '}
-                        {(specimen.type?.name || 'N/A') + ' - ' + (specimen.examination?.name || 'N/A')}
+                        {(specimen.type?.name || 'N/A') +
+                            ' - ' +
+                            (specimen.examination?.name || 'N/A')}
                     </td>
                     <td
                         style={{

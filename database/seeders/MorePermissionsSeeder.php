@@ -101,6 +101,13 @@ class MorePermissionsSeeder extends Seeder
             ['name' => 'Gestionar Mis Plantillas de Muestra', 'slug' => 'my_specimen_type_templates.manage'],
             ['name' => 'Ver Mis Órdenes de Trabajo', 'slug' => 'my_work_orders.view'],
             ['name' => 'Ver Todas las Órdenes de Trabajo', 'slug' => 'work_orders.admin_view'],
+
+            /*
+            |--------------------------------------------------------------------------
+            | AI Assistant
+            |--------------------------------------------------------------------------
+            */
+            ['name' => 'Ver Asistente de IA', 'slug' => 'ai_assistant.view'],
         ];
 
         foreach ($permissions as $permission) {

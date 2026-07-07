@@ -85,6 +85,8 @@ test('pathologist can create a work order', function () {
     $task = WorkOrderTask::create([
         'name' => 'Corte',
         'description' => 'Corte histológico',
+        'duration_unit' => 'hours',
+        'duration_value' => 24,
     ]);
 
     // Act
@@ -92,7 +94,7 @@ test('pathologist can create a work order', function () {
         ->post(route('work-order-records.store'), [
             'specimen_id' => $specimen->id,
             'specimen_ids' => [],
-            'work_order_type_id' => $workOrderType->id,
+            'work_order_type_id' => [$workOrderType->id],
             'work_order_task_id' => $task->id,
             'user_ids' => [$technician->id],
             'status' => 'Enviada',

@@ -363,6 +363,7 @@ class SpecimenController extends Controller
             }
 
             $specimenData['sequence_code'] = $sequenceCode;
+            $specimenData['location_id'] = $caiRange->location_id;
             $specimenData['access_token'] = Str::random(32);
             $specimenData['delivery_token'] = Str::random(32);
 
@@ -658,19 +659,64 @@ class SpecimenController extends Controller
 
         $oldPriorityId = $specimen->priority_id;
 
-        $specimen->update($validated);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($specimen, &$validated, $oldPriorityId) {
+            $oldSpecimenType = (int) $specimen->specimen_type;
+            $newSpecimenType = (int) $validated['specimen_type'];
 
-        if ($oldPriorityId != $validated['priority_id']) {
-            PrioritySpecimenOrder::where('specimen_id', $specimen->id)
-                ->where('priority_id', '!=', $validated['priority_id'])
-                ->delete();
+            if ($oldSpecimenType !== $newSpecimenType) {
+                $locationId = $specimen->location_id;
+                if (! $locationId) {
+                    if ($specimen->invoiceRelation && $specimen->invoiceRelation->caiRange) {
+                        $locationId = $specimen->invoiceRelation->caiRange->location_id;
+                    } else {
+                        $caiRange = CaiRange::where('status', 'active')->first();
+                        $locationId = $caiRange ? $caiRange->location_id : null;
+                    }
+                }
 
-            $maxOrder = PrioritySpecimenOrder::where('priority_id', $validated['priority_id'])->max('order') ?? 0;
-            PrioritySpecimenOrder::updateOrCreate(
-                ['priority_id' => $validated['priority_id'], 'specimen_id' => $specimen->id],
-                ['order' => $maxOrder + 1]
-            );
-        }
+                if ($locationId) {
+                    $sequence = Sequence::where('location_id', $locationId)
+                        ->where('specimen_type', $newSpecimenType)
+                        ->where('active', true)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (! $sequence) {
+                        throw new \Exception('No hay una secuencia de numeración activa configurada para esta sucursal y tipo de muestra.');
+                    }
+
+                    do {
+                        $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
+                        $paddedMonth = str_pad($sequence->month, 2, '0', STR_PAD_LEFT);
+                        $sequenceCode = $sequence->prefix.$sequence->separator.$paddedSeq.$sequence->separator.$paddedMonth.$sequence->separator.$sequence->year;
+
+                        $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
+                        if ($exists) {
+                            $sequence->increment('current_sequence');
+                        }
+                    } while ($exists);
+
+                    $sequence->increment('current_sequence');
+
+                    $validated['sequence_code'] = $sequenceCode;
+                    $validated['location_id'] = $locationId;
+                }
+            }
+
+            $specimen->update($validated);
+
+            if ($oldPriorityId != $validated['priority_id']) {
+                PrioritySpecimenOrder::where('specimen_id', $specimen->id)
+                    ->where('priority_id', '!=', $validated['priority_id'])
+                    ->delete();
+
+                $maxOrder = PrioritySpecimenOrder::where('priority_id', $validated['priority_id'])->max('order') ?? 0;
+                PrioritySpecimenOrder::updateOrCreate(
+                    ['priority_id' => $validated['priority_id'], 'specimen_id' => $specimen->id],
+                    ['order' => $maxOrder + 1]
+                );
+            }
+        });
 
         return redirect()->back();
     }

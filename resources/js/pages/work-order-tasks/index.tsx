@@ -1,7 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
 import { Edit2, ClipboardList, Plus, Search, Trash2 } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
     index as workOrderTasksIndex,
@@ -18,6 +18,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -34,6 +35,11 @@ interface Task {
     id: number;
     name: string;
     description: string;
+    duration_unit: 'hours' | 'days';
+    duration_value: number;
+    same_day_rule_enabled: boolean;
+    same_day_cutoff_start: string | null;
+    same_day_cutoff_end: string | null;
     created_at: string;
 }
 
@@ -68,25 +74,28 @@ export default function TasksIndex({ tasks, filters }: Props) {
     const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
     const [search, setSearch] = useState(filters.search || '');
 
-    const handleFilterChange = (key: string, value: string) => {
-        const newFilters = { ...filters, [key]: value };
+    const handleFilterChange = useCallback(
+        (key: string, value: string) => {
+            const newFilters = { ...filters, [key]: value };
 
-        if (value === '') {
-            delete newFilters[key as keyof typeof filters];
-        }
+            if (value === '') {
+                delete newFilters[key as keyof typeof filters];
+            }
 
-        router.get(workOrderTasksIndex().url, newFilters, {
-            preserveState: true,
-            replace: true,
-        });
-    };
+            router.get(workOrderTasksIndex().url, newFilters, {
+                preserveState: true,
+                replace: true,
+            });
+        },
+        [filters],
+    );
 
     const debouncedSearch = useMemo(
         () =>
             debounce((value: string) => {
                 handleFilterChange('search', value);
             }, 300),
-        [filters, handleFilterChange],
+        [handleFilterChange],
     );
 
     useEffect(() => {
@@ -167,6 +176,8 @@ export default function TasksIndex({ tasks, filters }: Props) {
                             <TableRow>
                                 <TableHead>Nombre</TableHead>
                                 <TableHead>Descripción</TableHead>
+                                <TableHead>Duración Estimada</TableHead>
+                                <TableHead>Entrega Mismo Día</TableHead>
                                 <TableHead className="text-right">
                                     {(canEdit || canDelete) && 'Acciones'}
                                 </TableHead>
@@ -181,6 +192,45 @@ export default function TasksIndex({ tasks, filters }: Props) {
                                         </TableCell>
                                         <TableCell>
                                             {task.description}
+                                        </TableCell>
+                                        <TableCell>
+                                            {task.duration_value}{' '}
+                                            {task.duration_unit === 'hours'
+                                                ? task.duration_value === 1
+                                                    ? 'Hora'
+                                                    : 'Horas'
+                                                : task.duration_value === 1
+                                                  ? 'Día'
+                                                  : 'Días'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {task.same_day_rule_enabled ? (
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className="border-transparent bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                                        Habilitado
+                                                    </Badge>
+                                                    {task.same_day_cutoff_start &&
+                                                        task.same_day_cutoff_end && (
+                                                            <span className="font-mono text-xs text-muted-foreground">
+                                                                (
+                                                                {task.same_day_cutoff_start.substring(
+                                                                    0,
+                                                                    5,
+                                                                )}{' '}
+                                                                -{' '}
+                                                                {task.same_day_cutoff_end.substring(
+                                                                    0,
+                                                                    5,
+                                                                )}
+                                                                )
+                                                            </span>
+                                                        )}
+                                                </div>
+                                            ) : (
+                                                <Badge variant="secondary">
+                                                    Deshabilitado
+                                                </Badge>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {(canEdit || canDelete) && (
@@ -218,7 +268,7 @@ export default function TasksIndex({ tasks, filters }: Props) {
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={3}
+                                        colSpan={5}
                                         className="h-24 text-center"
                                     >
                                         No se encontraron resultados.

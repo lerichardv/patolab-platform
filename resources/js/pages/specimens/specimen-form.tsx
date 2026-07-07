@@ -790,14 +790,19 @@ export default function SpecimenForm({
     }, [isDirty, setIsDirty]);
 
     const matchingSequence = React.useMemo(() => {
-        if (specimen || !data.specimen_type || !activeLocationId) {
+        if (!data.specimen_type) {
+            return null;
+        }
+
+        const targetLocationId = specimen?.location_id || activeLocationId;
+        if (!targetLocationId) {
             return null;
         }
 
         return localSequences.find(
             (s) =>
-                s.specimen_type.toString() === data.specimen_type &&
-                s.location_id === activeLocationId &&
+                s.specimen_type.toString() === data.specimen_type.toString() &&
+                s.location_id.toString() === targetLocationId.toString() &&
                 s.active,
         );
     }, [specimen, data.specimen_type, localSequences, activeLocationId]);
@@ -1839,17 +1844,41 @@ export default function SpecimenForm({
                             Datos de la Muestra
                         </h3>
 
-                        {specimen && specimen.sequence_code && (
-                            <div className="mb-4 flex items-center justify-between rounded-md border border-dashed bg-muted/40 p-3">
-                                <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                                    <Tag className="h-3.5 w-3.5" /> Código de
-                                    Secuencia (Muestra):
-                                </span>
-                                <span className="font-mono text-sm font-bold text-primary">
-                                    {specimen.sequence_code}
-                                </span>
-                            </div>
-                        )}
+                        {specimen &&
+                            specimen.sequence_code &&
+                            (Number(data.specimen_type) ===
+                            Number(specimen.specimen_type) ? (
+                                <div className="mb-4 flex items-center justify-between rounded-md border border-dashed bg-muted/40 p-3">
+                                    <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                                        <Tag className="h-3.5 w-3.5" /> Código
+                                        de Secuencia (Muestra):
+                                    </span>
+                                    <span className="font-mono text-sm font-bold text-primary">
+                                        {specimen.sequence_code}
+                                    </span>
+                                </div>
+                            ) : (
+                                <div className="mb-4 flex flex-col gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/5 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                                    <div className="flex items-center justify-between">
+                                        <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                            <AlertCircle className="h-3.5 w-3.5 text-amber-500" />{' '}
+                                            Código de Secuencia original:
+                                        </span>
+                                        <span className="font-mono text-sm font-bold line-through opacity-70">
+                                            {specimen.sequence_code}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 flex items-center justify-between border-t border-amber-500/10 pt-1.5">
+                                        <span className="text-[10.5px] font-semibold text-amber-600 dark:text-amber-400">
+                                            Nuevo código estimado:
+                                        </span>
+                                        <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                            {nextSequencePreview ||
+                                                'Generando nuevo correlativo...'}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
 
                         <div className="grid grid-cols-1 gap-4">
                             <div className="grid gap-2">

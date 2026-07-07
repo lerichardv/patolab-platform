@@ -1576,23 +1576,35 @@ export default function MyAssignmentsIndex({
                                                         <span className="text-xs font-semibold text-primary">
                                                             #{order.id}
                                                         </span>
-                                                        <span className="text-xs text-muted-foreground">|</span>
-                                                        <span className="text-sm font-semibold text-foreground">
-                                                            {order.type?.name || 'Tipo Desconocido'}
+                                                        <span className="text-xs text-muted-foreground">
+                                                            |
                                                         </span>
-                                                        <span className="text-xs text-muted-foreground">|</span>
+                                                        <span className="text-sm font-semibold text-foreground">
+                                                            {order.type?.name ||
+                                                                'Tipo Desconocido'}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            |
+                                                        </span>
                                                         <span className="text-xs font-medium text-foreground">
-                                                            Cantidad: {order.quantity}
+                                                            Cantidad:{' '}
+                                                            {order.quantity}
                                                         </span>
                                                     </div>
 
-                                                    <div className="rounded-md bg-muted/40 p-2.5 space-y-1">
+                                                    <div className="space-y-1 rounded-md bg-muted/40 p-2.5">
                                                         <p className="text-xs font-semibold text-foreground">
-                                                            Tarea: {order.task?.name || 'N/A'}
+                                                            Tarea:{' '}
+                                                            {order.task?.name ||
+                                                                'N/A'}
                                                         </p>
-                                                        {order.task?.description && (
+                                                        {order.task
+                                                            ?.description && (
                                                             <p className="text-[11px] text-muted-foreground">
-                                                                {order.task.description}
+                                                                {
+                                                                    order.task
+                                                                        .description
+                                                                }
                                                             </p>
                                                         )}
                                                     </div>
@@ -1612,10 +1624,12 @@ export default function MyAssignmentsIndex({
                                                     )}
                                                 </div>
                                                 <div className="flex shrink-0 flex-row items-center gap-1.5 sm:flex-col sm:items-end">
-                                                    <span className={cn(
-                                                        "inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase",
-                                                        statusColor
-                                                    )}>
+                                                    <span
+                                                        className={cn(
+                                                            'inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase',
+                                                            statusColor,
+                                                        )}
+                                                    >
                                                         {order.status}
                                                     </span>
                                                     <span
@@ -1660,7 +1674,7 @@ export default function MyAssignmentsIndex({
                                         </div>
                                     );
                                 },
-                             )
+                            )
                         ) : (
                             <p className="py-4 text-center text-sm text-muted-foreground">
                                 No hay órdenes de trabajo asignadas a esta
