@@ -102,6 +102,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('dashboard');
     Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
+    Route::get('customers/import', [CustomerController::class, 'importPage'])->name('customers.import-page');
+    Route::post('customers/import/parse', [CustomerController::class, 'parseImport'])->name('customers.import-parse');
+    Route::post('customers/import/row', [CustomerController::class, 'importRow'])->name('customers.import-row');
     Route::resource('customers', CustomerController::class);
 
     Route::get('departments', function () {
@@ -148,7 +151,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('my-specimen-type-templates/upload-image', [MySpecimenTypeTemplateController::class, 'uploadImage'])->name('my-specimen-type-templates.upload-image');
     Route::resource('my-specimen-type-templates', MySpecimenTypeTemplateController::class);
     Route::resource('specimen-categories', SpecimenCategoryController::class);
+    Route::get('specimen-types/import', [SpecimenTypeController::class, 'importPage'])->name('specimen-types.import-page');
+    Route::post('specimen-types/import/parse', [SpecimenTypeController::class, 'parseImport'])->name('specimen-types.import-parse');
+    Route::post('specimen-types/import/row', [SpecimenTypeController::class, 'importRow'])->name('specimen-types.import-row');
     Route::resource('specimen-types', SpecimenTypeController::class);
+    Route::get('specimen-type-examinations/import', [SpecimenTypeExaminationController::class, 'importPage'])->name('specimen-type-examinations.import-page');
+    Route::post('specimen-type-examinations/import/parse', [SpecimenTypeExaminationController::class, 'parseImport'])->name('specimen-type-examinations.import-parse');
+    Route::post('specimen-type-examinations/import/row', [SpecimenTypeExaminationController::class, 'importRow'])->name('specimen-type-examinations.import-row');
     Route::resource('specimen-type-examinations', SpecimenTypeExaminationController::class);
     Route::resource('work-orders', WorkOrderTypeController::class)->parameters([
         'work-orders' => 'work_order_type',

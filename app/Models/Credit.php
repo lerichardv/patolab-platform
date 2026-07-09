@@ -15,6 +15,15 @@ class Credit extends Model
     use Auditable;
     use HasFactory;
 
+    protected $appends = [
+        'has_payments',
+    ];
+
+    public function getHasPaymentsAttribute(): bool
+    {
+        return $this->invoices()->where('invoice_type', 'credit payment')->exists();
+    }
+
     protected $fillable = [
         'customer_id',
         'credit_amount',

@@ -1,11 +1,12 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
-import { Edit2, Microscope, Plus, Search, Trash2 } from 'lucide-react';
-import { useState, useCallback, useEffect } from 'react';
+import { ChevronDown, ChevronUp, ChevronsUpDown, Edit2, Microscope, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
     index as specimenTypesIndex,
     destroy as destroySpecimenType,
+    importPage as importSpecimenTypesPage,
 } from '@/actions/App/Http/Controllers/SpecimenTypeController';
 import { Pagination } from '@/components/pagination';
 import {
@@ -53,6 +54,8 @@ interface Props {
     };
     filters: {
         search?: string;
+        sort_field?: string;
+        sort_direction?: 'asc' | 'desc';
     };
 }
 
@@ -70,31 +73,78 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
         useState<SpecimenType | null>(null);
     const [search, setSearch] = useState(filters.search || '');
 
-    const handleFilterChange = (key: string, value: string) => {
-        const newFilters = { ...filters, [key]: value };
+    const handleFilterChange = useCallback(
+        (key: string, value: string) => {
+            const newFilters = { ...filters, [key]: value };
 
-        if (value === '') {
-            delete newFilters[key as keyof typeof filters];
-        }
+            if (value === '') {
+                delete newFilters[key as keyof typeof filters];
+            }
 
-        router.get(specimenTypesIndex().url, newFilters, {
-            preserveState: true,
-            replace: true,
-        });
+            router.get(specimenTypesIndex().url, newFilters, {
+                preserveState: true,
+                replace: true,
+            });
+        },
+        [filters],
+    );
+
+    const handleSort = useCallback(
+        (field: string) => {
+            const isCurrentField = filters.sort_field === field;
+            const direction =
+                isCurrentField && filters.sort_direction === 'asc'
+                    ? 'desc'
+                    : 'asc';
+
+            const newFilters = {
+                ...filters,
+                sort_field: field,
+                sort_direction: direction,
+            };
+
+            router.get(specimenTypesIndex().url, newFilters, {
+                preserveState: true,
+                replace: true,
+            });
+        },
+        [filters],
+    );
+
+    const renderSortHeader = (field: string, label: string) => {
+        const isSorted = filters.sort_field === field;
+        const direction = isSorted ? filters.sort_direction || 'desc' : null;
+
+        return (
+            <button
+                onClick={() => handleSort(field)}
+                className="group/btn flex items-center gap-1.5 text-left font-semibold transition-colors hover:text-foreground"
+            >
+                <span>{label}</span>
+                {direction === 'asc' ? (
+                    <ChevronUp className="h-4 w-4 shrink-0 text-primary" />
+                ) : direction === 'desc' ? (
+                    <ChevronDown className="h-4 w-4 shrink-0 text-primary" />
+                ) : (
+                    <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover/btn:opacity-100" />
+                )}
+            </button>
+        );
     };
 
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            handleFilterChange('search', value);
-        }, 300),
-        [filters],
+    const debouncedSearch = useMemo(
+        () =>
+            debounce((value: string) => {
+                handleFilterChange('search', value);
+            }, 300),
+        [handleFilterChange],
     );
 
     useEffect(() => {
         if (search !== filters.search) {
             debouncedSearch(search);
         }
-    }, [search]);
+    }, [search, debouncedSearch, filters.search]);
 
     const handleEdit = (specimenType: SpecimenType) => {
         setSelectedSpecimenType(specimenType);
@@ -142,6 +192,18 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                     {canCreate && (
                         <div className="flex gap-2">
                             <Button
+                                variant="outline"
+                                onClick={() =>
+                                    window.open(
+                                        importSpecimenTypesPage().url,
+                                        '_blank',
+                                    )
+                                }
+                                className="h-10 w-full px-5 text-sm md:w-auto"
+                            >
+                                <Upload className="mr-2 h-4 w-4" /> Importar
+                            </Button>
+                            <Button
                                 onClick={handleCreate}
                                 className="h-10 w-full px-5 text-sm md:w-auto"
                             >
@@ -167,8 +229,8 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Nombre</TableHead>
-                                <TableHead>Descripción</TableHead>
+                                <TableHead>{renderSortHeader('name', 'Nombre')}</TableHead>
+                                <TableHead>{renderSortHeader('description', 'Descripción')}</TableHead>
                                 <TableHead>Fecha Creación</TableHead>
                                 <TableHead className="text-right">
                                     {(canEdit || canDelete) && 'Acciones'}

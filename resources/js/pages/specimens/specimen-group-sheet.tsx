@@ -275,6 +275,11 @@ export default function SpecimenGroupSheet({
 
     // On-the-fly creator sheet states
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
+    const [customerSheetSource, setCustomerSheetSource] = useState<
+        'global' | 'nested'
+    >('global');
+    const prevCustomersRef = useRef<any[]>(customers);
+    const prevReferrersRef = useRef<any[]>(referrers);
     const [isReferrerSheetOpen, setIsReferrerSheetOpen] = useState(false);
     const [isSequenceSheetOpen, setIsSequenceSheetOpen] = useState(false);
     const [isSpecimenTypeSheetOpen, setIsSpecimenTypeSheetOpen] =
@@ -382,6 +387,47 @@ export default function SpecimenGroupSheet({
             setNestedPriority(priorities[0].id.toString());
         }
     }, [priorities]);
+
+    useEffect(() => {
+        if (customers.length > prevCustomersRef.current.length) {
+            const newCustomers = customers.filter(
+                (c) =>
+                    !prevCustomersRef.current.some((prev) => prev.id === c.id),
+            );
+
+            if (newCustomers.length > 0) {
+                const newId = newCustomers[0].id.toString();
+                if (customerSheetSource === 'global') {
+                    setGlobalCustomerId(newId);
+                } else {
+                    setNestedCustomer(newId);
+                }
+                toast.success(
+                    `Paciente "${newCustomers[0].name}" seleccionado automáticamente`,
+                );
+            }
+        }
+
+        prevCustomersRef.current = customers;
+    }, [customers, customerSheetSource]);
+
+    useEffect(() => {
+        if (referrers.length > prevReferrersRef.current.length) {
+            const newReferrers = referrers.filter(
+                (r) =>
+                    !prevReferrersRef.current.some((prev) => prev.id === r.id),
+            );
+
+            if (newReferrers.length > 0) {
+                setNestedReferrer(newReferrers[0].id.toString());
+                toast.success(
+                    `Médico "${newReferrers[0].name}" seleccionado automáticamente`,
+                );
+            }
+        }
+
+        prevReferrersRef.current = referrers;
+    }, [referrers]);
 
     // Active customer details
     const selectedGlobalCustomer = useMemo(() => {
@@ -1464,7 +1510,10 @@ export default function SpecimenGroupSheet({
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setIsCustomerSheetOpen(true)}
+                                    onClick={() => {
+                                        setCustomerSheetSource('global');
+                                        setIsCustomerSheetOpen(true);
+                                    }}
                                     className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                                 >
                                     <Plus className="h-3 w-3" /> Nuevo
@@ -2824,1321 +2873,1448 @@ export default function SpecimenGroupSheet({
                             </div>
                         </form>
                     )}
-                </SheetContent>
-            </Sheet>
 
-            {/* Nested Specimen Form Dialog */}
-            <Sheet open={isNestedFormOpen} onOpenChange={setIsNestedFormOpen}>
-                <SheetContent
-                    side="right"
-                    className="z-[90] w-full max-w-[550px] overflow-y-auto sm:max-w-[750px]"
-                >
-                    <HeadingSheet
-                        title={
-                            nestedSpecimenToEditId
-                                ? 'Editar Muestra del Grupo'
-                                : 'Agregar Muestra al Grupo'
-                        }
-                        description="Ingrese los datos requeridos para registrar este espécimen en el grupo."
-                    />
-
-                    <div className="space-y-5 px-5 py-4">
-                        <div className="grid gap-2">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="nested_customer">
-                                    Paciente / Cliente
-                                </Label>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCustomerSheetOpen(true)}
-                                    className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                >
-                                    <Plus className="h-3.5 w-3.5" /> Nuevo
-                                </button>
-                            </div>
-                            <FormCombobox
-                                placeholder="Seleccionar paciente"
-                                value={nestedCustomer}
-                                onChange={(v) => {
-                                    setNestedCustomer(v);
-                                    setNestedErrors((prev) => ({
-                                        ...prev,
-                                        customer: '',
-                                    }));
-                                }}
-                                options={customers.map((c) => ({
-                                    label: c.name,
-                                    value: c.id.toString(),
-                                }))}
-                            />
-                            {nestedErrors.customer && (
-                                <p className="text-xs text-destructive">
-                                    {nestedErrors.customer}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="grid gap-2">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="nested_referrer">
-                                    Médico Remitente
-                                </Label>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsReferrerSheetOpen(true)}
-                                    className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                >
-                                    <Plus className="h-3.5 w-3.5" /> Nuevo
-                                </button>
-                            </div>
-                            <FormCombobox
-                                placeholder="Seleccionar médico"
-                                value={nestedReferrer}
-                                onChange={(v) => {
-                                    setNestedReferrer(v);
-                                    setNestedErrors((prev) => ({
-                                        ...prev,
-                                        referrer: '',
-                                    }));
-                                }}
-                                options={referrers.map((r) => ({
-                                    label: r.name,
-                                    value: r.id.toString(),
-                                }))}
-                            />
-                            {nestedErrors.referrer && (
-                                <p className="text-xs text-destructive">
-                                    {nestedErrors.referrer}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="grid gap-2">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="nested_specimen_type">
-                                        Tipo de Muestra
-                                    </Label>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setIsSpecimenTypeSheetOpen(true)
-                                        }
-                                        className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                    >
-                                        <Plus className="h-3.5 w-3.5" /> Nuevo
-                                    </button>
-                                </div>
-                                <FormCombobox
-                                    placeholder="Seleccionar tipo"
-                                    value={nestedSpecimenType}
-                                    onChange={(v) => {
-                                        setNestedSpecimenType(v);
-                                        setNestedExamination(''); // reset exam
-                                        setNestedErrors((prev) => ({
-                                            ...prev,
-                                            specimen_type: '',
-                                        }));
-                                    }}
-                                    options={specimenTypes.map((t) => ({
-                                        label: t.name,
-                                        value: t.id.toString(),
-                                    }))}
-                                />
-                                {nestedErrors.specimen_type && (
-                                    <p className="text-xs text-destructive">
-                                        {nestedErrors.specimen_type}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="grid gap-2">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="nested_examination">
-                                        Análisis / Examen
-                                    </Label>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setIsExaminationSheetOpen(true)
-                                        }
-                                        disabled={!nestedSpecimenType}
-                                        className="flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        <Plus className="h-3.5 w-3.5" /> Nuevo
-                                    </button>
-                                </div>
-                                <FormCombobox
-                                    placeholder={
-                                        nestedSpecimenType
-                                            ? 'Seleccionar examen'
-                                            : 'Primero seleccione tipo de muestra'
-                                    }
-                                    value={nestedExamination}
-                                    disabled={!nestedSpecimenType}
-                                    onChange={(v) => {
-                                        setNestedExamination(v);
-                                        setNestedErrors((prev) => ({
-                                            ...prev,
-                                            specimen_type_examination: '',
-                                        }));
-                                    }}
-                                    options={examinations
-                                        .filter(
-                                            (e) =>
-                                                e.specimen_type?.toString() ===
-                                                nestedSpecimenType,
-                                        )
-                                        .map((e) => ({
-                                            label: e.name,
-                                            value: e.id.toString(),
-                                        }))}
-                                />
-                                {nestedErrors.specimen_type_examination && (
-                                    <p className="text-xs text-destructive">
-                                        {nestedErrors.specimen_type_examination}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="grid gap-2">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="nested_category">
-                                        Categoría (Tiempo)
-                                    </Label>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setIsCategorySheetOpen(true)
-                                        }
-                                        className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                    >
-                                        <Plus className="h-3.5 w-3.5" /> Nuevo
-                                    </button>
-                                </div>
-                                <FormCombobox
-                                    placeholder="Seleccionar categoría"
-                                    value={nestedCategory}
-                                    onChange={(v) => {
-                                        setNestedCategory(v);
-                                        setNestedErrors((prev) => ({
-                                            ...prev,
-                                            specimen_category: '',
-                                        }));
-                                    }}
-                                    options={categories.map((c) => ({
-                                        label: c.name,
-                                        value: c.id.toString(),
-                                    }))}
-                                />
-                                {nestedErrors.specimen_category && (
-                                    <p className="text-xs text-destructive">
-                                        {nestedErrors.specimen_category}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="nested_priority">
-                                    Prioridad
-                                </Label>
-                                <FormCombobox
-                                    placeholder="Seleccionar prioridad"
-                                    value={nestedPriority}
-                                    onChange={(v) => {
-                                        setNestedPriority(v);
-                                        setNestedErrors((prev) => ({
-                                            ...prev,
-                                            priority_id: '',
-                                        }));
-                                    }}
-                                    options={priorities.map((p) => ({
-                                        label: p.name,
-                                        value: p.id.toString(),
-                                        color: p.color,
-                                    }))}
-                                />
-                                {nestedErrors.priority_id && (
-                                    <p className="text-xs text-destructive">
-                                        {nestedErrors.priority_id}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="grid gap-2">
-                                <Label htmlFor="nested_anatomic_site">
-                                    Sitio Anatómico
-                                </Label>
-                                <Input
-                                    id="nested_anatomic_site"
-                                    value={nestedAnatomicSite}
-                                    onChange={(e) =>
-                                        setNestedAnatomicSite(e.target.value)
-                                    }
-                                    placeholder="Ej. Brazo izquierdo..."
-                                />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="nested_status">
-                                    Estado Inicial
-                                </Label>
-                                <FormCombobox
-                                    placeholder="Seleccionar estado"
-                                    value={nestedStatus}
-                                    onChange={(v) => {
-                                        setNestedStatus(v);
-                                        setNestedErrors((prev) => ({
-                                            ...prev,
-                                            status: '',
-                                        }));
-                                    }}
-                                    options={[
-                                        {
-                                            label: 'Recibida',
-                                            value: 'received',
-                                            color: '#3b82f6',
-                                        },
-                                        {
-                                            label: 'Revisión Macroscópica',
-                                            value: 'macroscopic_review',
-                                            color: '#8b5cf6',
-                                            disabled: true,
-                                        },
-                                        {
-                                            label: 'En Proceso',
-                                            value: 'processing',
-                                            color: '#f59e0b',
-                                            disabled: true,
-                                        },
-                                        {
-                                            label: 'Revisión Microscópica',
-                                            value: 'microscopic_review',
-                                            color: '#d946ef',
-                                            disabled: true,
-                                        },
-                                        {
-                                            label: 'Finalizada',
-                                            value: 'finalized',
-                                            color: '#10b981',
-                                            disabled: true,
-                                        },
-                                        {
-                                            label: 'Entregada',
-                                            value: 'delivered',
-                                            color: '#64748b',
-                                            disabled: true,
-                                        },
-                                        {
-                                            label: 'Cancelada',
-                                            value: 'cancelled',
-                                            color: '#ef4444',
-                                            disabled: true,
-                                        },
-                                    ]}
-                                />
-                                {nestedErrors.status && (
-                                    <p className="text-xs text-destructive">
-                                        {nestedErrors.status}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Medical order file upload inside nested form */}
-                        <div className="grid gap-2">
-                            <Label htmlFor="nested_medical_order_file">
-                                Orden Médica (Archivo PDF o Imagen)
-                            </Label>
-                            {nestedMedicalOrderFile ? (
-                                <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="h-5 w-5 text-emerald-500" />
-                                        <div className="flex flex-col text-xs">
-                                            <span className="max-w-[200px] truncate font-semibold text-foreground">
-                                                {nestedMedicalOrderFile.name}
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground">
-                                                {(
-                                                    nestedMedicalOrderFile.size /
-                                                    1024 /
-                                                    1024
-                                                ).toFixed(2)}{' '}
-                                                MB
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() =>
-                                            setNestedMedicalOrderFile(null)
-                                        }
-                                        className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="group relative">
-                                    <input
-                                        type="file"
-                                        id="nested_medical_order_file"
-                                        className="hidden"
-                                        accept=".pdf,image/*"
-                                        onChange={(e) => {
-                                            const file =
-                                                e.target.files?.[0] || null;
-
-                                            if (
-                                                file &&
-                                                file.size > 50 * 1024 * 1024
-                                            ) {
-                                                toast.error(
-                                                    'El archivo de Orden Médica no debe exceder los 50MB.',
-                                                );
-                                                e.target.value = '';
-
-                                                return;
-                                            }
-
-                                            setNestedMedicalOrderFile(file);
-                                        }}
-                                    />
-                                    <label
-                                        htmlFor="nested_medical_order_file"
-                                        className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-5 text-center transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
-                                    >
-                                        <div className="mb-2 rounded-full bg-secondary p-2.5 text-secondary-foreground">
-                                            <Upload className="h-4 w-4" />
-                                        </div>
-                                        <span className="text-xs font-semibold text-foreground">
-                                            Subir Orden Médica
-                                        </span>
-                                        <span className="mt-1 text-[10px] text-muted-foreground">
-                                            PDF o imágenes hasta 50MB
-                                        </span>
-                                    </label>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="nested_diagnosis">
-                                Diagnóstico Clínico / Sospecha
-                            </Label>
-                            <Textarea
-                                id="nested_diagnosis"
-                                value={nestedDiagnosis}
-                                onChange={(e) =>
-                                    setNestedDiagnosis(e.target.value)
+                    {/* Nested Specimen Form Dialog */}
+                    <Sheet
+                        open={isNestedFormOpen}
+                        onOpenChange={setIsNestedFormOpen}
+                    >
+                        <SheetContent
+                            side="right"
+                            className="z-[90] w-full max-w-[550px] overflow-y-auto sm:max-w-[750px]"
+                        >
+                            <HeadingSheet
+                                title={
+                                    nestedSpecimenToEditId
+                                        ? 'Editar Muestra del Grupo'
+                                        : 'Agregar Muestra al Grupo'
                                 }
-                                placeholder="Escriba el diagnóstico aquí..."
-                                className="resize-none"
-                                rows={2}
+                                description="Ingrese los datos requeridos para registrar este espécimen en el grupo."
                             />
-                        </div>
 
-                        <div className="grid gap-2">
-                            <Label htmlFor="nested_clinical_notes">
-                                Notas Clínicas
-                            </Label>
-                            <Textarea
-                                id="nested_clinical_notes"
-                                value={nestedClinicalNotes}
-                                onChange={(e) =>
-                                    setNestedClinicalNotes(e.target.value)
-                                }
-                                placeholder="Información adicional relevante..."
-                                className="resize-none"
-                                rows={2}
-                            />
-                        </div>
-
-                        {/* Agregar Insumos inside Nested Form */}
-                        <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-4">
-                            <div className="flex flex-col gap-0.5">
-                                <Label className="cursor-pointer text-xs font-semibold">
-                                    Agregar insumos
-                                </Label>
-                                <span className="text-[10px] text-muted-foreground">
-                                    Registre los insumos químicos o reactivos
-                                    que se utilizarán en el análisis.
-                                </span>
-                            </div>
-                            <Switch
-                                checked={nestedAgregarInsumos}
-                                onCheckedChange={(checked) => {
-                                    setNestedAgregarInsumos(checked);
-
-                                    if (!checked) {
-                                        setNestedInsumos([]);
-                                    }
-                                }}
-                            />
-                        </div>
-
-                        {nestedAgregarInsumos && (
-                            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-4">
-                                <div className="relative">
-                                    <Input
-                                        type="text"
-                                        placeholder="Buscar insumo por nombre o código..."
-                                        value={supplySearchQuery}
-                                        onChange={(e) =>
-                                            setSupplySearchQuery(e.target.value)
-                                        }
-                                        className="h-9 w-full pr-8"
-                                    />
-                                    {supplySearchQuery && (
+                            <div className="space-y-5 px-5 py-4">
+                                <div className="grid gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <Label htmlFor="nested_customer">
+                                            Paciente / Cliente
+                                        </Label>
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                setSupplySearchQuery('')
-                                            }
-                                            className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                            onClick={() => {
+                                                setCustomerSheetSource(
+                                                    'nested',
+                                                );
+                                                setIsCustomerSheetOpen(true);
+                                            }}
+                                            className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                                         >
-                                            <X className="h-4 w-4" />
+                                            <Plus className="h-3.5 w-3.5" />{' '}
+                                            Nuevo
                                         </button>
+                                    </div>
+                                    <FormCombobox
+                                        placeholder="Seleccionar paciente"
+                                        value={nestedCustomer}
+                                        onChange={(v) => {
+                                            setNestedCustomer(v);
+                                            setNestedErrors((prev) => ({
+                                                ...prev,
+                                                customer: '',
+                                            }));
+                                        }}
+                                        options={customers.map((c) => ({
+                                            label: c.name,
+                                            value: c.id.toString(),
+                                        }))}
+                                    />
+                                    {nestedErrors.customer && (
+                                        <p className="text-xs text-destructive">
+                                            {nestedErrors.customer}
+                                        </p>
                                     )}
                                 </div>
 
-                                <div className="overflow-hidden rounded-xl border bg-card">
-                                    <div className="max-h-[220px] divide-y divide-border overflow-y-auto">
-                                        {filteredProducts.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center gap-1 p-6 text-center text-xs text-muted-foreground">
-                                                <Microscope className="h-6 w-6 text-muted-foreground/30" />
-                                                <span>
-                                                    No se encontraron insumos.
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            filteredProducts.map((product) => {
-                                                const totalStock =
-                                                    parseInt(
-                                                        product.total_stock,
-                                                    ) || 0;
-                                                const isOutOfStock =
-                                                    totalStock <= 0;
-                                                const isAlreadyAdded =
-                                                    nestedInsumos.some(
-                                                        (i) =>
-                                                            i.id === product.id,
-                                                    );
+                                <div className="grid gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <Label htmlFor="nested_referrer">
+                                            Médico Remitente
+                                        </Label>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setIsReferrerSheetOpen(true)
+                                            }
+                                            className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                        >
+                                            <Plus className="h-3.5 w-3.5" />{' '}
+                                            Nuevo
+                                        </button>
+                                    </div>
+                                    <FormCombobox
+                                        placeholder="Seleccionar médico"
+                                        value={nestedReferrer}
+                                        onChange={(v) => {
+                                            setNestedReferrer(v);
+                                            setNestedErrors((prev) => ({
+                                                ...prev,
+                                                referrer: '',
+                                            }));
+                                        }}
+                                        options={referrers.map((r) => ({
+                                            label: r.name,
+                                            value: r.id.toString(),
+                                        }))}
+                                    />
+                                    {nestedErrors.referrer && (
+                                        <p className="text-xs text-destructive">
+                                            {nestedErrors.referrer}
+                                        </p>
+                                    )}
+                                </div>
 
-                                                return (
-                                                    <div
-                                                        key={product.id}
-                                                        className="flex items-center justify-between p-2 text-xs"
-                                                    >
-                                                        <div className="flex max-w-[65%] flex-col gap-0.5">
-                                                            <span className="truncate font-semibold text-foreground">
-                                                                {product.name}
-                                                            </span>
-                                                            <span className="font-mono text-[9px] text-muted-foreground">
-                                                                {product.code}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-semibold text-emerald-600">
-                                                                {totalStock} u.
-                                                            </span>
-                                                            <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                variant={
-                                                                    isAlreadyAdded
-                                                                        ? 'secondary'
-                                                                        : 'outline'
-                                                                }
-                                                                onClick={() =>
-                                                                    handleAddNestedInsumo(
-                                                                        product,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    isOutOfStock
-                                                                }
-                                                                className="h-7 text-[10px] font-semibold"
-                                                            >
-                                                                {isAlreadyAdded
-                                                                    ? 'Agregado'
-                                                                    : 'Agregar'}
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="grid gap-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="nested_specimen_type">
+                                                Tipo de Muestra
+                                            </Label>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setIsSpecimenTypeSheetOpen(
+                                                        true,
+                                                    )
+                                                }
+                                                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                            >
+                                                <Plus className="h-3.5 w-3.5" />{' '}
+                                                Nuevo
+                                            </button>
+                                        </div>
+                                        <FormCombobox
+                                            placeholder="Seleccionar tipo"
+                                            value={nestedSpecimenType}
+                                            onChange={(v) => {
+                                                setNestedSpecimenType(v);
+                                                setNestedExamination(''); // reset exam
+                                                setNestedErrors((prev) => ({
+                                                    ...prev,
+                                                    specimen_type: '',
+                                                }));
+                                            }}
+                                            options={specimenTypes.map((t) => ({
+                                                label: t.name,
+                                                value: t.id.toString(),
+                                            }))}
+                                        />
+                                        {nestedErrors.specimen_type && (
+                                            <p className="text-xs text-destructive">
+                                                {nestedErrors.specimen_type}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="nested_examination">
+                                                Análisis / Examen
+                                            </Label>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setIsExaminationSheetOpen(
+                                                        true,
+                                                    )
+                                                }
+                                                disabled={!nestedSpecimenType}
+                                                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                <Plus className="h-3.5 w-3.5" />{' '}
+                                                Nuevo
+                                            </button>
+                                        </div>
+                                        <FormCombobox
+                                            placeholder={
+                                                nestedSpecimenType
+                                                    ? 'Seleccionar examen'
+                                                    : 'Primero seleccione tipo de muestra'
+                                            }
+                                            value={nestedExamination}
+                                            disabled={!nestedSpecimenType}
+                                            onChange={(v) => {
+                                                setNestedExamination(v);
+                                                setNestedErrors((prev) => ({
+                                                    ...prev,
+                                                    specimen_type_examination:
+                                                        '',
+                                                }));
+                                            }}
+                                            options={examinations
+                                                .filter(
+                                                    (e) =>
+                                                        e.specimen_type?.toString() ===
+                                                        nestedSpecimenType,
+                                                )
+                                                .map((e) => ({
+                                                    label: e.name,
+                                                    value: e.id.toString(),
+                                                }))}
+                                        />
+                                        {nestedErrors.specimen_type_examination && (
+                                            <p className="text-xs text-destructive">
+                                                {
+                                                    nestedErrors.specimen_type_examination
+                                                }
+                                            </p>
                                         )}
                                     </div>
                                 </div>
 
-                                {nestedInsumos.length > 0 && (
-                                    <div className="space-y-2 border-t pt-3">
-                                        <div className="text-[11px] font-bold text-muted-foreground uppercase">
-                                            Seleccionados (
-                                            {nestedInsumos.length})
-                                        </div>
-                                        <div className="max-h-[200px] divide-y overflow-y-auto rounded border bg-card">
-                                            {nestedInsumos.map((i) => (
-                                                <div
-                                                    key={i.id}
-                                                    className="flex flex-col gap-2 p-2 hover:bg-accent/5"
-                                                >
-                                                    <div className="flex items-center justify-between text-xs">
-                                                        <span className="max-w-[200px] truncate font-medium">
-                                                            {i.name}
-                                                        </span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                handleRemoveNestedInsumo(
-                                                                    i.id,
-                                                                )
-                                                            }
-                                                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                        </Button>
-                                                    </div>
-                                                    <div className="flex items-center justify-between gap-4">
-                                                        <div className="flex h-7 items-center rounded border bg-background p-0.5">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    handleUpdateNestedQty(
-                                                                        i.id,
-                                                                        i.quantity -
-                                                                            1,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    i.quantity <=
-                                                                    1
-                                                                }
-                                                                className="h-5 w-5 rounded text-xs font-bold hover:bg-muted"
-                                                            >
-                                                                -
-                                                            </button>
-                                                            <span className="w-6 text-center font-mono text-xs font-bold">
-                                                                {i.quantity}
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    handleUpdateNestedQty(
-                                                                        i.id,
-                                                                        i.quantity +
-                                                                            1,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    i.quantity >=
-                                                                    i.total_stock
-                                                                }
-                                                                className="h-5 w-5 rounded text-xs font-bold hover:bg-muted"
-                                                            >
-                                                                +
-                                                            </button>
-                                                        </div>
-                                                        <span className="font-mono text-[10px] text-muted-foreground">
-                                                            Stock:{' '}
-                                                            {i.total_stock}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="flex justify-end gap-3 border-t pt-4">
-                            <Button
-                                variant="outline"
-                                onClick={() => setIsNestedFormOpen(false)}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button onClick={handleSaveNestedSpecimen}>
-                                Guardar Muestra
-                            </Button>
-                        </div>
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            {/* Close warning AlertDialog */}
-            <AlertDialog
-                open={showCloseConfirm}
-                onOpenChange={setShowCloseConfirm}
-            >
-                <AlertDialogContent className="max-w-[450px]">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            ¿Estás seguro de salir?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Todos los datos ingresados en la creación grupal se
-                            perderán permanentemente.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel
-                            onClick={() => setShowCloseConfirm(false)}
-                        >
-                            Cancelar
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => {
-                                setShowCloseConfirm(false);
-                                setIsFormDirty(false);
-                                onOpenChange(false);
-                            }}
-                            className="bg-destructive text-destructive-foreground text-white hover:bg-destructive/90"
-                        >
-                            Sí, salir
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            {/* Payment Details Configuration Sheet */}
-            <Sheet
-                open={isPaymentSheetOpen}
-                onOpenChange={setIsPaymentSheetOpen}
-            >
-                <SheetContent
-                    side="right"
-                    className="z-[95] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                >
-                    <HeadingSheet
-                        title="Método de Pago (Grupo)"
-                        description="Configure el método de pago e ingrese la información fiscal requerida para facturar."
-                    />
-                    <div className="mt-6 flex flex-col gap-6 px-5 pb-6">
-                        <div className="grid gap-2">
-                            <Label htmlFor="group_payment_type">
-                                Tipo de Pago{' '}
-                                <span className="text-destructive">*</span>
-                            </Label>
-                            <Select
-                                value={paymentType}
-                                onValueChange={(val) => {
-                                    setPaymentType(val);
-
-                                    if (val === 'credit') {
-                                        setHasInitialPayment(false);
-                                    }
-
-                                    resetDetailedPayments();
-                                }}
-                            >
-                                <SelectTrigger
-                                    id="group_payment_type"
-                                    className="w-full"
-                                >
-                                    <SelectValue placeholder="Seleccione el tipo de pago" />
-                                </SelectTrigger>
-                                <SelectContent className="z-[110]">
-                                    <SelectItem value="cash">
-                                        Efectivo
-                                    </SelectItem>
-                                    <SelectItem value="credit card">
-                                        Tarjeta de Crédito
-                                    </SelectItem>
-                                    <SelectItem value="bank transfer">
-                                        Transferencia Bancaria
-                                    </SelectItem>
-                                    <SelectItem value="check">
-                                        Cheque
-                                    </SelectItem>
-                                    <SelectItem value="credit">
-                                        Al Crédito
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {paymentType !== 'credit' && paymentType !== '' && (
-                            <div className="grid gap-2">
-                                <Label htmlFor="group_payment_date">
-                                    Fecha de Pago
-                                </Label>
-                                <Input
-                                    id="group_payment_date"
-                                    type="date"
-                                    value={paymentMethodDate}
-                                    onChange={(e) =>
-                                        setPaymentMethodDate(e.target.value)
-                                    }
-                                />
-                            </div>
-                        )}
-
-                        {paymentType === 'cash' && (
-                            <div className="grid gap-2">
-                                <Label htmlFor="group_cash_value">
-                                    Efectivo Recibido (L.){' '}
-                                    <span className="text-destructive">*</span>
-                                </Label>
-                                <Input
-                                    id="group_cash_value"
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={cashValue}
-                                    onChange={(e) =>
-                                        setCashValue(e.target.value)
-                                    }
-                                />
-                            </div>
-                        )}
-
-                        {paymentType === 'check' && (
-                            <div className="space-y-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="group_check_number">
-                                        Número de Cheque{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        id="group_check_number"
-                                        type="text"
-                                        placeholder="Ej. 100234"
-                                        value={checkNumber}
-                                        onChange={(e) =>
-                                            setCheckNumber(e.target.value)
-                                        }
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="group_check_value">
-                                        Valor del Cheque (L.){' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        id="group_check_value"
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={checkValue}
-                                        onChange={(e) =>
-                                            setCheckValue(e.target.value)
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {paymentType === 'credit card' && (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div className="grid gap-2">
-                                        <Label htmlFor="group_card_last_4">
-                                            Últimos 4 Dígitos{' '}
-                                            <span className="text-destructive">
-                                                *
-                                            </span>
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="nested_category">
+                                                Categoría (Tiempo)
+                                            </Label>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setIsCategorySheetOpen(true)
+                                                }
+                                                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                            >
+                                                <Plus className="h-3.5 w-3.5" />{' '}
+                                                Nuevo
+                                            </button>
+                                        </div>
+                                        <FormCombobox
+                                            placeholder="Seleccionar categoría"
+                                            value={nestedCategory}
+                                            onChange={(v) => {
+                                                setNestedCategory(v);
+                                                setNestedErrors((prev) => ({
+                                                    ...prev,
+                                                    specimen_category: '',
+                                                }));
+                                            }}
+                                            options={categories.map((c) => ({
+                                                label: c.name,
+                                                value: c.id.toString(),
+                                            }))}
+                                        />
+                                        {nestedErrors.specimen_category && (
+                                            <p className="text-xs text-destructive">
+                                                {nestedErrors.specimen_category}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="nested_priority">
+                                            Prioridad
+                                        </Label>
+                                        <FormCombobox
+                                            placeholder="Seleccionar prioridad"
+                                            value={nestedPriority}
+                                            onChange={(v) => {
+                                                setNestedPriority(v);
+                                                setNestedErrors((prev) => ({
+                                                    ...prev,
+                                                    priority_id: '',
+                                                }));
+                                            }}
+                                            options={priorities.map((p) => ({
+                                                label: p.name,
+                                                value: p.id.toString(),
+                                                color: p.color,
+                                            }))}
+                                        />
+                                        {nestedErrors.priority_id && (
+                                            <p className="text-xs text-destructive">
+                                                {nestedErrors.priority_id}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="nested_anatomic_site">
+                                            Sitio Anatómico
                                         </Label>
                                         <Input
-                                            id="group_card_last_4"
-                                            type="text"
-                                            maxLength={4}
-                                            placeholder="1234"
-                                            value={cardLast4}
+                                            id="nested_anatomic_site"
+                                            value={nestedAnatomicSite}
                                             onChange={(e) =>
-                                                setCardLast4(
-                                                    e.target.value.replace(
-                                                        /\D/g,
-                                                        '',
-                                                    ),
+                                                setNestedAnatomicSite(
+                                                    e.target.value,
                                                 )
                                             }
+                                            placeholder="Ej. Brazo izquierdo..."
                                         />
                                     </div>
+
                                     <div className="grid gap-2">
-                                        <Label htmlFor="group_card_expiration">
-                                            Vencimiento (MM/AA){' '}
-                                            <span className="text-destructive">
-                                                *
-                                            </span>
+                                        <Label htmlFor="nested_status">
+                                            Estado Inicial
                                         </Label>
-                                        <Input
-                                            id="group_card_expiration"
-                                            type="text"
-                                            placeholder="12/26"
-                                            value={cardExpiration}
-                                            onChange={(e) => {
-                                                const cleaned =
-                                                    e.target.value.replace(
-                                                        /\D/g,
-                                                        '',
-                                                    );
-                                                let formatted = cleaned;
-
-                                                if (cleaned.length > 2) {
-                                                    formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}`;
-                                                }
-
-                                                setCardExpiration(formatted);
+                                        <FormCombobox
+                                            placeholder="Seleccionar estado"
+                                            value={nestedStatus}
+                                            onChange={(v) => {
+                                                setNestedStatus(v);
+                                                setNestedErrors((prev) => ({
+                                                    ...prev,
+                                                    status: '',
+                                                }));
                                             }}
+                                            options={[
+                                                {
+                                                    label: 'Recibida',
+                                                    value: 'received',
+                                                    color: '#3b82f6',
+                                                },
+                                                {
+                                                    label: 'Revisión Macroscópica',
+                                                    value: 'macroscopic_review',
+                                                    color: '#8b5cf6',
+                                                    disabled: true,
+                                                },
+                                                {
+                                                    label: 'En Proceso',
+                                                    value: 'processing',
+                                                    color: '#f59e0b',
+                                                    disabled: true,
+                                                },
+                                                {
+                                                    label: 'Revisión Microscópica',
+                                                    value: 'microscopic_review',
+                                                    color: '#d946ef',
+                                                    disabled: true,
+                                                },
+                                                {
+                                                    label: 'Finalizada',
+                                                    value: 'finalized',
+                                                    color: '#10b981',
+                                                    disabled: true,
+                                                },
+                                                {
+                                                    label: 'Entregada',
+                                                    value: 'delivered',
+                                                    color: '#64748b',
+                                                    disabled: true,
+                                                },
+                                                {
+                                                    label: 'Cancelada',
+                                                    value: 'cancelled',
+                                                    color: '#ef4444',
+                                                    disabled: true,
+                                                },
+                                            ]}
                                         />
+                                        {nestedErrors.status && (
+                                            <p className="text-xs text-destructive">
+                                                {nestedErrors.status}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
+
+                                {/* Medical order file upload inside nested form */}
                                 <div className="grid gap-2">
-                                    <Label htmlFor="group_card_auth">
-                                        Código de Autorización{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
+                                    <Label htmlFor="nested_medical_order_file">
+                                        Orden Médica (Archivo PDF o Imagen)
                                     </Label>
-                                    <Input
-                                        id="group_card_auth"
-                                        type="text"
-                                        placeholder="Ej. 900234"
-                                        value={cardAuthorizationCode}
+                                    {nestedMedicalOrderFile ? (
+                                        <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="h-5 w-5 text-emerald-500" />
+                                                <div className="flex flex-col text-xs">
+                                                    <span className="max-w-[200px] truncate font-semibold text-foreground">
+                                                        {
+                                                            nestedMedicalOrderFile.name
+                                                        }
+                                                    </span>
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {(
+                                                            nestedMedicalOrderFile.size /
+                                                            1024 /
+                                                            1024
+                                                        ).toFixed(2)}{' '}
+                                                        MB
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() =>
+                                                    setNestedMedicalOrderFile(
+                                                        null,
+                                                    )
+                                                }
+                                                className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="group relative">
+                                            <input
+                                                type="file"
+                                                id="nested_medical_order_file"
+                                                className="hidden"
+                                                accept=".pdf,image/*"
+                                                onChange={(e) => {
+                                                    const file =
+                                                        e.target.files?.[0] ||
+                                                        null;
+
+                                                    if (
+                                                        file &&
+                                                        file.size >
+                                                            50 * 1024 * 1024
+                                                    ) {
+                                                        toast.error(
+                                                            'El archivo de Orden Médica no debe exceder los 50MB.',
+                                                        );
+                                                        e.target.value = '';
+
+                                                        return;
+                                                    }
+
+                                                    setNestedMedicalOrderFile(
+                                                        file,
+                                                    );
+                                                }}
+                                            />
+                                            <label
+                                                htmlFor="nested_medical_order_file"
+                                                className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-5 text-center transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
+                                            >
+                                                <div className="mb-2 rounded-full bg-secondary p-2.5 text-secondary-foreground">
+                                                    <Upload className="h-4 w-4" />
+                                                </div>
+                                                <span className="text-xs font-semibold text-foreground">
+                                                    Subir Orden Médica
+                                                </span>
+                                                <span className="mt-1 text-[10px] text-muted-foreground">
+                                                    PDF o imágenes hasta 50MB
+                                                </span>
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="nested_diagnosis">
+                                        Diagnóstico Clínico / Sospecha
+                                    </Label>
+                                    <Textarea
+                                        id="nested_diagnosis"
+                                        value={nestedDiagnosis}
                                         onChange={(e) =>
-                                            setCardAuthorizationCode(
+                                            setNestedDiagnosis(e.target.value)
+                                        }
+                                        placeholder="Escriba el diagnóstico aquí..."
+                                        className="resize-none"
+                                        rows={2}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="nested_clinical_notes">
+                                        Notas Clínicas
+                                    </Label>
+                                    <Textarea
+                                        id="nested_clinical_notes"
+                                        value={nestedClinicalNotes}
+                                        onChange={(e) =>
+                                            setNestedClinicalNotes(
                                                 e.target.value,
                                             )
                                         }
+                                        placeholder="Información adicional relevante..."
+                                        className="resize-none"
+                                        rows={2}
                                     />
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="group_card_charged">
-                                        Monto a Cobrar (L.){' '}
-                                        <span className="text-destructive">
-                                            *
+
+                                {/* Agregar Insumos inside Nested Form */}
+                                <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-4">
+                                    <div className="flex flex-col gap-0.5">
+                                        <Label className="cursor-pointer text-xs font-semibold">
+                                            Agregar insumos
+                                        </Label>
+                                        <span className="text-[10px] text-muted-foreground">
+                                            Registre los insumos químicos o
+                                            reactivos que se utilizarán en el
+                                            análisis.
                                         </span>
-                                    </Label>
-                                    <Input
-                                        id="group_card_charged"
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={cardValueCharged}
-                                        onChange={(e) =>
-                                            setCardValueCharged(e.target.value)
-                                        }
+                                    </div>
+                                    <Switch
+                                        checked={nestedAgregarInsumos}
+                                        onCheckedChange={(checked) => {
+                                            setNestedAgregarInsumos(checked);
+
+                                            if (!checked) {
+                                                setNestedInsumos([]);
+                                            }
+                                        }}
                                     />
+                                </div>
+
+                                {nestedAgregarInsumos && (
+                                    <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-4">
+                                        <div className="relative">
+                                            <Input
+                                                type="text"
+                                                placeholder="Buscar insumo por nombre o código..."
+                                                value={supplySearchQuery}
+                                                onChange={(e) =>
+                                                    setSupplySearchQuery(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="h-9 w-full pr-8"
+                                            />
+                                            {supplySearchQuery && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setSupplySearchQuery('')
+                                                    }
+                                                    className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="overflow-hidden rounded-xl border bg-card">
+                                            <div className="max-h-[220px] divide-y divide-border overflow-y-auto">
+                                                {filteredProducts.length ===
+                                                0 ? (
+                                                    <div className="flex flex-col items-center justify-center gap-1 p-6 text-center text-xs text-muted-foreground">
+                                                        <Microscope className="h-6 w-6 text-muted-foreground/30" />
+                                                        <span>
+                                                            No se encontraron
+                                                            insumos.
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    filteredProducts.map(
+                                                        (product) => {
+                                                            const totalStock =
+                                                                parseInt(
+                                                                    product.total_stock,
+                                                                ) || 0;
+                                                            const isOutOfStock =
+                                                                totalStock <= 0;
+                                                            const isAlreadyAdded =
+                                                                nestedInsumos.some(
+                                                                    (i) =>
+                                                                        i.id ===
+                                                                        product.id,
+                                                                );
+
+                                                            return (
+                                                                <div
+                                                                    key={
+                                                                        product.id
+                                                                    }
+                                                                    className="flex items-center justify-between p-2 text-xs"
+                                                                >
+                                                                    <div className="flex max-w-[65%] flex-col gap-0.5">
+                                                                        <span className="truncate font-semibold text-foreground">
+                                                                            {
+                                                                                product.name
+                                                                            }
+                                                                        </span>
+                                                                        <span className="font-mono text-[9px] text-muted-foreground">
+                                                                            {
+                                                                                product.code
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[10px] font-semibold text-emerald-600">
+                                                                            {
+                                                                                totalStock
+                                                                            }{' '}
+                                                                            u.
+                                                                        </span>
+                                                                        <Button
+                                                                            type="button"
+                                                                            size="sm"
+                                                                            variant={
+                                                                                isAlreadyAdded
+                                                                                    ? 'secondary'
+                                                                                    : 'outline'
+                                                                            }
+                                                                            onClick={() =>
+                                                                                handleAddNestedInsumo(
+                                                                                    product,
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                isOutOfStock
+                                                                            }
+                                                                            className="h-7 text-[10px] font-semibold"
+                                                                        >
+                                                                            {isAlreadyAdded
+                                                                                ? 'Agregado'
+                                                                                : 'Agregar'}
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        },
+                                                    )
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {nestedInsumos.length > 0 && (
+                                            <div className="space-y-2 border-t pt-3">
+                                                <div className="text-[11px] font-bold text-muted-foreground uppercase">
+                                                    Seleccionados (
+                                                    {nestedInsumos.length})
+                                                </div>
+                                                <div className="max-h-[200px] divide-y overflow-y-auto rounded border bg-card">
+                                                    {nestedInsumos.map((i) => (
+                                                        <div
+                                                            key={i.id}
+                                                            className="flex flex-col gap-2 p-2 hover:bg-accent/5"
+                                                        >
+                                                            <div className="flex items-center justify-between text-xs">
+                                                                <span className="max-w-[200px] truncate font-medium">
+                                                                    {i.name}
+                                                                </span>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    onClick={() =>
+                                                                        handleRemoveNestedInsumo(
+                                                                            i.id,
+                                                                        )
+                                                                    }
+                                                                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                                                >
+                                                                    <X className="h-3 w-3" />
+                                                                </Button>
+                                                            </div>
+                                                            <div className="flex items-center justify-between gap-4">
+                                                                <div className="flex h-7 items-center rounded border bg-background p-0.5">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            handleUpdateNestedQty(
+                                                                                i.id,
+                                                                                i.quantity -
+                                                                                    1,
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            i.quantity <=
+                                                                            1
+                                                                        }
+                                                                        className="h-5 w-5 rounded text-xs font-bold hover:bg-muted"
+                                                                    >
+                                                                        -
+                                                                    </button>
+                                                                    <span className="w-6 text-center font-mono text-xs font-bold">
+                                                                        {
+                                                                            i.quantity
+                                                                        }
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            handleUpdateNestedQty(
+                                                                                i.id,
+                                                                                i.quantity +
+                                                                                    1,
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            i.quantity >=
+                                                                            i.total_stock
+                                                                        }
+                                                                        className="h-5 w-5 rounded text-xs font-bold hover:bg-muted"
+                                                                    >
+                                                                        +
+                                                                    </button>
+                                                                </div>
+                                                                <span className="font-mono text-[10px] text-muted-foreground">
+                                                                    Stock:{' '}
+                                                                    {
+                                                                        i.total_stock
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end gap-3 border-t pt-4">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                            setIsNestedFormOpen(false)
+                                        }
+                                    >
+                                        Cancelar
+                                    </Button>
+                                    <Button onClick={handleSaveNestedSpecimen}>
+                                        Guardar Muestra
+                                    </Button>
                                 </div>
                             </div>
-                        )}
+                        </SheetContent>
+                    </Sheet>
 
-                        {paymentType === 'bank transfer' && (
-                            <div className="space-y-4">
+                    {/* Close warning AlertDialog */}
+                    <AlertDialog
+                        open={showCloseConfirm}
+                        onOpenChange={setShowCloseConfirm}
+                    >
+                        <AlertDialogContent className="max-w-[450px]">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                    ¿Estás seguro de salir?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Todos los datos ingresados en la creación
+                                    grupal se perderán permanentemente.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel
+                                    onClick={() => setShowCloseConfirm(false)}
+                                >
+                                    Cancelar
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => {
+                                        setShowCloseConfirm(false);
+                                        setIsFormDirty(false);
+                                        onOpenChange(false);
+                                    }}
+                                    className="bg-destructive text-destructive-foreground text-white hover:bg-destructive/90"
+                                >
+                                    Sí, salir
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+
+                    {/* Payment Details Configuration Sheet */}
+                    <Sheet
+                        open={isPaymentSheetOpen}
+                        onOpenChange={setIsPaymentSheetOpen}
+                    >
+                        <SheetContent
+                            side="right"
+                            className="z-[95] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                            overlayClassName="z-[95]"
+                        >
+                            <HeadingSheet
+                                title="Método de Pago (Grupo)"
+                                description="Configure el método de pago e ingrese la información fiscal requerida para facturar."
+                            />
+                            <div className="mt-6 flex flex-col gap-6 px-5 pb-6">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="group_transfer_bank">
-                                        Banco Receptor{' '}
+                                    <Label htmlFor="group_payment_type">
+                                        Tipo de Pago{' '}
                                         <span className="text-destructive">
                                             *
                                         </span>
                                     </Label>
                                     <Select
-                                        value={transferBankId}
-                                        onValueChange={setTransferBankId}
+                                        value={paymentType}
+                                        onValueChange={(val) => {
+                                            setPaymentType(val);
+
+                                            if (val === 'credit') {
+                                                setHasInitialPayment(false);
+                                            }
+
+                                            resetDetailedPayments();
+                                        }}
                                     >
                                         <SelectTrigger
-                                            id="group_transfer_bank"
+                                            id="group_payment_type"
                                             className="w-full"
                                         >
-                                            <SelectValue placeholder="Seleccione el banco" />
+                                            <SelectValue placeholder="Seleccione el tipo de pago" />
                                         </SelectTrigger>
                                         <SelectContent className="z-[110]">
-                                            {banks.map((b) => (
-                                                <SelectItem
-                                                    key={b.id}
-                                                    value={b.id.toString()}
-                                                >
-                                                    {b.name}
-                                                </SelectItem>
-                                            ))}
+                                            <SelectItem value="cash">
+                                                Efectivo
+                                            </SelectItem>
+                                            <SelectItem value="credit card">
+                                                Tarjeta de Crédito
+                                            </SelectItem>
+                                            <SelectItem value="bank transfer">
+                                                Transferencia Bancaria
+                                            </SelectItem>
+                                            <SelectItem value="check">
+                                                Cheque
+                                            </SelectItem>
+                                            <SelectItem value="credit">
+                                                Al Crédito
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="group_transfer_auth">
-                                        Código de Autorización / Referencia{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        id="group_transfer_auth"
-                                        type="text"
-                                        placeholder="Ej. TX-102934"
-                                        value={transferAuthorizationCode}
-                                        onChange={(e) =>
-                                            setTransferAuthorizationCode(
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="group_transfer_value">
-                                        Monto Transferido (L.){' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        id="group_transfer_value"
-                                        type="number"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={transferValue}
-                                        onChange={(e) =>
-                                            setTransferValue(e.target.value)
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        )}
 
-                        {paymentType === 'credit' && (
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-4">
-                                    <div className="flex flex-col gap-0.5">
-                                        <Label className="cursor-pointer text-xs font-semibold">
-                                            Registrar pago inicial / prima
-                                        </Label>
-                                        <span className="text-[10px] text-muted-foreground">
-                                            Si el cliente abona una parte del
-                                            saldo hoy
-                                        </span>
-                                    </div>
-                                    <Switch
-                                        checked={hasInitialPayment}
-                                        onCheckedChange={(checked) => {
-                                            setHasInitialPayment(checked);
-
-                                            if (!checked) {
-                                                setInitialPaymentAmount('');
-                                                resetDetailedPayments();
-                                            }
-                                        }}
-                                    />
-                                </div>
-
-                                {hasInitialPayment && (
-                                    <div className="space-y-4 border-t pt-2">
+                                {paymentType !== 'credit' &&
+                                    paymentType !== '' && (
                                         <div className="grid gap-2">
-                                            <Label htmlFor="group_initial_amount">
-                                                Monto de Pago Inicial (L.){' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
+                                            <Label htmlFor="group_payment_date">
+                                                Fecha de Pago
                                             </Label>
                                             <Input
-                                                id="group_initial_amount"
-                                                type="number"
-                                                step="0.01"
-                                                placeholder="0.00"
-                                                value={initialPaymentAmount}
+                                                id="group_payment_date"
+                                                type="date"
+                                                value={paymentMethodDate}
                                                 onChange={(e) =>
-                                                    setInitialPaymentAmount(
+                                                    setPaymentMethodDate(
                                                         e.target.value,
                                                     )
                                                 }
                                             />
                                         </div>
+                                    )}
 
+                                {paymentType === 'cash' && (
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="group_cash_value">
+                                            Efectivo Recibido (L.){' '}
+                                            <span className="text-destructive">
+                                                *
+                                            </span>
+                                        </Label>
+                                        <Input
+                                            id="group_cash_value"
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={cashValue}
+                                            onChange={(e) =>
+                                                setCashValue(e.target.value)
+                                            }
+                                        />
+                                    </div>
+                                )}
+
+                                {paymentType === 'check' && (
+                                    <div className="space-y-4">
                                         <div className="grid gap-2">
-                                            <Label htmlFor="group_initial_type">
-                                                Tipo de Pago Inicial{' '}
+                                            <Label htmlFor="group_check_number">
+                                                Número de Cheque{' '}
                                                 <span className="text-destructive">
                                                     *
                                                 </span>
                                             </Label>
-                                            <Select
-                                                value={initialPaymentType}
-                                                onValueChange={(val) => {
-                                                    setInitialPaymentType(val);
-                                                    resetDetailedPayments();
-                                                }}
-                                            >
-                                                <SelectTrigger
-                                                    id="group_initial_type"
-                                                    className="w-full"
-                                                >
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent className="z-[110]">
-                                                    <SelectItem value="cash">
-                                                        Efectivo
-                                                    </SelectItem>
-                                                    <SelectItem value="credit card">
-                                                        Tarjeta de Crédito
-                                                    </SelectItem>
-                                                    <SelectItem value="bank transfer">
-                                                        Transferencia Bancaria
-                                                    </SelectItem>
-                                                    <SelectItem value="check">
-                                                        Cheque
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                            <Input
+                                                id="group_check_number"
+                                                type="text"
+                                                placeholder="Ej. 100234"
+                                                value={checkNumber}
+                                                onChange={(e) =>
+                                                    setCheckNumber(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
                                         </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="group_check_value">
+                                                Valor del Cheque (L.){' '}
+                                                <span className="text-destructive">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <Input
+                                                id="group_check_value"
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="0.00"
+                                                value={checkValue}
+                                                onChange={(e) =>
+                                                    setCheckValue(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                )}
 
-                                        {initialPaymentType === 'check' && (
+                                {paymentType === 'credit card' && (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
                                             <div className="grid gap-2">
-                                                <Label htmlFor="group_check_number">
-                                                    Número de Cheque{' '}
+                                                <Label htmlFor="group_card_last_4">
+                                                    Últimos 4 Dígitos{' '}
                                                     <span className="text-destructive">
                                                         *
                                                     </span>
                                                 </Label>
                                                 <Input
-                                                    id="group_check_number"
+                                                    id="group_card_last_4"
                                                     type="text"
-                                                    placeholder="Ej. 100234"
-                                                    value={checkNumber}
+                                                    maxLength={4}
+                                                    placeholder="1234"
+                                                    value={cardLast4}
                                                     onChange={(e) =>
-                                                        setCheckNumber(
-                                                            e.target.value,
+                                                        setCardLast4(
+                                                            e.target.value.replace(
+                                                                /\D/g,
+                                                                '',
+                                                            ),
                                                         )
                                                     }
                                                 />
                                             </div>
-                                        )}
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="group_card_expiration">
+                                                    Vencimiento (MM/AA){' '}
+                                                    <span className="text-destructive">
+                                                        *
+                                                    </span>
+                                                </Label>
+                                                <Input
+                                                    id="group_card_expiration"
+                                                    type="text"
+                                                    placeholder="12/26"
+                                                    value={cardExpiration}
+                                                    onChange={(e) => {
+                                                        const cleaned =
+                                                            e.target.value.replace(
+                                                                /\D/g,
+                                                                '',
+                                                            );
+                                                        let formatted = cleaned;
 
-                                        {initialPaymentType ===
-                                            'credit card' && (
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="group_card_last_4">
-                                                        Últimos 4 Dígitos{' '}
-                                                        <span className="text-destructive">
-                                                            *
-                                                        </span>
-                                                    </Label>
-                                                    <Input
-                                                        id="group_card_last_4"
-                                                        type="text"
-                                                        maxLength={4}
-                                                        placeholder="1234"
-                                                        value={cardLast4}
-                                                        onChange={(e) =>
-                                                            setCardLast4(
-                                                                e.target.value.replace(
-                                                                    /\D/g,
-                                                                    '',
-                                                                ),
-                                                            )
+                                                        if (
+                                                            cleaned.length > 2
+                                                        ) {
+                                                            formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}`;
                                                         }
-                                                    />
-                                                </div>
+
+                                                        setCardExpiration(
+                                                            formatted,
+                                                        );
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="group_card_auth">
+                                                Código de Autorización{' '}
+                                                <span className="text-destructive">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <Input
+                                                id="group_card_auth"
+                                                type="text"
+                                                placeholder="Ej. 900234"
+                                                value={cardAuthorizationCode}
+                                                onChange={(e) =>
+                                                    setCardAuthorizationCode(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="group_card_charged">
+                                                Monto a Cobrar (L.){' '}
+                                                <span className="text-destructive">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <Input
+                                                id="group_card_charged"
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="0.00"
+                                                value={cardValueCharged}
+                                                onChange={(e) =>
+                                                    setCardValueCharged(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {paymentType === 'bank transfer' && (
+                                    <div className="space-y-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="group_transfer_bank">
+                                                Banco Receptor{' '}
+                                                <span className="text-destructive">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <Select
+                                                value={transferBankId}
+                                                onValueChange={
+                                                    setTransferBankId
+                                                }
+                                            >
+                                                <SelectTrigger
+                                                    id="group_transfer_bank"
+                                                    className="w-full"
+                                                >
+                                                    <SelectValue placeholder="Seleccione el banco" />
+                                                </SelectTrigger>
+                                                <SelectContent className="z-[110]">
+                                                    {banks.map((b) => (
+                                                        <SelectItem
+                                                            key={b.id}
+                                                            value={b.id.toString()}
+                                                        >
+                                                            {b.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="group_transfer_auth">
+                                                Código de Autorización /
+                                                Referencia{' '}
+                                                <span className="text-destructive">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <Input
+                                                id="group_transfer_auth"
+                                                type="text"
+                                                placeholder="Ej. TX-102934"
+                                                value={
+                                                    transferAuthorizationCode
+                                                }
+                                                onChange={(e) =>
+                                                    setTransferAuthorizationCode(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="group_transfer_value">
+                                                Monto Transferido (L.){' '}
+                                                <span className="text-destructive">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <Input
+                                                id="group_transfer_value"
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="0.00"
+                                                value={transferValue}
+                                                onChange={(e) =>
+                                                    setTransferValue(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {paymentType === 'credit' && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-4">
+                                            <div className="flex flex-col gap-0.5">
+                                                <Label className="cursor-pointer text-xs font-semibold">
+                                                    Registrar pago inicial /
+                                                    prima
+                                                </Label>
+                                                <span className="text-[10px] text-muted-foreground">
+                                                    Si el cliente abona una
+                                                    parte del saldo hoy
+                                                </span>
+                                            </div>
+                                            <Switch
+                                                checked={hasInitialPayment}
+                                                onCheckedChange={(checked) => {
+                                                    setHasInitialPayment(
+                                                        checked,
+                                                    );
+
+                                                    if (!checked) {
+                                                        setInitialPaymentAmount(
+                                                            '',
+                                                        );
+                                                        resetDetailedPayments();
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+
+                                        {hasInitialPayment && (
+                                            <div className="space-y-4 border-t pt-2">
                                                 <div className="grid gap-2">
-                                                    <Label htmlFor="group_card_auth">
-                                                        Autorización{' '}
+                                                    <Label htmlFor="group_initial_amount">
+                                                        Monto de Pago Inicial
+                                                        (L.){' '}
                                                         <span className="text-destructive">
                                                             *
                                                         </span>
                                                     </Label>
                                                     <Input
-                                                        id="group_card_auth"
-                                                        type="text"
-                                                        placeholder="Ej. 900234"
+                                                        id="group_initial_amount"
+                                                        type="number"
+                                                        step="0.01"
+                                                        placeholder="0.00"
                                                         value={
-                                                            cardAuthorizationCode
+                                                            initialPaymentAmount
                                                         }
                                                         onChange={(e) =>
-                                                            setCardAuthorizationCode(
+                                                            setInitialPaymentAmount(
                                                                 e.target.value,
                                                             )
                                                         }
                                                     />
                                                 </div>
-                                            </div>
-                                        )}
 
-                                        {initialPaymentType ===
-                                            'bank transfer' && (
-                                            <div className="grid grid-cols-2 gap-4">
                                                 <div className="grid gap-2">
-                                                    <Label htmlFor="group_transfer_bank">
-                                                        Banco{' '}
+                                                    <Label htmlFor="group_initial_type">
+                                                        Tipo de Pago Inicial{' '}
                                                         <span className="text-destructive">
                                                             *
                                                         </span>
                                                     </Label>
                                                     <Select
-                                                        value={transferBankId}
-                                                        onValueChange={
-                                                            setTransferBankId
+                                                        value={
+                                                            initialPaymentType
                                                         }
+                                                        onValueChange={(
+                                                            val,
+                                                        ) => {
+                                                            setInitialPaymentType(
+                                                                val,
+                                                            );
+                                                            resetDetailedPayments();
+                                                        }}
                                                     >
                                                         <SelectTrigger
-                                                            id="group_transfer_bank"
+                                                            id="group_initial_type"
                                                             className="w-full"
                                                         >
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent className="z-[110]">
-                                                            {banks.map((b) => (
-                                                                <SelectItem
-                                                                    key={b.id}
-                                                                    value={b.id.toString()}
-                                                                >
-                                                                    {b.name}
-                                                                </SelectItem>
-                                                            ))}
+                                                            <SelectItem value="cash">
+                                                                Efectivo
+                                                            </SelectItem>
+                                                            <SelectItem value="credit card">
+                                                                Tarjeta de
+                                                                Crédito
+                                                            </SelectItem>
+                                                            <SelectItem value="bank transfer">
+                                                                Transferencia
+                                                                Bancaria
+                                                            </SelectItem>
+                                                            <SelectItem value="check">
+                                                                Cheque
+                                                            </SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="group_transfer_auth">
-                                                        Referencia{' '}
-                                                        <span className="text-destructive">
-                                                            *
-                                                        </span>
-                                                    </Label>
-                                                    <Input
-                                                        id="group_transfer_auth"
-                                                        type="text"
-                                                        placeholder="TX-1029"
-                                                        value={
-                                                            transferAuthorizationCode
-                                                        }
-                                                        onChange={(e) =>
-                                                            setTransferAuthorizationCode(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
+
+                                                {initialPaymentType ===
+                                                    'check' && (
+                                                    <div className="grid gap-2">
+                                                        <Label htmlFor="group_check_number">
+                                                            Número de Cheque{' '}
+                                                            <span className="text-destructive">
+                                                                *
+                                                            </span>
+                                                        </Label>
+                                                        <Input
+                                                            id="group_check_number"
+                                                            type="text"
+                                                            placeholder="Ej. 100234"
+                                                            value={checkNumber}
+                                                            onChange={(e) =>
+                                                                setCheckNumber(
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                {initialPaymentType ===
+                                                    'credit card' && (
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="grid gap-2">
+                                                            <Label htmlFor="group_card_last_4">
+                                                                Últimos 4
+                                                                Dígitos{' '}
+                                                                <span className="text-destructive">
+                                                                    *
+                                                                </span>
+                                                            </Label>
+                                                            <Input
+                                                                id="group_card_last_4"
+                                                                type="text"
+                                                                maxLength={4}
+                                                                placeholder="1234"
+                                                                value={
+                                                                    cardLast4
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setCardLast4(
+                                                                        e.target.value.replace(
+                                                                            /\D/g,
+                                                                            '',
+                                                                        ),
+                                                                    )
+                                                                }
+                                                            />
+                                                        </div>
+                                                        <div className="grid gap-2">
+                                                            <Label htmlFor="group_card_auth">
+                                                                Autorización{' '}
+                                                                <span className="text-destructive">
+                                                                    *
+                                                                </span>
+                                                            </Label>
+                                                            <Input
+                                                                id="group_card_auth"
+                                                                type="text"
+                                                                placeholder="Ej. 900234"
+                                                                value={
+                                                                    cardAuthorizationCode
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setCardAuthorizationCode(
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {initialPaymentType ===
+                                                    'bank transfer' && (
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="grid gap-2">
+                                                            <Label htmlFor="group_transfer_bank">
+                                                                Banco{' '}
+                                                                <span className="text-destructive">
+                                                                    *
+                                                                </span>
+                                                            </Label>
+                                                            <Select
+                                                                value={
+                                                                    transferBankId
+                                                                }
+                                                                onValueChange={
+                                                                    setTransferBankId
+                                                                }
+                                                            >
+                                                                <SelectTrigger
+                                                                    id="group_transfer_bank"
+                                                                    className="w-full"
+                                                                >
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent className="z-[110]">
+                                                                    {banks.map(
+                                                                        (b) => (
+                                                                            <SelectItem
+                                                                                key={
+                                                                                    b.id
+                                                                                }
+                                                                                value={b.id.toString()}
+                                                                            >
+                                                                                {
+                                                                                    b.name
+                                                                                }
+                                                                            </SelectItem>
+                                                                        ),
+                                                                    )}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                        <div className="grid gap-2">
+                                                            <Label htmlFor="group_transfer_auth">
+                                                                Referencia{' '}
+                                                                <span className="text-destructive">
+                                                                    *
+                                                                </span>
+                                                            </Label>
+                                                            <Input
+                                                                id="group_transfer_auth"
+                                                                type="text"
+                                                                placeholder="TX-1029"
+                                                                value={
+                                                                    transferAuthorizationCode
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setTransferAuthorizationCode(
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
                                 )}
+
+                                <div className="mt-4 flex justify-end gap-3 border-t pt-6">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                            setIsPaymentSheetOpen(false)
+                                        }
+                                    >
+                                        Cancelar
+                                    </Button>
+                                    <Button onClick={handleSavePaymentDetails}>
+                                        Guardar
+                                    </Button>
+                                </div>
                             </div>
-                        )}
+                        </SheetContent>
+                    </Sheet>
 
-                        <div className="mt-4 flex justify-end gap-3 border-t pt-6">
-                            <Button
-                                variant="outline"
-                                onClick={() => setIsPaymentSheetOpen(false)}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button onClick={handleSavePaymentDetails}>
-                                Guardar
-                            </Button>
-                        </div>
-                    </div>
-                </SheetContent>
-            </Sheet>
+                    {/* On-the-fly sheets for nested creation */}
+                    <Sheet
+                        open={isEditPricesSheetOpen}
+                        onOpenChange={setIsEditPricesSheetOpen}
+                    >
+                        <SheetContent
+                            side="right"
+                            className="z-[120] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                            overlayClassName="z-[120]"
+                        >
+                            <HeadingSheet
+                                title="Gestionar Precios"
+                                description="Modifique la lista de precios para este análisis."
+                            />
+                            <div className="-mx-5 mt-4 px-5">
+                                {selectedExaminationForPrices && (
+                                    <ExaminationPricesForm
+                                        examination={
+                                            selectedExaminationForPrices
+                                        }
+                                        onSuccess={() =>
+                                            setIsEditPricesSheetOpen(false)
+                                        }
+                                    />
+                                )}
+                            </div>
+                        </SheetContent>
+                    </Sheet>
 
-            {/* On-the-fly sheets for nested creation */}
-            <Sheet
-                open={isEditPricesSheetOpen}
-                onOpenChange={setIsEditPricesSheetOpen}
-            >
-                <SheetContent
-                    side="right"
-                    className="z-[120] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                >
-                    <HeadingSheet
-                        title="Gestionar Precios"
-                        description="Modifique la lista de precios para este análisis."
-                    />
-                    <div className="-mx-5 mt-4 px-5">
-                        {selectedExaminationForPrices && (
-                            <ExaminationPricesForm
-                                examination={selectedExaminationForPrices}
+                    <Sheet
+                        open={isCustomerSheetOpen}
+                        onOpenChange={setIsCustomerSheetOpen}
+                    >
+                        <SheetContent
+                            side="right"
+                            className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                            overlayClassName="z-[100]"
+                        >
+                            <HeadingSheet
+                                title="Nuevo Paciente"
+                                description="Ingrese los datos del nuevo paciente a registrar en el sistema."
+                            />
+                            <CustomerForm
+                                customer={undefined}
+                                onSuccess={() => setIsCustomerSheetOpen(false)}
+                            />
+                        </SheetContent>
+                    </Sheet>
+
+                    <Sheet
+                        open={isReferrerSheetOpen}
+                        onOpenChange={setIsReferrerSheetOpen}
+                    >
+                        <SheetContent
+                            side="right"
+                            className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                            overlayClassName="z-[100]"
+                        >
+                            <HeadingSheet
+                                title="Nuevo Médico Remitente"
+                                description="Ingrese los datos del médico remitente a registrar en el sistema."
+                            />
+                            <ReferrerForm
+                                referrer={null}
+                                referrerTypes={referrerTypes}
+                                onSuccess={() => setIsReferrerSheetOpen(false)}
+                            />
+                        </SheetContent>
+                    </Sheet>
+
+                    <Sheet
+                        open={isSpecimenTypeSheetOpen}
+                        onOpenChange={setIsSpecimenTypeSheetOpen}
+                    >
+                        <SheetContent
+                            side="right"
+                            className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                            overlayClassName="z-[100]"
+                        >
+                            <HeadingSheet
+                                title="Nuevo Tipo de Muestra"
+                                description="Ingrese los datos del tipo de muestra a registrar en el sistema."
+                            />
+                            <SpecimenTypeForm
+                                specimenType={null}
                                 onSuccess={() =>
-                                    setIsEditPricesSheetOpen(false)
+                                    setIsSpecimenTypeSheetOpen(false)
                                 }
                             />
-                        )}
-                    </div>
-                </SheetContent>
-            </Sheet>
+                        </SheetContent>
+                    </Sheet>
 
-            <Sheet
-                open={isCustomerSheetOpen}
-                onOpenChange={setIsCustomerSheetOpen}
-            >
-                <SheetContent
-                    side="right"
-                    className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                >
-                    <HeadingSheet
-                        title="Nuevo Paciente"
-                        description="Ingrese los datos del nuevo paciente a registrar en el sistema."
+                    <SpecimenTypeExaminationSheet
+                        examination={null}
+                        specimenTypes={specimenTypes}
+                        open={isExaminationSheetOpen}
+                        onOpenChange={setIsExaminationSheetOpen}
+                        defaultSpecimenTypeId={nestedSpecimenType || undefined}
+                        className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                        overlayClassName="z-[100]"
                     />
-                    <CustomerForm
-                        customer={undefined}
-                        onSuccess={() => setIsCustomerSheetOpen(false)}
-                    />
-                </SheetContent>
-            </Sheet>
 
-            <Sheet
-                open={isReferrerSheetOpen}
-                onOpenChange={setIsReferrerSheetOpen}
-            >
-                <SheetContent
-                    side="right"
-                    className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                >
-                    <HeadingSheet
-                        title="Nuevo Médico Remitente"
-                        description="Ingrese los datos del médico remitente a registrar en el sistema."
-                    />
-                    <ReferrerForm
-                        referrer={null}
-                        referrerTypes={referrerTypes}
-                        onSuccess={() => setIsReferrerSheetOpen(false)}
+                    <CategorySheet
+                        category={null}
+                        open={isCategorySheetOpen}
+                        onOpenChange={setIsCategorySheetOpen}
+                        className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                        overlayClassName="z-[100]"
                     />
                 </SheetContent>
             </Sheet>
-
-            <Sheet
-                open={isSpecimenTypeSheetOpen}
-                onOpenChange={setIsSpecimenTypeSheetOpen}
-            >
-                <SheetContent
-                    side="right"
-                    className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                >
-                    <HeadingSheet
-                        title="Nuevo Tipo de Muestra"
-                        description="Ingrese los datos del tipo de muestra a registrar en el sistema."
-                    />
-                    <SpecimenTypeForm
-                        specimenType={null}
-                        onSuccess={() => setIsSpecimenTypeSheetOpen(false)}
-                    />
-                </SheetContent>
-            </Sheet>
-
-            <SpecimenTypeExaminationSheet
-                examination={null}
-                specimenTypes={specimenTypes}
-                open={isExaminationSheetOpen}
-                onOpenChange={setIsExaminationSheetOpen}
-                defaultSpecimenTypeId={nestedSpecimenType || undefined}
-            />
-
-            <CategorySheet
-                category={null}
-                open={isCategorySheetOpen}
-                onOpenChange={setIsCategorySheetOpen}
-            />
         </>
     );
 }

@@ -237,6 +237,8 @@ export default function SpecimenForm({
     const prevSpecimenTypesRef = React.useRef<any[]>(specimenTypes);
     const prevExaminationsRef = React.useRef<any[]>(examinations);
     const prevCategoriesRef = React.useRef<any[]>(categories);
+    const prevCustomersRef = React.useRef<any[]>(customers);
+    const prevReferrersRef = React.useRef<any[]>(referrers);
 
     React.useEffect(() => {
         if (specimenTypes.length > prevSpecimenTypesRef.current.length) {
@@ -296,9 +298,49 @@ export default function SpecimenForm({
         prevCategoriesRef.current = categories;
     }, [categories]);
 
+    React.useEffect(() => {
+        if (customers.length > prevCustomersRef.current.length) {
+            const newCustomers = customers.filter(
+                (c) =>
+                    !prevCustomersRef.current.some((prev) => prev.id === c.id),
+            );
+
+            if (newCustomers.length > 0) {
+                setData('customer', newCustomers[0].id.toString());
+                toast.success(
+                    `Paciente "${newCustomers[0].name}" seleccionado automáticamente`,
+                );
+            }
+        }
+
+        prevCustomersRef.current = customers;
+    }, [customers]);
+
+    React.useEffect(() => {
+        if (referrers.length > prevReferrersRef.current.length) {
+            const newReferrers = referrers.filter(
+                (r) =>
+                    !prevReferrersRef.current.some((prev) => prev.id === r.id),
+            );
+
+            if (newReferrers.length > 0) {
+                setData('referrer', newReferrers[0].id.toString());
+                toast.success(
+                    `Médico "${newReferrers[0].name}" seleccionado automáticamente`,
+                );
+            }
+        }
+
+        prevReferrersRef.current = referrers;
+    }, [referrers]);
+
     const [localSequences, setLocalSequences] =
         React.useState<any[]>(sequences);
     const [showConfirm, setShowConfirm] = React.useState(false);
+    const [showRegenerateConfirm, setShowRegenerateConfirm] =
+        React.useState(false);
+    const [showBlockedPaymentAlert, setShowBlockedPaymentAlert] =
+        React.useState(false);
     const [isFacturating, setIsFacturating] = React.useState(false);
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = React.useState(false);
     const [localPayment, setLocalPayment] = React.useState({
@@ -520,6 +562,34 @@ export default function SpecimenForm({
             return;
         }
 
+        if (specimen) {
+            const originalPaymentType =
+                specimen?.invoice_relation?.payment_type;
+            const hasPayments =
+                specimen?.invoice_relation?.credit_relation?.has_payments;
+            const newVal = localPayment.payment_type;
+
+            if (
+                originalPaymentType === 'credit' &&
+                newVal !== 'credit' &&
+                hasPayments
+            ) {
+                setShowBlockedPaymentAlert(true);
+                return;
+            }
+
+            if (
+                newVal === 'credit' &&
+                originalPaymentType !== 'credit' &&
+                hasPayments
+            ) {
+                setShowBlockedPaymentAlert(true);
+                return;
+            }
+        }
+
+        const isCredit = localPayment.payment_type === 'credit';
+
         // Apply to data
         setData((d) => ({
             ...d,
@@ -536,9 +606,15 @@ export default function SpecimenForm({
             transfer_value: localPayment.transfer_value,
             transfer_authorization_code:
                 localPayment.transfer_authorization_code,
-            has_initial_payment: localPayment.has_initial_payment,
-            initial_payment_amount: localPayment.initial_payment_amount,
-            initial_payment_type: localPayment.initial_payment_type,
+            has_initial_payment: isCredit
+                ? localPayment.has_initial_payment
+                : false,
+            initial_payment_amount: isCredit
+                ? localPayment.initial_payment_amount
+                : '',
+            initial_payment_type: isCredit
+                ? localPayment.initial_payment_type
+                : '',
         }));
 
         setIsPaymentSheetOpen(false);
@@ -605,24 +681,50 @@ export default function SpecimenForm({
         additional_discount: '0',
         age_discount_type: null as string | null,
         age_discount_amount: '0',
-        payment_type: '',
+        payment_type: specimen?.invoice_relation?.payment_type || '',
+        regenerate_pdf: true,
         proof_of_payment: null as File | null,
-        has_initial_payment: false,
-        initial_payment_amount: '',
-        initial_payment_type: 'cash',
+        has_initial_payment: specimen?.invoice_relation?.credit_payment_id
+            ? parseFloat(
+                  specimen?.invoice_relation?.credit_relation?.amount_paid ||
+                      '0',
+              ) > 0
+            : false,
+        initial_payment_amount: specimen?.invoice_relation?.credit_payment_id
+            ? specimen?.invoice_relation?.credit_relation?.amount_paid?.toString() ||
+              ''
+            : '',
+        initial_payment_type: specimen?.invoice_relation?.credit_payment_id
+            ? specimen?.invoice_relation?.cash_value
+                ? 'cash'
+                : specimen?.invoice_relation?.check_value
+                  ? 'check'
+                  : specimen?.invoice_relation?.card_value_charged
+                    ? 'credit card'
+                    : specimen?.invoice_relation?.transfer_value
+                      ? 'bank transfer'
+                      : 'cash'
+            : 'cash',
 
-        // Detailed payment fields (creation only)
-        payment_method_date: new Date().toISOString().split('T')[0],
-        cash_value: '',
-        check_number: '',
-        check_value: '',
-        card_last_4: '',
-        card_value_charged: '',
-        card_expiration: '',
-        card_authorization_code: '',
-        transfer_bank_id: '',
-        transfer_value: '',
-        transfer_authorization_code: '',
+        // Detailed payment fields
+        payment_method_date:
+            specimen?.invoice_relation?.payment_method_date ||
+            new Date().toISOString().split('T')[0],
+        cash_value: specimen?.invoice_relation?.cash_value?.toString() || '',
+        check_number: specimen?.invoice_relation?.check_number || '',
+        check_value: specimen?.invoice_relation?.check_value?.toString() || '',
+        card_last_4: specimen?.invoice_relation?.card_last_4 || '',
+        card_value_charged:
+            specimen?.invoice_relation?.card_value_charged?.toString() || '',
+        card_expiration: specimen?.invoice_relation?.card_expiration || '',
+        card_authorization_code:
+            specimen?.invoice_relation?.card_authorization_code || '',
+        transfer_bank_id:
+            specimen?.invoice_relation?.transfer_bank_id?.toString() || '',
+        transfer_value:
+            specimen?.invoice_relation?.transfer_value?.toString() || '',
+        transfer_authorization_code:
+            specimen?.invoice_relation?.transfer_authorization_code || '',
 
         // Insumos field (creation only)
         agregar_insumos: false,
@@ -795,6 +897,7 @@ export default function SpecimenForm({
         }
 
         const targetLocationId = specimen?.location_id || activeLocationId;
+
         if (!targetLocationId) {
             return null;
         }
@@ -1005,10 +1108,34 @@ export default function SpecimenForm({
     const handlePreSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Si es edición, se guarda directamente sin confirmación de facturación
-        if (specimen) {
-            submitForm();
+        // Validate step 1 fields before showing confirm/editing
+        if (!validateStep1()) {
+            return;
+        }
 
+        // Si es edición, se muestra confirmación de regenerar factura PDF
+        if (specimen) {
+            const originalPaymentType =
+                specimen?.invoice_relation?.payment_type;
+            const newVal = data.payment_type;
+
+            if (
+                originalPaymentType === 'credit' &&
+                ['credit card', 'bank transfer', 'check'].includes(newVal)
+            ) {
+                if (!data.proof_of_payment) {
+                    setError(
+                        'proof_of_payment',
+                        'El archivo de comprobante de pago es requerido al cambiar de crédito.',
+                    );
+                    toast.error(
+                        'El archivo de comprobante de pago es requerido al cambiar de crédito.',
+                    );
+                    return;
+                }
+            }
+
+            setShowRegenerateConfirm(true);
             return;
         }
 
@@ -1046,8 +1173,17 @@ export default function SpecimenForm({
                 setIsFacturating(false);
                 onSuccess();
             },
-            onError: () => {
+            onError: (err: any) => {
                 setIsFacturating(false);
+                console.error('Error al guardar la muestra:', err);
+                if (err && Object.keys(err).length > 0) {
+                    const firstError = Object.values(err)[0] as string;
+                    toast.error(`Error de validación: ${firstError}`);
+                } else {
+                    toast.error(
+                        'Hubo un error al procesar la solicitud. Por favor verifique los campos.',
+                    );
+                }
             },
         };
 
@@ -2355,6 +2491,202 @@ export default function SpecimenForm({
                                 </p>
                             )}
                         </div>
+
+                        {specimen && specimen.invoice_relation && (
+                            <div className="mt-6 flex flex-col gap-5 border-t pt-4">
+                                <h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+                                    Información de Facturación
+                                </h3>
+
+                                <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <span className="text-xs font-semibold">
+                                                    Método de pago:
+                                                </span>
+                                                <span className="ml-2 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary capitalize">
+                                                    {getPaymentTypeLabel(
+                                                        data.payment_type,
+                                                    )}
+                                                </span>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    setIsPaymentSheetOpen(true)
+                                                }
+                                                className="h-8 font-semibold"
+                                            >
+                                                {data.payment_type
+                                                    ? 'Cambiar método de Pago'
+                                                    : 'Seleccionar método de pago'}
+                                            </Button>
+                                        </div>
+
+                                        {data.payment_type ? (
+                                            renderPaymentResume()
+                                        ) : (
+                                            <div className="mt-2 border-t pt-2.5 text-[11px] text-muted-foreground italic">
+                                                Por favor, configure los
+                                                detalles del pago.
+                                            </div>
+                                        )}
+                                        {errors.payment_type && (
+                                            <p className="mt-1 text-sm text-destructive">
+                                                {errors.payment_type}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Comprobante de Pago */}
+                                {((data.payment_type !== 'cash' &&
+                                    data.payment_type !== 'credit') ||
+                                    (data.payment_type === 'credit' &&
+                                        data.has_initial_payment &&
+                                        data.initial_payment_type !==
+                                            'cash')) && (
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="proof_of_payment">
+                                            Comprobante de Pago (PDF o Imagen){' '}
+                                            {isProofRequired &&
+                                                !specimen?.invoice_relation
+                                                    ?.proof_of_payment && (
+                                                    <span className="text-destructive">
+                                                        *
+                                                    </span>
+                                                )}
+                                        </Label>
+
+                                        {/* If a new proof of payment was selected */}
+                                        {data.proof_of_payment && (
+                                            <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
+                                                        <FileText className="h-5 w-5" />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="max-w-[150px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
+                                                            {
+                                                                data
+                                                                    .proof_of_payment
+                                                                    .name
+                                                            }
+                                                        </span>
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            {(
+                                                                data
+                                                                    .proof_of_payment
+                                                                    .size /
+                                                                1024 /
+                                                                1024
+                                                            ).toFixed(2)}{' '}
+                                                            MB
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() =>
+                                                        setData(
+                                                            'proof_of_payment',
+                                                            null,
+                                                        )
+                                                    }
+                                                    className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        )}
+
+                                        {/* If no new proof of payment is selected but one already exists in DB */}
+                                        {!data.proof_of_payment &&
+                                            specimen?.invoice_relation
+                                                ?.proof_of_payment &&
+                                            specimen.invoice_relation
+                                                .proof_of_payment !==
+                                                'Efectivo' && (
+                                                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 p-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="rounded-md bg-primary/10 p-2 text-primary">
+                                                            <FileText className="h-5 w-5" />
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-semibold text-foreground">
+                                                                Comprobante
+                                                                actual guardado
+                                                            </span>
+                                                            <a
+                                                                href={`/storage/${specimen.invoice_relation.proof_of_payment}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-[10px] text-primary hover:underline"
+                                                            >
+                                                                Ver archivo
+                                                                actual
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                        {/* Upload input */}
+                                        <div className="group relative mt-1">
+                                            <input
+                                                type="file"
+                                                id="proof_of_payment"
+                                                className="hidden"
+                                                accept=".pdf,image/*"
+                                                onChange={(e) => {
+                                                    const file =
+                                                        e.target.files?.[0] ||
+                                                        null;
+
+                                                    if (
+                                                        file &&
+                                                        file.size >
+                                                            50 * 1024 * 1024
+                                                    ) {
+                                                        toast.error(
+                                                            'El archivo de Comprobante no debe exceder los 50MB.',
+                                                        );
+                                                        e.target.value = '';
+                                                        return;
+                                                    }
+                                                    setData(
+                                                        'proof_of_payment',
+                                                        file,
+                                                    );
+                                                }}
+                                            />
+                                            <label
+                                                htmlFor="proof_of_payment"
+                                                className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 px-6 py-4 text-center text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/50"
+                                            >
+                                                <Upload className="h-4 w-4 text-muted-foreground" />
+                                                <span>
+                                                    {specimen?.invoice_relation
+                                                        ?.proof_of_payment
+                                                        ? 'Reemplazar Comprobante'
+                                                        : 'Seleccionar Archivo (Máx 50MB)'}
+                                                </span>
+                                            </label>
+                                        </div>
+                                        {errors.proof_of_payment && (
+                                            <span className="text-[10px] text-destructive">
+                                                {errors.proof_of_payment}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {!specimen && (
                             <>
@@ -5004,6 +5336,61 @@ export default function SpecimenForm({
                             }}
                         >
                             Confirmar y Emitir Factura
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={showRegenerateConfirm}
+                onOpenChange={setShowRegenerateConfirm}
+            >
+                <AlertDialogContent className="max-w-[450px]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            ¿Actualizar muestra y regenerar factura?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Se guardarán los cambios de la muestra y se
+                            regenerará la factura PDF correspondiente con los
+                            nuevos datos.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            onClick={() => setShowRegenerateConfirm(false)}
+                        >
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setShowRegenerateConfirm(false);
+                                submitForm();
+                            }}
+                        >
+                            Actualizar y Regenerar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={showBlockedPaymentAlert}
+                onOpenChange={setShowBlockedPaymentAlert}
+            >
+                <AlertDialogContent className="max-w-[450px]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Acción no permitida</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            No se puede cambiar el método de pago porque este
+                            crédito ya tiene pagos registrados en el sistema.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogAction
+                            onClick={() => setShowBlockedPaymentAlert(false)}
+                        >
+                            Aceptar
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

@@ -32,8 +32,8 @@ import {
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import WorkOrderTypeForm from '../work-orders/work-order-type-form';
 import TaskForm from '../work-order-tasks/task-form';
+import WorkOrderTypeForm from '../work-orders/work-order-type-form';
 
 interface WorkOrderType {
     id: number;
@@ -298,10 +298,12 @@ export default function WorkOrderForm({
             const newTasks = workOrderTasks.filter(
                 (t) => !prevTasksRef.current.some((pt) => pt.id === t.id),
             );
+
             if (newTasks.length > 0) {
                 setData('work_order_task_id', newTasks[0].id.toString());
             }
         }
+
         prevTasksRef.current = workOrderTasks;
     }, [workOrderTasks, setData]);
 

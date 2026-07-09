@@ -1,5 +1,6 @@
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 import SpecimenTypeExaminationForm from './specimen-type-examination-form';
 
 interface SpecimenType {
@@ -26,6 +27,8 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     defaultSpecimenTypeId?: string;
+    className?: string;
+    overlayClassName?: string;
 }
 
 export default function SpecimenTypeExaminationSheet({
@@ -34,10 +37,15 @@ export default function SpecimenTypeExaminationSheet({
     open,
     onOpenChange,
     defaultSpecimenTypeId,
+    className,
+    overlayClassName,
 }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="sm:max-w-[540px]">
+            <SheetContent
+                className={cn('sm:max-w-[540px]', className)}
+                overlayClassName={overlayClassName}
+            >
                 <HeadingSheet
                     title={
                         examination

@@ -248,9 +248,9 @@ class SpecimenController extends Controller
             'amount' => 'required|numeric|min:0',
             'discount' => 'required|numeric|min:0',
             'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
-            'has_initial_payment' => 'nullable|boolean',
-            'initial_payment_amount' => 'required_if:has_initial_payment,true|nullable|numeric|min:0.01',
-            'initial_payment_type' => 'required_if:has_initial_payment,true|nullable|in:cash,credit card,bank transfer,check',
+            'has_initial_payment' => $request->input('payment_type') === 'credit' ? 'nullable|boolean' : 'nullable',
+            'initial_payment_amount' => $request->input('payment_type') === 'credit' ? 'required_if:has_initial_payment,true|nullable|numeric|min:0.01' : 'nullable',
+            'initial_payment_type' => $request->input('payment_type') === 'credit' ? 'required_if:has_initial_payment,true|nullable|in:cash,credit card,bank transfer,check' : 'nullable',
             'custom_amount_enabled' => 'nullable|boolean',
             'custom_amount' => 'nullable|numeric|min:0',
             'custom_amount_reason' => 'nullable|string|max:255',
@@ -645,7 +645,61 @@ class SpecimenController extends Controller
                     }
                 },
             ],
+            'payment_type' => 'nullable|in:cash,credit card,bank transfer,check,credit',
+            'has_initial_payment' => $request->input('payment_type') === 'credit' ? 'nullable|boolean' : 'nullable',
+            'initial_payment_amount' => $request->input('payment_type') === 'credit' ? 'required_if:has_initial_payment,true|nullable|numeric|min:0.01' : 'nullable',
+            'initial_payment_type' => $request->input('payment_type') === 'credit' ? 'required_if:has_initial_payment,true|nullable|in:cash,credit card,bank transfer,check' : 'nullable',
+            'payment_method_date' => 'nullable|date',
+            'cash_value' => 'nullable|numeric|min:0',
+            'check_number' => 'nullable|string|max:255',
+            'check_value' => 'nullable|numeric|min:0',
+            'card_last_4' => 'nullable|string|max:4',
+            'card_value_charged' => 'nullable|numeric|min:0',
+            'card_expiration' => 'nullable|string|max:10',
+            'card_authorization_code' => 'nullable|string|max:255',
+            'transfer_bank_id' => 'nullable|exists:banks,id',
+            'transfer_value' => 'nullable|numeric|min:0',
+            'transfer_authorization_code' => 'nullable|string|max:255',
+            'proof_of_payment' => [
+                'nullable',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp,gif',
+                function ($attribute, $value, $fail) {
+                    if ($value instanceof UploadedFile) {
+                        $mime = $value->getMimeType();
+                        $isImage = str_starts_with($mime, 'image/');
+                        $sizeInKb = $value->getSize() / 1024;
+                        if ($isImage) {
+                            if ($sizeInKb > 10240) {
+                                $fail('El archivo de comprobante no debe superar los 10 MB.');
+                            }
+                        } else {
+                            if ($sizeInKb > 30720) {
+                                $fail('El archivo de comprobante no debe superar los 30 MB.');
+                            }
+                        }
+                    }
+                },
+            ],
+            'regenerate_pdf' => 'nullable|boolean',
         ]);
+
+        $invoice = $specimen->is_group && $specimen->group
+            ? $specimen->group->invoice
+            : $specimen->invoiceRelation;
+
+        if ($invoice) {
+            $oldPaymentType = $invoice->payment_type;
+            $newPaymentType = $request->input('payment_type');
+
+            if ($oldPaymentType === 'credit' && in_array($newPaymentType, ['credit card', 'bank transfer', 'check'])) {
+                if (! $request->hasFile('proof_of_payment')) {
+                    throw ValidationException::withMessages([
+                        'proof_of_payment' => ['El archivo de comprobante de pago es requerido al cambiar de crédito.'],
+                    ]);
+                }
+            }
+        }
 
         if ($request->hasFile('medical_order_file')) {
             if ($specimen->medical_order_file) {
@@ -659,7 +713,7 @@ class SpecimenController extends Controller
 
         $oldPriorityId = $specimen->priority_id;
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($specimen, &$validated, $oldPriorityId) {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($specimen, &$validated, $oldPriorityId, $request) {
             $oldSpecimenType = (int) $specimen->specimen_type;
             $newSpecimenType = (int) $validated['specimen_type'];
 
@@ -716,7 +770,161 @@ class SpecimenController extends Controller
                     ['order' => $maxOrder + 1]
                 );
             }
+
+            // Payment type logic
+            $invoice = $specimen->is_group && $specimen->group
+                ? $specimen->group->invoice
+                : $specimen->invoiceRelation;
+
+            if ($invoice && $request->filled('payment_type')) {
+                $newPaymentType = $request->input('payment_type');
+                $oldPaymentType = $invoice->payment_type;
+
+                if ($newPaymentType !== $oldPaymentType) {
+                    if ($oldPaymentType === 'credit') {
+                        $credit = $invoice->creditRelation;
+                        if ($credit) {
+                            $hasPayments = $credit->invoices()->where('invoice_type', 'credit payment')->exists();
+                            if ($hasPayments) {
+                                throw ValidationException::withMessages([
+                                    'payment_type' => ['No se puede cambiar el método de pago porque el crédito ya tiene pagos registrados.'],
+                                ]);
+                            }
+                            $credit->delete();
+                        }
+                    }
+                }
+
+                // File upload for proof of payment
+                $proofOfPaymentPath = $invoice->proof_of_payment;
+                if ($request->hasFile('proof_of_payment')) {
+                    if ($proofOfPaymentPath && $proofOfPaymentPath !== 'Efectivo' && Storage::disk('public')->exists($proofOfPaymentPath)) {
+                        Storage::disk('public')->delete($proofOfPaymentPath);
+                    }
+                    $proofOfPaymentPath = $this->storeUploadedFile($request->file('proof_of_payment'), 'proofs');
+                } elseif ($newPaymentType === 'cash') {
+                    $proofOfPaymentPath = 'Efectivo';
+                }
+
+                if ($newPaymentType === 'credit') {
+                    $initialPaymentAmount = $request->boolean('has_initial_payment') ? (float) $request->input('initial_payment_amount') : 0.00;
+
+                    // Create or update credit
+                    $credit = $invoice->creditRelation;
+                    if ($credit) {
+                        $credit->update([
+                            'customer_id' => $validated['customer'],
+                            'credit_amount' => $invoice->total,
+                            'amount_paid' => $initialPaymentAmount,
+                            'amount_remaining' => $invoice->total - $initialPaymentAmount,
+                        ]);
+                    } else {
+                        $credit = Credit::create([
+                            'customer_id' => $validated['customer'],
+                            'credit_amount' => $invoice->total,
+                            'amount_paid' => $initialPaymentAmount,
+                            'amount_remaining' => $invoice->total - $initialPaymentAmount,
+                            'specimen_id' => $specimen->id,
+                            'is_group' => $specimen->is_group,
+                            'group_id' => $specimen->group_id,
+                        ]);
+                    }
+
+                    $invoice->update([
+                        'payment_type' => 'credit',
+                        'credit_payment_id' => $credit->id,
+                        'total_paid' => $initialPaymentAmount,
+                        'proof_of_payment' => $proofOfPaymentPath,
+                        'payment_method_date' => $request->input('payment_method_date'),
+                        'cash_value' => $request->input('initial_payment_type') === 'cash' ? $initialPaymentAmount : null,
+                        'check_number' => $request->input('initial_payment_type') === 'check' ? $request->input('check_number') : null,
+                        'check_value' => $request->input('initial_payment_type') === 'check' ? $initialPaymentAmount : null,
+                        'card_last_4' => $request->input('initial_payment_type') === 'credit card' ? $request->input('card_last_4') : null,
+                        'card_value_charged' => $request->input('initial_payment_type') === 'credit card' ? $initialPaymentAmount : null,
+                        'card_expiration' => $request->input('initial_payment_type') === 'credit card' ? $request->input('card_expiration') : null,
+                        'card_authorization_code' => $request->input('initial_payment_type') === 'credit card' ? $request->input('card_authorization_code') : null,
+                        'transfer_bank_id' => $request->input('initial_payment_type') === 'bank transfer' ? $request->input('transfer_bank_id') : null,
+                        'transfer_value' => $request->input('initial_payment_type') === 'bank transfer' ? $initialPaymentAmount : null,
+                        'transfer_authorization_code' => $request->input('initial_payment_type') === 'bank transfer' ? $request->input('transfer_authorization_code') : null,
+                    ]);
+                } else {
+                    $invoice->update([
+                        'payment_type' => $newPaymentType,
+                        'credit_payment_id' => null,
+                        'total_paid' => $invoice->total,
+                        'proof_of_payment' => $proofOfPaymentPath,
+                        'payment_method_date' => $request->input('payment_method_date'),
+                        'cash_value' => $newPaymentType === 'cash' ? $invoice->total : null,
+                        'check_number' => $newPaymentType === 'check' ? $request->input('check_number') : null,
+                        'check_value' => $newPaymentType === 'check' ? $invoice->total : null,
+                        'card_last_4' => $newPaymentType === 'credit card' ? $request->input('card_last_4') : null,
+                        'card_value_charged' => $newPaymentType === 'credit card' ? $invoice->total : null,
+                        'card_expiration' => $newPaymentType === 'credit card' ? $request->input('card_expiration') : null,
+                        'card_authorization_code' => $newPaymentType === 'credit card' ? $request->input('card_authorization_code') : null,
+                        'transfer_bank_id' => $newPaymentType === 'bank transfer' ? $request->input('transfer_bank_id') : null,
+                        'transfer_value' => $newPaymentType === 'bank transfer' ? $invoice->total : null,
+                        'transfer_authorization_code' => $newPaymentType === 'bank transfer' ? $request->input('transfer_authorization_code') : null,
+                    ]);
+                }
+            }
+
+            // Sync invoice customer to match specimen's customer
+            if ($invoice && ! $specimen->is_group && $invoice->customer_id != $validated['customer']) {
+                $invoice->update(['customer_id' => $validated['customer']]);
+            }
         });
+
+        $invoice = $specimen->is_group && $specimen->group
+            ? $specimen->group->invoice
+            : $specimen->invoiceRelation;
+
+        if ($request->boolean('regenerate_pdf', true) && $invoice) {
+            try {
+                $invoice->load(['specimen.products', 'specimen.examination.prices', 'creditRelation', 'customer', 'caiRange', 'groupSpecimens.specimen.examination', 'groupSpecimens.specimen.customerRelation', 'groupSpecimens.specimen.examination.prices', 'groupSpecimens.specimen.products']);
+                $totalWords = $this->numberToSpanishWords($invoice->total);
+
+                $customer = $invoice->customer;
+                $caiRange = $invoice->caiRange;
+                $location = Location::find($caiRange->location_id);
+                $examination = null;
+                if ($invoice->specimen) {
+                    $examination = SpecimenTypeExamination::find($invoice->specimen->specimen_type_examination);
+                }
+
+                $htmlContent = view('pdf.invoice', compact('invoice', 'caiRange', 'customer', 'examination', 'location', 'totalWords'))->render();
+
+                if ($invoice->invoice_file && Storage::disk('public')->exists($invoice->invoice_file)) {
+                    Storage::disk('public')->delete($invoice->invoice_file);
+                }
+
+                $filename = 'invoice_'.$invoice->id.'_'.time().'.pdf';
+                $pdfPath = 'invoices/'.$filename;
+
+                $browsershot = Browsershot::html($htmlContent);
+
+                if (app()->environment('production')) {
+                    $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
+                        ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
+                        ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
+                        ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
+                }
+
+                $pdfContent = $browsershot->addChromiumArguments([
+                    'disable-crash-reporter',
+                    'disable-dev-shm-usage',
+                    'no-sandbox',
+                ])
+                    ->noSandbox()
+                    ->margins(10, 10, 10, 10)
+                    ->format('A4')
+                    ->pdf();
+
+                Storage::disk('public')->put($pdfPath, $pdfContent);
+                $invoice->update(['invoice_file' => $pdfPath]);
+            } catch (\Exception $e) {
+                \Log::warning('Error regenerating invoice PDF: '.$e->getMessage());
+            }
+        }
 
         return redirect()->back();
     }

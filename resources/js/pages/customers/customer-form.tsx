@@ -160,38 +160,6 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="age">
-                        Edad {data.type === 'cliente' && '*'}
-                    </Label>
-                    <Input
-                        id="age"
-                        type="number"
-                        value={data.age}
-                        onChange={(e) => setData('age', e.target.value)}
-                        placeholder="Ej. 25"
-                    />
-                    <InputError message={errors.age} />
-                </div>
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                    <Label htmlFor="gender">Género *</Label>
-                    <Select
-                        value={data.gender}
-                        onValueChange={(value) => setData('gender', value)}
-                    >
-                        <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Seleccione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Mujer">Mujer</SelectItem>
-                            <SelectItem value="Hombre">Hombre</SelectItem>
-                            <SelectItem value="Otro">Otro</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <InputError message={errors.gender} />
-                </div>
-                <div className="space-y-2">
                     <Label htmlFor="id_number">
                         {data.type === 'cliente' ? 'Identidad / RTN' : 'RTN'} *
                     </Label>
@@ -208,6 +176,36 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
                     <InputError message={errors.id_number} />
                 </div>
             </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                    <Label htmlFor="gender">Género (Opcional)</Label>
+                    <Select
+                        value={data.gender}
+                        onValueChange={(value) => setData('gender', value)}
+                    >
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Seleccione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Mujer">Mujer</SelectItem>
+                            <SelectItem value="Hombre">Hombre</SelectItem>
+                            <SelectItem value="Otro">Otro</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError message={errors.gender} />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="age">Edad (Opcional)</Label>
+                    <Input
+                        id="age"
+                        type="number"
+                        value={data.age}
+                        onChange={(e) => setData('age', e.target.value)}
+                        placeholder="Ej. 25"
+                    />
+                    <InputError message={errors.age} />
+                </div>
+            </div>
 
             <h2 className="border-b-1 border-muted pt-3 pb-2 font-bold">
                 Contacto
@@ -215,7 +213,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                    <Label htmlFor="phone">Teléfono 1 *</Label>
+                    <Label htmlFor="phone">Teléfono 1 (Opcional)</Label>
                     <Input
                         id="phone"
                         value={data.phone}
@@ -225,14 +223,16 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
                     <InputError message={errors.phone} />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="secondary_phone">Teléfono 2</Label>
+                    <Label htmlFor="secondary_phone">
+                        Teléfono 2 (Opcional)
+                    </Label>
                     <Input
                         id="secondary_phone"
                         value={data.secondary_phone}
                         onChange={(e) =>
                             setData('secondary_phone', e.target.value)
                         }
-                        placeholder="Opcional"
+                        placeholder="Ej. 9970-7668"
                     />
                     <InputError message={errors.secondary_phone} />
                 </div>
@@ -240,7 +240,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                    <Label htmlFor="state">Departamento *</Label>
+                    <Label htmlFor="state">Departamento (Opcional)</Label>
                     <Select
                         value={data.state ? String(data.state) : ''}
                         onValueChange={(value) => setData('state', value)}
@@ -262,7 +262,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
                     <InputError message={errors.state} />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="city">Municipio *</Label>
+                    <Label htmlFor="city">Municipio (Opcional)</Label>
                     <Select
                         value={data.city ? String(data.city) : ''}
                         onValueChange={(value) => setData('city', value)}
@@ -287,7 +287,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
             </div>
 
             <div className="space-y-2">
-                <Label htmlFor="address">Dirección</Label>
+                <Label htmlFor="address">Dirección (Opcional)</Label>
                 <Input
                     id="address"
                     value={data.address}
@@ -298,7 +298,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
             </div>
 
             <div className="space-y-2">
-                <Label htmlFor="email">Correo</Label>
+                <Label htmlFor="email">Correo (Opcional)</Label>
                 <Input
                     id="email"
                     type="email"

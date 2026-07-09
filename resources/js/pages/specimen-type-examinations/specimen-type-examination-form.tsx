@@ -33,7 +33,7 @@ interface Examination {
     id: number;
     specimen_type: number;
     name: string;
-    description: string;
+    description: string | null;
     prices?: Price[];
 }
 
@@ -161,12 +161,12 @@ export default function SpecimenTypeExaminationForm({
             </div>
 
             <div className="grid gap-2">
-                <Label htmlFor="description">Descripción / Detalles</Label>
+                <Label htmlFor="description">Descripción / Detalles <span className="text-muted-foreground font-normal text-xs">(Opcional)</span></Label>
                 <Textarea
                     id="description"
                     value={data.description}
                     onChange={(e) => setData('description', e.target.value)}
-                    placeholder="Descripción detallada del análisis..."
+                    placeholder="Descripción detallada del análisis (opcional)..."
                     className="resize-none"
                     rows={4}
                 />

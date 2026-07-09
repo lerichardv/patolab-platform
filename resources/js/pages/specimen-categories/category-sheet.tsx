@@ -1,5 +1,6 @@
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 import CategoryForm from './category-form';
 
 interface Category {
@@ -15,12 +16,23 @@ interface Props {
     category: Category | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    className?: string;
+    overlayClassName?: string;
 }
 
-export default function CategorySheet({ category, open, onOpenChange }: Props) {
+export default function CategorySheet({
+    category,
+    open,
+    onOpenChange,
+    className,
+    overlayClassName,
+}: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="sm:max-w-[540px]">
+            <SheetContent
+                className={cn('sm:max-w-[540px]', className)}
+                overlayClassName={overlayClassName}
+            >
                 <HeadingSheet
                     title={category ? 'Editar Categoría' : 'Nueva Categoría'}
                     description={

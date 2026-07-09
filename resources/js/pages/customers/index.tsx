@@ -6,7 +6,7 @@ import {
     Plus,
     Search,
     Trash2,
-    Users,
+    Upload,
 } from 'lucide-react';
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import {
     index as customersIndex,
     destroy as destroyCustomer,
     exportMethod as exportCustomers,
+    importPage as importCustomersPage,
 } from '@/actions/App/Http/Controllers/CustomerController';
 import { Pagination } from '@/components/pagination';
 import {
@@ -170,6 +171,20 @@ export default function CustomersIndex({ customers, filters }: Props) {
                         </p>
                     </div>
                     <div className="flex gap-2">
+                        {auth.permissions?.includes('patients.create') && (
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    window.open(
+                                        importCustomersPage().url,
+                                        '_blank',
+                                    )
+                                }
+                                className="h-10 w-full px-5 text-sm md:w-auto"
+                            >
+                                <Upload className="mr-2 h-4 w-4" /> Importar
+                            </Button>
+                        )}
                         {auth.permissions?.includes('patients.view') && (
                             <Button
                                 variant="outline"
@@ -200,7 +215,7 @@ export default function CustomersIndex({ customers, filters }: Props) {
                     <div className="relative">
                         <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Buscar por nombre, tel o correo..."
+                            placeholder="Buscar por ID, RTN, nombre..."
                             className="pl-8"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
