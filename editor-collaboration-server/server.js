@@ -174,7 +174,7 @@ const extensions = [
 	ImageGrid,
 ];
 
-const webhookUrl = process.env.WEBHOOK_URL || 'http://127.0.0.1:8000/api/collaboration';
+const webhookUrl = process.env.WEBHOOK_URL || 'http://127.0.0.1:8001/api/collaboration';
 
 const pendingSaves = new Map();
 
