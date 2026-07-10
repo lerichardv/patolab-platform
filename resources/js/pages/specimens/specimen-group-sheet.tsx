@@ -239,6 +239,7 @@ export default function SpecimenGroupSheet({
     // Page close/refresh prevention states
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
 
     // Wizard wizard states
     const [currentStep, setCurrentStep] = useState(1);
@@ -289,6 +290,44 @@ export default function SpecimenGroupSheet({
     const [isEditPricesSheetOpen, setIsEditPricesSheetOpen] = useState(false);
     const [selectedExaminationForPrices, setSelectedExaminationForPrices] =
         useState<any | null>(null);
+
+    const [localSequences, setLocalSequences] = useState<any[]>(sequences);
+
+    useEffect(() => {
+        setLocalSequences(sequences);
+    }, [sequences]);
+
+    const matchingSequence = useMemo(() => {
+        if (!nestedSpecimenType) {
+            return null;
+        }
+
+        if (!activeLocationId) {
+            return null;
+        }
+
+        return localSequences.find(
+            (s) =>
+                s.specimen_type.toString() === nestedSpecimenType.toString() &&
+                s.location_id.toString() === activeLocationId.toString() &&
+                s.active,
+        );
+    }, [nestedSpecimenType, localSequences, activeLocationId]);
+
+    const nextSequencePreview = useMemo(() => {
+        if (!matchingSequence) {
+            return '';
+        }
+
+        const fillWidth = matchingSequence.fill ?? 4;
+        const paddedSeq = String(matchingSequence.current_sequence).padStart(
+            fillWidth,
+            '0',
+        );
+        const paddedMonth = String(matchingSequence.month).padStart(2, '0');
+
+        return `${matchingSequence.prefix}${matchingSequence.separator}${paddedSeq}${matchingSequence.separator}${paddedMonth}${matchingSequence.separator}${matchingSequence.year}`;
+    }, [matchingSequence]);
 
     // Global billing fields (Step 2)
     const [paymentType, setPaymentType] = useState('');
@@ -397,11 +436,13 @@ export default function SpecimenGroupSheet({
 
             if (newCustomers.length > 0) {
                 const newId = newCustomers[0].id.toString();
+
                 if (customerSheetSource === 'global') {
                     setGlobalCustomerId(newId);
                 } else {
                     setNestedCustomer(newId);
                 }
+
                 toast.success(
                     `Paciente "${newCustomers[0].name}" seleccionado automáticamente`,
                 );
@@ -591,18 +632,9 @@ export default function SpecimenGroupSheet({
         }
 
         // Verify CAI sequences
-        if (nestedSpecimenType && activeLocationId) {
-            const sequence = sequences.find(
-                (s) =>
-                    s.specimen_type.toString() === nestedSpecimenType &&
-                    s.location_id === activeLocationId &&
-                    s.active,
-            );
-
-            if (!sequence) {
-                errors.specimen_type =
-                    'No existe una secuencia de numeración activa configurada en esta sucursal para este tipo de muestra.';
-            }
+        if (nestedSpecimenType && !matchingSequence) {
+            errors.specimen_type =
+                'No existe una secuencia de numeración activa configurada en esta sucursal para este tipo de muestra.';
         }
 
         setNestedErrors(errors);
@@ -920,7 +952,7 @@ export default function SpecimenGroupSheet({
                 return;
             }
 
-            const seq = sequences.find(
+            const seq = localSequences.find(
                 (s) =>
                     s.specimen_type.toString() === typeId.toString() &&
                     s.location_id === activeLocationId,
@@ -952,7 +984,7 @@ export default function SpecimenGroupSheet({
         });
 
         return map;
-    }, [specimens, sequences, activeLocationId]);
+    }, [specimens, localSequences, activeLocationId]);
 
     // Validation for step 1 wizard
     const validateStep1 = () => {
@@ -1278,6 +1310,10 @@ export default function SpecimenGroupSheet({
             return;
         }
 
+        setShowConfirm(true);
+    };
+
+    const submitGroupForm = () => {
         setProcessing(true);
 
         // Build request payload using Inertia router POST
@@ -3070,6 +3106,63 @@ export default function SpecimenGroupSheet({
                                     </div>
                                 </div>
 
+                                {nestedSpecimenType && (
+                                    <div className="mt-2 transition-all duration-300">
+                                        {matchingSequence ? (
+                                            <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                                <Tag className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="text-xs font-semibold">
+                                                        Secuencia num. activa
+                                                        configurada
+                                                    </span>
+                                                    <span className="text-[10.5px] text-emerald-600 dark:text-emerald-400">
+                                                        Ejemplo de próximo
+                                                        código correlativo a ser
+                                                        asignado:
+                                                    </span>
+                                                    <div className="mt-1">
+                                                        <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                                            {
+                                                                nextSequencePreview
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                                        ¡Falta secuencia de
+                                                        numeración!
+                                                    </span>
+                                                    <span className="text-[10.5px] leading-normal text-amber-600 dark:text-amber-400">
+                                                        No existe una secuencia
+                                                        activa para este tipo de
+                                                        muestra en la sucursal
+                                                        activa. Debe crear una
+                                                        antes de poder facturar.
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setIsSequenceSheetOpen(
+                                                                true,
+                                                            )
+                                                        }
+                                                        className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 self-start rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-500/20 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30"
+                                                    >
+                                                        <Plus className="h-3.5 w-3.5" />
+                                                        Crear Secuencia Ahora
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div className="grid gap-2">
                                         <div className="flex items-center justify-between">
@@ -4296,6 +4389,42 @@ export default function SpecimenGroupSheet({
                         </SheetContent>
                     </Sheet>
 
+                    <Sheet
+                        open={isSequenceSheetOpen}
+                        onOpenChange={setIsSequenceSheetOpen}
+                    >
+                        <SheetContent
+                            side="right"
+                            className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                            overlayClassName="z-[100]"
+                        >
+                            <HeadingSheet
+                                title="Nueva Secuencia de Numeración"
+                                description="Configure una secuencia de numeración correlativa."
+                            />
+                            <div className="-mx-5 mt-4 px-5">
+                                {isSequenceSheetOpen && (
+                                    <SequenceForm
+                                        locations={locations}
+                                        specimenTypes={specimenTypes}
+                                        defaultLocationId={
+                                            activeLocationId || undefined
+                                        }
+                                        defaultSpecimenTypeId={
+                                            nestedSpecimenType
+                                                ? parseInt(nestedSpecimenType)
+                                                : undefined
+                                        }
+                                        sequences={localSequences}
+                                        onSuccess={() => {
+                                            setIsSequenceSheetOpen(false);
+                                        }}
+                                    />
+                                )}
+                            </div>
+                        </SheetContent>
+                    </Sheet>
+
                     <SpecimenTypeExaminationSheet
                         examination={null}
                         specimenTypes={specimenTypes}
@@ -4313,6 +4442,237 @@ export default function SpecimenGroupSheet({
                         className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
                         overlayClassName="z-[100]"
                     />
+
+                    {/* CONFIRMACIÓN DE DIÁLOGO SHADCN (ALERTDIALOG) */}
+                    <AlertDialog
+                        open={showConfirm}
+                        onOpenChange={setShowConfirm}
+                    >
+                        <AlertDialogContent className="z-[120] max-w-[500px]">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                    Resumen de Factura y Transacción
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Revise detalladamente los importes antes de
+                                    emitir la factura fiscal del grupo.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+
+                            <div className="grid gap-3 py-3 text-sm">
+                                <div className="flex justify-between border-b pb-2">
+                                    <span className="font-medium text-muted-foreground">
+                                        Cliente / Paciente (Facturación):
+                                    </span>
+                                    <span className="font-semibold text-foreground">
+                                        {customers.find(
+                                            (c) =>
+                                                c.id.toString() ===
+                                                globalCustomerId,
+                                        )?.name || 'Sin seleccionar'}
+                                    </span>
+                                </div>
+
+                                {/* RESUMEN DE MUESTRAS EN UNA FILA */}
+                                <div className="flex flex-col gap-1.5 border-b pb-2">
+                                    <span className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                        Muestras del Grupo ({specimens.length}):
+                                    </span>
+                                    <div className="flex max-h-[160px] flex-col gap-1.5 overflow-y-auto pr-1">
+                                        {specimens.map((spec) => {
+                                            const specTypeName =
+                                                specimenTypes.find(
+                                                    (t) =>
+                                                        t.id.toString() ===
+                                                        spec.specimen_type.toString(),
+                                                )?.name || '';
+                                            const examName =
+                                                examinations.find(
+                                                    (e) =>
+                                                        e.id.toString() ===
+                                                        spec.specimen_type_examination.toString(),
+                                                )?.name || '';
+
+                                            const prices =
+                                                examinations.find(
+                                                    (e) =>
+                                                        e.id ===
+                                                        spec.specimen_type_examination,
+                                                )?.prices || [];
+                                            const maxVal =
+                                                prices.length > 0
+                                                    ? Math.max(
+                                                          ...prices.map(
+                                                              (p: any) =>
+                                                                  parseFloat(
+                                                                      p.amount,
+                                                                  ) || 0,
+                                                          ),
+                                                      )
+                                                    : 0;
+                                            const chosen =
+                                                spec.selected_price === 'custom'
+                                                    ? parseFloat(
+                                                          spec.custom_specimen_price,
+                                                      ) || 0
+                                                    : parseFloat(
+                                                          spec.selected_price,
+                                                      ) || 0;
+                                            const diffDiscount = Math.max(
+                                                0,
+                                                maxVal - chosen,
+                                            );
+                                            const ageDiscVal =
+                                                parseFloat(
+                                                    spec.age_discount_amount,
+                                                ) || 0;
+                                            const addDiscVal =
+                                                spec.additional_discount_enabled
+                                                    ? parseFloat(
+                                                          spec.additional_discount,
+                                                      ) || 0
+                                                    : 0;
+                                            const qty = spec.quantity ?? 1;
+                                            const netPrice = Math.max(
+                                                0,
+                                                (maxVal -
+                                                    (diffDiscount +
+                                                        ageDiscVal +
+                                                        addDiscVal)) *
+                                                    qty,
+                                            );
+
+                                            return (
+                                                <div
+                                                    key={spec.client_id}
+                                                    className="flex items-center justify-between border-b border-muted/50 py-0.5 text-xs last:border-0"
+                                                >
+                                                    <span className="max-w-[320px] truncate font-medium text-foreground">
+                                                        {specTypeName} -{' '}
+                                                        {examName}{' '}
+                                                        {qty > 1 && `(x${qty})`}
+                                                    </span>
+                                                    <span className="font-semibold whitespace-nowrap text-foreground">
+                                                        L. {netPrice.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between border-b pb-2">
+                                    <span className="font-medium text-muted-foreground">
+                                        Tipo de Pago:
+                                    </span>
+                                    <span className="font-semibold text-foreground">
+                                        {getPaymentTypeLabel(paymentType)}
+                                    </span>
+                                </div>
+
+                                <div className="flex justify-between border-b pb-2">
+                                    <span className="font-medium text-muted-foreground">
+                                        Total Muestras (Base):
+                                    </span>
+                                    <span className="font-semibold text-foreground">
+                                        L. {specimensBaseTotal.toFixed(2)}
+                                    </span>
+                                </div>
+
+                                {customAmountEnabled && (
+                                    <div className="flex flex-col gap-0.5 border-b pb-2">
+                                        <div className="flex justify-between">
+                                            <span className="font-medium text-muted-foreground">
+                                                Importe Personalizado:
+                                            </span>
+                                            <span className="font-semibold text-foreground">
+                                                L. {customAmountVal.toFixed(2)}
+                                            </span>
+                                        </div>
+                                        {customAmountReason && (
+                                            <span className="text-left text-[10px] text-muted-foreground italic">
+                                                Razón: {customAmountReason}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+
+                                {globalDiscountTotal > 0 ? (
+                                    <div className="flex flex-col gap-1.5 rounded border border-b border-emerald-500/20 bg-emerald-500/5 p-2.5 pb-2 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                        <span className="text-[10px] font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
+                                            Descuentos Aplicados
+                                        </span>
+                                        {specimensAutoDiscount > 0 && (
+                                            <div className="flex justify-between text-xs">
+                                                <span>
+                                                    Descuentos Automáticos /
+                                                    Edad:
+                                                </span>
+                                                <span className="font-semibold">
+                                                    - L.{' '}
+                                                    {specimensAutoDiscount.toFixed(
+                                                        2,
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {specimensAdditionalDiscount > 0 && (
+                                            <div className="flex justify-between text-xs">
+                                                <span>
+                                                    Descuentos Adicionales:
+                                                </span>
+                                                <span className="font-semibold">
+                                                    - L.{' '}
+                                                    {specimensAdditionalDiscount.toFixed(
+                                                        2,
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between border-t border-emerald-500/20 pt-1 text-xs font-bold">
+                                            <span>Total Descuentos:</span>
+                                            <span>
+                                                - L.{' '}
+                                                {globalDiscountTotal.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex justify-between border-b pb-2 text-emerald-600 dark:text-emerald-400">
+                                        <span className="font-medium">
+                                            Descuentos Aplicados:
+                                        </span>
+                                        <span className="font-semibold">
+                                            - L. 0.00
+                                        </span>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between pt-1 text-base font-bold">
+                                    <span>TOTAL NETO A PAGAR:</span>
+                                    <span className="text-primary">
+                                        L. {finalSubtotalVal.toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <AlertDialogFooter>
+                                <AlertDialogCancel
+                                    onClick={() => setShowConfirm(false)}
+                                >
+                                    Cancelar
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={() => {
+                                        setShowConfirm(false);
+                                        submitGroupForm();
+                                    }}
+                                >
+                                    Confirmar y Emitir Factura
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </SheetContent>
             </Sheet>
         </>

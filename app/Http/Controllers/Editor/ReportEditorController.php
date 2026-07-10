@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Editor;
 
 use App\Http\Controllers\Controller;
+use App\Models\CuttingCode;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\InvoiceGroupSpecimen;
@@ -14,6 +15,7 @@ use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
 use App\Models\UserCommission;
 use App\Models\UserCommissionRule;
+use App\Models\WorkOrderType;
 use App\Services\ImageOptimizerService;
 use App\Services\ReportPdfService;
 use App\Services\WhatsAppService;
@@ -144,7 +146,7 @@ class ReportEditorController extends Controller
 
             return response()->json([
                 // Read binary block timeline data and hand it off safely encoded
-                'document' => $report->$stateColumn ? base64_encode($report->$stateColumn) : null,
+                'document' => $report->$stateColumn ? $report->$stateColumn : null,
             ]);
         }
 
@@ -158,7 +160,7 @@ class ReportEditorController extends Controller
         // SCENARIO B: Typing pause threshold reached (Background automatic save process)
         if ($event === 'onChange') {
             $updateData = [
-                $stateColumn => base64_decode($payload['document']), // Save raw binary vector history
+                $stateColumn => $payload['document'] ?? null, // Save raw base64 string directly
                 'updated_at' => now(),
             ];
 
@@ -202,6 +204,8 @@ class ReportEditorController extends Controller
             'invoiceRelation.creditRelation',
             'invoiceRelation.transferBank',
             'products.prices',
+            'cuttings.code',
+            'cuttings.responsible',
         ]);
 
         $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
@@ -220,7 +224,7 @@ class ReportEditorController extends Controller
             ->with('prices')
             ->get();
 
-        return Inertia::render('specimens/report-editor', [
+        return Inertia::render('specimens/report-editor/report-editor', [
             'specimen' => $specimen,
             'report' => $specimen->report,
             'auth' => [
@@ -232,6 +236,9 @@ class ReportEditorController extends Controller
             ],
             'pathologists' => $pathologists,
             'products' => $products,
+            'cutting_codes' => CuttingCode::all(),
+            'cutting_slide_types' => WorkOrderType::all(),
+            'users' => User::where('active', true)->select('id', 'name')->get(),
         ]);
     }
 
@@ -401,28 +408,28 @@ class ReportEditorController extends Controller
         }
 
         if ($request->filled('yjs_macroscopy_state') && $hasMacroAccess) {
-            $updateData['yjs_macroscopy_state'] = base64_decode($request->input('yjs_macroscopy_state'));
+            $updateData['yjs_macroscopy_state'] = $request->input('yjs_macroscopy_state');
         }
         if ($request->filled('yjs_microscopy_state') && $hasMicroAccess) {
-            $updateData['yjs_microscopy_state'] = base64_decode($request->input('yjs_microscopy_state'));
+            $updateData['yjs_microscopy_state'] = $request->input('yjs_microscopy_state');
         }
         if ($request->filled('yjs_diagnosis_state') && $hasGeneralAccess) {
-            $updateData['yjs_diagnosis_state'] = base64_decode($request->input('yjs_diagnosis_state'));
+            $updateData['yjs_diagnosis_state'] = $request->input('yjs_diagnosis_state');
         }
         if ($request->filled('yjs_clinical_details_state') && $hasGeneralAccess) {
-            $updateData['yjs_clinical_details_state'] = base64_decode($request->input('yjs_clinical_details_state'));
+            $updateData['yjs_clinical_details_state'] = $request->input('yjs_clinical_details_state');
         }
         if ($request->filled('yjs_comments_notes_state') && $hasGeneralAccess) {
-            $updateData['yjs_comments_notes_state'] = base64_decode($request->input('yjs_comments_notes_state'));
+            $updateData['yjs_comments_notes_state'] = $request->input('yjs_comments_notes_state');
         }
         if ($request->filled('yjs_protocols_state') && $hasGeneralAccess) {
-            $updateData['yjs_protocols_state'] = base64_decode($request->input('yjs_protocols_state'));
+            $updateData['yjs_protocols_state'] = $request->input('yjs_protocols_state');
         }
         if ($request->filled('yjs_legend_state') && $hasGeneralAccess) {
-            $updateData['yjs_legend_state'] = base64_decode($request->input('yjs_legend_state'));
+            $updateData['yjs_legend_state'] = $request->input('yjs_legend_state');
         }
         if ($request->filled('yjs_report_date_state') && $hasGeneralAccess) {
-            $updateData['yjs_report_date_state'] = base64_decode($request->input('yjs_report_date_state'));
+            $updateData['yjs_report_date_state'] = $request->input('yjs_report_date_state');
         }
 
         if (! empty($updateData)) {

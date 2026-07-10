@@ -19,8 +19,10 @@ use App\Models\Sequence;
 use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenCategory;
+use App\Models\SpecimenReport;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
+use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
 use App\Services\ImageOptimizerService;
 use App\Services\ReportPdfService;
@@ -754,6 +756,57 @@ class SpecimenController extends Controller
 
                     $validated['sequence_code'] = $sequenceCode;
                     $validated['location_id'] = $locationId;
+                }
+            }
+
+            $oldSpecimenExam = (int) $specimen->specimen_type_examination;
+            $newSpecimenExam = (int) $validated['specimen_type_examination'];
+
+            if ($specimen->report_id && ($oldSpecimenType !== $newSpecimenType || $oldSpecimenExam !== $newSpecimenExam)) {
+                $template = SpecimenTypeTemplate::where('user_id', auth()->id())
+                    ->where('specimen_type_id', $newSpecimenType)
+                    ->where('specimen_type_examination_id', $newSpecimenExam)
+                    ->first();
+
+                if (! $template) {
+                    $template = SpecimenTypeTemplate::where('user_id', auth()->id())
+                        ->where('specimen_type_id', $newSpecimenType)
+                        ->first();
+                }
+
+                if (! $template) {
+                    $template = SpecimenTypeTemplate::where('specimen_type_id', $newSpecimenType)
+                        ->where('specimen_type_examination_id', $newSpecimenExam)
+                        ->first();
+                }
+
+                if (! $template) {
+                    $template = SpecimenTypeTemplate::where('specimen_type_id', $newSpecimenType)->first();
+                }
+
+                $report = SpecimenReport::find($specimen->report_id);
+                if ($report) {
+                    $report->update([
+                        'macroscopy_html' => $template?->macroscopy_html ?? '',
+                        'microscopy_html' => $template?->microscopy_html ?? '',
+                        'diagnosis_html' => $template?->diagnosis_html ?? '',
+                        'clinical_details_html' => $template?->clinical_details_html ?? '',
+                        'comments_notes_html' => $template?->comments_notes_html ?? '',
+                        'protocols_html' => $template?->protocols_html ?? '',
+                        'legend_html' => $template?->legend_html ?? '',
+                        'sections_order' => $template?->sections_order ?? null,
+                    ]);
+
+                    \Illuminate\Support\Facades\DB::table('specimen_reports')->where('id', $report->id)->update([
+                        'yjs_macroscopy_state' => null,
+                        'yjs_microscopy_state' => null,
+                        'yjs_diagnosis_state' => null,
+                        'yjs_report_date_state' => null,
+                        'yjs_clinical_details_state' => null,
+                        'yjs_comments_notes_state' => null,
+                        'yjs_protocols_state' => null,
+                        'yjs_legend_state' => null,
+                    ]);
                 }
             }
 

@@ -295,9 +295,21 @@ export default function SpecimenTypeExaminationsIndex({
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>{renderSortHeader('specimen_type', 'Tipo de Muestra')}</TableHead>
-                                <TableHead>{renderSortHeader('name', 'Análisis')}</TableHead>
-                                <TableHead>{renderSortHeader('description', 'Descripción')}</TableHead>
+                                <TableHead>
+                                    {renderSortHeader(
+                                        'specimen_type',
+                                        'Tipo de Muestra',
+                                    )}
+                                </TableHead>
+                                <TableHead>
+                                    {renderSortHeader('name', 'Análisis')}
+                                </TableHead>
+                                <TableHead>
+                                    {renderSortHeader(
+                                        'description',
+                                        'Descripción',
+                                    )}
+                                </TableHead>
                                 <TableHead>Precios</TableHead>
                                 <TableHead>Fecha Creación</TableHead>
                                 <TableHead className="text-right">

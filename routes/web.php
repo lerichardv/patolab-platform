@@ -4,6 +4,7 @@ use App\Http\Controllers\AiAssistantController;
 use App\Http\Controllers\CaiRangeController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\Editor\CuttingController;
 use App\Http\Controllers\Editor\ReportEditorController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryMovementController;
@@ -135,6 +136,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimens/{specimen:sequence_code}/report-editor/upload-image', [ReportEditorController::class, 'uploadImage'])->name('specimens.report-editor.upload-image');
     Route::post('specimens/{specimen:sequence_code}/report-editor/update-products', [ReportEditorController::class, 'updateProducts'])->name('specimens.report-editor.update-products');
     Route::get('specimens/{specimen:sequence_code}/report-editor/pdf', [ReportEditorController::class, 'downloadPdf'])->name('specimens.report-editor.pdf');
+
+    // Specimen Cutting routes
+    Route::post('specimens/{specimen:sequence_code}/cuttings', [CuttingController::class, 'store'])->name('cuttings.store');
+    Route::put('cuttings/{cutting}', [CuttingController::class, 'update'])->name('cuttings.update');
+    Route::put('cuttings/{cutting}/status', [CuttingController::class, 'updateStatus'])->name('cuttings.update-status');
+    Route::delete('cuttings/{cutting}', [CuttingController::class, 'destroy'])->name('cuttings.destroy');
+    Route::post('cutting-codes', [CuttingController::class, 'storeCode'])->name('cuttings.store-code');
     Route::post('specimens/{specimen:sequence_code}/generate-report', [SpecimenController::class, 'generateReport'])->name('specimens.generate-report');
     Route::resource('specimens', SpecimenController::class);
     Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');

@@ -12,11 +12,14 @@ use App\Models\Role;
 use App\Models\Sequence;
 use App\Models\Specimen;
 use App\Models\SpecimenCategory;
+use App\Models\SpecimenReport;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
+use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 uses(RefreshDatabase::class);
@@ -668,4 +671,171 @@ test('specimen payment type change from credit to credit card succeeds when proo
     expect($invoice->proof_of_payment)->not->toBeNull();
     expect($invoice->proof_of_payment)->not->toBe('Efectivo');
     expect(Storage::disk('public')->exists($invoice->proof_of_payment))->toBeTrue();
+});
+
+test('specimen report updates template and resets Yjs state when specimen type is changed', function () {
+    $editRole = Role::create(['slug' => 'admin', 'name' => 'Admin']);
+    Gate::define('specimens.edit', fn () => true);
+
+    $user = User::factory()->create([
+        'role_id' => $editRole->id,
+        'active' => true,
+    ]);
+
+    $customer = Customer::factory()->create();
+
+    $location = Location::create([
+        'name' => 'Principal',
+        'address' => 'Dirección',
+        'active' => true,
+    ]);
+
+    $type1 = SpecimenType::create([
+        'name' => 'Biopsia',
+        'active' => true,
+    ]);
+
+    $type2 = SpecimenType::create([
+        'name' => 'Citología',
+        'active' => true,
+    ]);
+
+    $sequence1 = Sequence::create([
+        'location_id' => $location->id,
+        'specimen_type' => $type1->id,
+        'prefix' => 'BIO',
+        'separator' => '-',
+        'fill' => 4,
+        'month' => 7,
+        'year' => 2026,
+        'current_sequence' => 1,
+        'active' => true,
+    ]);
+
+    $sequence2 = Sequence::create([
+        'location_id' => $location->id,
+        'specimen_type' => $type2->id,
+        'prefix' => 'CYT',
+        'separator' => '-',
+        'fill' => 4,
+        'month' => 7,
+        'year' => 2026,
+        'current_sequence' => 5,
+        'active' => true,
+    ]);
+
+    $examination1 = SpecimenTypeExamination::create([
+        'specimen_type' => $type1->id,
+        'name' => 'Examen 1',
+        'code' => 'EX1',
+        'description' => 'Desc 1',
+        'active' => true,
+    ]);
+
+    $examination2 = SpecimenTypeExamination::create([
+        'specimen_type' => $type2->id,
+        'name' => 'Examen 2',
+        'code' => 'EX2',
+        'description' => 'Desc 2',
+        'active' => true,
+    ]);
+
+    $category = SpecimenCategory::create([
+        'name' => 'Categoría',
+        'quantity' => 1,
+        'active' => true,
+    ]);
+
+    $referrerType = ReferrerType::create([
+        'name' => 'Tipo de Referente',
+        'active' => true,
+    ]);
+
+    $referrer = Referrer::create([
+        'name' => 'Referente',
+        'referrer_type' => $referrerType->id,
+        'active' => true,
+    ]);
+
+    $priority = Priority::create([
+        'name' => 'Baja',
+        'color' => '#10b981',
+        'order' => 3,
+        'active' => true,
+    ]);
+
+    // Create a template for type2/examination2
+    SpecimenTypeTemplate::create([
+        'specimen_type_id' => $type2->id,
+        'specimen_type_examination_id' => $examination2->id,
+        'macroscopy_html' => '<p>Nueva Macroscopía</p>',
+        'microscopy_html' => '<p>Nueva Microscopía</p>',
+        'diagnosis_html' => '<p>Nuevo Diagnóstico</p>',
+        'clinical_details_html' => '<p>Nuevos Detalles Clínicos</p>',
+        'comments_notes_html' => '<p>Nuevos Comentarios</p>',
+        'protocols_html' => '<p>Nuevos Protocolos</p>',
+        'legend_html' => '<p>Nueva Leyenda</p>',
+        'user_id' => $user->id,
+    ]);
+
+    // Create a report first
+    $report = SpecimenReport::create([
+        'report_date' => now()->format('Y-m-d'),
+        'macroscopy_html' => '<p>Original Macro</p>',
+        'microscopy_html' => '<p>Original Micro</p>',
+        'diagnosis_html' => '<p>Original Diagnosis</p>',
+    ]);
+
+    // Set binary state vectors on database to make sure they get reset
+    DB::table('specimen_reports')->where('id', $report->id)->update([
+        'yjs_macroscopy_state' => 'some_data',
+        'yjs_microscopy_state' => 'some_data',
+    ]);
+
+    // Create specimen with type1 and report_id
+    $specimen = Specimen::create([
+        'sequence_code' => 'BIO-0001-07-2026',
+        'customer' => $customer->id,
+        'location_id' => $location->id,
+        'specimen_type' => $type1->id,
+        'specimen_type_examination' => $examination1->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+        'anatomic_site' => 'Estómago',
+        'diagnosis' => 'Gastritis',
+        'active' => true,
+        'report_id' => $report->id,
+    ]);
+
+    // Act: Send update request with type2 and examination2
+    $response = $this->actingAs($user)
+        ->put(route('specimens.update', $specimen->id), [
+            'customer' => $customer->id,
+            'specimen_type' => $type2->id,
+            'specimen_type_examination' => $examination2->id,
+            'specimen_category' => $category->id,
+            'referrer' => $referrer->id,
+            'anatomic_site' => 'Estómago',
+            'diagnosis' => 'Gastritis',
+            'clinical_notes' => 'Notas',
+            'status' => 'received',
+            'priority_id' => $priority->id,
+            'regenerate_pdf' => false,
+        ]);
+
+    $response->assertRedirect();
+
+    $report->refresh();
+
+    // Assert that the HTML content is overwritten with the template values
+    expect($report->macroscopy_html)->toBe('<p>Nueva Macroscopía</p>');
+    expect($report->microscopy_html)->toBe('<p>Nueva Microscopía</p>');
+    expect($report->diagnosis_html)->toBe('<p>Nuevo Diagnóstico</p>');
+    expect($report->clinical_details_html)->toBe('<p>Nuevos Detalles Clínicos</p>');
+
+    // Assert that YJS state vectors were wiped
+    $dbReport = DB::table('specimen_reports')->where('id', $report->id)->first();
+    expect($dbReport->yjs_macroscopy_state)->toBeNull();
+    expect($dbReport->yjs_microscopy_state)->toBeNull();
 });

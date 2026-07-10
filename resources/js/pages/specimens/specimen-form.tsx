@@ -575,6 +575,7 @@ export default function SpecimenForm({
                 hasPayments
             ) {
                 setShowBlockedPaymentAlert(true);
+
                 return;
             }
 
@@ -584,6 +585,7 @@ export default function SpecimenForm({
                 hasPayments
             ) {
                 setShowBlockedPaymentAlert(true);
+
                 return;
             }
         }
@@ -925,6 +927,14 @@ export default function SpecimenForm({
         return `${matchingSequence.prefix}${matchingSequence.separator}${paddedSeq}${matchingSequence.separator}${paddedMonth}${matchingSequence.separator}${matchingSequence.year}`;
     }, [matchingSequence]);
 
+    const isSpecimenTypeChanged = React.useMemo(() => {
+        if (!specimen) return false;
+        return (
+            String(data.specimen_type) !== String(specimen.specimen_type) ||
+            String(data.specimen_type_examination) !== String(specimen.specimen_type_examination)
+        );
+    }, [specimen, data.specimen_type, data.specimen_type_examination]);
+
     const validateStep1 = () => {
         clearErrors();
         const localErrors: Record<string, string> = {};
@@ -1131,11 +1141,13 @@ export default function SpecimenForm({
                     toast.error(
                         'El archivo de comprobante de pago es requerido al cambiar de crédito.',
                     );
+
                     return;
                 }
             }
 
             setShowRegenerateConfirm(true);
+
             return;
         }
 
@@ -1176,6 +1188,7 @@ export default function SpecimenForm({
             onError: (err: any) => {
                 setIsFacturating(false);
                 console.error('Error al guardar la muestra:', err);
+
                 if (err && Object.keys(err).length > 0) {
                     const firstError = Object.values(err)[0] as string;
                     toast.error(`Error de validación: ${firstError}`);
@@ -2657,8 +2670,10 @@ export default function SpecimenForm({
                                                             'El archivo de Comprobante no debe exceder los 50MB.',
                                                         );
                                                         e.target.value = '';
+
                                                         return;
                                                     }
+
                                                     setData(
                                                         'proof_of_payment',
                                                         file,
@@ -5083,7 +5098,7 @@ export default function SpecimenForm({
             >
                 <SheetContent
                     side="right"
-                    className="w-[400px] overflow-y-auto sm:w-[540px]"
+                    className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
                 >
                     <SheetHeader>
                         <SheetTitle>Nueva Secuencia de Numeración</SheetTitle>
@@ -5173,6 +5188,7 @@ export default function SpecimenForm({
                                 Examen:
                             </span>
                             <span className="max-w-[250px] truncate font-semibold text-foreground">
+                                {selectedType?.name || 'Sin seleccionar'} -{' '}
                                 {selectedExaminationLabel}
                             </span>
                         </div>
@@ -5350,10 +5366,22 @@ export default function SpecimenForm({
                         <AlertDialogTitle>
                             ¿Actualizar muestra y regenerar factura?
                         </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Se guardarán los cambios de la muestra y se
-                            regenerará la factura PDF correspondiente con los
-                            nuevos datos.
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-3 text-sm text-muted-foreground">
+                                <p>
+                                    Se guardarán los cambios de la muestra y se
+                                    regenerará la factura PDF correspondiente con los
+                                    nuevos datos.
+                                </p>
+                                {isSpecimenTypeChanged && (
+                                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                                        <span className="font-semibold block mb-1">
+                                            ⚠️ Advertencia de cambio de Tipo/Examen:
+                                        </span>
+                                        Al cambiar el tipo de muestra o examen, el código de secuencia será actualizado. Además, se cargará la plantilla correspondiente al nuevo examen en el reporte, lo que significa que <strong>todos los cambios previos realizados en el reporte se perderán permanentemente.</strong>
+                                    </div>
+                                )}
+                            </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

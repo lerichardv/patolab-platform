@@ -69,6 +69,7 @@ import {
     LayoutGrid,
     GripVertical,
 } from 'lucide-react';
+import { Scissors } from 'lucide-react';
 import React, { useState, useEffect, useRef, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -104,12 +105,13 @@ import {
 } from '@/components/ui/tooltip';
 import EditorLayout from '@/layouts/editor-layout';
 import { cn } from '@/lib/utils';
+import SpecimenPathologistSheet from '../specimen-pathologist-sheet';
+import SpecimenProductsSheet from '../specimen-products-sheet';
+import SpecimenViewSheet from '../specimen-view-sheet';
 import AIDictationSheet from './ai-dictation-sheet';
 import AIGrammarSheet from './ai-grammar-sheet';
+import ManageCuttingsSheet from './cuttings/manage-cuttings-sheet';
 import ImageGridComponent, { ImageCropperDialog } from './image-grid-component';
-import SpecimenPathologistSheet from './specimen-pathologist-sheet';
-import SpecimenProductsSheet from './specimen-products-sheet';
-import SpecimenViewSheet from './specimen-view-sheet';
 
 interface Collaborator {
     name: string;
@@ -188,6 +190,7 @@ interface Specimen {
         };
     }>;
     products?: any[];
+    cuttings?: any[];
 }
 
 interface Props {
@@ -202,6 +205,9 @@ interface Props {
     };
     pathologists?: any[];
     products?: any[];
+    cutting_codes: any[];
+    cutting_slide_types: any[];
+    users: any[];
 }
 
 const editorStyles = `
@@ -2617,11 +2623,13 @@ interface MeasuredBlock {
         | 'page-break'
         | 'signature'
         | 'heading'
-        | 'image';
+        | 'image'
+        | 'cuttings-summary';
     height: number;
     title?: string;
     html?: string;
     className?: string;
+    text?: string;
 }
 
 function estimatePatientCardHeight(specimen: Specimen) {
@@ -3360,6 +3368,9 @@ export default function ReportWorkspace({
     auth,
     pathologists = [],
     products = [],
+    cutting_codes = [],
+    cutting_slide_types = [],
+    users = [],
 }: Props) {
     const currentUserSpecimenRelation = specimen.users?.find(
         (u: any) => u.id === auth.user.id,
@@ -3403,6 +3414,7 @@ export default function ReportWorkspace({
     const [isLoading, setIsLoading] = useState(true);
     const [isAssignSheetOpen, setIsAssignSheetOpen] = useState(false);
     const [isProductsSheetOpen, setIsProductsSheetOpen] = useState(false);
+    const [isManageCuttingsOpen, setIsManageCuttingsOpen] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -3656,6 +3668,25 @@ export default function ReportWorkspace({
     const dialogPreviewContainerRef = useRef<HTMLDivElement>(null);
 
     const calculateLayout = () => {
+        const letterToIndex = (letter: string): number => {
+            let index = 0;
+            const len = letter.length;
+            for (let i = 0; i < len; i++) {
+                index = index * 26 + (letter.charCodeAt(i) - 64);
+            }
+            return index;
+        };
+
+        const indexToLetter = (index: number): string => {
+            let letter = '';
+            while (index > 0) {
+                const temp = (index - 1) % 26;
+                letter = String.fromCharCode(65 + temp) + letter;
+                index = Math.floor((index - temp - 1) / 26);
+            }
+            return letter;
+        };
+
         const pageContentHeight = 190.5; // mm
         const lineHeight = 3.97; // mm
         const maxCharsPerLine = 140;
@@ -3805,6 +3836,28 @@ export default function ReportWorkspace({
                 }
             }
         });
+
+        // Concatenated cuts block
+        const cuttings = specimen.cuttings || [];
+        if (cuttings.length > 0) {
+            const cutsList: string[] = [];
+            cuttings.forEach((cutting: any, idx: number) => {
+                const letter = indexToLetter(idx + 1);
+                const desc = cutting.description || '';
+                cutsList.push(`${letter}) ${desc}`);
+            });
+            const concatenatedCuts = `Cortes: ${cutsList.join('; ')}.`;
+            const charsCount = concatenatedCuts.length;
+            const lines = Math.max(1, Math.ceil(charsCount / maxCharsPerLine));
+            const cutsHeight = lines * lineHeight + 2.0;
+
+            blocks.push({
+                type: 'cuttings-summary',
+                height: cutsHeight,
+                text: concatenatedCuts,
+                id: 'cuttings-summary',
+            });
+        }
 
         const computedPages: MeasuredBlock[][] = [];
         let currentPage: MeasuredBlock[] = [];
@@ -4041,6 +4094,20 @@ export default function ReportWorkspace({
             }
 
             if (block.type === 'image') {
+                if (currentHeight + block.height > maxHeightForPage) {
+                    computedPages.push(currentPage);
+                    currentPage = [];
+                    currentHeight = 0.0;
+                    pageIndex++;
+                    maxHeightForPage = pageContentHeight;
+                }
+
+                currentPage.push(block);
+                currentHeight += block.height;
+                continue;
+            }
+
+            if (block.type === 'cuttings-summary') {
                 if (currentHeight + block.height > maxHeightForPage) {
                     computedPages.push(currentPage);
                     currentPage = [];
@@ -5490,6 +5557,27 @@ export default function ReportWorkspace({
                             );
                         }
 
+                        if (block.type === 'cuttings-summary') {
+                            return (
+                                <div
+                                    key={block.id}
+                                    className="preview-content shrink-0 select-none"
+                                    style={{
+                                        fontSize: '2.51mm',
+                                        lineHeight: '3.97mm',
+                                        textAlign: 'justify',
+                                        marginTop: '2.0mm',
+                                        marginBottom: '2.0mm',
+                                        fontFamily: 'inherit',
+                                        fontWeight: 'normal',
+                                    }}
+                                >
+                                    <u>Cortes</u>:{' '}
+                                    {block.text?.replace('Cortes: ', '')}
+                                </div>
+                            );
+                        }
+
                         if (
                             block.type === 'html' ||
                             block.type === 'heading' ||
@@ -5856,6 +5944,18 @@ export default function ReportWorkspace({
                                                 ? 'Microscopía'
                                                 : 'Finalizado'}
                                     </span>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 cursor-pointer text-violet-600 hover:bg-violet-100 hover:text-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/30"
+                                        onClick={() =>
+                                            setIsManageCuttingsOpen(true)
+                                        }
+                                        title="Gestionar Cortes"
+                                    >
+                                        <Scissors className="h-4 w-4" />
+                                    </Button>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] tracking-tight text-muted-foreground uppercase">
@@ -6398,14 +6498,33 @@ export default function ReportWorkspace({
                                                                 <>
                                                                     <div
                                                                         {...provided.dragHandleProps}
-                                                                        className="flex cursor-grab items-center gap-1.5 rounded-r-md border-l-4 border-violet-500/80 py-0.5 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
+                                                                        className="flex cursor-grab items-center justify-between rounded-r-md border-l-4 border-violet-500/80 py-0.5 pr-4 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
                                                                     >
-                                                                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                                                                        <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
-                                                                            <Microscope className="h-4 w-4 text-violet-500" />{' '}
-                                                                            Descripción
-                                                                            Macroscópica
-                                                                        </h3>
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                                                                            <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
+                                                                                <Microscope className="h-4 w-4 text-violet-500" />{' '}
+                                                                                Descripción
+                                                                                Macroscópica
+                                                                            </h3>
+                                                                        </div>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-8 cursor-pointer gap-1.5 border-violet-500/30 text-violet-600 hover:bg-violet-50 hover:text-violet-700 dark:border-violet-500/20 dark:text-violet-400 dark:hover:bg-violet-500/10"
+                                                                            onClick={() =>
+                                                                                setIsManageCuttingsOpen(
+                                                                                    true,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <Scissors className="h-3.5 w-3.5" />
+                                                                            <span>
+                                                                                Gestionar
+                                                                                Cortes
+                                                                            </span>
+                                                                        </Button>
                                                                     </div>
 
                                                                     {isMacroscopyEditable ? (
@@ -7197,6 +7316,15 @@ export default function ReportWorkspace({
                 open={isProductsSheetOpen}
                 onOpenChange={setIsProductsSheetOpen}
                 products={products}
+            />
+
+            <ManageCuttingsSheet
+                specimen={specimen}
+                cuttingCodes={cutting_codes}
+                cuttingSlideTypes={cutting_slide_types}
+                users={users}
+                open={isManageCuttingsOpen}
+                onOpenChange={setIsManageCuttingsOpen}
             />
 
             <AlertDialog

@@ -161,7 +161,12 @@ export default function SpecimenTypeExaminationForm({
             </div>
 
             <div className="grid gap-2">
-                <Label htmlFor="description">Descripción / Detalles <span className="text-muted-foreground font-normal text-xs">(Opcional)</span></Label>
+                <Label htmlFor="description">
+                    Descripción / Detalles{' '}
+                    <span className="text-xs font-normal text-muted-foreground">
+                        (Opcional)
+                    </span>
+                </Label>
                 <Textarea
                     id="description"
                     value={data.description}

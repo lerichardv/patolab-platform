@@ -181,4 +181,12 @@ class Specimen extends Model
     {
         return $this->hasMany(WorkOrder::class, 'specimen_id');
     }
+
+    /**
+     * Obtiene los cortes asociados al espécimen.
+     */
+    public function cuttings(): HasMany
+    {
+        return $this->hasMany(Cutting::class, 'specimen_id');
+    }
 }

@@ -1,6 +1,16 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
-import { ChevronDown, ChevronUp, ChevronsUpDown, Edit2, Microscope, Plus, Search, Trash2, Upload } from 'lucide-react';
+import {
+    ChevronDown,
+    ChevronUp,
+    ChevronsUpDown,
+    Edit2,
+    Microscope,
+    Plus,
+    Search,
+    Trash2,
+    Upload,
+} from 'lucide-react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
@@ -229,8 +239,15 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>{renderSortHeader('name', 'Nombre')}</TableHead>
-                                <TableHead>{renderSortHeader('description', 'Descripción')}</TableHead>
+                                <TableHead>
+                                    {renderSortHeader('name', 'Nombre')}
+                                </TableHead>
+                                <TableHead>
+                                    {renderSortHeader(
+                                        'description',
+                                        'Descripción',
+                                    )}
+                                </TableHead>
                                 <TableHead>Fecha Creación</TableHead>
                                 <TableHead className="text-right">
                                     {(canEdit || canDelete) && 'Acciones'}

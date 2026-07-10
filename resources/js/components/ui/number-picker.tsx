@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 export interface NumberPickerProps {
+	id?: string;
 	value: number;
 	onChange: (value: number) => void;
 	min?: number;
@@ -15,6 +16,7 @@ export interface NumberPickerProps {
 }
 
 export function NumberPicker({
+	id,
 	value,
 	onChange,
 	min = 1,
@@ -69,6 +71,7 @@ export function NumberPicker({
 				<Minus className="h-4 w-4" />
 			</Button>
 			<Input
+				id={id}
 				type="number"
 				value={inputValue}
 				onChange={handleInputChange}

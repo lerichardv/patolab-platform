@@ -146,6 +146,33 @@ class ReportPaginator
             }
         }
 
+        // Add Concatenated Cuts block if there are cuttings
+        $cuttings = collect();
+        if (is_object($specimen) && isset($specimen->cuttings)) {
+            $cuttings = $specimen->cuttings;
+        }
+        if ($cuttings->count() > 0) {
+            $cutsList = [];
+            $idx = 1;
+            foreach ($cuttings as $cutting) {
+                $letter = self::indexToLetter($idx);
+                $desc = $cutting->description;
+                $cutsList[] = "{$letter}) {$desc}";
+                $idx++;
+            }
+            $concatenatedCuts = 'Cortes: '.implode('; ', $cutsList).'.';
+
+            $charsCount = mb_strlen($concatenatedCuts);
+            $lines = max(1, (int) ceil($charsCount / $maxCharsPerLine));
+            $cutsHeight = $lines * $lineHeight + 2.0;
+
+            $blocks[] = [
+                'type' => 'cuttings-summary',
+                'text' => $concatenatedCuts,
+                'height' => $cutsHeight,
+            ];
+        }
+
         // 3. Paginate the stream of blocks
         $pages = [];
         $currentPage = [];
@@ -349,6 +376,20 @@ class ReportPaginator
             }
 
             if ($block['type'] === 'image') {
+                if ($currentHeight + $block['height'] > $maxHeightForPage) {
+                    $pages[] = $currentPage;
+                    $currentPage = [];
+                    $currentHeight = 0.0;
+                    $pageIndex++;
+                    $maxHeightForPage = $pageContentHeight;
+                }
+                $currentPage[] = $block;
+                $currentHeight += $block['height'];
+
+                continue;
+            }
+
+            if ($block['type'] === 'cuttings-summary') {
                 if ($currentHeight + $block['height'] > $maxHeightForPage) {
                     $pages[] = $currentPage;
                     $currentPage = [];
@@ -1086,5 +1127,28 @@ class ReportPaginator
             'rows' => $rows,
             'colCount' => $colCount,
         ];
+    }
+
+    public static function letterToIndex(string $letter): int
+    {
+        $index = 0;
+        $len = strlen($letter);
+        for ($i = 0; $i < $len; $i++) {
+            $index = $index * 26 + (ord($letter[$i]) - 64);
+        }
+
+        return $index;
+    }
+
+    public static function indexToLetter(int $index): string
+    {
+        $letter = '';
+        while ($index > 0) {
+            $temp = ($index - 1) % 26;
+            $letter = chr(65 + $temp).$letter;
+            $index = intval(($index - $temp - 1) / 26);
+        }
+
+        return $letter;
     }
 }
