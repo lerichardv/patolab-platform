@@ -431,7 +431,8 @@ export default function RentalPaymentSheet({
         data.initial_payment_type,
     ]);
 
-    const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null);
+    const [selectedCustomer, setSelectedCustomer] =
+        useState<CustomerOption | null>(null);
 
     const handleSavePaymentDetails = () => {
         const errorsMap: Record<string, string> = {};

@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import AsyncCustomerCombobox, { type CustomerOption } from '@/components/async-customer-combobox';
+import AsyncCustomerCombobox from '@/components/async-customer-combobox';
+import type {CustomerOption} from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import {
     AlertDialog,
@@ -156,11 +157,20 @@ export default function InvoiceForm({
 }: Props) {
     const [showConfirm, setShowConfirm] = useState(false);
     const [regeneratePdf, setRegeneratePdf] = useState(true);
-    const [selectedCustomerData, setSelectedCustomerData] = useState<CustomerOption | null>(
-        invoice?.customer
-            ? { id: invoice.customer.id, name: invoice.customer.name, id_number: invoice.customer.id_number, phone: invoice.customer.phone, gender: invoice.customer.gender, type: invoice.customer.type, age: invoice.customer.age }
-            : null,
-    );
+    const [selectedCustomerData, setSelectedCustomerData] =
+        useState<CustomerOption | null>(
+            invoice?.customer
+                ? {
+                      id: invoice.customer.id,
+                      name: invoice.customer.name,
+                      id_number: invoice.customer.id_number,
+                      phone: invoice.customer.phone,
+                      gender: invoice.customer.gender,
+                      type: invoice.customer.type,
+                      age: invoice.customer.age,
+                  }
+                : null,
+        );
 
     const {
         data,

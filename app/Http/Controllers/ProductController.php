@@ -14,6 +14,10 @@ class ProductController extends Controller
     {
         Gate::authorize('products.view');
 
+        if ($request->wantsJson() || $request->has('all')) {
+            return response()->json(Product::where('active', true)->with('prices')->get());
+        }
+
         $query = Product::query()->with('prices')->where('active', true);
 
         if ($request->has('search')) {

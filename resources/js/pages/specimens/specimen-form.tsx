@@ -24,7 +24,8 @@ import {
     store as storeSpecimen,
     update as updateSpecimen,
 } from '@/actions/App/Http/Controllers/SpecimenController';
-import AsyncCustomerCombobox, { type CustomerOption } from '@/components/async-customer-combobox';
+import AsyncCustomerCombobox from '@/components/async-customer-combobox';
+import type {CustomerOption} from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import {
     AlertDialog,
@@ -239,19 +240,20 @@ export default function SpecimenForm({
     const prevCategoriesRef = React.useRef<any[]>(categories);
     const prevReferrersRef = React.useRef<any[]>(referrers);
     // Track the currently-selected customer locally (for display + detail panel)
-    const [selectedCustomerData, setSelectedCustomerData] = React.useState<CustomerOption | null>(
-        specimen?.customerRelation
-            ? {
-                  id: specimen.customerRelation.id,
-                  name: specimen.customerRelation.name,
-                  id_number: specimen.customerRelation.id_number,
-                  phone: specimen.customerRelation.phone,
-                  gender: specimen.customerRelation.gender,
-                  type: specimen.customerRelation.type,
-                  age: specimen.customerRelation.age,
-              }
-            : null,
-    );
+    const [selectedCustomerData, setSelectedCustomerData] =
+        React.useState<CustomerOption | null>(
+            specimen?.customerRelation
+                ? {
+                      id: specimen.customerRelation.id,
+                      name: specimen.customerRelation.name,
+                      id_number: specimen.customerRelation.id_number,
+                      phone: specimen.customerRelation.phone,
+                      gender: specimen.customerRelation.gender,
+                      type: specimen.customerRelation.type,
+                      age: specimen.customerRelation.age,
+                  }
+                : null,
+        );
 
     React.useEffect(() => {
         if (specimenTypes.length > prevSpecimenTypesRef.current.length) {
@@ -314,13 +316,22 @@ export default function SpecimenForm({
     // Auto-select a newly created customer via flash data from the server
     const createdCustomerId = flash?.created_customer?.id as number | undefined;
     React.useEffect(() => {
-        if (!flash?.created_customer) return;
+        if (!flash?.created_customer) {
+return;
+}
+
         const createdCustomer = flash.created_customer as any;
-        if (!createdCustomer.id) return;
+
+        if (!createdCustomer.id) {
+return;
+}
+
         setData('customer', createdCustomer.id.toString());
         setSelectedCustomerData(createdCustomer);
-        toast.success(`Paciente "${createdCustomer.name}" seleccionado automáticamente`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        toast.success(
+            `Paciente "${createdCustomer.name}" seleccionado automáticamente`,
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [createdCustomerId]);
 
     React.useEffect(() => {
@@ -935,10 +946,14 @@ export default function SpecimenForm({
     }, [matchingSequence]);
 
     const isSpecimenTypeChanged = React.useMemo(() => {
-        if (!specimen) return false;
+        if (!specimen) {
+return false;
+}
+
         return (
             String(data.specimen_type) !== String(specimen.specimen_type) ||
-            String(data.specimen_type_examination) !== String(specimen.specimen_type_examination)
+            String(data.specimen_type_examination) !==
+                String(specimen.specimen_type_examination)
         );
     }, [specimen, data.specimen_type, data.specimen_type_examination]);
 
@@ -1474,7 +1489,6 @@ export default function SpecimenForm({
         isPaymentSheetOpen,
     ]);
 
-
     const selectedCustomer = selectedCustomerData;
     const selectedCustomerLabel = selectedCustomer?.name || 'Sin seleccionar';
     const selectedExaminationLabel =
@@ -1935,14 +1949,16 @@ export default function SpecimenForm({
                                     initialCustomer={selectedCustomerData}
                                     onChange={(v, customer) => {
                                         setData('customer', v);
-                                        setSelectedCustomerData(customer ?? null);
+                                        setSelectedCustomerData(
+                                            customer ?? null,
+                                        );
                                     }}
                                 />
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setIsCustomerSheetOpen(true)}
-                                className="shrink-0 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
                             >
                                 <Plus className="h-3 w-3" /> Nuevo
                             </button>
@@ -5372,15 +5388,25 @@ export default function SpecimenForm({
                             <div className="space-y-3 text-sm text-muted-foreground">
                                 <p>
                                     Se guardarán los cambios de la muestra y se
-                                    regenerará la factura PDF correspondiente con los
-                                    nuevos datos.
+                                    regenerará la factura PDF correspondiente
+                                    con los nuevos datos.
                                 </p>
                                 {isSpecimenTypeChanged && (
                                     <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-                                        <span className="font-semibold block mb-1">
-                                            ⚠️ Advertencia de cambio de Tipo/Examen:
+                                        <span className="mb-1 block font-semibold">
+                                            ⚠️ Advertencia de cambio de
+                                            Tipo/Examen:
                                         </span>
-                                        Al cambiar el tipo de muestra o examen, el código de secuencia será actualizado. Además, se cargará la plantilla correspondiente al nuevo examen en el reporte, lo que significa que <strong>todos los cambios previos realizados en el reporte se perderán permanentemente.</strong>
+                                        Al cambiar el tipo de muestra o examen,
+                                        el código de secuencia será actualizado.
+                                        Además, se cargará la plantilla
+                                        correspondiente al nuevo examen en el
+                                        reporte, lo que significa que{' '}
+                                        <strong>
+                                            todos los cambios previos realizados
+                                            en el reporte se perderán
+                                            permanentemente.
+                                        </strong>
                                     </div>
                                 )}
                             </div>

@@ -3671,19 +3671,23 @@ export default function ReportWorkspace({
         const letterToIndex = (letter: string): number => {
             let index = 0;
             const len = letter.length;
+
             for (let i = 0; i < len; i++) {
                 index = index * 26 + (letter.charCodeAt(i) - 64);
             }
+
             return index;
         };
 
         const indexToLetter = (index: number): string => {
             let letter = '';
+
             while (index > 0) {
                 const temp = (index - 1) % 26;
                 letter = String.fromCharCode(65 + temp) + letter;
                 index = Math.floor((index - temp - 1) / 26);
             }
+
             return letter;
         };
 
@@ -3839,6 +3843,7 @@ export default function ReportWorkspace({
 
         // Concatenated cuts block
         const cuttings = specimen.cuttings || [];
+
         if (cuttings.length > 0) {
             const cutsList: string[] = [];
             cuttings.forEach((cutting: any, idx: number) => {

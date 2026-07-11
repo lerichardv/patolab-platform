@@ -27,6 +27,8 @@ import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditCont
 import { index as customersIndex } from '@/actions/App/Http/Controllers/CustomerController';
 import { index as inventoriesIndex } from '@/actions/App/Http/Controllers/InventoryController';
 import { index as inventoryMovementsIndex } from '@/actions/App/Http/Controllers/InventoryMovementController';
+import { index as inventoryProvidersIndex } from '@/actions/App/Http/Controllers/InventoryProviderController';
+import { index as inventoryPurchaseOrdersIndex } from '@/actions/App/Http/Controllers/InventoryPurchaseOrderController';
 import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
 import { index as locationsIndex } from '@/actions/App/Http/Controllers/LocationController';
 import { index as myAssignmentsIndex } from '@/actions/App/Http/Controllers/MyAssignmentController';
@@ -120,6 +122,12 @@ const adminNavItems: NavItem[] = [
                 permission: 'inventory.view',
             },
             {
+                title: 'Órdenes de Compra',
+                href: inventoryPurchaseOrdersIndex(),
+                icon: ClipboardList,
+                permission: 'inventory.view',
+            },
+            {
                 title: 'Productos',
                 href: productsIndex(),
                 icon: Package,
@@ -130,6 +138,12 @@ const adminNavItems: NavItem[] = [
                 href: storagesIndex(),
                 icon: Warehouse,
                 permission: 'storages.view',
+            },
+            {
+                title: 'Proveedores',
+                href: inventoryProvidersIndex(),
+                icon: Users,
+                permission: 'inventory.view',
             },
             {
                 title: 'Historial de Movimientos',

@@ -9,6 +9,8 @@ use App\Http\Controllers\Editor\CuttingController;
 use App\Http\Controllers\Editor\ReportEditorController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryMovementController;
+use App\Http\Controllers\InventoryProviderController;
+use App\Http\Controllers\InventoryPurchaseOrderController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MyAssignmentController;
@@ -184,6 +186,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('sequences', SequenceController::class);
     Route::resource('storages', StorageController::class);
     Route::resource('products', ProductController::class);
+    Route::resource('inventory-providers', InventoryProviderController::class);
+    Route::put('inventory-purchase-orders/{inventory_purchase_order}/status', [InventoryPurchaseOrderController::class, 'updateStatus'])->name('inventory-purchase-orders.update-status');
+    Route::resource('inventory-purchase-orders', InventoryPurchaseOrderController::class);
     Route::post('inventories/abastecer', [InventoryController::class, 'abastecer'])->name('inventories.abastecer');
     Route::resource('inventories', InventoryController::class);
     Route::get('inventory-movements', [InventoryMovementController::class, 'index'])->name('inventory-movements.index');

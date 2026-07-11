@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import AsyncCustomerCombobox, { type CustomerOption } from '@/components/async-customer-combobox';
+import AsyncCustomerCombobox from '@/components/async-customer-combobox';
+import type {CustomerOption} from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import {
     AlertDialog,
@@ -280,8 +281,10 @@ export default function SpecimenGroupSheet({
         'global' | 'nested'
     >('global');
     // Track selected customer data for display (async combobox)
-    const [selectedGlobalCustomerData, setSelectedGlobalCustomerData] = useState<CustomerOption | null>(null);
-    const [selectedNestedCustomerData, setSelectedNestedCustomerData] = useState<CustomerOption | null>(null);
+    const [selectedGlobalCustomerData, setSelectedGlobalCustomerData] =
+        useState<CustomerOption | null>(null);
+    const [selectedNestedCustomerData, setSelectedNestedCustomerData] =
+        useState<CustomerOption | null>(null);
     const prevReferrersRef = useRef<any[]>(referrers);
     const [isReferrerSheetOpen, setIsReferrerSheetOpen] = useState(false);
     const [isSequenceSheetOpen, setIsSequenceSheetOpen] = useState(false);
@@ -432,10 +435,18 @@ export default function SpecimenGroupSheet({
     // Auto-select a newly created customer via flash data from the server
     const createdCustomerId = flash?.created_customer?.id as number | undefined;
     useEffect(() => {
-        if (!flash?.created_customer) return;
+        if (!flash?.created_customer) {
+return;
+}
+
         const createdCustomer = flash.created_customer as any;
-        if (!createdCustomer.id) return;
+
+        if (!createdCustomer.id) {
+return;
+}
+
         const newId = createdCustomer.id.toString();
+
         if (customerSheetSource === 'global') {
             setGlobalCustomerId(newId);
             setSelectedGlobalCustomerData(createdCustomer);
@@ -443,8 +454,11 @@ export default function SpecimenGroupSheet({
             setNestedCustomer(newId);
             setSelectedNestedCustomerData(createdCustomer);
         }
-        toast.success(`Paciente "${createdCustomer.name}" seleccionado automáticamente`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+        toast.success(
+            `Paciente "${createdCustomer.name}" seleccionado automáticamente`,
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [createdCustomerId]);
 
     useEffect(() => {
@@ -664,8 +678,7 @@ export default function SpecimenGroupSheet({
                 nestedSpecimenToEditId ||
                 Math.random().toString(36).substring(2, 9),
             customer: parseInt(nestedCustomer),
-            customer_name:
-                selectedNestedCustomerData?.name || 'Desconocido',
+            customer_name: selectedNestedCustomerData?.name || 'Desconocido',
             specimen_type: parseInt(nestedSpecimenType),
             specimen_type_name:
                 specimenTypes.find(
@@ -1524,10 +1537,14 @@ export default function SpecimenGroupSheet({
                                     <AsyncCustomerCombobox
                                         placeholder="Seleccionar cliente"
                                         value={globalCustomerId}
-                                        initialCustomer={selectedGlobalCustomerData}
+                                        initialCustomer={
+                                            selectedGlobalCustomerData
+                                        }
                                         onChange={(v, customer) => {
                                             setGlobalCustomerId(v);
-                                            setSelectedGlobalCustomerData(customer ?? null);
+                                            setSelectedGlobalCustomerData(
+                                                customer ?? null,
+                                            );
                                             setIsFormDirty(true);
                                         }}
                                     />
@@ -1538,7 +1555,7 @@ export default function SpecimenGroupSheet({
                                         setCustomerSheetSource('global');
                                         setIsCustomerSheetOpen(true);
                                     }}
-                                    className="shrink-0 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                    className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
                                 >
                                     <Plus className="h-3 w-3" /> Nuevo
                                 </button>
@@ -2919,17 +2936,24 @@ export default function SpecimenGroupSheet({
                             <div className="space-y-5 px-5 py-4">
                                 <div className="grid gap-2">
                                     <div className="flex items-center gap-2">
-                                        <Label htmlFor="nested_customer" className="shrink-0">
+                                        <Label
+                                            htmlFor="nested_customer"
+                                            className="shrink-0"
+                                        >
                                             Paciente / Cliente
                                         </Label>
                                         <div className="min-w-0 flex-1">
                                             <AsyncCustomerCombobox
                                                 placeholder="Seleccionar paciente"
                                                 value={nestedCustomer}
-                                                initialCustomer={selectedNestedCustomerData}
+                                                initialCustomer={
+                                                    selectedNestedCustomerData
+                                                }
                                                 onChange={(v, customer) => {
                                                     setNestedCustomer(v);
-                                                    setSelectedNestedCustomerData(customer ?? null);
+                                                    setSelectedNestedCustomerData(
+                                                        customer ?? null,
+                                                    );
                                                     setNestedErrors((prev) => ({
                                                         ...prev,
                                                         customer: '',
@@ -2940,10 +2964,12 @@ export default function SpecimenGroupSheet({
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                setCustomerSheetSource('nested');
+                                                setCustomerSheetSource(
+                                                    'nested',
+                                                );
                                                 setIsCustomerSheetOpen(true);
                                             }}
-                                            className="shrink-0 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                            className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
                                         >
                                             <Plus className="h-3 w-3" /> Nuevo
                                         </button>
@@ -4450,7 +4476,8 @@ export default function SpecimenGroupSheet({
                                         Cliente / Paciente (Facturación):
                                     </span>
                                     <span className="font-semibold text-foreground">
-                                        {selectedGlobalCustomerData?.name || 'Sin seleccionar'}
+                                        {selectedGlobalCustomerData?.name ||
+                                            'Sin seleccionar'}
                                     </span>
                                 </div>
 

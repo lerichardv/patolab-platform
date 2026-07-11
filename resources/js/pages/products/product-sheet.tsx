@@ -24,9 +24,10 @@ interface Props {
     product?: Product | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onSuccess?: () => void;
 }
 
-export default function ProductSheet({ product, open, onOpenChange }: Props) {
+export default function ProductSheet({ product, open, onOpenChange, onSuccess }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="w-full overflow-y-auto sm:max-w-[540px]">
@@ -40,7 +41,10 @@ export default function ProductSheet({ product, open, onOpenChange }: Props) {
                 />
                 <ProductForm
                     product={product || undefined}
-                    onSuccess={() => onOpenChange(false)}
+                    onSuccess={() => {
+                        onOpenChange(false);
+                        if (onSuccess) onSuccess();
+                    }}
                 />
             </SheetContent>
         </Sheet>
