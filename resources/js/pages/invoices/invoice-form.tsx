@@ -18,7 +18,7 @@ import {
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
-import type {CustomerOption} from '@/components/async-customer-combobox';
+import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import {
     AlertDialog,

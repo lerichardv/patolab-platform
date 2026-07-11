@@ -23,7 +23,7 @@ import {
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
-import type {CustomerOption} from '@/components/async-customer-combobox';
+import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import {
     AlertDialog,
@@ -436,14 +436,14 @@ export default function SpecimenGroupSheet({
     const createdCustomerId = flash?.created_customer?.id as number | undefined;
     useEffect(() => {
         if (!flash?.created_customer) {
-return;
-}
+            return;
+        }
 
         const createdCustomer = flash.created_customer as any;
 
         if (!createdCustomer.id) {
-return;
-}
+            return;
+        }
 
         const newId = createdCustomer.id.toString();
 

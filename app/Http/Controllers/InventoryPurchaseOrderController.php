@@ -101,7 +101,7 @@ class InventoryPurchaseOrderController extends Controller
 
         if ($purchaseOrder) {
             $this->generatePdf($purchaseOrder);
-            session()->flash('new_purchase_order_url', asset('storage/' . $purchaseOrder->purchase_order_file));
+            session()->flash('new_purchase_order_url', asset('storage/'.$purchaseOrder->purchase_order_file));
         }
 
         return redirect()->back();
@@ -150,7 +150,7 @@ class InventoryPurchaseOrderController extends Controller
         });
 
         $this->generatePdf($inventoryPurchaseOrder);
-        session()->flash('new_purchase_order_url', asset('storage/' . $inventoryPurchaseOrder->purchase_order_file));
+        session()->flash('new_purchase_order_url', asset('storage/'.$inventoryPurchaseOrder->purchase_order_file));
 
         return redirect()->back();
     }
@@ -207,8 +207,8 @@ class InventoryPurchaseOrderController extends Controller
                 Storage::disk('public')->delete($purchaseOrder->purchase_order_file);
             }
 
-            $filename = 'purchase_order_' . $purchaseOrder->id . '_' . time() . '.pdf';
-            $pdfPath = 'purchase_orders/' . $filename;
+            $filename = 'purchase_order_'.$purchaseOrder->id.'_'.time().'.pdf';
+            $pdfPath = 'purchase_orders/'.$filename;
 
             $browsershot = Browsershot::html($htmlContent);
 
@@ -232,7 +232,7 @@ class InventoryPurchaseOrderController extends Controller
             Storage::disk('public')->put($pdfPath, $pdfContent);
             $purchaseOrder->update(['purchase_order_file' => $pdfPath]);
         } catch (\Exception $e) {
-            \Log::warning('Error generating purchase order PDF: ' . $e->getMessage());
+            \Log::warning('Error generating purchase order PDF: '.$e->getMessage());
         }
     }
 }

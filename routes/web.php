@@ -161,6 +161,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('specimen-type-templates', SpecimenTypeTemplateController::class);
 
     Route::post('my-specimen-type-templates/upload-image', [MySpecimenTypeTemplateController::class, 'uploadImage'])->name('my-specimen-type-templates.upload-image');
+    Route::post('my-specimen-type-templates/share', [MySpecimenTypeTemplateController::class, 'share'])->name('my-specimen-type-templates.share');
+    Route::delete('my-specimen-type-templates/share/{permission}', [MySpecimenTypeTemplateController::class, 'revokeShare'])->name('my-specimen-type-templates.revoke-share');
+    Route::post('my-specimen-type-templates/share/bulk-revoke', [MySpecimenTypeTemplateController::class, 'bulkRevokeShare'])->name('my-specimen-type-templates.bulk-revoke-share');
     Route::resource('my-specimen-type-templates', MySpecimenTypeTemplateController::class);
     Route::resource('specimen-categories', SpecimenCategoryController::class);
     Route::get('specimen-types/import', [SpecimenTypeController::class, 'importPage'])->name('specimen-types.import-page');

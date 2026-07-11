@@ -19,9 +19,15 @@ class MySpecimenTypeTemplateController extends Controller
     {
         Gate::authorize('my_specimen_type_templates.view');
 
+        $sharedTemplateIds = \App\Models\UserTemplatePermission::where('shared_with_id', Auth::id())
+            ->pluck('template_id');
+
         $query = SpecimenTypeTemplate::query()
-            ->with(['specimenType', 'specimenTypeExamination'])
-            ->where('user_id', Auth::id())
+            ->with(['specimenType', 'specimenTypeExamination', 'user'])
+            ->where(function ($q) use ($sharedTemplateIds) {
+                $q->where('user_id', Auth::id())
+                  ->orWhereIn('id', $sharedTemplateIds);
+            })
             ->orderBy('created_at', 'desc');
 
         if ($request->has('search')) {
@@ -56,9 +62,26 @@ class MySpecimenTypeTemplateController extends Controller
                 ];
             });
 
+        $users = \App\Models\User::where('active', true)
+            ->where('id', '!=', Auth::id())
+            ->orderBy('name')
+            ->get();
+
+        $examinations = \App\Models\SpecimenTypeExamination::where('active', true)
+            ->orderBy('name')
+            ->get();
+
+        $sharedPermissions = \App\Models\UserTemplatePermission::with(['specimenType', 'specimenTypeExamination', 'sharedWith'])
+            ->where('owner_id', Auth::id())
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return Inertia::render('my-specimen-type-templates/index', [
             'templates' => $templates,
             'specimenTypes' => $specimenTypes,
+            'users' => $users,
+            'examinations' => $examinations,
+            'sharedPermissions' => $sharedPermissions,
             'filters' => $request->only(['search']),
         ]);
     }
@@ -149,11 +172,16 @@ class MySpecimenTypeTemplateController extends Controller
     {
         Gate::authorize('my_specimen_type_templates.manage');
 
-        if ($my_specimen_type_template->user_id !== Auth::id()) {
+        $isOwner = $my_specimen_type_template->user_id === Auth::id();
+        $isShared = \App\Models\UserTemplatePermission::where('template_id', $my_specimen_type_template->id)
+            ->where('shared_with_id', Auth::id())
+            ->exists();
+
+        if (! $isOwner && ! $isShared) {
             abort(403, 'No autorizado para editar esta plantilla.');
         }
 
-        $userId = Auth::id();
+        $userId = $my_specimen_type_template->user_id;
 
         $validated = $request->validate([
             'specimen_type_id' => 'required|exists:specimen_type,id',
@@ -218,5 +246,108 @@ class MySpecimenTypeTemplateController extends Controller
         return response()->json([
             'url' => Storage::disk('public')->url($path),
         ]);
+    }
+
+    public function share(Request $request)
+    {
+        Gate::authorize('my_specimen_type_templates.manage');
+
+        $validated = $request->validate([
+            'user_ids' => 'required|array|min:1',
+            'user_ids.*' => 'exists:users,id',
+            'specimen_type_ids' => 'required|array|min:1',
+            'specimen_type_ids.*' => 'exists:specimen_type,id',
+            'specimen_type_examination_ids' => 'required|array|min:1',
+            'specimen_type_examination_ids.*' => 'exists:specimen_type_examination,id',
+        ]);
+
+        $userId = Auth::id();
+
+        // Retrieve examinations that belong to the selected specimen types
+        $examinations = SpecimenTypeExamination::whereIn('id', $validated['specimen_type_examination_ids'])
+            ->whereIn('specimen_type', $validated['specimen_type_ids'])
+            ->get();
+
+        if ($examinations->isEmpty()) {
+            return redirect()->back()->withErrors([
+                'specimen_type_examination_ids' => 'Ninguno de los exámenes seleccionados pertenece a los tipos de muestra seleccionados.',
+            ]);
+        }
+
+        // Find all templates owned by the current user that match the selected combinations
+        $templates = SpecimenTypeTemplate::where('user_id', $userId)
+            ->where(function ($query) use ($examinations) {
+                foreach ($examinations as $exam) {
+                    $query->orWhere(function ($q) use ($exam) {
+                        $q->where('specimen_type_id', $exam->specimen_type)
+                          ->where('specimen_type_examination_id', $exam->id);
+                    });
+                }
+            })
+            ->get();
+
+        if ($templates->isEmpty()) {
+            return redirect()->back()->withErrors([
+                'specimen_type_examination_ids' => 'No tiene plantillas creadas para las combinaciones de tipo de muestra y examen seleccionadas.',
+            ]);
+        }
+
+        $sharedCount = 0;
+
+        foreach ($templates as $template) {
+            foreach ($validated['user_ids'] as $sharedWithId) {
+                if ($sharedWithId == $userId) {
+                    continue;
+                }
+
+                \App\Models\UserTemplatePermission::updateOrCreate(
+                    [
+                        'owner_id' => $userId,
+                        'specimen_type_id' => $template->specimen_type_id,
+                        'specimen_type_examination_id' => $template->specimen_type_examination_id,
+                        'template_id' => $template->id,
+                        'shared_with_id' => $sharedWithId,
+                    ]
+                );
+                $sharedCount++;
+            }
+        }
+
+        if ($sharedCount === 0) {
+            return redirect()->back()->withErrors([
+                'user_ids' => 'No se pudo compartir ninguna plantilla.',
+            ]);
+        }
+
+        return redirect()->back();
+    }
+
+    public function revokeShare(\App\Models\UserTemplatePermission $permission)
+    {
+        Gate::authorize('my_specimen_type_templates.manage');
+
+        if ($permission->owner_id !== Auth::id()) {
+            abort(403, 'No autorizado para revocar este permiso.');
+        }
+
+        $permission->delete();
+
+        return redirect()->back();
+    }
+
+    public function bulkRevokeShare(Request $request)
+    {
+        Gate::authorize('my_specimen_type_templates.manage');
+
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'exists:user_templates_permissions,id',
+        ]);
+
+        \App\Models\UserTemplatePermission::whereIn('id', $validated['ids'])
+            ->where('owner_id', Auth::id())
+            ->delete();
+
+        return redirect()->back();
     }
 }

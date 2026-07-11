@@ -1,6 +1,14 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
-import { Edit2, FileSpreadsheet, Plus, Search, Trash2 } from 'lucide-react';
+import {
+    Edit2,
+    FileSpreadsheet,
+    Plus,
+    Search,
+    Trash2,
+    Share2,
+    ChevronDown,
+} from 'lucide-react';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
@@ -19,6 +27,12 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Table,
@@ -28,17 +42,26 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import ShareTemplatesSheet from './share-templates-sheet';
+import SharedTemplatesListSheet from './shared-templates-list-sheet';
 import TemplateSheet from './template-sheet';
+
+interface User {
+    id: number;
+    name: string;
+    email: string;
+}
 
 interface SpecimenTypeExamination {
     id: number;
+    specimen_type: number;
     name: string;
 }
 
 interface SpecimenType {
     id: number;
     name: string;
-    examinations: SpecimenTypeExamination[];
+    examinations: any[];
 }
 
 interface SectionsOrderElement {
@@ -50,13 +73,17 @@ interface SectionsOrderElement {
 interface Template {
     id: number;
     user_id: number;
+    user?: User | null;
     specimen_type_id: number;
     specimen_type: {
         id: number;
         name: string;
     } | null;
     specimen_type_examination_id: number;
-    specimen_type_examination: SpecimenTypeExamination | null;
+    specimen_type_examination: {
+        id: number;
+        name: string;
+    } | null;
     clinical_details_html: string | null;
     diagnosis_html: string | null;
     macroscopy_html: string | null;
@@ -65,6 +92,19 @@ interface Template {
     protocols_html: string | null;
     legend_html: string | null;
     sections_order?: SectionsOrderElement[] | null;
+    created_at: string;
+}
+
+interface SharedPermission {
+    id: number;
+    owner_id: number;
+    specimen_type_id: number;
+    specimen_type: SpecimenType | null;
+    specimen_type_examination_id: number;
+    specimen_type_examination: { id: number; name: string } | null;
+    template_id: number;
+    shared_with_id: number;
+    shared_with: User | null;
     created_at: string;
 }
 
@@ -83,6 +123,9 @@ interface Props {
         to: number;
     };
     specimenTypes: SpecimenType[];
+    users: User[];
+    examinations: SpecimenTypeExamination[];
+    sharedPermissions: SharedPermission[];
     filters: {
         search?: string;
     };
@@ -91,6 +134,9 @@ interface Props {
 export default function MyTemplatesIndex({
     templates,
     specimenTypes,
+    users,
+    examinations,
+    sharedPermissions,
     filters,
 }: Props) {
     const { auth } = usePage<any>().props;
@@ -99,6 +145,8 @@ export default function MyTemplatesIndex({
     );
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
+    const [isShareListSheetOpen, setIsShareListSheetOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
         null,
@@ -195,6 +243,39 @@ export default function MyTemplatesIndex({
                     </div>
                     {canManage && (
                         <div className="flex gap-2">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="h-10 w-full cursor-pointer px-5 text-sm md:w-auto"
+                                    >
+                                        <Share2 className="mr-2 h-4 w-4" />{' '}
+                                        Compartir{' '}
+                                        <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="w-56"
+                                >
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setIsShareSheetOpen(true)
+                                        }
+                                        className="cursor-pointer"
+                                    >
+                                        Compartir Plantillas
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setIsShareListSheetOpen(true)
+                                        }
+                                        className="cursor-pointer"
+                                    >
+                                        Ver Plantillas Compartidas
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                             <Button
                                 onClick={handleCreate}
                                 className="h-10 w-full cursor-pointer px-5 text-sm md:w-auto"
@@ -222,6 +303,7 @@ export default function MyTemplatesIndex({
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead>Usuario</TableHead>
                                 <TableHead>Tipo de Muestra</TableHead>
                                 <TableHead>Examen</TableHead>
                                 <TableHead>Diagnóstico</TableHead>
@@ -236,6 +318,20 @@ export default function MyTemplatesIndex({
                             {templates.data.length > 0 ? (
                                 templates.data.map((template) => (
                                     <TableRow key={template.id}>
+                                        <TableCell className="font-medium">
+                                            <div className="flex flex-col">
+                                                <span>
+                                                    {template.user?.name ||
+                                                        'Desconocido'}
+                                                </span>
+                                                {template.user_id !==
+                                                    auth.user.id && (
+                                                    <span className="mt-1 inline-flex w-max items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-700/10 ring-inset dark:bg-blue-900/30 dark:text-blue-300">
+                                                        Compartido
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="font-medium">
                                             {template.specimen_type?.name ||
                                                 'Desconocido'}
@@ -270,18 +366,21 @@ export default function MyTemplatesIndex({
                                                     >
                                                         <Edit2 className="h-4 w-4" />
                                                     </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="cursor-pointer text-destructive"
-                                                        onClick={() =>
-                                                            handleDeleteClick(
-                                                                template,
-                                                            )
-                                                        }
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    {template.user_id ===
+                                                        auth.user.id && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="cursor-pointer text-destructive"
+                                                            onClick={() =>
+                                                                handleDeleteClick(
+                                                                    template,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             )}
                                         </TableCell>
@@ -290,7 +389,7 @@ export default function MyTemplatesIndex({
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={6}
+                                        colSpan={7}
                                         className="h-24 text-center"
                                     >
                                         No se encontraron resultados.
@@ -316,6 +415,20 @@ export default function MyTemplatesIndex({
                 specimenTypes={specimenTypes}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
+            />
+
+            <ShareTemplatesSheet
+                open={isShareSheetOpen}
+                onOpenChange={setIsShareSheetOpen}
+                users={users}
+                specimenTypes={specimenTypes}
+                examinations={examinations}
+            />
+
+            <SharedTemplatesListSheet
+                open={isShareListSheetOpen}
+                onOpenChange={setIsShareListSheetOpen}
+                sharedPermissions={sharedPermissions}
             />
 
             <AlertDialog

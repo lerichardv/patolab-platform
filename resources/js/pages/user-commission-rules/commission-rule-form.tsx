@@ -352,7 +352,7 @@ export default function CommissionRuleForm({
     }));
 
     const specimenTypeOptions = specimenTypes.map((st) => ({
-        label: st.name,
+        label: `[${st.id}] ${st.name}`,
         value: st.id.toString(),
     }));
 
@@ -366,7 +366,7 @@ export default function CommissionRuleForm({
           );
 
     const examinationOptions = filteredExaminations.map((e) => ({
-        label: e.name,
+        label: `[${e.id}] ${e.name}`,
         value: e.id.toString(),
     }));
 

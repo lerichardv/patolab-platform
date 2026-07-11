@@ -60,7 +60,11 @@ export default function PurchaseOrderSheet({
                 overlayClassName={overlayClassName}
             >
                 <HeadingSheet
-                    title={purchaseOrder ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
+                    title={
+                        purchaseOrder
+                            ? 'Editar Orden de Compra'
+                            : 'Nueva Orden de Compra'
+                    }
                     description={
                         purchaseOrder
                             ? 'Actualice la información de la orden de compra aquí.'

@@ -25,7 +25,7 @@ import {
     update as updateSpecimen,
 } from '@/actions/App/Http/Controllers/SpecimenController';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
-import type {CustomerOption} from '@/components/async-customer-combobox';
+import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import {
     AlertDialog,
@@ -317,14 +317,14 @@ export default function SpecimenForm({
     const createdCustomerId = flash?.created_customer?.id as number | undefined;
     React.useEffect(() => {
         if (!flash?.created_customer) {
-return;
-}
+            return;
+        }
 
         const createdCustomer = flash.created_customer as any;
 
         if (!createdCustomer.id) {
-return;
-}
+            return;
+        }
 
         setData('customer', createdCustomer.id.toString());
         setSelectedCustomerData(createdCustomer);
@@ -947,8 +947,8 @@ return;
 
     const isSpecimenTypeChanged = React.useMemo(() => {
         if (!specimen) {
-return false;
-}
+            return false;
+        }
 
         return (
             String(data.specimen_type) !== String(specimen.specimen_type) ||

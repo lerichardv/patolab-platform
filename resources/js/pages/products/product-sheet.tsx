@@ -27,7 +27,12 @@ interface Props {
     onSuccess?: () => void;
 }
 
-export default function ProductSheet({ product, open, onOpenChange, onSuccess }: Props) {
+export default function ProductSheet({
+    product,
+    open,
+    onOpenChange,
+    onSuccess,
+}: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="w-full overflow-y-auto sm:max-w-[540px]">
