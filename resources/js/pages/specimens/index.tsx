@@ -123,7 +123,6 @@ interface Priority {
 
 interface Props {
     priorities: Priority[];
-    customers: any[];
     specimenTypes: any[];
     examinations: any[];
     categories: any[];
@@ -247,7 +246,6 @@ const deduplicateSpecimens = (prioritiesList: Priority[]): Priority[] => {
 
 export default function SpecimensIndex({
     priorities: initialPriorities,
-    customers,
     specimenTypes,
     examinations,
     categories,
@@ -2273,7 +2271,6 @@ export default function SpecimensIndex({
                 specimen={selectedSpecimen}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
-                customers={customers}
                 specimenTypes={specimenTypes}
                 examinations={examinations}
                 categories={categories}
@@ -2290,7 +2287,6 @@ export default function SpecimensIndex({
             <SpecimenGroupSheet
                 open={isGroupSheetOpen}
                 onOpenChange={setIsGroupSheetOpen}
-                customers={customers}
                 specimenTypes={specimenTypes}
                 examinations={examinations}
                 categories={categories}
@@ -2325,7 +2321,6 @@ export default function SpecimensIndex({
                 invoice={selectedInvoice}
                 open={isInvoiceSheetOpen}
                 onOpenChange={setIsInvoiceSheetOpen}
-                customers={customers}
                 banks={banks}
             />
 

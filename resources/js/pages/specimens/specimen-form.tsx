@@ -24,6 +24,7 @@ import {
     store as storeSpecimen,
     update as updateSpecimen,
 } from '@/actions/App/Http/Controllers/SpecimenController';
+import AsyncCustomerCombobox, { type CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import {
     AlertDialog,
@@ -77,12 +78,10 @@ import CategorySheet from '../specimen-categories/category-sheet';
 import ExaminationPricesForm from '../specimen-type-examinations/examination-prices-form';
 import SpecimenTypeExaminationSheet from '../specimen-type-examinations/specimen-type-examination-sheet';
 import SpecimenTypeForm from '../specimen-types/specimen-type-form';
-
 interface Props {
     specimen: any | null;
     onSuccess: () => void;
     setIsDirty?: (dirty: boolean) => void;
-    customers: any[];
     specimenTypes: any[];
     examinations: any[];
     categories: any[];
@@ -211,7 +210,6 @@ export default function SpecimenForm({
     specimen,
     onSuccess,
     setIsDirty,
-    customers,
     specimenTypes,
     examinations,
     categories,
@@ -224,6 +222,8 @@ export default function SpecimenForm({
     products = [],
     banks = [],
 }: Props) {
+    const { props: pageProps } = usePage<any>();
+    const flash = pageProps.flash as Record<string, any> | undefined;
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = React.useState(false);
     const [isReferrerSheetOpen, setIsReferrerSheetOpen] = React.useState(false);
     const [isSequenceSheetOpen, setIsSequenceSheetOpen] = React.useState(false);
@@ -237,8 +237,21 @@ export default function SpecimenForm({
     const prevSpecimenTypesRef = React.useRef<any[]>(specimenTypes);
     const prevExaminationsRef = React.useRef<any[]>(examinations);
     const prevCategoriesRef = React.useRef<any[]>(categories);
-    const prevCustomersRef = React.useRef<any[]>(customers);
     const prevReferrersRef = React.useRef<any[]>(referrers);
+    // Track the currently-selected customer locally (for display + detail panel)
+    const [selectedCustomerData, setSelectedCustomerData] = React.useState<CustomerOption | null>(
+        specimen?.customerRelation
+            ? {
+                  id: specimen.customerRelation.id,
+                  name: specimen.customerRelation.name,
+                  id_number: specimen.customerRelation.id_number,
+                  phone: specimen.customerRelation.phone,
+                  gender: specimen.customerRelation.gender,
+                  type: specimen.customerRelation.type,
+                  age: specimen.customerRelation.age,
+              }
+            : null,
+    );
 
     React.useEffect(() => {
         if (specimenTypes.length > prevSpecimenTypesRef.current.length) {
@@ -298,23 +311,17 @@ export default function SpecimenForm({
         prevCategoriesRef.current = categories;
     }, [categories]);
 
+    // Auto-select a newly created customer via flash data from the server
+    const createdCustomerId = flash?.created_customer?.id as number | undefined;
     React.useEffect(() => {
-        if (customers.length > prevCustomersRef.current.length) {
-            const newCustomers = customers.filter(
-                (c) =>
-                    !prevCustomersRef.current.some((prev) => prev.id === c.id),
-            );
-
-            if (newCustomers.length > 0) {
-                setData('customer', newCustomers[0].id.toString());
-                toast.success(
-                    `Paciente "${newCustomers[0].name}" seleccionado automáticamente`,
-                );
-            }
-        }
-
-        prevCustomersRef.current = customers;
-    }, [customers]);
+        if (!flash?.created_customer) return;
+        const createdCustomer = flash.created_customer as any;
+        if (!createdCustomer.id) return;
+        setData('customer', createdCustomer.id.toString());
+        setSelectedCustomerData(createdCustomer);
+        toast.success(`Paciente "${createdCustomer.name}" seleccionado automáticamente`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [createdCustomerId]);
 
     React.useEffect(() => {
         if (referrers.length > prevReferrersRef.current.length) {
@@ -1229,8 +1236,8 @@ export default function SpecimenForm({
         }, 0);
     }, [data.insumos]);
 
-    // retrieve settings
-    const { settings } = usePage<any>().props;
+    // retrieve settings (reuse pageProps from above)
+    const { settings } = pageProps;
     const thirdAgePercent = parseFloat(settings?.third_age_discount || '30');
     const fourthAgePercent = parseFloat(settings?.fourth_age_discount || '40');
 
@@ -1467,10 +1474,8 @@ export default function SpecimenForm({
         isPaymentSheetOpen,
     ]);
 
-    const selectedCustomer = React.useMemo(() => {
-        return customers.find((c) => c.id.toString() === data.customer);
-    }, [data.customer, customers]);
 
+    const selectedCustomer = selectedCustomerData;
     const selectedCustomerLabel = selectedCustomer?.name || 'Sin seleccionar';
     const selectedExaminationLabel =
         examinations.find(
@@ -1905,51 +1910,48 @@ export default function SpecimenForm({
 
                     {/* Customer Selection Row inside the gray steps container */}
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between gap-5">
-                            <div className="flex w-full items-center gap-2">
-                                <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                    Cliente
-                                </span>
-                                {selectedCustomer && (
-                                    <span
-                                        className={cn(
-                                            'rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase',
-                                            selectedCustomer.type === 'empresa'
-                                                ? 'border border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                                                : 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-                                        )}
-                                    >
-                                        {selectedCustomer.type === 'empresa'
-                                            ? 'Empresa'
-                                            : 'Individual'}
-                                    </span>
-                                )}
-
-                                <div className="flex w-full flex-col gap-2">
-                                    <FormCombobox
-                                        placeholder="Seleccionar cliente"
-                                        value={data.customer}
-                                        onChange={(v) => setData('customer', v)}
-                                        options={customers.map((c) => ({
-                                            label: c.name,
-                                            value: c.id.toString(),
-                                        }))}
-                                    />
-                                    {errors.customer && (
-                                        <p className="text-sm text-xs text-destructive">
-                                            {errors.customer}
-                                        </p>
+                        <div className="flex items-center gap-2">
+                            <span className="shrink-0 text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                Cliente
+                            </span>
+                            {selectedCustomer && (
+                                <span
+                                    className={cn(
+                                        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase',
+                                        selectedCustomer.type === 'empresa'
+                                            ? 'border border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                            : 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
                                     )}
-                                </div>
+                                >
+                                    {selectedCustomer.type === 'empresa'
+                                        ? 'Empresa'
+                                        : 'Individual'}
+                                </span>
+                            )}
+                            <div className="min-w-0 flex-1">
+                                <AsyncCustomerCombobox
+                                    placeholder="Seleccionar cliente"
+                                    value={data.customer}
+                                    initialCustomer={selectedCustomerData}
+                                    onChange={(v, customer) => {
+                                        setData('customer', v);
+                                        setSelectedCustomerData(customer ?? null);
+                                    }}
+                                />
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setIsCustomerSheetOpen(true)}
-                                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                className="shrink-0 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                             >
                                 <Plus className="h-3 w-3" /> Nuevo
                             </button>
                         </div>
+                        {errors.customer && (
+                            <p className="text-xs text-destructive">
+                                {errors.customer}
+                            </p>
+                        )}
 
                         {selectedCustomer && (
                             <div className="grid grid-cols-1 gap-4 border-t border-border/50 pt-3 text-xs sm:grid-cols-3">

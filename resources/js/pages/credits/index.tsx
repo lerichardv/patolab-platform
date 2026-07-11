@@ -19,6 +19,7 @@ import {
 import * as React from 'react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
+import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Pagination } from '@/components/pagination';
 import {
@@ -149,11 +150,10 @@ interface Props {
         has_pending_balance?: string;
         group_id?: string;
     };
-    customers: {
+    selectedCustomer?: {
         id: number;
         name: string;
-        id_number: string;
-    }[];
+    } | null;
     specimenTypes: {
         id: number;
         name: string;
@@ -244,7 +244,7 @@ function FormCombobox({
 export default function CreditsIndex({
     credits,
     filters,
-    customers,
+    selectedCustomer,
     specimenTypes,
     groups,
     banks = [],
@@ -495,22 +495,14 @@ export default function CreditsIndex({
                             <span className="text-xs font-semibold text-muted-foreground">
                                 Cliente
                             </span>
-                            <FormCombobox
-                                placeholder="Todos los clientes"
-                                value={filters.customer_id || 'all'}
-                                onChange={(v) =>
-                                    handleFilterChange('customer_id', v)
+                            <AsyncCustomerCombobox
+                                value={filters.customer_id || ''}
+                                onChange={(id) =>
+                                    handleFilterChange('customer_id', id || '')
                                 }
-                                options={[
-                                    {
-                                        label: 'Todos los clientes',
-                                        value: 'all',
-                                    },
-                                    ...customers.map((c) => ({
-                                        label: c.name,
-                                        value: c.id.toString(),
-                                    })),
-                                ]}
+                                placeholder="Filtrar por cliente"
+                                initialCustomer={selectedCustomer || undefined}
+                                allowClear
                             />
                         </div>
                         <div className="flex w-full flex-col gap-1.5">

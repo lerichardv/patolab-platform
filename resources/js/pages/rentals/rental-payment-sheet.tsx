@@ -17,6 +17,8 @@ import * as React from 'react';
 import { useEffect, useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { pay as payRental } from '@/actions/App/Http/Controllers/RentalController';
+import AsyncCustomerCombobox from '@/components/async-customer-combobox';
+import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -75,7 +77,6 @@ interface Props {
     rental: Rental | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    customers: Customer[];
     banks: Bank[];
     rentals: Rental[];
 }
@@ -205,7 +206,6 @@ export default function RentalPaymentSheet({
     rental,
     open,
     onOpenChange,
-    customers,
     banks,
     rentals,
 }: Props) {
@@ -431,15 +431,7 @@ export default function RentalPaymentSheet({
         data.initial_payment_type,
     ]);
 
-    const selectedCustomer = useMemo(() => {
-        if (!data.customer_id) {
-            return null;
-        }
-
-        return (
-            customers.find((c) => c.id.toString() === data.customer_id) || null
-        );
-    }, [data.customer_id, customers]);
+    const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null);
 
     const handleSavePaymentDetails = () => {
         const errorsMap: Record<string, string> = {};
@@ -960,14 +952,13 @@ export default function RentalPaymentSheet({
                                 </button>
                             </div>
 
-                            <FormCombobox
-                                placeholder="Seleccione un cliente"
+                            <AsyncCustomerCombobox
                                 value={data.customer_id}
-                                onChange={(val) => setData('customer_id', val)}
-                                options={customers.map((c) => ({
-                                    label: c.name,
-                                    value: c.id.toString(),
-                                }))}
+                                onChange={(id, customer) => {
+                                    setData('customer_id', id);
+                                    setSelectedCustomer(customer ?? null);
+                                }}
+                                placeholder="Seleccione un cliente"
                             />
 
                             {selectedCustomer && (

@@ -133,7 +133,15 @@ class CreditController extends Controller
 
         $credits = $query->latest()->paginate(10)->withQueryString();
 
-        $customers = Customer::where('active', true)->orderBy('name', 'asc')->get();
+        // Resolve the currently-filtered customer for the async combobox initial label
+        $selectedCustomer = null;
+        $filteredCustomerId = $request->get('customer_id');
+        if ($filteredCustomerId && $filteredCustomerId !== 'all') {
+            $selectedCustomer = Customer::where('id', $filteredCustomerId)
+                ->select('id', 'name', 'id_number')
+                ->first();
+        }
+
         $specimenTypes = SpecimenType::where('active', true)->orderBy('name', 'asc')->get();
 
         return Inertia::render('credits/index', [
@@ -145,7 +153,7 @@ class CreditController extends Controller
                     'date_to' => $dateTo,
                 ]
             ),
-            'customers' => $customers,
+            'selectedCustomer' => $selectedCustomer,
             'specimenTypes' => $specimenTypes,
             'groups' => SpecimenGroup::orderBy('name', 'asc')->get(),
             'banks' => Bank::orderBy('name', 'asc')->get(),

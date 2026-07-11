@@ -84,9 +84,17 @@ class CustomerController extends Controller
             'email' => 'nullable|email',
         ]);
 
-        Customer::create($validated);
+        $customer = Customer::create($validated);
 
-        return redirect()->back();
+        return redirect()->back()->with('created_customer', [
+            'id' => $customer->id,
+            'name' => $customer->name,
+            'id_number' => $customer->id_number,
+            'phone' => $customer->phone,
+            'gender' => $customer->gender,
+            'type' => $customer->type,
+            'age' => $customer->age,
+        ]);
     }
 
     public function update(Request $request, Customer $customer)

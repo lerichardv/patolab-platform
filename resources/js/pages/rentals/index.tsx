@@ -19,6 +19,7 @@ import {
 import { useState, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
 import { index as rentalsIndex } from '@/actions/App/Http/Controllers/RentalController';
+import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Pagination } from '@/components/pagination';
 import {
@@ -95,11 +96,10 @@ interface Props {
         sort_field?: string;
         sort_direction?: 'asc' | 'desc';
     };
-    customers: {
+    selectedCustomer?: {
         id: number;
         name: string;
-        id_number: string;
-    }[];
+    } | null;
     banks: {
         id: number;
         name: string;
@@ -110,7 +110,7 @@ interface Props {
 export default function RentalsIndex({
     rentals,
     filters,
-    customers,
+    selectedCustomer,
     banks,
     allRentals = [],
 }: Props) {
@@ -125,8 +125,6 @@ export default function RentalsIndex({
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
     const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
     const [search, setSearch] = useState(filters.search || '');
-    const [isCustomerFilterOpen, setIsCustomerFilterOpen] = useState(false);
-
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
 
@@ -360,100 +358,15 @@ export default function RentalsIndex({
                             <span className="text-xs font-semibold text-muted-foreground">
                                 Cliente
                             </span>
-                            <Popover
-                                open={isCustomerFilterOpen}
-                                onOpenChange={setIsCustomerFilterOpen}
-                                modal={true}
-                            >
-                                <PopoverTrigger asChild className="w-full">
-                                    <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        aria-expanded={isCustomerFilterOpen}
-                                        className="w-full justify-between text-left font-normal"
-                                    >
-                                        <span className="truncate">
-                                            {filters.customer_id &&
-                                            filters.customer_id !== 'all'
-                                                ? customers.find(
-                                                      (c) =>
-                                                          c.id.toString() ===
-                                                          filters.customer_id,
-                                                  )?.name ||
-                                                  'Cliente seleccionado'
-                                                : 'Todos los clientes'}
-                                        </span>
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                    className="w-[--radix-popover-trigger-width] p-0"
-                                    align="start"
-                                >
-                                    <Command>
-                                        <CommandInput placeholder="Buscar cliente..." />
-                                        <CommandList>
-                                            <CommandEmpty>
-                                                No se encontraron clientes.
-                                            </CommandEmpty>
-                                            <CommandGroup>
-                                                <CommandItem
-                                                    value="todos"
-                                                    onSelect={() => {
-                                                        handleFilterChange(
-                                                            'customer_id',
-                                                            'all',
-                                                        );
-                                                        setIsCustomerFilterOpen(
-                                                            false,
-                                                        );
-                                                    }}
-                                                >
-                                                    <Check
-                                                        className={cn(
-                                                            'mr-2 h-4 w-4',
-                                                            !filters.customer_id ||
-                                                                filters.customer_id ===
-                                                                    'all'
-                                                                ? 'opacity-100'
-                                                                : 'opacity-0',
-                                                        )}
-                                                    />
-                                                    Todos los clientes
-                                                </CommandItem>
-                                                {customers.map((c) => (
-                                                    <CommandItem
-                                                        key={c.id}
-                                                        value={c.name}
-                                                        onSelect={() => {
-                                                            handleFilterChange(
-                                                                'customer_id',
-                                                                c.id.toString(),
-                                                            );
-                                                            setIsCustomerFilterOpen(
-                                                                false,
-                                                            );
-                                                        }}
-                                                    >
-                                                        <Check
-                                                            className={cn(
-                                                                'mr-2 h-4 w-4',
-                                                                filters.customer_id ===
-                                                                    c.id.toString()
-                                                                    ? 'opacity-100'
-                                                                    : 'opacity-0',
-                                                            )}
-                                                        />
-                                                        <span className="truncate">
-                                                            {c.name}
-                                                        </span>
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
+                            <AsyncCustomerCombobox
+                                value={filters.customer_id || ''}
+                                onChange={(id) =>
+                                    handleFilterChange('customer_id', id || '')
+                                }
+                                placeholder="Filtrar por cliente"
+                                initialCustomer={selectedCustomer || undefined}
+                                allowClear
+                            />
                         </div>
                     </div>
                 </div>
@@ -646,7 +559,6 @@ export default function RentalsIndex({
                 rental={selectedRental}
                 open={isPaymentSheetOpen}
                 onOpenChange={setIsPaymentSheetOpen}
-                customers={customers}
                 banks={banks}
                 rentals={allRentals}
             />

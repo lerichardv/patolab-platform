@@ -105,7 +105,16 @@ class RentalController extends Controller
         $rentals = $query->paginate(10)->withQueryString();
 
         $allRentals = Rental::orderBy('name', 'asc')->get();
-        $customers = Customer::where('active', true)->orderBy('name', 'asc')->get();
+
+        // Resolve the currently-filtered customer for the async combobox initial label
+        $selectedCustomer = null;
+        $filteredCustomerId = $request->get('customer_id');
+        if ($filteredCustomerId && $filteredCustomerId !== 'all') {
+            $selectedCustomer = Customer::where('id', $filteredCustomerId)
+                ->select('id', 'name', 'id_number')
+                ->first();
+        }
+
         $banks = Bank::all();
 
         return Inertia::render('rentals/index', [
@@ -118,7 +127,7 @@ class RentalController extends Controller
                     'date_to' => $dateTo,
                 ]
             ),
-            'customers' => $customers,
+            'selectedCustomer' => $selectedCustomer,
             'banks' => $banks,
         ]);
     }

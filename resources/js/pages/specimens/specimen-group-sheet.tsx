@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
+import AsyncCustomerCombobox, { type CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import {
     AlertDialog,
@@ -87,11 +88,9 @@ import CategorySheet from '../specimen-categories/category-sheet';
 import ExaminationPricesForm from '../specimen-type-examinations/examination-prices-form';
 import SpecimenTypeExaminationSheet from '../specimen-type-examinations/specimen-type-examination-sheet';
 import SpecimenTypeForm from '../specimen-types/specimen-type-form';
-
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    customers: any[];
     specimenTypes: any[];
     examinations: any[];
     categories: any[];
@@ -219,7 +218,6 @@ function FormCombobox({
 export default function SpecimenGroupSheet({
     open,
     onOpenChange,
-    customers,
     specimenTypes,
     examinations,
     categories,
@@ -232,7 +230,9 @@ export default function SpecimenGroupSheet({
     products = [],
     banks = [],
 }: Props) {
-    const { settings } = usePage<any>().props;
+    const { props: pageProps } = usePage<any>();
+    const { settings } = pageProps;
+    const flash = pageProps.flash as Record<string, any> | undefined;
     const thirdAgePercent = parseFloat(settings?.third_age_discount || '30');
     const fourthAgePercent = parseFloat(settings?.fourth_age_discount || '40');
 
@@ -279,7 +279,9 @@ export default function SpecimenGroupSheet({
     const [customerSheetSource, setCustomerSheetSource] = useState<
         'global' | 'nested'
     >('global');
-    const prevCustomersRef = useRef<any[]>(customers);
+    // Track selected customer data for display (async combobox)
+    const [selectedGlobalCustomerData, setSelectedGlobalCustomerData] = useState<CustomerOption | null>(null);
+    const [selectedNestedCustomerData, setSelectedNestedCustomerData] = useState<CustomerOption | null>(null);
     const prevReferrersRef = useRef<any[]>(referrers);
     const [isReferrerSheetOpen, setIsReferrerSheetOpen] = useState(false);
     const [isSequenceSheetOpen, setIsSequenceSheetOpen] = useState(false);
@@ -427,30 +429,23 @@ export default function SpecimenGroupSheet({
         }
     }, [priorities]);
 
+    // Auto-select a newly created customer via flash data from the server
+    const createdCustomerId = flash?.created_customer?.id as number | undefined;
     useEffect(() => {
-        if (customers.length > prevCustomersRef.current.length) {
-            const newCustomers = customers.filter(
-                (c) =>
-                    !prevCustomersRef.current.some((prev) => prev.id === c.id),
-            );
-
-            if (newCustomers.length > 0) {
-                const newId = newCustomers[0].id.toString();
-
-                if (customerSheetSource === 'global') {
-                    setGlobalCustomerId(newId);
-                } else {
-                    setNestedCustomer(newId);
-                }
-
-                toast.success(
-                    `Paciente "${newCustomers[0].name}" seleccionado automáticamente`,
-                );
-            }
+        if (!flash?.created_customer) return;
+        const createdCustomer = flash.created_customer as any;
+        if (!createdCustomer.id) return;
+        const newId = createdCustomer.id.toString();
+        if (customerSheetSource === 'global') {
+            setGlobalCustomerId(newId);
+            setSelectedGlobalCustomerData(createdCustomer);
+        } else {
+            setNestedCustomer(newId);
+            setSelectedNestedCustomerData(createdCustomer);
         }
-
-        prevCustomersRef.current = customers;
-    }, [customers, customerSheetSource]);
+        toast.success(`Paciente "${createdCustomer.name}" seleccionado automáticamente`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [createdCustomerId]);
 
     useEffect(() => {
         if (referrers.length > prevReferrersRef.current.length) {
@@ -471,9 +466,7 @@ export default function SpecimenGroupSheet({
     }, [referrers]);
 
     // Active customer details
-    const selectedGlobalCustomer = useMemo(() => {
-        return customers.find((c) => c.id.toString() === globalCustomerId);
-    }, [globalCustomerId, customers]);
+    const selectedGlobalCustomer = selectedGlobalCustomerData;
 
     // Pre-select global customer when opening nested form to create a specimen
     const handleOpenNestedForm = () => {
@@ -672,8 +665,7 @@ export default function SpecimenGroupSheet({
                 Math.random().toString(36).substring(2, 9),
             customer: parseInt(nestedCustomer),
             customer_name:
-                customers.find((c) => c.id.toString() === nestedCustomer)
-                    ?.name || 'Desconocido',
+                selectedNestedCustomerData?.name || 'Desconocido',
             specimen_type: parseInt(nestedSpecimenType),
             specimen_type_name:
                 specimenTypes.find(
@@ -1524,25 +1516,21 @@ export default function SpecimenGroupSheet({
 
                         {/* Customer Global Selector */}
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between gap-5">
-                                <div className="flex w-full items-center gap-2">
-                                    <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                        Cliente
-                                    </span>
-                                    <div className="flex w-full flex-col gap-2">
-                                        <FormCombobox
-                                            placeholder="Seleccionar cliente"
-                                            value={globalCustomerId}
-                                            onChange={(v) => {
-                                                setGlobalCustomerId(v);
-                                                setIsFormDirty(true);
-                                            }}
-                                            options={customers.map((c) => ({
-                                                label: c.name,
-                                                value: c.id.toString(),
-                                            }))}
-                                        />
-                                    </div>
+                            <div className="flex items-center gap-2">
+                                <span className="shrink-0 text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                    Cliente
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                    <AsyncCustomerCombobox
+                                        placeholder="Seleccionar cliente"
+                                        value={globalCustomerId}
+                                        initialCustomer={selectedGlobalCustomerData}
+                                        onChange={(v, customer) => {
+                                            setGlobalCustomerId(v);
+                                            setSelectedGlobalCustomerData(customer ?? null);
+                                            setIsFormDirty(true);
+                                        }}
+                                    />
                                 </div>
                                 <button
                                     type="button"
@@ -1550,7 +1538,7 @@ export default function SpecimenGroupSheet({
                                         setCustomerSheetSource('global');
                                         setIsCustomerSheetOpen(true);
                                     }}
-                                    className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                    className="shrink-0 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                                 >
                                     <Plus className="h-3 w-3" /> Nuevo
                                 </button>
@@ -2930,39 +2918,36 @@ export default function SpecimenGroupSheet({
 
                             <div className="space-y-5 px-5 py-4">
                                 <div className="grid gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <Label htmlFor="nested_customer">
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="nested_customer" className="shrink-0">
                                             Paciente / Cliente
                                         </Label>
+                                        <div className="min-w-0 flex-1">
+                                            <AsyncCustomerCombobox
+                                                placeholder="Seleccionar paciente"
+                                                value={nestedCustomer}
+                                                initialCustomer={selectedNestedCustomerData}
+                                                onChange={(v, customer) => {
+                                                    setNestedCustomer(v);
+                                                    setSelectedNestedCustomerData(customer ?? null);
+                                                    setNestedErrors((prev) => ({
+                                                        ...prev,
+                                                        customer: '',
+                                                    }));
+                                                }}
+                                            />
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                setCustomerSheetSource(
-                                                    'nested',
-                                                );
+                                                setCustomerSheetSource('nested');
                                                 setIsCustomerSheetOpen(true);
                                             }}
-                                            className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                            className="shrink-0 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                                         >
-                                            <Plus className="h-3.5 w-3.5" />{' '}
-                                            Nuevo
+                                            <Plus className="h-3 w-3" /> Nuevo
                                         </button>
                                     </div>
-                                    <FormCombobox
-                                        placeholder="Seleccionar paciente"
-                                        value={nestedCustomer}
-                                        onChange={(v) => {
-                                            setNestedCustomer(v);
-                                            setNestedErrors((prev) => ({
-                                                ...prev,
-                                                customer: '',
-                                            }));
-                                        }}
-                                        options={customers.map((c) => ({
-                                            label: c.name,
-                                            value: c.id.toString(),
-                                        }))}
-                                    />
                                     {nestedErrors.customer && (
                                         <p className="text-xs text-destructive">
                                             {nestedErrors.customer}
@@ -4465,11 +4450,7 @@ export default function SpecimenGroupSheet({
                                         Cliente / Paciente (Facturación):
                                     </span>
                                     <span className="font-semibold text-foreground">
-                                        {customers.find(
-                                            (c) =>
-                                                c.id.toString() ===
-                                                globalCustomerId,
-                                        )?.name || 'Sin seleccionar'}
+                                        {selectedGlobalCustomerData?.name || 'Sin seleccionar'}
                                     </span>
                                 </div>
 

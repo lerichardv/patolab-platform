@@ -49,6 +49,7 @@ class HandleInertiaRequests extends Middleware
                 'new_specimen_id' => $request->session()->get('new_specimen_id'),
                 'new_invoice_id' => $request->session()->get('new_invoice_id'),
                 'new_invoice_url' => $request->session()->get('new_invoice_url'),
+                'created_customer' => $request->session()->get('created_customer'),
             ],
         ];
     }

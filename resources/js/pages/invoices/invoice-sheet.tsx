@@ -18,7 +18,6 @@ interface Props {
     invoice: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    customers: any[];
     banks: any[];
     specimenTypes?: any[];
     settings?: Record<string, string>;
@@ -28,7 +27,6 @@ export default function InvoiceSheet({
     invoice,
     open,
     onOpenChange,
-    customers,
     banks,
     specimenTypes,
     settings,
@@ -84,7 +82,6 @@ export default function InvoiceSheet({
                     {invoice && (
                         <InvoiceForm
                             invoice={invoice}
-                            customers={customers}
                             banks={banks}
                             specimenTypes={finalSpecimenTypes}
                             examinations={finalExaminations}

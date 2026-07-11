@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import AsyncCustomerCombobox, { type CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import {
     AlertDialog,
@@ -61,7 +62,6 @@ import { cn } from '@/lib/utils';
 
 interface Props {
     invoice: any;
-    customers: any[];
     banks: any[];
     specimenTypes: any[];
     examinations: any[];
@@ -147,7 +147,6 @@ function FormCombobox({
 
 export default function InvoiceForm({
     invoice,
-    customers,
     banks,
     specimenTypes,
     examinations,
@@ -157,6 +156,11 @@ export default function InvoiceForm({
 }: Props) {
     const [showConfirm, setShowConfirm] = useState(false);
     const [regeneratePdf, setRegeneratePdf] = useState(true);
+    const [selectedCustomerData, setSelectedCustomerData] = useState<CustomerOption | null>(
+        invoice?.customer
+            ? { id: invoice.customer.id, name: invoice.customer.name, id_number: invoice.customer.id_number, phone: invoice.customer.phone, gender: invoice.customer.gender, type: invoice.customer.type, age: invoice.customer.age }
+            : null,
+    );
 
     const {
         data,
@@ -1625,14 +1629,14 @@ export default function InvoiceForm({
                             Cliente / Paciente{' '}
                             <span className="text-destructive">*</span>
                         </Label>
-                        <FormCombobox
+                        <AsyncCustomerCombobox
                             placeholder="Seleccione un Cliente"
                             value={data.customer_id}
-                            onChange={(val) => setData('customer_id', val)}
-                            options={customers.map((c) => ({
-                                label: `${c.name} (${c.id_number || 'Sin ID'})`,
-                                value: c.id.toString(),
-                            }))}
+                            initialCustomer={selectedCustomerData}
+                            onChange={(val, customer) => {
+                                setData('customer_id', val);
+                                setSelectedCustomerData(customer ?? null);
+                            }}
                         />
                         {errors.customer_id && (
                             <p className="text-xs text-destructive">

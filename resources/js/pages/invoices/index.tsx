@@ -30,6 +30,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
 import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
 import { index as rentalsIndex } from '@/actions/App/Http/Controllers/RentalController';
+import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import {
     DateRangePicker,
     setCookie,
@@ -152,11 +153,10 @@ interface Props {
         group_id?: string;
         invoice_type?: string;
     };
-    customers: {
+    selectedCustomer?: {
         id: number;
         name: string;
-        id_number: string;
-    }[];
+    } | null;
     specimenTypes: {
         id: number;
         name: string;
@@ -271,7 +271,7 @@ const ALL_STATUSES = [
 export default function InvoicesIndex({
     invoices,
     filters,
-    customers,
+    selectedCustomer,
     specimenTypes,
     banks,
     examinations,
@@ -819,22 +819,14 @@ export default function InvoicesIndex({
                             <span className="text-xs font-semibold text-muted-foreground">
                                 Cliente
                             </span>
-                            <FormCombobox
-                                placeholder="Todos los clientes"
-                                value={filters.customer_id || 'all'}
-                                onChange={(v) =>
-                                    handleFilterChange('customer_id', v)
+                            <AsyncCustomerCombobox
+                                value={filters.customer_id || ''}
+                                onChange={(id) =>
+                                    handleFilterChange('customer_id', id || '')
                                 }
-                                options={[
-                                    {
-                                        label: 'Todos los clientes',
-                                        value: 'all',
-                                    },
-                                    ...customers.map((c) => ({
-                                        label: c.name,
-                                        value: c.id.toString(),
-                                    })),
-                                ]}
+                                placeholder="Filtrar por cliente"
+                                initialCustomer={selectedCustomer || undefined}
+                                allowClear
                             />
                         </div>
                         <div className="flex w-full flex-col gap-1.5">
@@ -1599,7 +1591,6 @@ export default function InvoicesIndex({
                 invoice={invoiceToEdit}
                 open={isEditSheetOpen}
                 onOpenChange={setIsEditSheetOpen}
-                customers={customers}
                 banks={banks}
                 specimenTypes={specimenTypes}
                 settings={settings}
@@ -1616,7 +1607,6 @@ export default function InvoicesIndex({
                         setSelectedSpecimen(null);
                     }
                 }}
-                customers={customers}
                 specimenTypes={specimenTypes}
                 examinations={examinations}
                 categories={categories}
@@ -1650,7 +1640,6 @@ export default function InvoicesIndex({
             <SpecimenGroupSheet
                 open={isGroupSheetOpen}
                 onOpenChange={setIsGroupSheetOpen}
-                customers={customers}
                 specimenTypes={specimenTypes}
                 examinations={examinations}
                 categories={categories}

@@ -17,7 +17,6 @@ interface Props {
     specimen: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    customers: any[];
     specimenTypes: any[];
     examinations: any[];
     categories: any[];
@@ -35,7 +34,6 @@ export default function SpecimenSheet({
     specimen,
     open,
     onOpenChange,
-    customers,
     specimenTypes,
     examinations,
     categories,
@@ -95,7 +93,6 @@ export default function SpecimenSheet({
                         specimen={specimen}
                         onSuccess={() => onOpenChange(false)}
                         setIsDirty={setIsFormDirty}
-                        customers={customers}
                         specimenTypes={specimenTypes}
                         examinations={examinations}
                         categories={categories}

@@ -4,6 +4,7 @@ use App\Http\Controllers\AiAssistantController;
 use App\Http\Controllers\CaiRangeController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerSearchController;
 use App\Http\Controllers\Editor\CuttingController;
 use App\Http\Controllers\Editor\ReportEditorController;
 use App\Http\Controllers\InventoryController;
@@ -106,6 +107,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('customers/import', [CustomerController::class, 'importPage'])->name('customers.import-page');
     Route::post('customers/import/parse', [CustomerController::class, 'parseImport'])->name('customers.import-parse');
     Route::post('customers/import/row', [CustomerController::class, 'importRow'])->name('customers.import-row');
+    Route::get('customers/search', [CustomerSearchController::class, 'search'])->name('customers.search');
     Route::resource('customers', CustomerController::class);
 
     Route::get('departments', function () {
