@@ -765,7 +765,7 @@ test('specimen report updates template and resets Yjs state when specimen type i
     ]);
 
     // Create a template for type2/examination2
-    SpecimenTypeTemplate::create([
+    $template2 = SpecimenTypeTemplate::create([
         'specimen_type_id' => $type2->id,
         'specimen_type_examination_id' => $examination2->id,
         'macroscopy_html' => '<p>Nueva Macroscopía</p>',
@@ -822,6 +822,7 @@ test('specimen report updates template and resets Yjs state when specimen type i
             'status' => 'received',
             'priority_id' => $priority->id,
             'regenerate_pdf' => false,
+            'template_id' => $template2->id,
         ]);
 
     $response->assertRedirect();

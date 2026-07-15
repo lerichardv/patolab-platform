@@ -139,7 +139,7 @@ class WorkOrderController extends Controller
             'work_order_type_id.*' => 'exists:work_order_types,id',
             'work_order_task_id' => 'required|exists:work_order_tasks,id',
             'quantity' => 'nullable|integer|min:1',
-            'user_ids' => 'required|array|min:1',
+            'user_ids' => 'nullable|array',
             'user_ids.*' => 'exists:users,id',
             'status' => 'required|in:Enviada,En Proceso,Finalizada',
             'priority' => 'required|integer|in:1,2,3',
@@ -147,8 +147,8 @@ class WorkOrderController extends Controller
         ]);
 
         $specimenIds = ($request->has('specimen_ids') && ! empty($request->input('specimen_ids'))) ? $validated['specimen_ids'] : [$validated['specimen_id']];
-        $userIds = $validated['user_ids'];
-        $primaryUserId = $userIds[0];
+        $userIds = $validated['user_ids'] ?? [];
+        $primaryUserId = ! empty($userIds) ? $userIds[0] : null;
 
         $task = WorkOrderTask::find($validated['work_order_task_id']);
         $dueDate = null;

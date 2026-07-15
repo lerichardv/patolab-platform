@@ -86,6 +86,14 @@ import {
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Popover,
     PopoverTrigger,
@@ -136,6 +144,7 @@ interface SpecimenReport {
         order: number;
         active: boolean;
     }> | null;
+    headings_toggles: Record<string, boolean> | null;
 }
 
 interface Specimen {
@@ -208,6 +217,7 @@ interface Props {
     cutting_codes: any[];
     cutting_slide_types: any[];
     users: any[];
+    templates?: any[];
 }
 
 const editorStyles = `
@@ -3371,7 +3381,16 @@ export default function ReportWorkspace({
     cutting_codes = [],
     cutting_slide_types = [],
     users = [],
+    templates = [],
 }: Props) {
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+
+    useEffect(() => {
+        if (templates && templates.length === 1) {
+            setSelectedTemplateId(String(templates[0].id));
+        }
+    }, [templates]);
+
     const currentUserSpecimenRelation = specimen.users?.find(
         (u: any) => u.id === auth.user.id,
     );
@@ -3592,6 +3611,53 @@ export default function ReportWorkspace({
         return defaultSectionsOrder;
     });
 
+    const defaultHeadingsToggles: Record<string, boolean> = {
+        clinical_details_html: true,
+        diagnosis_html: true,
+        macroscopy_html: true,
+        microscopy_html: true,
+        comments_notes_html: true,
+        protocols_html: true,
+        legend_html: true,
+    };
+
+    const [headingsToggles, setHeadingsToggles] = useState<
+        Record<string, boolean>
+    >(() => {
+        if (
+            report?.headings_toggles &&
+            typeof report.headings_toggles === 'object'
+        ) {
+            return { ...defaultHeadingsToggles, ...report.headings_toggles };
+        }
+        return defaultHeadingsToggles;
+    });
+
+    const handleHeadingToggle = (key: string, value: boolean) => {
+        const updated = { ...headingsToggles, [key]: value };
+        setHeadingsToggles(updated);
+
+        // Persist immediately via the save endpoint
+        const csrfToken =
+            (
+                document.querySelector(
+                    'meta[name="csrf-token"]',
+                ) as HTMLMetaElement
+            )?.content ?? '';
+
+        fetch(`/specimens/${specimen.sequence_code}/report-editor/save`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                Accept: 'application/json',
+            },
+            body: JSON.stringify({ headings_toggles: updated }),
+        }).catch((err) => {
+            console.error('Failed to persist headings_toggles:', err);
+        });
+    };
+
     const handleDragEnd = (result: DropResult) => {
         if (!result.destination) {
             return;
@@ -3717,16 +3783,20 @@ export default function ReportWorkspace({
                 return;
             }
 
+            const showHeading = headingsToggles[section.key] ?? true;
+
             if (section.key === 'clinical_details_html') {
                 const clinHtml = clinicalDetailsHtml || '';
 
                 if (!isEmptyHtml(clinHtml)) {
-                    blocks.push({
-                        type: 'section-header',
-                        title: 'Datos Clínicos',
-                        height: 7.94,
-                        id: 'clin-header',
-                    });
+                    if (showHeading) {
+                        blocks.push({
+                            type: 'section-header',
+                            title: 'Datos Clínicos',
+                            height: 7.94,
+                            id: 'clin-header',
+                        });
+                    }
                     const clinBlocks = parseHtmlToBlocks(clinHtml);
                     clinBlocks.forEach((bHtml, idx) => {
                         const b = classifyBlock(bHtml, maxCharsPerLine);
@@ -3738,12 +3808,14 @@ export default function ReportWorkspace({
                 const diagHtml = diagnosisHtml || specimen.diagnosis || '';
 
                 if (!isEmptyHtml(diagHtml)) {
-                    blocks.push({
-                        type: 'section-header',
-                        title: 'Diagnóstico',
-                        height: 7.94, // 2 lines * 3.97
-                        id: 'diag-header',
-                    });
+                    if (showHeading) {
+                        blocks.push({
+                            type: 'section-header',
+                            title: 'Diagnóstico',
+                            height: 7.94, // 2 lines * 3.97
+                            id: 'diag-header',
+                        });
+                    }
                     const diagBlocks = parseHtmlToBlocks(diagHtml);
                     diagBlocks.forEach((bHtml, idx) => {
                         const b = classifyBlock(bHtml, maxCharsPerLine);
@@ -3755,12 +3827,14 @@ export default function ReportWorkspace({
                 const macroHtml = macroscopyHtml || '';
 
                 if (!isEmptyHtml(macroHtml)) {
-                    blocks.push({
-                        type: 'section-header',
-                        title: 'Descripción Macroscópica',
-                        height: 7.94,
-                        id: 'macro-header',
-                    });
+                    if (showHeading) {
+                        blocks.push({
+                            type: 'section-header',
+                            title: 'Descripción Macroscópica',
+                            height: 7.94,
+                            id: 'macro-header',
+                        });
+                    }
                     const macroBlocks = parseHtmlToBlocks(macroHtml);
                     macroBlocks.forEach((bHtml, idx) => {
                         const b = classifyBlock(bHtml, maxCharsPerLine);
@@ -3773,12 +3847,14 @@ export default function ReportWorkspace({
                     const microHtml = microscopyHtml || '';
 
                     if (!isEmptyHtml(microHtml)) {
-                        blocks.push({
-                            type: 'section-header',
-                            title: 'Descripción Microscópica',
-                            height: 7.94,
-                            id: 'micro-header',
-                        });
+                        if (showHeading) {
+                            blocks.push({
+                                type: 'section-header',
+                                title: 'Descripción Microscópica',
+                                height: 7.94,
+                                id: 'micro-header',
+                            });
+                        }
                         const microBlocks = parseHtmlToBlocks(microHtml);
                         microBlocks.forEach((bHtml, idx) => {
                             const b = classifyBlock(bHtml, maxCharsPerLine);
@@ -3791,12 +3867,14 @@ export default function ReportWorkspace({
                 const commHtml = commentsNotesHtml || '';
 
                 if (!isEmptyHtml(commHtml)) {
-                    blocks.push({
-                        type: 'section-header',
-                        title: 'Comentarios y Notas',
-                        height: 7.94,
-                        id: 'comm-header',
-                    });
+                    if (showHeading) {
+                        blocks.push({
+                            type: 'section-header',
+                            title: 'Comentarios y Notas',
+                            height: 7.94,
+                            id: 'comm-header',
+                        });
+                    }
                     const commBlocks = parseHtmlToBlocks(commHtml);
                     commBlocks.forEach((bHtml, idx) => {
                         const b = classifyBlock(bHtml, maxCharsPerLine);
@@ -3808,12 +3886,14 @@ export default function ReportWorkspace({
                 const protHtml = protocolsHtml || '';
 
                 if (!isEmptyHtml(protHtml)) {
-                    blocks.push({
-                        type: 'section-header',
-                        title: 'Protocolos',
-                        height: 7.94,
-                        id: 'prot-header',
-                    });
+                    if (showHeading) {
+                        blocks.push({
+                            type: 'section-header',
+                            title: 'Protocolos',
+                            height: 7.94,
+                            id: 'prot-header',
+                        });
+                    }
                     const protBlocks = parseHtmlToBlocks(protHtml);
                     protBlocks.forEach((bHtml, idx) => {
                         const b = classifyBlock(bHtml, maxCharsPerLine);
@@ -3825,12 +3905,14 @@ export default function ReportWorkspace({
                 const legHtml = legendHtml || '';
 
                 if (!isEmptyHtml(legHtml)) {
-                    blocks.push({
-                        type: 'section-header',
-                        title: 'Leyenda',
-                        height: 7.94,
-                        id: 'leg-header',
-                    });
+                    if (showHeading) {
+                        blocks.push({
+                            type: 'section-header',
+                            title: 'Leyenda',
+                            height: 7.94,
+                            id: 'leg-header',
+                        });
+                    }
                     const legBlocks = parseHtmlToBlocks(legHtml);
                     legBlocks.forEach((bHtml, idx) => {
                         const b = classifyBlock(bHtml, maxCharsPerLine);
@@ -3845,11 +3927,49 @@ export default function ReportWorkspace({
         const cuttings = specimen.cuttings || [];
 
         if (cuttings.length > 0) {
-            const cutsList: string[] = [];
+            const groups: {
+                startIndex: number;
+                endIndex: number;
+                description: string;
+                totalCuts: number;
+                count: number;
+            }[] = [];
+
             cuttings.forEach((cutting: any, idx: number) => {
-                const letter = indexToLetter(idx + 1);
                 const desc = cutting.description || '';
-                cutsList.push(`${letter}) ${desc}`);
+                const cuts = cutting.number_of_cuttings ?? 0;
+
+                if (
+                    groups.length > 0 &&
+                    groups[groups.length - 1].description === desc
+                ) {
+                    const lastGroup = groups[groups.length - 1];
+                    lastGroup.endIndex = idx;
+                    lastGroup.totalCuts += cuts;
+                    lastGroup.count += 1;
+                } else {
+                    groups.push({
+                        startIndex: idx,
+                        endIndex: idx,
+                        description: desc,
+                        totalCuts: cuts,
+                        count: 1,
+                    });
+                }
+            });
+
+            const cutsList: string[] = [];
+            groups.forEach((g) => {
+                const startLetter = indexToLetter(g.startIndex + 1);
+                const label =
+                    g.startIndex === g.endIndex
+                        ? startLetter
+                        : `${startLetter}-${indexToLetter(g.endIndex + 1)}`;
+
+                const formattedDesc = g.description ? `${g.description} ` : '';
+                cutsList.push(
+                    `${label}) ${formattedDesc}${g.totalCuts}x${g.count}`,
+                );
             });
             const concatenatedCuts = `Cortes: ${cutsList.join('; ')}.`;
             const charsCount = concatenatedCuts.length;
@@ -4462,6 +4582,7 @@ export default function ReportWorkspace({
         isMicroscopyVisible,
         isLoading,
         sectionsOrder,
+        headingsToggles,
     ]);
 
     // Detect typing activity and trigger autosave feedback
@@ -4674,6 +4795,7 @@ export default function ReportWorkspace({
                 yjs_legend_state: legendBase64,
                 yjs_report_date_state: dateBase64,
                 sections_order: sectionsOrder,
+                headings_toggles: headingsToggles,
             }),
         })
             .then(async (res) => {
@@ -5155,9 +5277,14 @@ export default function ReportWorkspace({
     }, [report]);
 
     const handleCreateReport = () => {
+        if (templates && templates.length > 0 && !selectedTemplateId) {
+            toast.error('Debe seleccionar una plantilla para continuar.');
+            return;
+        }
+
         router.post(
             `/specimens/${specimen.sequence_code}/report-editor`,
-            {},
+            { template_id: selectedTemplateId || null },
             {
                 onSuccess: () => {
                     toast.success(
@@ -5360,9 +5487,69 @@ export default function ReportWorkspace({
                             </span>
                             .
                         </p>
+                        {templates && templates.length > 0 ? (
+                            <div className="mb-6 text-left">
+                                <label className="mb-2 block text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                    Seleccionar Plantilla de Reporte
+                                </label>
+                                <Select
+                                    value={selectedTemplateId}
+                                    onValueChange={setSelectedTemplateId}
+                                >
+                                    <SelectTrigger className="h-12 w-full text-foreground">
+                                        <SelectValue placeholder="Seleccione una plantilla..." />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[300px]">
+                                        {templates.map((temp) => (
+                                            <SelectItem
+                                                key={temp.id}
+                                                value={String(temp.id)}
+                                                className="group"
+                                            >
+                                                <div className="flex flex-row flex-nowrap gap-3 py-1 text-left">
+                                                    <span className="text-sm font-medium text-foreground group-focus:text-white group-data-[highlighted]:text-white">
+                                                        {temp.user?.name ||
+                                                            'Sin propietario'}
+                                                    </span>
+                                                    <span className="mt-0.5 text-xs text-muted-foreground group-focus:text-white/80 group-data-[highlighted]:text-white/80">
+                                                        {
+                                                            temp.specimen_type
+                                                                ?.name
+                                                        }{' '}
+                                                        -{' '}
+                                                        {
+                                                            temp
+                                                                .specimen_type_examination
+                                                                ?.name
+                                                        }
+                                                    </span>
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        ) : (
+                            <div className="mb-6 flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-left text-xs text-muted-foreground">
+                                <Info className="h-5 w-5 shrink-0 text-muted-foreground" />
+                                <div>
+                                    <span className="mb-0.5 block font-semibold text-foreground">
+                                        Sin plantillas disponibles
+                                    </span>
+                                    No se encontraron plantillas para este tipo
+                                    de muestra y examen. Se creará un reporte en
+                                    blanco.
+                                </div>
+                            </div>
+                        )}
                         <Button
                             size="lg"
                             onClick={handleCreateReport}
+                            disabled={
+                                templates &&
+                                templates.length > 0 &&
+                                !selectedTemplateId
+                            }
                             className="w-full cursor-pointer font-semibold shadow-md shadow-primary/20 transition-transform hover:scale-[1.01] active:scale-[0.99]"
                         >
                             Crear Reporte
@@ -6343,14 +6530,59 @@ export default function ReportWorkspace({
                                                                 <>
                                                                     <div
                                                                         {...provided.dragHandleProps}
-                                                                        className="flex cursor-grab items-center gap-1.5 rounded-r-md border-l-4 border-emerald-500/85 py-0.5 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
+                                                                        className="flex cursor-grab items-center justify-between rounded-r-md border-l-4 border-emerald-500/85 py-0.5 pr-2 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
                                                                     >
-                                                                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                                                                        <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
-                                                                            <FileText className="h-4 w-4 text-emerald-500" />{' '}
-                                                                            Datos
-                                                                            Clínicos
-                                                                        </h3>
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                                                                            <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
+                                                                                <FileText className="h-4 w-4 text-emerald-500" />{' '}
+                                                                                Datos
+                                                                                Clínicos
+                                                                            </h3>
+                                                                        </div>
+                                                                        <TooltipProvider>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger
+                                                                                    asChild
+                                                                                >
+                                                                                    <div
+                                                                                        className="flex items-center gap-1.5"
+                                                                                        onClick={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            e.stopPropagation()
+                                                                                        }
+                                                                                    >
+                                                                                        <Switch
+                                                                                            id="toggle-clinical_details_html"
+                                                                                            checked={
+                                                                                                headingsToggles[
+                                                                                                    'clinical_details_html'
+                                                                                                ] ??
+                                                                                                true
+                                                                                            }
+                                                                                            onCheckedChange={(
+                                                                                                v,
+                                                                                            ) =>
+                                                                                                handleHeadingToggle(
+                                                                                                    'clinical_details_html',
+                                                                                                    v,
+                                                                                                )
+                                                                                            }
+                                                                                            className="scale-75"
+                                                                                        />
+                                                                                    </div>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent side="top">
+                                                                                    {(headingsToggles[
+                                                                                        'clinical_details_html'
+                                                                                    ] ??
+                                                                                    true)
+                                                                                        ? 'Ocultar título en PDF'
+                                                                                        : 'Mostrar título en PDF'}
+                                                                                </TooltipContent>
+                                                                            </Tooltip>
+                                                                        </TooltipProvider>
                                                                     </div>
 
                                                                     {(![
@@ -6423,14 +6655,59 @@ export default function ReportWorkspace({
                                                                 <>
                                                                     <div
                                                                         {...provided.dragHandleProps}
-                                                                        className="flex cursor-grab items-center gap-1.5 rounded-r-md border-l-4 border-blue-500/80 py-0.5 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
+                                                                        className="flex cursor-grab items-center justify-between rounded-r-md border-l-4 border-blue-500/80 py-0.5 pr-2 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
                                                                     >
-                                                                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                                                                        <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
-                                                                            <FileText className="h-4 w-4 text-blue-500" />{' '}
-                                                                            Diagnóstico
-                                                                            Patológico
-                                                                        </h3>
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                                                                            <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
+                                                                                <FileText className="h-4 w-4 text-blue-500" />{' '}
+                                                                                Diagnóstico
+                                                                                Patológico
+                                                                            </h3>
+                                                                        </div>
+                                                                        <TooltipProvider>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger
+                                                                                    asChild
+                                                                                >
+                                                                                    <div
+                                                                                        className="flex items-center gap-1.5"
+                                                                                        onClick={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            e.stopPropagation()
+                                                                                        }
+                                                                                    >
+                                                                                        <Switch
+                                                                                            id="toggle-diagnosis_html"
+                                                                                            checked={
+                                                                                                headingsToggles[
+                                                                                                    'diagnosis_html'
+                                                                                                ] ??
+                                                                                                true
+                                                                                            }
+                                                                                            onCheckedChange={(
+                                                                                                v,
+                                                                                            ) =>
+                                                                                                handleHeadingToggle(
+                                                                                                    'diagnosis_html',
+                                                                                                    v,
+                                                                                                )
+                                                                                            }
+                                                                                            className="scale-75"
+                                                                                        />
+                                                                                    </div>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent side="top">
+                                                                                    {(headingsToggles[
+                                                                                        'diagnosis_html'
+                                                                                    ] ??
+                                                                                    true)
+                                                                                        ? 'Ocultar título en PDF'
+                                                                                        : 'Mostrar título en PDF'}
+                                                                                </TooltipContent>
+                                                                            </Tooltip>
+                                                                        </TooltipProvider>
                                                                     </div>
 
                                                                     {(![
@@ -6513,23 +6790,68 @@ export default function ReportWorkspace({
                                                                                 Macroscópica
                                                                             </h3>
                                                                         </div>
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            className="h-8 cursor-pointer gap-1.5 border-violet-500/30 text-violet-600 hover:bg-violet-50 hover:text-violet-700 dark:border-violet-500/20 dark:text-violet-400 dark:hover:bg-violet-500/10"
-                                                                            onClick={() =>
-                                                                                setIsManageCuttingsOpen(
-                                                                                    true,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <Scissors className="h-3.5 w-3.5" />
-                                                                            <span>
-                                                                                Gestionar
-                                                                                Cortes
-                                                                            </span>
-                                                                        </Button>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <TooltipProvider>
+                                                                                <Tooltip>
+                                                                                    <TooltipTrigger
+                                                                                        asChild
+                                                                                    >
+                                                                                        <div
+                                                                                            className="flex items-center gap-1.5"
+                                                                                            onClick={(
+                                                                                                e,
+                                                                                            ) =>
+                                                                                                e.stopPropagation()
+                                                                                            }
+                                                                                        >
+                                                                                            <Switch
+                                                                                                id="toggle-macroscopy_html"
+                                                                                                checked={
+                                                                                                    headingsToggles[
+                                                                                                        'macroscopy_html'
+                                                                                                    ] ??
+                                                                                                    true
+                                                                                                }
+                                                                                                onCheckedChange={(
+                                                                                                    v,
+                                                                                                ) =>
+                                                                                                    handleHeadingToggle(
+                                                                                                        'macroscopy_html',
+                                                                                                        v,
+                                                                                                    )
+                                                                                                }
+                                                                                                className="scale-75"
+                                                                                            />
+                                                                                        </div>
+                                                                                    </TooltipTrigger>
+                                                                                    <TooltipContent side="top">
+                                                                                        {(headingsToggles[
+                                                                                            'macroscopy_html'
+                                                                                        ] ??
+                                                                                        true)
+                                                                                            ? 'Ocultar título en PDF'
+                                                                                            : 'Mostrar título en PDF'}
+                                                                                    </TooltipContent>
+                                                                                </Tooltip>
+                                                                            </TooltipProvider>
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                className="h-8 cursor-pointer gap-1.5 border-violet-500/30 text-violet-600 hover:bg-violet-50 hover:text-violet-700 dark:border-violet-500/20 dark:text-violet-400 dark:hover:bg-violet-500/10"
+                                                                                onClick={() =>
+                                                                                    setIsManageCuttingsOpen(
+                                                                                        true,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <Scissors className="h-3.5 w-3.5" />
+                                                                                <span>
+                                                                                    Gestionar
+                                                                                    Cortes
+                                                                                </span>
+                                                                            </Button>
+                                                                        </div>
                                                                     </div>
 
                                                                     {isMacroscopyEditable ? (
@@ -6673,14 +6995,59 @@ export default function ReportWorkspace({
                                                                 <>
                                                                     <div
                                                                         {...provided.dragHandleProps}
-                                                                        className="flex cursor-grab items-center gap-1.5 rounded-r-md border-l-4 border-fuchsia-500/80 py-0.5 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
+                                                                        className="flex cursor-grab items-center justify-between rounded-r-md border-l-4 border-fuchsia-500/80 py-0.5 pr-2 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
                                                                     >
-                                                                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                                                                        <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
-                                                                            <Microscope className="h-4 w-4 text-fuchsia-500" />{' '}
-                                                                            Descripción
-                                                                            Microscópica
-                                                                        </h3>
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                                                                            <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
+                                                                                <Microscope className="h-4 w-4 text-fuchsia-500" />{' '}
+                                                                                Descripción
+                                                                                Microscópica
+                                                                            </h3>
+                                                                        </div>
+                                                                        <TooltipProvider>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger
+                                                                                    asChild
+                                                                                >
+                                                                                    <div
+                                                                                        className="flex items-center gap-1.5"
+                                                                                        onClick={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            e.stopPropagation()
+                                                                                        }
+                                                                                    >
+                                                                                        <Switch
+                                                                                            id="toggle-microscopy_html"
+                                                                                            checked={
+                                                                                                headingsToggles[
+                                                                                                    'microscopy_html'
+                                                                                                ] ??
+                                                                                                true
+                                                                                            }
+                                                                                            onCheckedChange={(
+                                                                                                v,
+                                                                                            ) =>
+                                                                                                handleHeadingToggle(
+                                                                                                    'microscopy_html',
+                                                                                                    v,
+                                                                                                )
+                                                                                            }
+                                                                                            className="scale-75"
+                                                                                        />
+                                                                                    </div>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent side="top">
+                                                                                    {(headingsToggles[
+                                                                                        'microscopy_html'
+                                                                                    ] ??
+                                                                                    true)
+                                                                                        ? 'Ocultar título en PDF'
+                                                                                        : 'Mostrar título en PDF'}
+                                                                                </TooltipContent>
+                                                                            </Tooltip>
+                                                                        </TooltipProvider>
                                                                     </div>
 
                                                                     {(specimen.status ===
@@ -6926,15 +7293,60 @@ export default function ReportWorkspace({
                                                                 <>
                                                                     <div
                                                                         {...provided.dragHandleProps}
-                                                                        className="flex cursor-grab items-center gap-1.5 rounded-r-md border-l-4 border-amber-500/85 py-0.5 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
+                                                                        className="flex cursor-grab items-center justify-between rounded-r-md border-l-4 border-amber-500/85 py-0.5 pr-2 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
                                                                     >
-                                                                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                                                                        <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
-                                                                            <FileText className="h-4 w-4 text-amber-500" />{' '}
-                                                                            Comentarios
-                                                                            y
-                                                                            Notas
-                                                                        </h3>
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                                                                            <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
+                                                                                <FileText className="h-4 w-4 text-amber-500" />{' '}
+                                                                                Comentarios
+                                                                                y
+                                                                                Notas
+                                                                            </h3>
+                                                                        </div>
+                                                                        <TooltipProvider>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger
+                                                                                    asChild
+                                                                                >
+                                                                                    <div
+                                                                                        className="flex items-center gap-1.5"
+                                                                                        onClick={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            e.stopPropagation()
+                                                                                        }
+                                                                                    >
+                                                                                        <Switch
+                                                                                            id="toggle-comments_notes_html"
+                                                                                            checked={
+                                                                                                headingsToggles[
+                                                                                                    'comments_notes_html'
+                                                                                                ] ??
+                                                                                                true
+                                                                                            }
+                                                                                            onCheckedChange={(
+                                                                                                v,
+                                                                                            ) =>
+                                                                                                handleHeadingToggle(
+                                                                                                    'comments_notes_html',
+                                                                                                    v,
+                                                                                                )
+                                                                                            }
+                                                                                            className="scale-75"
+                                                                                        />
+                                                                                    </div>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent side="top">
+                                                                                    {(headingsToggles[
+                                                                                        'comments_notes_html'
+                                                                                    ] ??
+                                                                                    true)
+                                                                                        ? 'Ocultar título en PDF'
+                                                                                        : 'Mostrar título en PDF'}
+                                                                                </TooltipContent>
+                                                                            </Tooltip>
+                                                                        </TooltipProvider>
                                                                     </div>
 
                                                                     {(![
@@ -7007,13 +7419,58 @@ export default function ReportWorkspace({
                                                                 <>
                                                                     <div
                                                                         {...provided.dragHandleProps}
-                                                                        className="flex cursor-grab items-center gap-1.5 rounded-r-md border-l-4 border-blue-600/85 py-0.5 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
+                                                                        className="flex cursor-grab items-center justify-between rounded-r-md border-l-4 border-blue-600/85 py-0.5 pr-2 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
                                                                     >
-                                                                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                                                                        <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
-                                                                            <FileText className="h-4 w-4 text-blue-600" />{' '}
-                                                                            Protocolos
-                                                                        </h3>
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                                                                            <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
+                                                                                <FileText className="h-4 w-4 text-blue-600" />{' '}
+                                                                                Protocolos
+                                                                            </h3>
+                                                                        </div>
+                                                                        <TooltipProvider>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger
+                                                                                    asChild
+                                                                                >
+                                                                                    <div
+                                                                                        className="flex items-center gap-1.5"
+                                                                                        onClick={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            e.stopPropagation()
+                                                                                        }
+                                                                                    >
+                                                                                        <Switch
+                                                                                            id="toggle-protocols_html"
+                                                                                            checked={
+                                                                                                headingsToggles[
+                                                                                                    'protocols_html'
+                                                                                                ] ??
+                                                                                                true
+                                                                                            }
+                                                                                            onCheckedChange={(
+                                                                                                v,
+                                                                                            ) =>
+                                                                                                handleHeadingToggle(
+                                                                                                    'protocols_html',
+                                                                                                    v,
+                                                                                                )
+                                                                                            }
+                                                                                            className="scale-75"
+                                                                                        />
+                                                                                    </div>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent side="top">
+                                                                                    {(headingsToggles[
+                                                                                        'protocols_html'
+                                                                                    ] ??
+                                                                                    true)
+                                                                                        ? 'Ocultar título en PDF'
+                                                                                        : 'Mostrar título en PDF'}
+                                                                                </TooltipContent>
+                                                                            </Tooltip>
+                                                                        </TooltipProvider>
                                                                     </div>
 
                                                                     {(![
@@ -7086,13 +7543,58 @@ export default function ReportWorkspace({
                                                                 <>
                                                                     <div
                                                                         {...provided.dragHandleProps}
-                                                                        className="flex cursor-grab items-center gap-1.5 rounded-r-md border-l-4 border-slate-500/85 py-0.5 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
+                                                                        className="flex cursor-grab items-center justify-between rounded-r-md border-l-4 border-slate-500/85 py-0.5 pr-2 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30"
                                                                     >
-                                                                        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                                                                        <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
-                                                                            <FileText className="h-4 w-4 text-slate-500" />{' '}
-                                                                            Leyenda
-                                                                        </h3>
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                                                                            <h3 className="flex items-center gap-2 text-base font-bold tracking-tight text-slate-800 dark:text-slate-200">
+                                                                                <FileText className="h-4 w-4 text-slate-500" />{' '}
+                                                                                Leyenda
+                                                                            </h3>
+                                                                        </div>
+                                                                        <TooltipProvider>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger
+                                                                                    asChild
+                                                                                >
+                                                                                    <div
+                                                                                        className="flex items-center gap-1.5"
+                                                                                        onClick={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            e.stopPropagation()
+                                                                                        }
+                                                                                    >
+                                                                                        <Switch
+                                                                                            id="toggle-legend_html"
+                                                                                            checked={
+                                                                                                headingsToggles[
+                                                                                                    'legend_html'
+                                                                                                ] ??
+                                                                                                true
+                                                                                            }
+                                                                                            onCheckedChange={(
+                                                                                                v,
+                                                                                            ) =>
+                                                                                                handleHeadingToggle(
+                                                                                                    'legend_html',
+                                                                                                    v,
+                                                                                                )
+                                                                                            }
+                                                                                            className="scale-75"
+                                                                                        />
+                                                                                    </div>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent side="top">
+                                                                                    {(headingsToggles[
+                                                                                        'legend_html'
+                                                                                    ] ??
+                                                                                    true)
+                                                                                        ? 'Ocultar título en PDF'
+                                                                                        : 'Mostrar título en PDF'}
+                                                                                </TooltipContent>
+                                                                            </Tooltip>
+                                                                        </TooltipProvider>
                                                                     </div>
 
                                                                     {(![

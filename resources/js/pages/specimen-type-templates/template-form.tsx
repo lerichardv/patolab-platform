@@ -23,6 +23,13 @@ import {
     editorStyles,
 } from '@/components/rich-text-editor';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
     Command,
     CommandEmpty,
@@ -76,6 +83,7 @@ interface Template {
     protocols_html: string | null;
     legend_html: string | null;
     sections_order?: SectionsOrderElement[] | null;
+    headings_toggles?: Record<string, boolean> | null;
 }
 
 interface Props {
@@ -288,6 +296,15 @@ export default function TemplateForm({
         protocols_html: template?.protocols_html || '',
         legend_html: template?.legend_html || '',
         sections_order: template?.sections_order || defaultSectionsOrder,
+        headings_toggles: (template?.headings_toggles ?? {
+            clinical_details_html: true,
+            diagnosis_html: true,
+            macroscopy_html: true,
+            microscopy_html: true,
+            comments_notes_html: true,
+            protocols_html: true,
+            legend_html: true,
+        }) as Record<string, boolean>,
     });
 
     const [sectionsOrder, setSectionsOrder] = useState<SectionsOrderElement[]>(
@@ -325,6 +342,15 @@ export default function TemplateForm({
             protocols_html: template?.protocols_html || '',
             legend_html: template?.legend_html || '',
             sections_order: template?.sections_order || defaultSectionsOrder,
+            headings_toggles: (template?.headings_toggles ?? {
+                clinical_details_html: true,
+                diagnosis_html: true,
+                macroscopy_html: true,
+                microscopy_html: true,
+                comments_notes_html: true,
+                protocols_html: true,
+                legend_html: true,
+            }) as Record<string, boolean>,
         });
 
         if (
@@ -638,11 +664,11 @@ export default function TemplateForm({
                                                                     'w-[720px] max-w-[90vw] rotate-1 border-primary/20 bg-card/85 shadow-lg ring-1 ring-primary/10 backdrop-blur-xs',
                                                             )}
                                                         >
-                                                            {/* Drag Handle Container (GripVertical + Label) */}
+                                                            {/* Drag Handle Container (GripVertical + Label + Toggle) */}
                                                             <div
                                                                 {...provided.dragHandleProps}
                                                                 className={cn(
-                                                                    'mb-2 flex cursor-grab items-center gap-1.5 rounded-r-md border-l-4 py-0.5 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30',
+                                                                    'mb-2 flex cursor-grab items-center justify-between rounded-r-md border-l-4 py-0.5 pr-2 pl-2 transition-colors select-none hover:bg-slate-100/50 active:cursor-grabbing dark:hover:bg-slate-800/30',
                                                                     isClin &&
                                                                         'border-emerald-500/85',
                                                                     isDiag &&
@@ -659,68 +685,122 @@ export default function TemplateForm({
                                                                         'border-slate-500/85',
                                                                 )}
                                                             >
-                                                                <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                                                                <h3 className="flex items-center gap-2 text-sm font-bold tracking-tight text-slate-800 dark:text-slate-200">
-                                                                    {isClin && (
-                                                                        <>
-                                                                            <FileText className="h-4 w-4 text-emerald-500" />
-                                                                            Plantilla
-                                                                            de
-                                                                            Datos
-                                                                            Clínicos
-                                                                        </>
-                                                                    )}
-                                                                    {isDiag && (
-                                                                        <>
-                                                                            <FileText className="h-4 w-4 text-blue-500" />
-                                                                            Plantilla
-                                                                            de
-                                                                            Diagnóstico
-                                                                        </>
-                                                                    )}
-                                                                    {isMacro && (
-                                                                        <>
-                                                                            <Microscope className="h-4 w-4 text-violet-500" />
-                                                                            Plantilla
-                                                                            de
-                                                                            Macroscopía
-                                                                        </>
-                                                                    )}
-                                                                    {isMicro && (
-                                                                        <>
-                                                                            <Microscope className="h-4 w-4 text-fuchsia-500" />
-                                                                            Plantilla
-                                                                            de
-                                                                            Microscopía
-                                                                        </>
-                                                                    )}
-                                                                    {isComm && (
-                                                                        <>
-                                                                            <FileText className="h-4 w-4 text-amber-500" />
-                                                                            Plantilla
-                                                                            de
-                                                                            Comentarios
-                                                                            /
-                                                                            Notas
-                                                                        </>
-                                                                    )}
-                                                                    {isProt && (
-                                                                        <>
-                                                                            <FileText className="h-4 w-4 text-blue-600" />
-                                                                            Plantilla
-                                                                            de
-                                                                            Protocolos
-                                                                        </>
-                                                                    )}
-                                                                    {isLeg && (
-                                                                        <>
-                                                                            <FileText className="h-4 w-4 text-slate-500" />
-                                                                            Plantilla
-                                                                            de
-                                                                            Leyenda
-                                                                        </>
-                                                                    )}
-                                                                </h3>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                                                                    <h3 className="flex items-center gap-2 text-sm font-bold tracking-tight text-slate-800 dark:text-slate-200">
+                                                                        {isClin && (
+                                                                            <>
+                                                                                <FileText className="h-4 w-4 text-emerald-500" />
+                                                                                Plantilla
+                                                                                de
+                                                                                Datos
+                                                                                Clínicos
+                                                                            </>
+                                                                        )}
+                                                                        {isDiag && (
+                                                                            <>
+                                                                                <FileText className="h-4 w-4 text-blue-500" />
+                                                                                Plantilla
+                                                                                de
+                                                                                Diagnóstico
+                                                                            </>
+                                                                        )}
+                                                                        {isMacro && (
+                                                                            <>
+                                                                                <Microscope className="h-4 w-4 text-violet-500" />
+                                                                                Plantilla
+                                                                                de
+                                                                                Macroscopía
+                                                                            </>
+                                                                        )}
+                                                                        {isMicro && (
+                                                                            <>
+                                                                                <Microscope className="h-4 w-4 text-fuchsia-500" />
+                                                                                Plantilla
+                                                                                de
+                                                                                Microscopía
+                                                                            </>
+                                                                        )}
+                                                                        {isComm && (
+                                                                            <>
+                                                                                <FileText className="h-4 w-4 text-amber-500" />
+                                                                                Plantilla
+                                                                                de
+                                                                                Comentarios
+                                                                                /
+                                                                                Notas
+                                                                            </>
+                                                                        )}
+                                                                        {isProt && (
+                                                                            <>
+                                                                                <FileText className="h-4 w-4 text-blue-600" />
+                                                                                Plantilla
+                                                                                de
+                                                                                Protocolos
+                                                                            </>
+                                                                        )}
+                                                                        {isLeg && (
+                                                                            <>
+                                                                                <FileText className="h-4 w-4 text-slate-500" />
+                                                                                Plantilla
+                                                                                de
+                                                                                Leyenda
+                                                                            </>
+                                                                        )}
+                                                                    </h3>
+                                                                </div>
+                                                                {/* Heading visibility toggle */}
+                                                                <TooltipProvider>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger
+                                                                            asChild
+                                                                        >
+                                                                            <div
+                                                                                className="flex items-center gap-1.5"
+                                                                                onClick={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    e.stopPropagation()
+                                                                                }
+                                                                            >
+                                                                                <Switch
+                                                                                    id={`toggle-${section.key}`}
+                                                                                    checked={
+                                                                                        data
+                                                                                            .headings_toggles?.[
+                                                                                            section
+                                                                                                .key
+                                                                                        ] ??
+                                                                                        true
+                                                                                    }
+                                                                                    onCheckedChange={(
+                                                                                        v,
+                                                                                    ) =>
+                                                                                        setData(
+                                                                                            'headings_toggles',
+                                                                                            {
+                                                                                                ...data.headings_toggles,
+                                                                                                [section.key]:
+                                                                                                    v,
+                                                                                            },
+                                                                                        )
+                                                                                    }
+                                                                                    className="scale-75"
+                                                                                />
+                                                                            </div>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent side="top">
+                                                                            {(data
+                                                                                .headings_toggles?.[
+                                                                                section
+                                                                                    .key
+                                                                            ] ??
+                                                                            true)
+                                                                                ? 'Ocultar título en PDF'
+                                                                                : 'Mostrar título en PDF'}
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                </TooltipProvider>
                                                             </div>
 
                                                             {/* Rich Text Editor */}

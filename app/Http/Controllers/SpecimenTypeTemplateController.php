@@ -88,6 +88,8 @@ class SpecimenTypeTemplateController extends Controller
             'sections_order.*.key' => 'required|string',
             'sections_order.*.order' => 'required|integer',
             'sections_order.*.active' => 'required|boolean',
+            'headings_toggles' => 'nullable|array',
+            'headings_toggles.*' => 'boolean',
         ]);
 
         $sectionsOrder = $request->input('sections_order', [
@@ -134,6 +136,7 @@ class SpecimenTypeTemplateController extends Controller
                 'protocols_html' => $validated['protocols_html'] ?? null,
                 'legend_html' => $validated['legend_html'] ?? null,
                 'sections_order' => $sectionsOrder,
+                'headings_toggles' => $validated['headings_toggles'] ?? null,
             ]);
 
             $createdCount++;
@@ -173,6 +176,8 @@ class SpecimenTypeTemplateController extends Controller
             'sections_order.*.key' => 'required|string',
             'sections_order.*.order' => 'required|integer',
             'sections_order.*.active' => 'required|boolean',
+            'headings_toggles' => 'nullable|array',
+            'headings_toggles.*' => 'boolean',
         ]);
 
         $specimenTypeTemplate->update($validated);

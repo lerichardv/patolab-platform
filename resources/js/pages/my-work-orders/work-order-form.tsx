@@ -330,12 +330,6 @@ export default function WorkOrderForm({
             return;
         }
 
-        if (data.user_ids.length === 0) {
-            toast.error('Debe seleccionar al menos un técnico asignado.');
-
-            return;
-        }
-
         post(storeWorkOrder().url, {
             onSuccess: () => {
                 if (data.specimen_ids && data.specimen_ids.length > 0) {
@@ -464,7 +458,7 @@ export default function WorkOrderForm({
 
             {/* Técnico Asignado */}
             <div className="grid gap-2">
-                <Label htmlFor="user_ids">Técnicos Asignados</Label>
+                <Label htmlFor="user_ids">Técnicos Asignados (Opcional)</Label>
                 <FormCombobox
                     placeholder="Seleccionar técnico(s)..."
                     value={data.user_ids}

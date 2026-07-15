@@ -72,6 +72,16 @@ class RolesSeeder extends Seeder
             'specimen_categories.create',
             'specimen_categories.edit',
             'specimen_categories.delete',
+
+            // Cutting codes management
+            'cutting_codes.view',
+            'cutting_codes.create',
+            'cutting_codes.edit',
+            'cutting_codes.delete',
+
+            // My templates management
+            'my_specimen_type_templates.view',
+            'my_specimen_type_templates.manage',
         ];
 
         $permissionIds = Permission::whereIn('slug', $pathologistPermissions)->pluck('id');
@@ -93,5 +103,57 @@ class RolesSeeder extends Seeder
 
         $techPermissionIds = Permission::whereIn('slug', $techPermissions)->pluck('id');
         $techPathologist->permissions()->sync($techPermissionIds);
+
+        // 4. Create Asistente Patólogo Role
+        $assistantPathologist = Role::updateOrCreate(
+            ['slug' => 'assistant_pathologist'],
+            ['name' => 'Asistente Patólogo']
+        );
+
+        $assistantPermissions = [
+            'specimens.view',
+            'specimens.create',
+            'specimens.edit',
+            'specimens.delete',
+            'specimens.manage',
+            'my_assignments.view',
+            'my_specimen_type_templates.view',
+            'my_specimen_type_templates.manage',
+            'patients.view',
+            'patients.create',
+            'patients.edit',
+        ];
+
+        $assistantPermissionIds = Permission::whereIn('slug', $assistantPermissions)->pluck('id');
+        $assistantPathologist->permissions()->sync($assistantPermissionIds);
+
+        // 5. Create Histotecnólogo Role
+        $histotechnologist = Role::updateOrCreate(
+            ['slug' => 'histotechnologist'],
+            ['name' => 'Histotecnólogo']
+        );
+
+        $histotechnologistPermissions = [
+            // Full work order management (admin view + CRUD)
+            'work_orders.view',
+            'work_orders.create',
+            'work_orders.edit',
+            'work_orders.delete',
+            'work_orders.admin_view',
+            'work_order_tasks.view',
+            'work_order_tasks.create',
+            'work_order_tasks.edit',
+            'work_order_tasks.delete',
+            'my_work_orders.view',
+
+            // View users to assign técnicos patólogos to work orders
+            'users.view',
+
+            // View specimens to associate them with work orders
+            'specimens.view',
+        ];
+
+        $histotechnologistPermissionIds = Permission::whereIn('slug', $histotechnologistPermissions)->pluck('id');
+        $histotechnologist->permissions()->sync($histotechnologistPermissionIds);
     }
 }

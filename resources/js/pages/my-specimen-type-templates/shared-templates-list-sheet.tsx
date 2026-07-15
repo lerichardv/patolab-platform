@@ -84,7 +84,9 @@ export default function SharedTemplatesListSheet({
     };
 
     const handleBulkRevoke = () => {
-        if (selectedIds.length === 0) return;
+        if (selectedIds.length === 0) {
+            return;
+        }
 
         router.post(
             bulkRevokeShareAction().url,
@@ -103,7 +105,10 @@ export default function SharedTemplatesListSheet({
     // Client-side filtering
     const filteredPermissions = useMemo(() => {
         const query = search.toLowerCase().trim();
-        if (!query) return sharedPermissions;
+
+        if (!query) {
+            return sharedPermissions;
+        }
 
         return sharedPermissions.filter((permission) => {
             const userName = permission.shared_with?.name?.toLowerCase() || '';
@@ -136,6 +141,7 @@ export default function SharedTemplatesListSheet({
     );
     const paginatedPermissions = useMemo(() => {
         const start = (currentPage - 1) * ITEMS_PER_PAGE;
+
         return filteredPermissions.slice(start, start + ITEMS_PER_PAGE);
     }, [filteredPermissions, currentPage]);
 
@@ -163,6 +169,7 @@ export default function SharedTemplatesListSheet({
                         newSelection.push(id);
                     }
                 });
+
                 return newSelection;
             });
         }

@@ -49,6 +49,10 @@ class MorePermissionsSeeder extends Seeder
             ['name' => 'Ver Exámenes de Tipo de Muestra', 'slug' => 'specimen_type_examinations.view'],
             ['name' => 'Ver Categorías de Muestra', 'slug' => 'specimen_categories.view'],
             ['name' => 'Ver Secuencias', 'slug' => 'sequences.view'],
+            ['name' => 'Ver Códigos de Casete', 'slug' => 'cutting_codes.view'],
+            ['name' => 'Crear Códigos de Casete', 'slug' => 'cutting_codes.create'],
+            ['name' => 'Editar Códigos de Casete', 'slug' => 'cutting_codes.edit'],
+            ['name' => 'Eliminar Códigos de Casete', 'slug' => 'cutting_codes.delete'],
 
             /*
             |--------------------------------------------------------------------------

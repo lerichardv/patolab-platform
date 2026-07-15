@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\HeadingsTogglesCast;
 use App\Casts\SectionsOrderCast;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -35,6 +36,7 @@ class SpecimenReport extends Model
         'legend_html',
         'report_finalization_datetime',
         'sections_order',
+        'headings_toggles',
         'report_file',
     ];
 
@@ -45,6 +47,7 @@ class SpecimenReport extends Model
         'microscopy_finalization_datetime' => 'datetime',
         'report_finalization_datetime' => 'datetime',
         'sections_order' => SectionsOrderCast::class,
+        'headings_toggles' => HeadingsTogglesCast::class,
     ];
 
     /**

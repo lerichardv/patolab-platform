@@ -581,6 +581,7 @@ export default function PurchaseOrdersIndex({
                 open={showPdfModal}
                 onOpenChange={(open) => {
                     setShowPdfModal(open);
+
                     if (!open) {
                         setPdfPreviewUrl(null);
                     }

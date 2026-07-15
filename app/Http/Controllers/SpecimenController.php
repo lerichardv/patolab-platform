@@ -15,6 +15,7 @@ use App\Models\PrioritySpecimenOrder;
 use App\Models\Product;
 use App\Models\Referrer;
 use App\Models\ReferrerType;
+use App\Models\Role;
 use App\Models\Sequence;
 use App\Models\Setting;
 use App\Models\Specimen;
@@ -183,7 +184,9 @@ class SpecimenController extends Controller
         $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
         $pathologists = [];
         if ($pathologistRoleId) {
-            $pathologists = User::where('active', true)->where('role_id', $pathologistRoleId)->get();
+            $assistantRole = Role::where('slug', 'assistant_pathologist')->first();
+            $roleIds = array_filter([$pathologistRoleId, $assistantRole?->id]);
+            $pathologists = User::where('active', true)->whereIn('role_id', $roleIds)->get();
         }
 
         return Inertia::render('specimens/index', [
@@ -762,38 +765,42 @@ class SpecimenController extends Controller
             $newSpecimenExam = (int) $validated['specimen_type_examination'];
 
             if ($specimen->report_id && ($oldSpecimenType !== $newSpecimenType || $oldSpecimenExam !== $newSpecimenExam)) {
-                $template = SpecimenTypeTemplate::where('user_id', auth()->id())
+                $request->validate([
+                    'template_id' => 'required|exists:specimen_type_templates,id',
+                ]);
+
+                $template = SpecimenTypeTemplate::where('id', $request->template_id)
                     ->where('specimen_type_id', $newSpecimenType)
                     ->where('specimen_type_examination_id', $newSpecimenExam)
+                    ->where(function ($query) {
+                        $query->where('user_id', auth()->id())
+                            ->orWhereExists(function ($q) {
+                                $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                                    ->from('user_templates_permissions')
+                                    ->whereColumn('user_templates_permissions.template_id', 'specimen_type_templates.id')
+                                    ->where('user_templates_permissions.shared_with_id', auth()->id());
+                            });
+                    })
                     ->first();
 
                 if (! $template) {
-                    $template = SpecimenTypeTemplate::where('user_id', auth()->id())
-                        ->where('specimen_type_id', $newSpecimenType)
-                        ->first();
-                }
-
-                if (! $template) {
-                    $template = SpecimenTypeTemplate::where('specimen_type_id', $newSpecimenType)
-                        ->where('specimen_type_examination_id', $newSpecimenExam)
-                        ->first();
-                }
-
-                if (! $template) {
-                    $template = SpecimenTypeTemplate::where('specimen_type_id', $newSpecimenType)->first();
+                    throw ValidationException::withMessages([
+                        'template_id' => ['La plantilla seleccionada no es válida o no tienes permisos para usarla.'],
+                    ]);
                 }
 
                 $report = SpecimenReport::find($specimen->report_id);
                 if ($report) {
                     $report->update([
-                        'macroscopy_html' => $template?->macroscopy_html ?? '',
-                        'microscopy_html' => $template?->microscopy_html ?? '',
-                        'diagnosis_html' => $template?->diagnosis_html ?? '',
-                        'clinical_details_html' => $template?->clinical_details_html ?? '',
-                        'comments_notes_html' => $template?->comments_notes_html ?? '',
-                        'protocols_html' => $template?->protocols_html ?? '',
-                        'legend_html' => $template?->legend_html ?? '',
-                        'sections_order' => $template?->sections_order ?? null,
+                        'macroscopy_html' => $template->macroscopy_html ?? '',
+                        'microscopy_html' => $template->microscopy_html ?? '',
+                        'diagnosis_html' => $template->diagnosis_html ?? '',
+                        'clinical_details_html' => $template->clinical_details_html ?? '',
+                        'comments_notes_html' => $template->comments_notes_html ?? '',
+                        'protocols_html' => $template->protocols_html ?? '',
+                        'legend_html' => $template->legend_html ?? '',
+                        'sections_order' => $template->sections_order ?? null,
+                        'headings_toggles' => $template->headings_toggles ?? null,
                     ]);
 
                     \Illuminate\Support\Facades\DB::table('specimen_reports')->where('id', $report->id)->update([

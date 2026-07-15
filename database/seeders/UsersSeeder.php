@@ -16,6 +16,8 @@ class UsersSeeder extends Seeder
         $adminRole = Role::where('slug', 'admin')->first();
         $pathologistRole = Role::where('slug', 'pathologist')->first();
         $technicianRole = Role::where('slug', 'technician_pathologist')->first();
+        $assistantRole = Role::where('slug', 'assistant_pathologist')->first();
+        $histotechnologistRole = Role::where('slug', 'histotechnologist')->first();
 
         $users = [
             [
@@ -88,6 +90,30 @@ class UsersSeeder extends Seeder
                 'name' => 'Tecnico Patologo 3',
                 'email' => 'tecnico3@email.com',
                 'role_id' => $technicianRole?->id,
+                'active' => true,
+            ],
+            [
+                'name' => 'Asistente Patólogo 1',
+                'email' => 'asistente1@patolab.org',
+                'role_id' => $assistantRole?->id,
+                'active' => true,
+            ],
+            [
+                'name' => 'Asistente Patólogo 2',
+                'email' => 'asistente2@patolab.org',
+                'role_id' => $assistantRole?->id,
+                'active' => true,
+            ],
+            [
+                'name' => 'Histotecnólogo 1',
+                'email' => 'histotecnologo1@patolab.org',
+                'role_id' => $histotechnologistRole?->id,
+                'active' => true,
+            ],
+            [
+                'name' => 'Histotecnólogo 2',
+                'email' => 'histotecnologo2@patolab.org',
+                'role_id' => $histotechnologistRole?->id,
                 'active' => true,
             ],
         ];

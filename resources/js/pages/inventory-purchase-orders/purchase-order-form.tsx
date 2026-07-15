@@ -2,7 +2,13 @@ import { useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { FormEventHandler } from 'react';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
+import {
+    store as storePurchaseOrder,
+    update as updatePurchaseOrder,
+} from '@/actions/App/Http/Controllers/InventoryPurchaseOrderController';
+import InputError from '@/components/input-error';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -13,13 +19,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { createPortal } from 'react-dom';
-import { Spinner } from '@/components/ui/spinner';
-import {
-    store as storePurchaseOrder,
-    update as updatePurchaseOrder,
-} from '@/actions/App/Http/Controllers/InventoryPurchaseOrderController';
-import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +30,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import InventoryProviderSheet from '@/pages/inventory-providers/inventory-provider-sheet';
 import ProductSheet from '@/pages/products/product-sheet';
 
@@ -165,6 +165,7 @@ export default function PurchaseOrderForm({
                         );
                     }
                 }
+
                 setFetchedProducts(data);
             })
             .catch((err) => console.error('Error loading products:', err));
@@ -238,6 +239,7 @@ export default function PurchaseOrderForm({
             onError: (err: any) => {
                 setIsSaving(false);
                 console.error('Error al guardar la orden de compra:', err);
+
                 if (err && Object.keys(err).length > 0) {
                     const firstError = Object.values(err)[0] as string;
                     toast.error(`Error: ${firstError}`);
@@ -555,6 +557,7 @@ export default function PurchaseOrderForm({
                                             String(p.id) ===
                                             String(row.product_id),
                                     );
+
                                     return (
                                         <div
                                             key={idx}

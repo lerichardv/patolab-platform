@@ -1650,27 +1650,36 @@ export default function MyAssignmentsIndex({
                                             )}
 
                                             {order.users &&
-                                                order.users.length > 0 && (
-                                                    <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
-                                                        <span className="text-[10px] font-medium text-muted-foreground">
-                                                            Técnicos Asignados:
-                                                        </span>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {order.users.map(
-                                                                (u: any) => (
-                                                                    <span
-                                                                        key={
-                                                                            u.id
-                                                                        }
-                                                                        className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[9px] font-medium text-secondary-foreground"
-                                                                    >
-                                                                        {u.name}
-                                                                    </span>
-                                                                ),
-                                                            )}
-                                                        </div>
+                                            order.users.length > 0 ? (
+                                                <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
+                                                    <span className="text-[10px] font-medium text-muted-foreground">
+                                                        Técnicos Asignados:
+                                                    </span>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {order.users.map(
+                                                            (u: any) => (
+                                                                <span
+                                                                    key={u.id}
+                                                                    className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[9px] font-medium text-secondary-foreground"
+                                                                >
+                                                                    {u.name}
+                                                                </span>
+                                                            ),
+                                                        )}
                                                     </div>
-                                                )}
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
+                                                    <span className="text-[10px] font-medium text-muted-foreground">
+                                                        Técnicos Asignados:
+                                                    </span>
+                                                    <div>
+                                                        <span className="inline-flex items-center rounded bg-destructive/10 px-2 py-0.5 text-[9px] font-medium text-destructive">
+                                                            Sin asignar
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 },

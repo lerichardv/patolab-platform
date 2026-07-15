@@ -72,6 +72,7 @@ interface Props {
     specimen: {
         id: number;
         sequence_code: string;
+        cuttings?: Cutting[];
     };
     cuttingCodes: CuttingCode[];
     cuttingSlideTypes: CuttingSlideType[];
@@ -89,7 +90,12 @@ function FormCombobox({
     disabled = false,
     multiple = false,
 }: {
-    options: { label: string; value: string }[];
+    options: {
+        label: string;
+        value: string;
+        color?: string;
+        disabled?: boolean;
+    }[];
     value: string | string[];
     onChange: (value: any) => void;
     placeholder: string;
@@ -119,8 +125,16 @@ function FormCombobox({
                             selectedOptions.map((opt) => (
                                 <span
                                     key={opt.value}
-                                    className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
+                                    className="inline-flex items-center gap-1.5 rounded border bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground"
                                 >
+                                    {opt.color && (
+                                        <span
+                                            className="h-2 w-2 rounded-full border border-slate-300 shadow-sm"
+                                            style={{
+                                                backgroundColor: opt.color,
+                                            }}
+                                        />
+                                    )}
                                     {opt.label}
                                     {multiple && (
                                         <span
@@ -151,6 +165,8 @@ function FormCombobox({
             <PopoverContent
                 className="z-[120] w-[var(--radix-popover-trigger-width)] p-0"
                 align="start"
+                onWheel={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
             >
                 <Command>
                     <CommandInput placeholder={`Buscar...`} />
@@ -160,7 +176,11 @@ function FormCombobox({
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        onChange(options.map((o) => o.value));
+                                        onChange(
+                                            options
+                                                .filter((o) => !o.disabled)
+                                                .map((o) => o.value),
+                                        );
                                     }}
                                     className="cursor-pointer font-medium text-primary transition-all hover:underline"
                                 >
@@ -183,12 +203,18 @@ function FormCombobox({
                                 const isSelected = selectedValues.includes(
                                     option.value,
                                 );
+                                const isUsed = option.disabled;
 
                                 return (
                                     <CommandItem
                                         key={option.value}
                                         value={option.label}
+                                        disabled={isUsed}
                                         onSelect={() => {
+                                            if (isUsed) {
+                                                return;
+                                            }
+
                                             if (multiple) {
                                                 const newValue = isSelected
                                                     ? selectedValues.filter(
@@ -206,31 +232,53 @@ function FormCombobox({
                                                 setOpen(false);
                                             }
                                         }}
-                                    >
-                                        {multiple ? (
-                                            <div
-                                                className={cn(
-                                                    'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-all',
-                                                    isSelected
-                                                        ? 'bg-primary text-primary-foreground'
-                                                        : 'opacity-50',
-                                                )}
-                                            >
-                                                <Check className="h-3 w-3 stroke-[3]" />
-                                            </div>
-                                        ) : (
-                                            <Check
-                                                className={cn(
-                                                    'mr-2 h-4 w-4 shrink-0',
-                                                    isSelected
-                                                        ? 'opacity-100'
-                                                        : 'opacity-0',
-                                                )}
-                                            />
+                                        className={cn(
+                                            isUsed &&
+                                                'pointer-events-none cursor-not-allowed opacity-50',
                                         )}
-                                        <span className="truncate">
-                                            {option.label}
-                                        </span>
+                                    >
+                                        <div className="flex w-full items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                {multiple ? (
+                                                    <div
+                                                        className={cn(
+                                                            'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-all',
+                                                            isSelected
+                                                                ? 'bg-primary text-primary-foreground'
+                                                                : 'opacity-50',
+                                                        )}
+                                                    >
+                                                        <Check className="h-3 w-3 stroke-[3]" />
+                                                    </div>
+                                                ) : (
+                                                    <Check
+                                                        className={cn(
+                                                            'mr-2 h-4 w-4 shrink-0',
+                                                            isSelected
+                                                                ? 'opacity-100'
+                                                                : 'opacity-0',
+                                                        )}
+                                                    />
+                                                )}
+                                                {option.color && (
+                                                    <span
+                                                        className="h-3 w-3 rounded-full border border-slate-300 shadow-sm"
+                                                        style={{
+                                                            backgroundColor:
+                                                                option.color,
+                                                        }}
+                                                    />
+                                                )}
+                                                <span className="font-bold text-slate-800 dark:text-slate-200">
+                                                    {option.label}
+                                                </span>
+                                            </div>
+                                            {isUsed && (
+                                                <span className="rounded border border-amber-200/40 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
+                                                    Ya usado
+                                                </span>
+                                            )}
+                                        </div>
                                     </CommandItem>
                                 );
                             })}
@@ -252,9 +300,36 @@ export default function CuttingForm({
 }: Props) {
     const isEditMode = !!cutting?.id && !isDuplicate;
 
+    const usedCodeIds = (specimen.cuttings || [])
+        .filter((c) => {
+            if (isEditMode && c.id === cutting?.id) {
+                return false;
+            }
+
+            return true;
+        })
+        .map((c) => c.code_id);
+
+    const allCodesUsed =
+        cuttingCodes.length > 0 &&
+        cuttingCodes.every((code) => usedCodeIds.includes(code.id));
+
     const { data, setData, post, put, processing, errors, reset, transform } =
-        useForm({
-            code_id: cutting?.code_id ? String(cutting.code_id) : '',
+        useForm<{
+            code_id: string;
+            code_ids: string[];
+            description: string;
+            number_of_cuttings: number;
+            cuttings_description: string;
+            number_of_slides: number;
+            cutting_slide_types: string[];
+            comments: string;
+            responsible_id: string;
+            status: string;
+        }>({
+            code_id:
+                isEditMode && cutting?.code_id ? String(cutting.code_id) : '',
+            code_ids: [],
             description: cutting?.description || '',
             number_of_cuttings: cutting?.number_of_cuttings ?? 1,
             cuttings_description: cutting?.cuttings_description || '',
@@ -282,7 +357,15 @@ export default function CuttingForm({
             );
 
             if (newCodes.length > 0) {
-                setData('code_id', String(newCodes[0].id));
+                if (isEditMode) {
+                    setData('code_id', String(newCodes[0].id));
+                } else {
+                    setData('code_ids', [
+                        ...data.code_ids,
+                        String(newCodes[0].id),
+                    ]);
+                }
+
                 toast.success(
                     `Código de casete "${newCodes[0].code}" seleccionado automáticamente`,
                 );
@@ -290,7 +373,7 @@ export default function CuttingForm({
         }
 
         prevCodesRef.current = cuttingCodes;
-    }, [cuttingCodes]);
+    }, [cuttingCodes, isEditMode, data.code_ids, setData]);
 
     useEffect(() => {
         if (cuttingSlideTypes.length > prevSlideTypesRef.current.length) {
@@ -313,12 +396,13 @@ export default function CuttingForm({
         }
 
         prevSlideTypesRef.current = cuttingSlideTypes;
-    }, [cuttingSlideTypes]);
+    }, [cuttingSlideTypes, data.cutting_slide_types, setData]);
 
     useEffect(() => {
         transform((data) => ({
             ...data,
             code_id: Number(data.code_id) || 0,
+            code_ids: data.code_ids ? data.code_ids.map(Number) : [],
             responsible_id: Number(data.responsible_id) || 0,
             number_of_cuttings: Number(data.number_of_cuttings),
             number_of_slides: data.number_of_slides
@@ -328,16 +412,19 @@ export default function CuttingForm({
         }));
     }, [
         data.code_id,
+        data.code_ids,
         data.responsible_id,
         data.number_of_cuttings,
         data.number_of_slides,
         data.cutting_slide_types,
+        transform,
     ]);
 
     useEffect(() => {
         if (cutting) {
             setData({
-                code_id: String(cutting.code_id),
+                code_id: isEditMode ? String(cutting.code_id) : '',
+                code_ids: [],
                 description: cutting.description,
                 number_of_cuttings: cutting.number_of_cuttings,
                 cuttings_description: cutting.cuttings_description || '',
@@ -352,11 +439,17 @@ export default function CuttingForm({
         } else {
             reset();
         }
-    }, [cutting, isEditMode]);
+    }, [cutting, isEditMode, setData, reset]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
         e.stopPropagation();
+
+        if (!isEditMode && data.code_ids.length === 0) {
+            toast.error('Debe seleccionar al menos un código de casete');
+
+            return;
+        }
 
         if (data.cutting_slide_types.length === 0) {
             toast.error('Debe seleccionar al menos un tipo de lámina especial');
@@ -390,6 +483,13 @@ export default function CuttingForm({
     const selectedCode = cuttingCodes.find(
         (c) => String(c.id) === data.code_id,
     );
+
+    const cassetteCodeOptions = cuttingCodes.map((code) => ({
+        label: code.code,
+        value: String(code.id),
+        color: code.color,
+        disabled: usedCodeIds.includes(code.id),
+    }));
 
     const specialStainOptions = cuttingSlideTypes.map((st) => ({
         label: st.name,
@@ -426,52 +526,90 @@ export default function CuttingForm({
                                 <Plus className="h-3 w-3" /> Nuevo
                             </button>
                         </div>
-                        <Select
-                            value={data.code_id}
-                            onValueChange={(val) => setData('code_id', val)}
-                        >
-                            <SelectTrigger id="code_id" className="w-full">
-                                <SelectValue placeholder="Seleccione código">
-                                    {selectedCode ? (
-                                        <div className="flex items-center gap-2">
-                                            <span
-                                                className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300 shadow-sm"
-                                                style={{
-                                                    backgroundColor:
-                                                        selectedCode.color,
-                                                }}
-                                            />
-                                            <span className="font-bold text-slate-800 dark:text-slate-200">
-                                                {selectedCode.code}
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        'Seleccione código'
-                                    )}
-                                </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                                {cuttingCodes.map((code) => (
-                                    <SelectItem
-                                        key={code.id}
-                                        value={String(code.id)}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <span
-                                                className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300 shadow-sm"
-                                                style={{
-                                                    backgroundColor: code.color,
-                                                }}
-                                            />
-                                            <span className="font-bold text-slate-800 dark:text-slate-200">
-                                                {code.code}
-                                            </span>
-                                        </div>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <InputError message={errors.code_id} />
+                        {isEditMode ? (
+                            <Select
+                                value={data.code_id}
+                                onValueChange={(val) => setData('code_id', val)}
+                            >
+                                <SelectTrigger id="code_id" className="w-full">
+                                    <SelectValue placeholder="Seleccione código">
+                                        {selectedCode ? (
+                                            <div className="flex items-center gap-2">
+                                                <span
+                                                    className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300 shadow-sm"
+                                                    style={{
+                                                        backgroundColor:
+                                                            selectedCode.color,
+                                                    }}
+                                                />
+                                                <span className="font-bold text-slate-800 dark:text-slate-200">
+                                                    {selectedCode.code}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            'Seleccione código'
+                                        )}
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {cuttingCodes.map((code) => {
+                                        const isUsed = usedCodeIds.includes(
+                                            code.id,
+                                        );
+
+                                        return (
+                                            <SelectItem
+                                                key={code.id}
+                                                value={String(code.id)}
+                                                disabled={isUsed}
+                                            >
+                                                <div className="flex w-full items-center justify-between gap-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span
+                                                            className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300 shadow-sm"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    code.color,
+                                                            }}
+                                                        />
+                                                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                                                            {code.code}
+                                                        </span>
+                                                    </div>
+                                                    {isUsed && (
+                                                        <span className="rounded border border-amber-200/40 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
+                                                            Ya usado
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </SelectItem>
+                                        );
+                                    })}
+                                </SelectContent>
+                            </Select>
+                        ) : (
+                            <FormCombobox
+                                options={cassetteCodeOptions}
+                                value={data.code_ids}
+                                multiple={true}
+                                onChange={(val) => setData('code_ids', val)}
+                                placeholder="Seleccione códigos de casete"
+                                emptyMessage="No se encontraron códigos."
+                            />
+                        )}
+                        {allCodesUsed && (
+                            <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-2.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+                                <Info className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                <div>
+                                    Todos los códigos de casete ya están en uso
+                                    para esta muestra. Cree uno nuevo haciendo
+                                    clic en <strong>Nuevo</strong>.
+                                </div>
+                            </div>
+                        )}
+                        <InputError
+                            message={errors.code_id || errors.code_ids}
+                        />
                     </div>
 
                     {/* Responsible */}

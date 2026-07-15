@@ -3,6 +3,7 @@
 use App\Models\Customer;
 use App\Models\Cutting;
 use App\Models\CuttingCode;
+use App\Models\Permission;
 use App\Models\Priority;
 use App\Models\Referrer;
 use App\Models\ReferrerType;
@@ -20,6 +21,8 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     // 1. Create a user to act as authenticated pathologist
     $pathologistRole = Role::create(['slug' => 'pathologist', 'name' => 'Patólogo']);
+    $createPermission = Permission::create(['slug' => 'cutting_codes.create', 'name' => 'Crear Código de Casete']);
+    $pathologistRole->permissions()->attach($createPermission);
     $this->user = User::factory()->create([
         'role_id' => $pathologistRole->id,
         'active' => true,
@@ -173,7 +176,7 @@ test('user can delete a cutting', function () {
 
 test('user can store a new cutting code', function () {
     $response = $this->actingAs($this->user)
-        ->post(route('cuttings.store-code'), [
+        ->post(route('cutting-codes.store'), [
             'code' => 'B',
             'color' => '#ff0000',
         ]);

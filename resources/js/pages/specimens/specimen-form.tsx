@@ -16,6 +16,8 @@ import {
     Receipt,
     Calendar,
     Edit2,
+    Loader2,
+    Info,
 } from 'lucide-react';
 import React from 'react';
 import { createPortal } from 'react-dom';
@@ -225,6 +227,10 @@ export default function SpecimenForm({
 }: Props) {
     const { props: pageProps } = usePage<any>();
     const flash = pageProps.flash as Record<string, any> | undefined;
+    const [availableTemplates, setAvailableTemplates] = React.useState<any[]>(
+        [],
+    );
+    const [isLoadingTemplates, setIsLoadingTemplates] = React.useState(false);
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = React.useState(false);
     const [isReferrerSheetOpen, setIsReferrerSheetOpen] = React.useState(false);
     const [isSequenceSheetOpen, setIsSequenceSheetOpen] = React.useState(false);
@@ -703,6 +709,7 @@ export default function SpecimenForm({
         age_discount_amount: '0',
         payment_type: specimen?.invoice_relation?.payment_type || '',
         regenerate_pdf: true,
+        template_id: '',
         proof_of_payment: null as File | null,
         has_initial_payment: specimen?.invoice_relation?.credit_payment_id
             ? parseFloat(
@@ -956,6 +963,45 @@ export default function SpecimenForm({
                 String(specimen.specimen_type_examination)
         );
     }, [specimen, data.specimen_type, data.specimen_type_examination]);
+
+    React.useEffect(() => {
+        if (specimen && specimen.report_id && isSpecimenTypeChanged) {
+            const typeId = data.specimen_type;
+            const examId = data.specimen_type_examination;
+            if (typeId && examId) {
+                setIsLoadingTemplates(true);
+                fetch(
+                    `/specimens/templates/available?specimen_type_id=${typeId}&specimen_type_examination_id=${examId}`,
+                )
+                    .then((res) => res.json())
+                    .then((templatesList) => {
+                        setAvailableTemplates(templatesList);
+                        if (templatesList.length === 1) {
+                            setData('template_id', String(templatesList[0].id));
+                        } else {
+                            setData('template_id', '');
+                        }
+                    })
+                    .catch((err) => {
+                        console.error('Error fetching templates:', err);
+                    })
+                    .finally(() => {
+                        setIsLoadingTemplates(false);
+                    });
+            } else {
+                setAvailableTemplates([]);
+                setData('template_id', '');
+            }
+        } else {
+            setAvailableTemplates([]);
+            setData('template_id', '');
+        }
+    }, [
+        specimen,
+        data.specimen_type,
+        data.specimen_type_examination,
+        isSpecimenTypeChanged,
+    ]);
 
     const validateStep1 = () => {
         clearErrors();
@@ -1783,6 +1829,13 @@ export default function SpecimenForm({
             </div>
         );
     };
+
+    const isSubmitDisabled = !!(
+        specimen?.report_id &&
+        isSpecimenTypeChanged &&
+        availableTemplates.length > 0 &&
+        !data.template_id
+    );
 
     return (
         <>
@@ -5409,6 +5462,90 @@ export default function SpecimenForm({
                                         </strong>
                                     </div>
                                 )}
+                                {isSpecimenTypeChanged &&
+                                    specimen?.report_id && (
+                                        <div className="mt-4 space-y-3 text-left">
+                                            <label className="block text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                                Seleccionar Nueva Plantilla de
+                                                Reporte
+                                            </label>
+                                            {isLoadingTemplates ? (
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                                    <span>
+                                                        Cargando plantillas...
+                                                    </span>
+                                                </div>
+                                            ) : availableTemplates.length >
+                                              0 ? (
+                                                <Select
+                                                    value={data.template_id}
+                                                    onValueChange={(val) =>
+                                                        setData(
+                                                            'template_id',
+                                                            val,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger className="w-full text-foreground">
+                                                        <SelectValue placeholder="Seleccione una plantilla..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="z-[200] max-h-[250px]">
+                                                        {availableTemplates.map(
+                                                            (temp) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        temp.id
+                                                                    }
+                                                                    value={String(
+                                                                        temp.id,
+                                                                    )}
+                                                                    className="group"
+                                                                >
+                                                                    <div className="flex flex-row flex-nowrap gap-3 py-1 text-left">
+                                                                        <span className="text-sm font-medium text-foreground group-focus:text-white group-data-[highlighted]:text-white">
+                                                                            {temp
+                                                                                .user
+                                                                                ?.name ||
+                                                                                'Sin propietario'}
+                                                                        </span>
+                                                                        <span className="mt-0.5 text-xs text-muted-foreground group-focus:text-white/80 group-data-[highlighted]:text-white/80">
+                                                                            {
+                                                                                temp
+                                                                                    .specimen_type
+                                                                                    ?.name
+                                                                            }{' '}
+                                                                            -{' '}
+                                                                            {
+                                                                                temp
+                                                                                    .specimen_type_examination
+                                                                                    ?.name
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : (
+                                                <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-left text-xs text-muted-foreground">
+                                                    <Info className="h-5 w-5 shrink-0 text-muted-foreground" />
+                                                    <div>
+                                                        <span className="mb-0.5 block font-semibold text-foreground">
+                                                            Sin plantillas
+                                                            disponibles
+                                                        </span>
+                                                        No se encontraron
+                                                        plantillas para este
+                                                        tipo de muestra y
+                                                        examen. Se creará un
+                                                        reporte en blanco.
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                             </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -5423,6 +5560,7 @@ export default function SpecimenForm({
                                 setShowRegenerateConfirm(false);
                                 submitForm();
                             }}
+                            disabled={isSubmitDisabled}
                         >
                             Actualizar y Regenerar
                         </AlertDialogAction>

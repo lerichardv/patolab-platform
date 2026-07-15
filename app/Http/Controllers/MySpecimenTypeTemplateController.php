@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Models\SpecimenTypeTemplate;
+use App\Models\User;
+use App\Models\UserTemplatePermission;
 use App\Services\ImageOptimizerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,14 +21,14 @@ class MySpecimenTypeTemplateController extends Controller
     {
         Gate::authorize('my_specimen_type_templates.view');
 
-        $sharedTemplateIds = \App\Models\UserTemplatePermission::where('shared_with_id', Auth::id())
+        $sharedTemplateIds = UserTemplatePermission::where('shared_with_id', Auth::id())
             ->pluck('template_id');
 
         $query = SpecimenTypeTemplate::query()
             ->with(['specimenType', 'specimenTypeExamination', 'user'])
             ->where(function ($q) use ($sharedTemplateIds) {
                 $q->where('user_id', Auth::id())
-                  ->orWhereIn('id', $sharedTemplateIds);
+                    ->orWhereIn('id', $sharedTemplateIds);
             })
             ->orderBy('created_at', 'desc');
 
@@ -62,16 +64,16 @@ class MySpecimenTypeTemplateController extends Controller
                 ];
             });
 
-        $users = \App\Models\User::where('active', true)
+        $users = User::where('active', true)
             ->where('id', '!=', Auth::id())
             ->orderBy('name')
             ->get();
 
-        $examinations = \App\Models\SpecimenTypeExamination::where('active', true)
+        $examinations = SpecimenTypeExamination::where('active', true)
             ->orderBy('name')
             ->get();
 
-        $sharedPermissions = \App\Models\UserTemplatePermission::with(['specimenType', 'specimenTypeExamination', 'sharedWith'])
+        $sharedPermissions = UserTemplatePermission::with(['specimenType', 'specimenTypeExamination', 'sharedWith'])
             ->where('owner_id', Auth::id())
             ->orderBy('created_at', 'desc')
             ->get();
@@ -108,6 +110,8 @@ class MySpecimenTypeTemplateController extends Controller
             'sections_order.*.key' => 'required|string',
             'sections_order.*.order' => 'required|integer',
             'sections_order.*.active' => 'required|boolean',
+            'headings_toggles' => 'nullable|array',
+            'headings_toggles.*' => 'boolean',
         ]);
 
         $sectionsOrder = $request->input('sections_order', [
@@ -154,6 +158,7 @@ class MySpecimenTypeTemplateController extends Controller
                 'protocols_html' => $validated['protocols_html'] ?? null,
                 'legend_html' => $validated['legend_html'] ?? null,
                 'sections_order' => $sectionsOrder,
+                'headings_toggles' => $validated['headings_toggles'] ?? null,
             ]);
 
             $createdCount++;
@@ -173,7 +178,7 @@ class MySpecimenTypeTemplateController extends Controller
         Gate::authorize('my_specimen_type_templates.manage');
 
         $isOwner = $my_specimen_type_template->user_id === Auth::id();
-        $isShared = \App\Models\UserTemplatePermission::where('template_id', $my_specimen_type_template->id)
+        $isShared = UserTemplatePermission::where('template_id', $my_specimen_type_template->id)
             ->where('shared_with_id', Auth::id())
             ->exists();
 
@@ -204,6 +209,8 @@ class MySpecimenTypeTemplateController extends Controller
             'sections_order.*.key' => 'required|string',
             'sections_order.*.order' => 'required|integer',
             'sections_order.*.active' => 'required|boolean',
+            'headings_toggles' => 'nullable|array',
+            'headings_toggles.*' => 'boolean',
         ]);
 
         $validated['user_id'] = $userId;
@@ -280,7 +287,7 @@ class MySpecimenTypeTemplateController extends Controller
                 foreach ($examinations as $exam) {
                     $query->orWhere(function ($q) use ($exam) {
                         $q->where('specimen_type_id', $exam->specimen_type)
-                          ->where('specimen_type_examination_id', $exam->id);
+                            ->where('specimen_type_examination_id', $exam->id);
                     });
                 }
             })
@@ -300,7 +307,7 @@ class MySpecimenTypeTemplateController extends Controller
                     continue;
                 }
 
-                \App\Models\UserTemplatePermission::updateOrCreate(
+                UserTemplatePermission::updateOrCreate(
                     [
                         'owner_id' => $userId,
                         'specimen_type_id' => $template->specimen_type_id,
@@ -322,7 +329,7 @@ class MySpecimenTypeTemplateController extends Controller
         return redirect()->back();
     }
 
-    public function revokeShare(\App\Models\UserTemplatePermission $permission)
+    public function revokeShare(UserTemplatePermission $permission)
     {
         Gate::authorize('my_specimen_type_templates.manage');
 
@@ -344,7 +351,7 @@ class MySpecimenTypeTemplateController extends Controller
             'ids.*' => 'exists:user_templates_permissions,id',
         ]);
 
-        \App\Models\UserTemplatePermission::whereIn('id', $validated['ids'])
+        UserTemplatePermission::whereIn('id', $validated['ids'])
             ->where('owner_id', Auth::id())
             ->delete();
 

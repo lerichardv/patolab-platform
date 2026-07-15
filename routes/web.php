@@ -5,8 +5,10 @@ use App\Http\Controllers\CaiRangeController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerSearchController;
+use App\Http\Controllers\CuttingCodeController;
 use App\Http\Controllers\Editor\CuttingController;
 use App\Http\Controllers\Editor\ReportEditorController;
+use App\Http\Controllers\HistotechnologistWorkOrderController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\InventoryProviderController;
@@ -131,6 +133,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimen-groups', [SpecimenGroupController::class, 'store'])->name('specimen-groups.store');
 
     // Specimen Report Editor routes
+    Route::get('specimens/templates/available', [ReportEditorController::class, 'getAvailableTemplates'])->name('specimens.templates.available');
     Route::get('specimens/{specimen:sequence_code}/report-editor', [ReportEditorController::class, 'show'])->name('specimens.report-editor');
     Route::post('specimens/{specimen:sequence_code}/report-editor', [ReportEditorController::class, 'store'])->name('specimens.report-editor.store');
     Route::post('specimens/{specimen:sequence_code}/report-editor/save', [ReportEditorController::class, 'save'])->name('specimens.report-editor.save');
@@ -142,11 +145,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('specimens/{specimen:sequence_code}/report-editor/pdf', [ReportEditorController::class, 'downloadPdf'])->name('specimens.report-editor.pdf');
 
     // Specimen Cutting routes
+    Route::put('cuttings/bulk-update', [CuttingController::class, 'bulkUpdate'])->name('cuttings.bulk-update');
     Route::post('specimens/{specimen:sequence_code}/cuttings', [CuttingController::class, 'store'])->name('cuttings.store');
     Route::put('cuttings/{cutting}', [CuttingController::class, 'update'])->name('cuttings.update');
     Route::put('cuttings/{cutting}/status', [CuttingController::class, 'updateStatus'])->name('cuttings.update-status');
     Route::delete('cuttings/{cutting}', [CuttingController::class, 'destroy'])->name('cuttings.destroy');
-    Route::post('cutting-codes', [CuttingController::class, 'storeCode'])->name('cuttings.store-code');
+    Route::resource('cutting-codes', CuttingCodeController::class);
     Route::post('specimens/{specimen:sequence_code}/generate-report', [SpecimenController::class, 'generateReport'])->name('specimens.generate-report');
     Route::resource('specimens', SpecimenController::class);
     Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');
@@ -182,6 +186,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('admin-work-orders', [WorkOrderController::class, 'index'])->name('admin-work-orders.index');
     Route::get('my-work-orders', [MyWorkOrderController::class, 'index'])->name('my-work-orders.index');
     Route::put('my-work-orders/{work_order}/status', [MyWorkOrderController::class, 'updateStatus'])->name('my-work-orders.update-status');
+
+    // Histotechnologist Work Orders Control routes
+    Route::get('histotechnologist-work-orders', [HistotechnologistWorkOrderController::class, 'index'])->name('histotechnologist-work-orders.index');
+    Route::post('histotechnologist-work-orders/{work_order}/users', [HistotechnologistWorkOrderController::class, 'assignTechnician'])->name('histotechnologist-work-orders.assign');
+    Route::delete('histotechnologist-work-orders/{work_order}/users/{user}', [HistotechnologistWorkOrderController::class, 'unassignTechnician'])->name('histotechnologist-work-orders.unassign');
+    Route::put('histotechnologist-work-orders/{work_order}/status', [HistotechnologistWorkOrderController::class, 'updateStatus'])->name('histotechnologist-work-orders.update-status');
     Route::resource('referrers', ReferrerController::class);
     Route::resource('referrer-types', ReferrerTypeController::class);
     Route::resource('locations', LocationController::class);

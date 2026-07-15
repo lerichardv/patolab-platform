@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 import {
+    Check,
     Copy,
     Edit2,
     Loader2,
@@ -13,6 +14,7 @@ import { toast } from 'sonner';
 import {
     destroy as destroyCutting,
     updateStatus as updateStatusCutting,
+    bulkUpdate as bulkUpdateCutting,
 } from '@/actions/App/Http/Controllers/Editor/CuttingController';
 import HeadingSheet from '@/components/heading-sheet';
 import {
@@ -44,6 +46,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import CuttingSheet from './cutting-sheet';
 
 interface Cutting {
@@ -98,6 +101,54 @@ interface Props {
     onOpenChange: (open: boolean) => void;
 }
 
+const getCuttingsSuffixes = (cuttings: Cutting[]) => {
+    const groups: {
+        startIndex: number;
+        endIndex: number;
+        description: string;
+        totalCuts: number;
+        count: number;
+    }[] = [];
+
+    cuttings.forEach((cutting, idx) => {
+        const desc = cutting.description || '';
+        const cuts = cutting.number_of_cuttings ?? 0;
+
+        if (
+            groups.length > 0 &&
+            groups[groups.length - 1].description === desc
+        ) {
+            const lastGroup = groups[groups.length - 1];
+            lastGroup.endIndex = idx;
+            lastGroup.totalCuts += cuts;
+            lastGroup.count += 1;
+        } else {
+            groups.push({
+                startIndex: idx,
+                endIndex: idx,
+                description: desc,
+                totalCuts: cuts,
+                count: 1,
+            });
+        }
+    });
+
+    const suffixMap: Record<number, string> = {};
+    groups.forEach((g) => {
+        const suffix = `${g.totalCuts}x${g.count}`;
+
+        for (let i = g.startIndex; i <= g.endIndex; i++) {
+            const cutting = cuttings[i];
+
+            if (cutting) {
+                suffixMap[cutting.id] = suffix;
+            }
+        }
+    });
+
+    return suffixMap;
+};
+
 export default function ManageCuttingsSheet({
     specimen,
     cuttingCodes,
@@ -118,8 +169,21 @@ export default function ManageCuttingsSheet({
     const [loadingCuttingId, setLoadingCuttingId] = useState<number | null>(
         null,
     );
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
+    const [prevSearchQuery, setPrevSearchQuery] = useState(searchQuery);
+    const [prevOpen, setPrevOpen] = useState(open);
+
+    if (searchQuery !== prevSearchQuery || open !== prevOpen) {
+        setPrevSearchQuery(searchQuery);
+        setPrevOpen(open);
+        setSelectedIds([]);
+    }
 
     const cuttings = specimen.cuttings || [];
+
+    const suffixMap = getCuttingsSuffixes(cuttings);
 
     // Filter cuttings locally
     const filteredCuttings = cuttings.filter((c) => {
@@ -133,6 +197,91 @@ export default function ManageCuttingsSheet({
             (c.code?.code && c.code.code.toLowerCase().includes(query))
         );
     });
+
+    const toggleSelect = (id: number) => {
+        setSelectedIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+        );
+    };
+
+    const toggleAll = () => {
+        const filteredIds = filteredCuttings.map((c) => c.id);
+        const allSelected =
+            filteredIds.length > 0 &&
+            filteredIds.every((id) => selectedIds.includes(id));
+
+        if (allSelected) {
+            setSelectedIds((prev) =>
+                prev.filter((id) => !filteredIds.includes(id)),
+            );
+        } else {
+            setSelectedIds((prev) => {
+                const newSelection = [...prev];
+                filteredIds.forEach((id) => {
+                    if (!newSelection.includes(id)) {
+                        newSelection.push(id);
+                    }
+                });
+
+                return newSelection;
+            });
+        }
+    };
+
+    const isAllSelected =
+        filteredCuttings.length > 0 &&
+        filteredCuttings.every((c) => selectedIds.includes(c.id));
+
+    const handleBulkStatusChange = (
+        nextStatus: 'processing' | 'macroscopy' | 'delivered',
+    ) => {
+        if (selectedIds.length === 0) {
+            return;
+        }
+
+        setIsBulkUpdating(true);
+        router.put(
+            bulkUpdateCutting().url,
+            { ids: selectedIds, status: nextStatus },
+            {
+                onSuccess: () => {
+                    toast.success(
+                        'Estado actualizado para los cortes seleccionados',
+                    );
+                    setSelectedIds([]);
+                },
+                onFinish: () => {
+                    setIsBulkUpdating(false);
+                },
+            },
+        );
+    };
+
+    const handleBulkResponsibleChange = (nextResponsibleId: string) => {
+        if (selectedIds.length === 0) {
+            return;
+        }
+
+        setIsBulkUpdating(true);
+        router.put(
+            bulkUpdateCutting().url,
+            {
+                ids: selectedIds,
+                responsible_id: parseInt(nextResponsibleId, 10),
+            },
+            {
+                onSuccess: () => {
+                    toast.success(
+                        'Responsable actualizado para los cortes seleccionados',
+                    );
+                    setSelectedIds([]);
+                },
+                onFinish: () => {
+                    setIsBulkUpdating(false);
+                },
+            },
+        );
+    };
 
     const handleCreate = () => {
         setSelectedCutting(null);
@@ -228,11 +377,117 @@ export default function ManageCuttingsSheet({
                                 </Button>
                             </div>
 
+                            {/* Bulk Actions Bar */}
+                            {selectedIds.length > 0 && (
+                                <div className="mb-3 flex animate-in flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-sm duration-200 fade-in sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900/50">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                            {selectedIds.length}{' '}
+                                            {selectedIds.length === 1
+                                                ? 'corte seleccionado'
+                                                : 'cortes seleccionados'}
+                                        </span>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={isBulkUpdating}
+                                            onClick={() => setSelectedIds([])}
+                                            className="h-8 cursor-pointer text-xs text-muted-foreground hover:text-foreground"
+                                        >
+                                            Limpiar selección
+                                        </Button>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        {/* Bulk Edit Status */}
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-xs text-muted-foreground">
+                                                Estado:
+                                            </span>
+                                            <Select
+                                                disabled={isBulkUpdating}
+                                                onValueChange={(val: any) =>
+                                                    handleBulkStatusChange(val)
+                                                }
+                                                value=""
+                                            >
+                                                <SelectTrigger className="h-8 w-[140px] text-xs">
+                                                    <SelectValue placeholder="Cambiar estado..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem
+                                                        value="macroscopy"
+                                                        className="text-xs"
+                                                    >
+                                                        Macroscopía
+                                                    </SelectItem>
+                                                    <SelectItem
+                                                        value="processing"
+                                                        className="text-xs"
+                                                    >
+                                                        Procesamiento
+                                                    </SelectItem>
+                                                    <SelectItem
+                                                        value="delivered"
+                                                        className="text-xs"
+                                                    >
+                                                        Entregado
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        {/* Bulk Edit Responsible */}
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-xs text-muted-foreground">
+                                                Responsable:
+                                            </span>
+                                            <Select
+                                                disabled={isBulkUpdating}
+                                                onValueChange={(val: any) =>
+                                                    handleBulkResponsibleChange(
+                                                        val,
+                                                    )
+                                                }
+                                                value=""
+                                            >
+                                                <SelectTrigger className="h-8 w-[180px] text-xs">
+                                                    <SelectValue placeholder="Asignar responsable..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {users.map((u) => (
+                                                        <SelectItem
+                                                            key={u.id}
+                                                            value={u.id.toString()}
+                                                            className="text-xs"
+                                                        >
+                                                            {u.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Table */}
                             <div className="flex-1 overflow-x-auto rounded-md border border-slate-200 bg-card dark:border-slate-800">
                                 <Table className="min-w-[1000px]">
                                     <TableHeader>
                                         <TableRow className="bg-slate-50/50 dark:bg-slate-900/50">
+                                            <TableHead className="w-[50px] text-center">
+                                                <div
+                                                    className={cn(
+                                                        'mx-auto flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm border border-primary transition-all',
+                                                        isAllSelected
+                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            : 'opacity-50 hover:opacity-80',
+                                                    )}
+                                                    onClick={toggleAll}
+                                                >
+                                                    <Check className="h-3 w-3 stroke-[3]" />
+                                                </div>
+                                            </TableHead>
                                             <TableHead className="w-[130px] min-w-[130px] font-semibold text-slate-800 dark:text-slate-200">
                                                 Casete Código
                                             </TableHead>
@@ -272,6 +527,27 @@ export default function ManageCuttingsSheet({
                                                     key={c.id}
                                                     className="group hover:bg-slate-50/50 dark:hover:bg-slate-900/30"
                                                 >
+                                                    {/* Selection Checkbox */}
+                                                    <TableCell className="w-[50px] text-center align-middle">
+                                                        <div
+                                                            className={cn(
+                                                                'mx-auto flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm border border-primary transition-all',
+                                                                selectedIds.includes(
+                                                                    c.id,
+                                                                )
+                                                                    ? 'border-primary bg-primary text-primary-foreground'
+                                                                    : 'opacity-50 hover:opacity-80',
+                                                            )}
+                                                            onClick={() =>
+                                                                toggleSelect(
+                                                                    c.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Check className="h-3 w-3 stroke-[3]" />
+                                                        </div>
+                                                    </TableCell>
+
                                                     {/* Cassette Code with Custom Color Badge */}
                                                     <TableCell className="w-[130px] min-w-[130px] align-middle">
                                                         <span
@@ -314,7 +590,25 @@ export default function ManageCuttingsSheet({
 
                                                     {/* Description */}
                                                     <TableCell className="min-w-[180px] align-middle font-medium text-slate-700 dark:text-slate-300">
-                                                        {c.description}
+                                                        <div className="flex items-center gap-2">
+                                                            <span>
+                                                                {c.description}
+                                                            </span>
+                                                            {suffixMap[
+                                                                c.id
+                                                            ] && (
+                                                                <Badge
+                                                                    variant="secondary"
+                                                                    className="px-1.5 py-0 font-mono text-[10px] font-semibold text-slate-600 dark:text-slate-400"
+                                                                >
+                                                                    {
+                                                                        suffixMap[
+                                                                            c.id
+                                                                        ]
+                                                                    }
+                                                                </Badge>
+                                                            )}
+                                                        </div>
                                                     </TableCell>
 
                                                     {/* Number of Cuttings */}
@@ -495,7 +789,7 @@ export default function ManageCuttingsSheet({
                                         ) : (
                                             <TableRow>
                                                 <TableCell
-                                                    colSpan={10}
+                                                    colSpan={11}
                                                     className="h-32 text-center text-slate-400 dark:text-slate-500"
                                                 >
                                                     <Scissors className="mx-auto mb-2 h-8 w-8 stroke-1 text-slate-300 dark:text-slate-700" />

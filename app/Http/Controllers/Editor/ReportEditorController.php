@@ -8,6 +8,7 @@ use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\InvoiceGroupSpecimen;
 use App\Models\Product;
+use App\Models\Role;
 use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenReport;
@@ -24,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Spatie\Browsershot\Browsershot;
 
@@ -211,7 +213,9 @@ class ReportEditorController extends Controller
         $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
         $pathologists = [];
         if ($pathologistRoleId) {
-            $pathologists = User::where('active', true)->where('role_id', $pathologistRoleId)->get();
+            $assistantRole = Role::where('slug', 'assistant_pathologist')->first();
+            $roleIds = array_filter([$pathologistRoleId, $assistantRole?->id]);
+            $pathologists = User::where('active', true)->whereIn('role_id', $roleIds)->get();
         }
 
         $products = Product::where('active', true)
@@ -224,9 +228,27 @@ class ReportEditorController extends Controller
             ->with('prices')
             ->get();
 
+        $templates = [];
+        if (! $specimen->report_id) {
+            $templates = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)
+                ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+                ->where(function ($query) {
+                    $query->where('user_id', auth()->id())
+                        ->orWhereExists(function ($q) {
+                            $q->select(DB::raw(1))
+                                ->from('user_templates_permissions')
+                                ->whereColumn('user_templates_permissions.template_id', 'specimen_type_templates.id')
+                                ->where('user_templates_permissions.shared_with_id', auth()->id());
+                        });
+                })
+                ->with(['user:id,name', 'specimenType:id,name', 'specimenTypeExamination:id,name'])
+                ->get();
+        }
+
         return Inertia::render('specimens/report-editor/report-editor', [
             'specimen' => $specimen,
             'report' => $specimen->report,
+            'templates' => $templates,
             'auth' => [
                 'user' => [
                     'id' => auth()->user()->id,
@@ -245,32 +267,57 @@ class ReportEditorController extends Controller
     /**
      * Create a new specimen report row and update specimen state to macroscopic_review.
      */
-    public function store(Specimen $specimen)
+    public function store(Request $request, Specimen $specimen)
     {
         if ($specimen->report_id) {
             return redirect()->back()->with('error', 'Esta muestra ya tiene un reporte creado.');
         }
 
-        DB::transaction(function () use ($specimen) {
-            $template = SpecimenTypeTemplate::where('user_id', auth()->id())
-                ->where('specimen_type_id', $specimen->specimen_type)
-                ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
-                ->first();
+        $templatesExist = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)
+            ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+            ->where(function ($query) {
+                $query->where('user_id', auth()->id())
+                    ->orWhereExists(function ($q) {
+                        $q->select(DB::raw(1))
+                            ->from('user_templates_permissions')
+                            ->whereColumn('user_templates_permissions.template_id', 'specimen_type_templates.id')
+                            ->where('user_templates_permissions.shared_with_id', auth()->id());
+                    });
+            })
+            ->exists();
 
-            if (! $template) {
-                $template = SpecimenTypeTemplate::where('user_id', auth()->id())
+        if ($templatesExist) {
+            $request->validate([
+                'template_id' => 'required|exists:specimen_type_templates,id',
+            ]);
+        } else {
+            $request->validate([
+                'template_id' => 'nullable',
+            ]);
+        }
+
+        DB::transaction(function () use ($specimen, $request) {
+            $template = null;
+            if ($request->filled('template_id')) {
+                $template = SpecimenTypeTemplate::where('id', $request->template_id)
                     ->where('specimen_type_id', $specimen->specimen_type)
-                    ->first();
-            }
-
-            if (! $template) {
-                $template = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)
                     ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+                    ->where(function ($query) {
+                        $query->where('user_id', auth()->id())
+                            ->orWhereExists(function ($q) {
+                                $q->select(DB::raw(1))
+                                    ->from('user_templates_permissions')
+                                    ->whereColumn('user_templates_permissions.template_id', 'specimen_type_templates.id')
+                                    ->where('user_templates_permissions.shared_with_id', auth()->id());
+                            });
+                    })
                     ->first();
-            }
 
-            if (! $template) {
-                $template = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)->first();
+                if (! $template) {
+                    throw ValidationException::withMessages([
+                        'template_id' => ['La plantilla seleccionada no es válida o no tienes permisos para usarla.'],
+                    ]);
+                }
             }
 
             $report = SpecimenReport::create([
@@ -283,6 +330,7 @@ class ReportEditorController extends Controller
                 'protocols_html' => $template?->protocols_html ?? '',
                 'legend_html' => $template?->legend_html ?? '',
                 'sections_order' => $template?->sections_order ?? null,
+                'headings_toggles' => $template?->headings_toggles ?? null,
             ]);
 
             $specimen->update([
@@ -353,6 +401,8 @@ class ReportEditorController extends Controller
             'sections_order.*.key' => 'required|string',
             'sections_order.*.order' => 'required|integer',
             'sections_order.*.active' => 'required|boolean',
+            'headings_toggles' => 'nullable|array',
+            'headings_toggles.*' => 'boolean',
         ]);
 
         $specimen->load('report');
@@ -405,6 +455,9 @@ class ReportEditorController extends Controller
         }
         if ($request->has('sections_order') && $hasGeneralAccess) {
             $updateData['sections_order'] = $request->input('sections_order');
+        }
+        if ($request->has('headings_toggles') && $hasGeneralAccess) {
+            $updateData['headings_toggles'] = $request->input('headings_toggles');
         }
 
         if ($request->filled('yjs_macroscopy_state') && $hasMacroAccess) {
@@ -892,5 +945,36 @@ class ReportEditorController extends Controller
             'movement' => 'removed',
             'user_id' => auth()->id() ?? 1,
         ]);
+    }
+
+    /**
+     * Get available templates for a specimen type and examination.
+     */
+    public function getAvailableTemplates(Request $request)
+    {
+        $request->validate([
+            'specimen_type_id' => 'required|exists:specimen_type,id',
+            'specimen_type_examination_id' => 'required|exists:specimen_type_examination,id',
+        ]);
+
+        $specimenTypeId = $request->specimen_type_id;
+        $examinationId = $request->specimen_type_examination_id;
+        $userId = auth()->id();
+
+        $templates = SpecimenTypeTemplate::where('specimen_type_id', $specimenTypeId)
+            ->where('specimen_type_examination_id', $examinationId)
+            ->where(function ($query) use ($userId) {
+                $query->where('user_id', $userId)
+                    ->orWhereExists(function ($q) use ($userId) {
+                        $q->select(DB::raw(1))
+                            ->from('user_templates_permissions')
+                            ->whereColumn('user_templates_permissions.template_id', 'specimen_type_templates.id')
+                            ->where('user_templates_permissions.shared_with_id', $userId);
+                    });
+            })
+            ->with(['user:id,name', 'specimenType:id,name', 'specimenTypeExamination:id,name'])
+            ->get();
+
+        return response()->json($templates);
     }
 }

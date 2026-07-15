@@ -48,7 +48,10 @@ export default function ProductSheet({
                     product={product || undefined}
                     onSuccess={() => {
                         onOpenChange(false);
-                        if (onSuccess) onSuccess();
+
+                        if (onSuccess) {
+                            onSuccess();
+                        }
                     }}
                 />
             </SheetContent>

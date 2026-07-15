@@ -38,6 +38,7 @@ interface Props {
     specimen: {
         id: number;
         sequence_code: string;
+        cuttings?: Cutting[];
     };
     cuttingCodes: CuttingCode[];
     cuttingSlideTypes: CuttingSlideType[];

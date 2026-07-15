@@ -13,6 +13,12 @@ class ReportPaginator
         $rowsCount = (int) ceil($pathologistsCount / 2);
         $signatureHeight = $rowsCount * 25.0; // 25mm per row
 
+        // Resolve headings_toggles — defaults all sections to visible (true) when null/absent
+        $headingsToggles = [];
+        if (isset($report->headings_toggles)) {
+            $headingsToggles = is_array($report->headings_toggles) ? $report->headings_toggles : json_decode($report->headings_toggles, true) ?? [];
+        }
+
         // 1. Calculate Patient Metadata Card height (mm)
         $patientCardHeight = self::estimatePatientCardHeight($specimen, $customer, $referrer);
 
@@ -50,14 +56,20 @@ class ReportPaginator
                 continue;
             }
 
+            // Determine whether this section's heading title should be rendered.
+            // Defaults to true (visible) when not specified in headings_toggles.
+            $showHeading = $headingsToggles[$key] ?? true;
+
             if ($key === 'clinical_details_html') {
                 $clinHtml = ! empty($report->clinical_details_html) ? $report->clinical_details_html : '';
                 if (! self::isEmptyHtml($clinHtml)) {
-                    $blocks[] = [
-                        'type' => 'section-header',
-                        'title' => 'DATOS CLÍNICOS',
-                        'height' => 7.94,
-                    ];
+                    if ($showHeading) {
+                        $blocks[] = [
+                            'type' => 'section-header',
+                            'title' => 'DATOS CLÍNICOS',
+                            'height' => 7.94,
+                        ];
+                    }
                     $clinBlocks = self::parseHtmlToBlocks($clinHtml);
                     foreach ($clinBlocks as $bHtml) {
                         $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
@@ -66,11 +78,13 @@ class ReportPaginator
             } elseif ($key === 'diagnosis_html') {
                 $diagHtml = ! empty($report->diagnosis_html) ? $report->diagnosis_html : ($specimen->diagnosis ?? '');
                 if (! self::isEmptyHtml($diagHtml)) {
-                    $blocks[] = [
-                        'type' => 'section-header',
-                        'title' => 'DIAGNÓSTICO',
-                        'height' => 7.94,
-                    ];
+                    if ($showHeading) {
+                        $blocks[] = [
+                            'type' => 'section-header',
+                            'title' => 'DIAGNÓSTICO',
+                            'height' => 7.94,
+                        ];
+                    }
                     $diagBlocks = self::parseHtmlToBlocks($diagHtml);
                     foreach ($diagBlocks as $bHtml) {
                         $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
@@ -79,11 +93,13 @@ class ReportPaginator
             } elseif ($key === 'macroscopy_html') {
                 $macroHtml = ! empty($report->macroscopy_html) ? $report->macroscopy_html : '';
                 if (! self::isEmptyHtml($macroHtml)) {
-                    $blocks[] = [
-                        'type' => 'section-header',
-                        'title' => 'DESCRIPCIÓN MACROSCÓPICA',
-                        'height' => 7.94,
-                    ];
+                    if ($showHeading) {
+                        $blocks[] = [
+                            'type' => 'section-header',
+                            'title' => 'DESCRIPCIÓN MACROSCÓPICA',
+                            'height' => 7.94,
+                        ];
+                    }
                     $macroBlocks = self::parseHtmlToBlocks($macroHtml);
                     foreach ($macroBlocks as $bHtml) {
                         $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
@@ -93,11 +109,13 @@ class ReportPaginator
                 if ($isMicroscopyVisible) {
                     $microHtml = ! empty($report->microscopy_html) ? $report->microscopy_html : '';
                     if (! self::isEmptyHtml($microHtml)) {
-                        $blocks[] = [
-                            'type' => 'section-header',
-                            'title' => 'DESCRIPCIÓN MICROSCÓPICA',
-                            'height' => 7.94,
-                        ];
+                        if ($showHeading) {
+                            $blocks[] = [
+                                'type' => 'section-header',
+                                'title' => 'DESCRIPCIÓN MICROSCÓPICA',
+                                'height' => 7.94,
+                            ];
+                        }
                         $microBlocks = self::parseHtmlToBlocks($microHtml);
                         foreach ($microBlocks as $bHtml) {
                             $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
@@ -107,11 +125,13 @@ class ReportPaginator
             } elseif ($key === 'comments_notes_html') {
                 $commHtml = ! empty($report->comments_notes_html) ? $report->comments_notes_html : '';
                 if (! self::isEmptyHtml($commHtml)) {
-                    $blocks[] = [
-                        'type' => 'section-header',
-                        'title' => 'COMENTARIOS Y NOTAS',
-                        'height' => 7.94,
-                    ];
+                    if ($showHeading) {
+                        $blocks[] = [
+                            'type' => 'section-header',
+                            'title' => 'COMENTARIOS Y NOTAS',
+                            'height' => 7.94,
+                        ];
+                    }
                     $commBlocks = self::parseHtmlToBlocks($commHtml);
                     foreach ($commBlocks as $bHtml) {
                         $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
@@ -120,11 +140,13 @@ class ReportPaginator
             } elseif ($key === 'protocols_html') {
                 $protHtml = ! empty($report->protocols_html) ? $report->protocols_html : '';
                 if (! self::isEmptyHtml($protHtml)) {
-                    $blocks[] = [
-                        'type' => 'section-header',
-                        'title' => 'PROTOCOLOS',
-                        'height' => 7.94,
-                    ];
+                    if ($showHeading) {
+                        $blocks[] = [
+                            'type' => 'section-header',
+                            'title' => 'PROTOCOLOS',
+                            'height' => 7.94,
+                        ];
+                    }
                     $protBlocks = self::parseHtmlToBlocks($protHtml);
                     foreach ($protBlocks as $bHtml) {
                         $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
@@ -133,11 +155,13 @@ class ReportPaginator
             } elseif ($key === 'legend_html') {
                 $legHtml = ! empty($report->legend_html) ? $report->legend_html : '';
                 if (! self::isEmptyHtml($legHtml)) {
-                    $blocks[] = [
-                        'type' => 'section-header',
-                        'title' => 'LEYENDA',
-                        'height' => 7.94,
-                    ];
+                    if ($showHeading) {
+                        $blocks[] = [
+                            'type' => 'section-header',
+                            'title' => 'LEYENDA',
+                            'height' => 7.94,
+                        ];
+                    }
                     $legBlocks = self::parseHtmlToBlocks($legHtml);
                     foreach ($legBlocks as $bHtml) {
                         $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
@@ -152,14 +176,39 @@ class ReportPaginator
             $cuttings = $specimen->cuttings;
         }
         if ($cuttings->count() > 0) {
-            $cutsList = [];
-            $idx = 1;
-            foreach ($cuttings as $cutting) {
-                $letter = self::indexToLetter($idx);
-                $desc = $cutting->description;
-                $cutsList[] = "{$letter}) {$desc}";
-                $idx++;
+            $cuttingsList = $cuttings->values()->all();
+            $groups = [];
+            foreach ($cuttingsList as $idx => $cutting) {
+                $desc = $cutting->description ?? '';
+                $cuts = $cutting->number_of_cuttings ?? 0;
+
+                $lastGroupIdx = count($groups) - 1;
+                if ($lastGroupIdx >= 0 && $groups[$lastGroupIdx]['description'] === $desc) {
+                    $groups[$lastGroupIdx]['endIndex'] = $idx;
+                    $groups[$lastGroupIdx]['totalCuts'] += $cuts;
+                    $groups[$lastGroupIdx]['count'] += 1;
+                } else {
+                    $groups[] = [
+                        'startIndex' => $idx,
+                        'endIndex' => $idx,
+                        'description' => $desc,
+                        'totalCuts' => $cuts,
+                        'count' => 1,
+                    ];
+                }
             }
+
+            $cutsList = [];
+            foreach ($groups as $g) {
+                $startLetter = self::indexToLetter($g['startIndex'] + 1);
+                $label = $g['startIndex'] === $g['endIndex']
+                    ? $startLetter
+                    : $startLetter.'-'.self::indexToLetter($g['endIndex'] + 1);
+
+                $formattedDesc = $g['description'] !== '' ? $g['description'].' ' : '';
+                $cutsList[] = "{$label}) {$formattedDesc}{$g['totalCuts']}x{$g['count']}";
+            }
+
             $concatenatedCuts = 'Cortes: '.implode('; ', $cutsList).'.';
 
             $charsCount = mb_strlen($concatenatedCuts);

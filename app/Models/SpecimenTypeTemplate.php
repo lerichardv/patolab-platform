@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\HeadingsTogglesCast;
 use App\Casts\SectionsOrderCast;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,6 +28,7 @@ class SpecimenTypeTemplate extends Model
         'legend_html',
         'user_id',
         'sections_order',
+        'headings_toggles',
     ];
 
     protected $casts = [
@@ -50,6 +52,7 @@ class SpecimenTypeTemplate extends Model
          * The purpose of this column is to let the user order the sections on the report editor.
          */
         'sections_order' => SectionsOrderCast::class,
+        'headings_toggles' => HeadingsTogglesCast::class,
     ];
 
     public function specimenType(): BelongsTo
