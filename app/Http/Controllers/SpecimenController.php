@@ -202,6 +202,7 @@ class SpecimenController extends Controller
             'products' => $products,
             'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
             'pathologists' => $pathologists,
+            'usersList' => User::where('active', true)->orderBy('name')->get(),
             'banks' => Bank::all(),
             'filters' => [
                 'status' => $statuses,

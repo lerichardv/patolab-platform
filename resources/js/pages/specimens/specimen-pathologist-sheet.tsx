@@ -28,6 +28,7 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     pathologists: any[];
+    usersList?: any[];
 }
 
 export default function SpecimenPathologistSheet({
@@ -35,6 +36,7 @@ export default function SpecimenPathologistSheet({
     open,
     onOpenChange,
     pathologists = [],
+    usersList = [],
 }: Props) {
     const [selectedPathologistId, setSelectedPathologistId] =
         useState<string>('');
@@ -66,12 +68,13 @@ export default function SpecimenPathologistSheet({
     }, [pathologists, assignedUserIds, assignedCollaboratorIds]);
 
     const availableCollaborators = useMemo(() => {
-        return pathologists.filter(
+        const sourceList = usersList.length > 0 ? usersList : pathologists;
+        return sourceList.filter(
             (p) =>
                 !assignedCollaboratorIds.includes(p.id) &&
                 !assignedUserIds.includes(p.id),
         );
-    }, [pathologists, assignedCollaboratorIds, assignedUserIds]);
+    }, [pathologists, usersList, assignedCollaboratorIds, assignedUserIds]);
 
     if (!specimen) {
         return null;

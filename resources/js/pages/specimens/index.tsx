@@ -133,6 +133,7 @@ interface Props {
     activeLocationId: number | null;
     products: any[];
     pathologists: any[];
+    usersList?: any[];
     banks: any[];
     filters: {
         status?: string[];
@@ -256,6 +257,7 @@ export default function SpecimensIndex({
     activeLocationId,
     products,
     pathologists,
+    usersList = [],
     banks,
     filters,
 }: Props) {
@@ -2346,6 +2348,7 @@ export default function SpecimensIndex({
                 open={isAssignSheetOpen}
                 onOpenChange={setIsAssignSheetOpen}
                 pathologists={pathologists}
+                usersList={usersList}
             />
 
             <SpecimenBulkPathologistSheet
