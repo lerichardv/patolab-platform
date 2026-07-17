@@ -59,6 +59,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Obtiene las muestras a las que el usuario está asignado como colaborador.
+     */
+    public function collaboratorSpecimens(): BelongsToMany
+    {
+        return $this->belongsToMany(Specimen::class, 'specimen_collaborators', 'user_id', 'specimen_id')
+            ->withPivot(['macroscopy_access', 'microscopy_access'])
+            ->withTimestamps();
+    }
+
+    /**
      * Obtiene las reglas de comisión asociadas al usuario (patólogo).
      */
     public function commissionRules(): HasMany

@@ -19,6 +19,7 @@ import {
     EllipsisVertical,
     Plus,
     Layers,
+    UserPlus,
 } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -71,6 +72,7 @@ import {
 import { cn } from '@/lib/utils';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
+import SpecimenCollaboratorSheet from '../specimens/specimen-collaborator-sheet';
 
 interface Specimen {
     id: number;
@@ -111,6 +113,7 @@ interface Specimen {
     invoice_relation?: any;
     users?: any[];
     work_orders?: any[];
+    collaborators?: any[];
 }
 
 interface Priority {
@@ -240,6 +243,9 @@ export default function MyAssignmentsIndex({
     const [selectedSpecimenForWorkOrder, setSelectedSpecimenForWorkOrder] =
         useState<number | null>(null);
     const [isWorkOrderSheetOpen, setIsWorkOrderSheetOpen] = useState(false);
+    const [selectedSpecimenForCollaborator, setSelectedSpecimenForCollaborator] =
+        useState<Specimen | null>(null);
+    const [isCollaboratorSheetOpen, setIsCollaboratorSheetOpen] = useState(false);
 
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -1152,7 +1158,7 @@ export default function MyAssignmentsIndex({
                                                             />
                                                         </TableHead>
                                                     )}
-                                                    <TableHead className="w-[100px] font-semibold">
+                                                    <TableHead className="w-[160px] font-semibold">
                                                         Código
                                                     </TableHead>
                                                     <TableHead className="w-[95px] min-w-[75px] text-center font-semibold">
@@ -1242,43 +1248,66 @@ export default function MyAssignmentsIndex({
                                                                     </TableCell>
                                                                 )}
                                                                 <TableCell className="font-mono text-xs font-semibold text-primary">
-                                                                    <div className="flex min-h-[24px] flex-wrap items-center gap-1.5">
-                                                                        <span>
-                                                                            {specimen.sequence_code ||
-                                                                                `#${specimen.id}`}
-                                                                        </span>
-                                                                        <CopyButton
-                                                                            text={
-                                                                                specimen.sequence_code ||
-                                                                                `#${specimen.id}`
-                                                                            }
-                                                                        />
-                                                                        {specimen.work_orders &&
-                                                                            specimen
-                                                                                .work_orders
-                                                                                .length >
-                                                                                0 && (
-                                                                                <Badge
-                                                                                    variant="secondary"
-                                                                                    className="animate-in cursor-pointer rounded-full border bg-primary/5 px-1.5 py-0.5 text-[10px] font-bold text-primary select-none fade-in hover:bg-primary/10"
-                                                                                    onClick={(
-                                                                                        e,
-                                                                                    ) => {
-                                                                                        e.stopPropagation();
-                                                                                        setSelectedSpecimenForWorkOrdersList(
-                                                                                            specimen,
-                                                                                        );
-                                                                                    }}
-                                                                                    title={`${specimen.work_orders.length} órdenes de trabajo creadas. Haga clic para ver detalles.`}
-                                                                                >
-                                                                                    <Layers className="mr-0.5 h-3 w-3 text-primary" />
-                                                                                    {
-                                                                                        specimen
-                                                                                            .work_orders
-                                                                                            .length
-                                                                                    }
-                                                                                </Badge>
-                                                                            )}
+                                                                    <div className="flex flex-col gap-1 py-1">
+                                                                        {(() => {
+                                                                            const isPathologist = specimen.users?.some((u: any) => u.id === props.auth?.user?.id);
+                                                                            const isCollaborator = specimen.collaborators?.some((c: any) => c.id === props.auth?.user?.id);
+
+                                                                            if (!isPathologist && !isCollaborator) return null;
+
+                                                                            return (
+                                                                                <div className="flex flex-wrap gap-1">
+                                                                                    {isPathologist && (
+                                                                                        <Badge variant="outline" className="text-[8px] px-1 py-0 bg-blue-500/10 text-blue-500 border-blue-500/20 font-semibold uppercase">
+                                                                                            Patólogo
+                                                                                        </Badge>
+                                                                                    )}
+                                                                                    {isCollaborator && (
+                                                                                        <Badge variant="outline" className="text-[8px] px-1 py-0 bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-semibold uppercase">
+                                                                                            Colaborador
+                                                                                        </Badge>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                        <div className="flex min-h-[24px] flex-wrap items-center gap-1">
+                                                                            <span>
+                                                                                {specimen.sequence_code ||
+                                                                                    `#${specimen.id}`}
+                                                                            </span>
+                                                                            <CopyButton
+                                                                                text={
+                                                                                    specimen.sequence_code ||
+                                                                                    `#${specimen.id}`
+                                                                                }
+                                                                            />
+                                                                            {specimen.work_orders &&
+                                                                                specimen
+                                                                                    .work_orders
+                                                                                    .length >
+                                                                                    0 && (
+                                                                                    <Badge
+                                                                                        variant="secondary"
+                                                                                        className="animate-in cursor-pointer rounded-full border bg-primary/5 px-1.5 py-0.5 text-[10px] font-bold text-primary select-none fade-in hover:bg-primary/10"
+                                                                                        onClick={(
+                                                                                            e,
+                                                                                        ) => {
+                                                                                            e.stopPropagation();
+                                                                                            setSelectedSpecimenForWorkOrdersList(
+                                                                                                specimen,
+                                                                                            );
+                                                                                        }}
+                                                                                        title={`${specimen.work_orders.length} órdenes de trabajo creadas. Haga clic para ver detalles.`}
+                                                                                    >
+                                                                                        <Layers className="mr-0.5 h-3 w-3 text-primary" />
+                                                                                        {
+                                                                                            specimen
+                                                                                                .work_orders
+                                                                                                .length
+                                                                                        }
+                                                                                    </Badge>
+                                                                                )}
+                                                                        </div>
                                                                     </div>
                                                                 </TableCell>
                                                                 {/* Visual Day Calendar Tear-off Widget */}
@@ -1453,6 +1482,23 @@ export default function MyAssignmentsIndex({
                                                                                     Trabajo
                                                                                 </span>
                                                                             </DropdownMenuItem>
+                                                                            <DropdownMenuItem
+                                                                                onClick={() => {
+                                                                                    setSelectedSpecimenForCollaborator(
+                                                                                        specimen,
+                                                                                    );
+                                                                                    setIsCollaboratorSheetOpen(
+                                                                                        true,
+                                                                                    );
+                                                                                }}
+                                                                                className="group cursor-pointer"
+                                                                            >
+                                                                                <UserPlus className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                                                                <span>
+                                                                                    Asignar
+                                                                                    Colaboradores
+                                                                                </span>
+                                                                            </DropdownMenuItem>
                                                                         </DropdownMenuContent>
                                                                     </DropdownMenu>
                                                                 </TableCell>
@@ -1513,6 +1559,20 @@ export default function MyAssignmentsIndex({
                         setIsSelectionMode(false);
                     }
                 }}
+            />
+
+            <SpecimenCollaboratorSheet
+                specimen={
+                    selectedSpecimenForCollaborator
+                        ? specimens.find(
+                              (s) =>
+                                  s.id === selectedSpecimenForCollaborator.id,
+                          ) || selectedSpecimenForCollaborator
+                        : null
+                }
+                open={isCollaboratorSheetOpen}
+                onOpenChange={setIsCollaboratorSheetOpen}
+                pathologists={usersList}
             />
 
             <Dialog

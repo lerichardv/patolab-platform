@@ -142,7 +142,7 @@ class SpecimenController extends Controller
                 $q->whereDate('specimen.created_at', '<=', $dateTo);
             }
 
-            $q->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report'])
+            $q->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report'])
                 ->leftJoin(\DB::raw('(SELECT specimen_id, priority_id, MIN(`order`) as board_order FROM priorities_specimens_order GROUP BY specimen_id, priority_id) as pso'), function ($join) {
                     $join->on('specimen.id', '=', 'pso.specimen_id')
                         ->on('specimen.priority_id', '=', 'pso.priority_id');
@@ -1167,6 +1167,53 @@ class SpecimenController extends Controller
         $specimen->users()->detach($validated['user_id']);
 
         return redirect()->back()->with('success', 'Patólogo desasignado con éxito.');
+    }
+
+    public function assignCollaborator(Request $request, Specimen $specimen)
+    {
+        $isAssigned = $specimen->users()->where('user_id', auth()->id())->exists();
+        if (!Gate::allows('specimens.manage') && !$isAssigned) {
+            abort(403, 'No tienes permiso para gestionar colaboradores en esta muestra.');
+        }
+
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'macroscopy_access' => 'nullable|boolean',
+            'microscopy_access' => 'nullable|boolean',
+        ]);
+
+        $macroscopy = $request->boolean('macroscopy_access', false);
+        $microscopy = $request->boolean('microscopy_access', false);
+
+        if ($specimen->collaborators()->where('user_id', $validated['user_id'])->exists()) {
+            $specimen->collaborators()->updateExistingPivot($validated['user_id'], [
+                'macroscopy_access' => $macroscopy,
+                'microscopy_access' => $microscopy,
+            ]);
+        } else {
+            $specimen->collaborators()->attach($validated['user_id'], [
+                'macroscopy_access' => $macroscopy,
+                'microscopy_access' => $microscopy,
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Colaborador asignado con éxito.');
+    }
+
+    public function unassignCollaborator(Request $request, Specimen $specimen)
+    {
+        $isAssigned = $specimen->users()->where('user_id', auth()->id())->exists();
+        if (!Gate::allows('specimens.manage') && !$isAssigned) {
+            abort(403, 'No tienes permiso para gestionar colaboradores en esta muestra.');
+        }
+
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+        ]);
+
+        $specimen->collaborators()->detach($validated['user_id']);
+
+        return redirect()->back()->with('success', 'Colaborador desasignado con éxito.');
     }
 
     public function bulkAction(Request $request)

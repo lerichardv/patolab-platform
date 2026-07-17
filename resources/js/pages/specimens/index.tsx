@@ -2115,6 +2115,23 @@ export default function SpecimensIndex({
                                                                                                                 </span>
                                                                                                             </DropdownMenuItem>
                                                                                                         )}
+                                                                                                        <DropdownMenuItem
+                                                                                                            onClick={(
+                                                                                                                e,
+                                                                                                            ) => {
+                                                                                                                e.stopPropagation();
+                                                                                                                window.open(
+                                                                                                                    `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
+                                                                                                                    '_blank',
+                                                                                                                );
+                                                                                                            }}
+                                                                                                        >
+                                                                                                            <FileText className="mr-2 h-4 w-4" />
+                                                                                                            <span>
+                                                                                                                Abrir
+                                                                                                                Reporte
+                                                                                                            </span>
+                                                                                                        </DropdownMenuItem>
                                                                                                         {auth.permissions?.includes(
                                                                                                             'specimens.delete',
                                                                                                         ) && (

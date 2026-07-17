@@ -129,6 +129,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimens/bulk-action', [SpecimenController::class, 'bulkAction'])->name('specimens.bulk-action');
     Route::post('specimens/{specimen}/assign-user', [SpecimenController::class, 'assignUser'])->name('specimens.assign-user');
     Route::post('specimens/{specimen}/unassign-user', [SpecimenController::class, 'unassignUser'])->name('specimens.unassign-user');
+    Route::post('specimens/{specimen}/assign-collaborator', [SpecimenController::class, 'assignCollaborator'])->name('specimens.assign-collaborator');
+    Route::post('specimens/{specimen}/unassign-collaborator', [SpecimenController::class, 'unassignCollaborator'])->name('specimens.unassign-collaborator');
     Route::get('my-assignments', [MyAssignmentController::class, 'index'])->name('my-assignments.index');
     Route::post('specimen-groups', [SpecimenGroupController::class, 'store'])->name('specimen-groups.store');
 
@@ -138,7 +140,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimens/{specimen:sequence_code}/report-editor', [ReportEditorController::class, 'store'])->name('specimens.report-editor.store');
     Route::post('specimens/{specimen:sequence_code}/report-editor/save', [ReportEditorController::class, 'save'])->name('specimens.report-editor.save');
     Route::post('specimens/{specimen:sequence_code}/report-editor/update-date', [ReportEditorController::class, 'updateDate'])->name('specimens.report-editor.update-date');
+    Route::post('specimens/{specimen:sequence_code}/report-editor/apply-template', [ReportEditorController::class, 'applyTemplate'])->name('specimens.report-editor.apply-template');
     Route::post('specimens/{specimen:sequence_code}/report-editor/transition-state', [ReportEditorController::class, 'transitionState'])->name('specimens.report-editor.transition-state');
+
     Route::post('specimens/{specimen:sequence_code}/report-editor/generate-temp-pdf', [ReportEditorController::class, 'generateTempPdf'])->name('specimens.report-editor.generate-temp-pdf');
     Route::post('specimens/{specimen:sequence_code}/report-editor/upload-image', [ReportEditorController::class, 'uploadImage'])->name('specimens.report-editor.upload-image');
     Route::post('specimens/{specimen:sequence_code}/report-editor/update-products', [ReportEditorController::class, 'updateProducts'])->name('specimens.report-editor.update-products');

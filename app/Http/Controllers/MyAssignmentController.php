@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Priority;
+use App\Models\Specimen;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Models\User;
@@ -88,8 +89,14 @@ class MyAssignmentController extends Controller
             cookie()->queue(cookie("date_filter_my_assignments_user_{$userId}", json_encode(['from' => $dateFrom ?? '', 'to' => $dateTo ?? '']), 525600, null, null, null, false));
         }
 
-        $query = $user->specimens()
-            ->where('specimen.active', true);
+        $query = Specimen::where('specimen.active', true)
+            ->where(function ($q) use ($userId) {
+                $q->whereHas('users', function ($sub) use ($userId) {
+                    $sub->where('users.id', $userId);
+                })->orWhereHas('collaborators', function ($sub) use ($userId) {
+                    $sub->where('users.id', $userId);
+                });
+            });
 
         // Filter by statuses
         if (! empty($statuses)) {
@@ -118,7 +125,7 @@ class MyAssignmentController extends Controller
             ->select('specimen.*')
             ->orderBy('priorities.order', 'asc')
             ->orderBy('specimen.created_at', 'desc')
-            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'workOrders.task', 'workOrders.users'])
+            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'workOrders.task', 'workOrders.users'])
             ->get();
 
         $priorities = Priority::orderBy('order', 'asc')->get();

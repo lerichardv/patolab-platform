@@ -157,6 +157,16 @@ class Specimen extends Model
             ->withTimestamps();
     }
 
+    /**
+     * Obtiene los colaboradores asignados a la muestra.
+     */
+    public function collaborators(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'specimen_collaborators', 'specimen_id', 'user_id')
+            ->withPivot(['macroscopy_access', 'microscopy_access'])
+            ->withTimestamps();
+    }
+
     public function invoiceRelation(): HasOne
     {
         return $this->hasOne(Invoice::class, 'specimen_id');

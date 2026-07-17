@@ -199,6 +199,7 @@ class ReportEditorController extends Controller
             'referrerRelation',
             'report',
             'users.role',
+            'collaborators',
             'group.invoice.caiRange',
             'group.invoice.creditRelation',
             'group.invoice.transferBank',
@@ -228,22 +229,19 @@ class ReportEditorController extends Controller
             ->with('prices')
             ->get();
 
-        $templates = [];
-        if (! $specimen->report_id) {
-            $templates = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)
-                ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
-                ->where(function ($query) {
-                    $query->where('user_id', auth()->id())
-                        ->orWhereExists(function ($q) {
-                            $q->select(DB::raw(1))
-                                ->from('user_templates_permissions')
-                                ->whereColumn('user_templates_permissions.template_id', 'specimen_type_templates.id')
-                                ->where('user_templates_permissions.shared_with_id', auth()->id());
-                        });
-                })
-                ->with(['user:id,name', 'specimenType:id,name', 'specimenTypeExamination:id,name'])
-                ->get();
-        }
+        $templates = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)
+            ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+            ->where(function ($query) {
+                $query->where('user_id', auth()->id())
+                    ->orWhereExists(function ($q) {
+                        $q->select(DB::raw(1))
+                            ->from('user_templates_permissions')
+                            ->whereColumn('user_templates_permissions.template_id', 'specimen_type_templates.id')
+                            ->where('user_templates_permissions.shared_with_id', auth()->id());
+                    });
+            })
+            ->with(['user:id,name', 'specimenType:id,name', 'specimenTypeExamination:id,name'])
+            ->get();
 
         return Inertia::render('specimens/report-editor/report-editor', [
             'specimen' => $specimen,
@@ -351,13 +349,7 @@ class ReportEditorController extends Controller
             'report_date' => 'required|date',
         ]);
 
-        $assignment = DB::table('specimen_user')
-            ->where('specimen_id', $specimen->id)
-            ->where('user_id', auth()->id())
-            ->first();
-
-        $hasMacroAccess = $assignment ? (bool) $assignment->macroscopy_access : false;
-        $hasMicroAccess = $assignment ? (bool) $assignment->microscopy_access : false;
+        [$hasMacroAccess, $hasMicroAccess] = $this->getUserAccess($specimen);
 
         if (! $hasMacroAccess && ! $hasMicroAccess) {
             return redirect()->back()->with('error', 'No tienes permisos de edición para esta muestra.');
@@ -373,6 +365,69 @@ class ReportEditorController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Fecha del reporte actualizada.');
+    }
+
+    /**
+     * Apply a template to an existing report.
+     */
+    public function applyTemplate(Request $request, Specimen $specimen)
+    {
+        $request->validate([
+            'template_id' => 'required|exists:specimen_type_templates,id',
+        ]);
+
+        $specimen->load('report');
+        if (! $specimen->report) {
+            return response()->json(['error' => 'No hay reporte asociado a esta muestra.'], 404);
+        }
+
+        // When report is finalized, changing templates is forbidden.
+        if (in_array($specimen->status, ['finalized', 'delivered'])) {
+            return response()->json(['error' => 'No se puede cambiar la plantilla de un reporte finalizado.'], 403);
+        }
+
+        [$hasMacroAccess, $hasMicroAccess] = $this->getUserAccess($specimen);
+
+        if (! $hasMacroAccess && ! $hasMicroAccess) {
+            return response()->json(['error' => 'No tienes permisos de edición para esta muestra.'], 403);
+        }
+
+        $template = SpecimenTypeTemplate::where('id', $request->template_id)
+            ->where('specimen_type_id', $specimen->specimen_type)
+            ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+            ->where(function ($query) {
+                $query->where('user_id', auth()->id())
+                    ->orWhereExists(function ($q) {
+                        $q->select(DB::raw(1))
+                            ->from('user_templates_permissions')
+                            ->whereColumn('user_templates_permissions.template_id', 'specimen_type_templates.id')
+                            ->where('user_templates_permissions.shared_with_id', auth()->id());
+                    });
+            })
+            ->first();
+
+        if (! $template) {
+            return response()->json(['error' => 'La plantilla seleccionada no es válida o no tienes permisos para usarla.'], 422);
+        }
+
+        // Update database report columns
+        $specimen->report->update([
+            'macroscopy_html' => $template->macroscopy_html ?? '',
+            'microscopy_html' => $template->microscopy_html ?? '',
+            'diagnosis_html' => $template->diagnosis_html ?? '',
+            'clinical_details_html' => $template->clinical_details_html ?? '',
+            'comments_notes_html' => $template->comments_notes_html ?? '',
+            'protocols_html' => $template->protocols_html ?? '',
+            'legend_html' => $template->legend_html ?? '',
+            'sections_order' => $template->sections_order ?? null,
+            'headings_toggles' => $template->headings_toggles ?? null,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Plantilla aplicada y guardada con éxito.',
+            'template' => $template,
+        ]);
     }
 
     /**
@@ -410,13 +465,7 @@ class ReportEditorController extends Controller
             return response()->json(['error' => 'No hay reporte asociado a esta muestra.'], 404);
         }
 
-        $assignment = DB::table('specimen_user')
-            ->where('specimen_id', $specimen->id)
-            ->where('user_id', auth()->id())
-            ->first();
-
-        $hasMacroAccess = $assignment ? (bool) $assignment->macroscopy_access : false;
-        $hasMicroAccess = $assignment ? (bool) $assignment->microscopy_access : false;
+        [$hasMacroAccess, $hasMicroAccess] = $this->getUserAccess($specimen);
 
         if (! $hasMacroAccess && ! $hasMicroAccess) {
             return response()->json(['error' => 'No tienes permisos de edición para esta muestra.'], 403);
@@ -697,13 +746,7 @@ class ReportEditorController extends Controller
      */
     public function generateTempPdf(Specimen $specimen)
     {
-        $assignment = DB::table('specimen_user')
-            ->where('specimen_id', $specimen->id)
-            ->where('user_id', auth()->id())
-            ->first();
-
-        $hasMacroAccess = $assignment ? (bool) $assignment->macroscopy_access : false;
-        $hasMicroAccess = $assignment ? (bool) $assignment->microscopy_access : false;
+        [$hasMacroAccess, $hasMicroAccess] = $this->getUserAccess($specimen);
 
         if (! $hasMacroAccess && ! $hasMicroAccess) {
             return response()->json(['error' => 'No tienes permisos de edición para esta muestra.'], 403);
@@ -789,13 +832,7 @@ class ReportEditorController extends Controller
             'insumos.*.price' => 'required|numeric|min:0',
         ]);
 
-        $assignment = DB::table('specimen_user')
-            ->where('specimen_id', $specimen->id)
-            ->where('user_id', auth()->id())
-            ->first();
-
-        $hasMacroAccess = $assignment ? (bool) $assignment->macroscopy_access : false;
-        $hasMicroAccess = $assignment ? (bool) $assignment->microscopy_access : false;
+        [$hasMacroAccess, $hasMicroAccess] = $this->getUserAccess($specimen);
 
         if (! $hasMacroAccess && ! $hasMicroAccess) {
             return redirect()->back()->with('error', 'No tienes permisos de edición para esta muestra.');
@@ -976,5 +1013,31 @@ class ReportEditorController extends Controller
             ->get();
 
         return response()->json($templates);
+    }
+
+    /**
+     * Helper to get user access (macro/micro) either as a pathologist or collaborator.
+     */
+    private function getUserAccess(Specimen $specimen)
+    {
+        $userId = auth()->id();
+
+        $assignment = DB::table('specimen_user')
+            ->where('specimen_id', $specimen->id)
+            ->where('user_id', $userId)
+            ->first();
+
+        $collaborator = DB::table('specimen_collaborators')
+            ->where('specimen_id', $specimen->id)
+            ->where('user_id', $userId)
+            ->first();
+
+        $hasMacroAccess = ($assignment ? (bool) $assignment->macroscopy_access : false)
+            || ($collaborator ? (bool) $collaborator->macroscopy_access : false);
+
+        $hasMicroAccess = ($assignment ? (bool) $assignment->microscopy_access : false)
+            || ($collaborator ? (bool) $collaborator->microscopy_access : false);
+
+        return [$hasMacroAccess, $hasMicroAccess];
     }
 }

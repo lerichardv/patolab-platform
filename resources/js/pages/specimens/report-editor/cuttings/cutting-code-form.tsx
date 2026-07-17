@@ -1,7 +1,9 @@
 import { useForm } from '@inertiajs/react';
 import { Palette, Plus, Trash2 } from 'lucide-react';
 import React, { useEffect } from 'react';
-import { SwatchesPicker } from 'react-color';
+import reactColor from 'react-color';
+import type { ColorResult } from 'react-color';
+const { SwatchesPicker } = reactColor as any;
 import { toast } from 'sonner';
 import {
     store as storeCuttingCode,
@@ -202,7 +204,7 @@ export default function CuttingCodeForm({ cuttingCode, onSuccess }: Props) {
                                     <div className="flex max-h-[220px] justify-center overflow-x-hidden overflow-y-auto rounded-md border bg-muted/20 p-1">
                                         <SwatchesPicker
                                             color={data.color}
-                                            onChangeComplete={(color) =>
+                                            onChangeComplete={(color: ColorResult) =>
                                                 setData('color', color.hex)
                                             }
                                             width={320}
@@ -329,13 +331,13 @@ export default function CuttingCodeForm({ cuttingCode, onSuccess }: Props) {
                                             <div className="mt-1 flex max-h-[220px] justify-center overflow-x-hidden overflow-y-auto rounded-md border bg-muted/20 p-1">
                                                 <SwatchesPicker
                                                     color={item.color}
-                                                    onChangeComplete={(color) =>
+                                                    onChangeComplete={(color: ColorResult) =>
                                                         updateRow(
                                                             index,
                                                             'color',
                                                             color.hex,
-                                                        )
-                                                    }
+                                                            )
+                                                        }
                                                     width={320}
                                                     styles={{
                                                         default: {
