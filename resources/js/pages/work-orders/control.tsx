@@ -73,6 +73,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 import WorkOrderViewSheet from '../my-work-orders/work-order-view-sheet';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
 
 interface User {
     id: number;
@@ -198,6 +206,9 @@ export default function HistotechnologistWorkOrdersControl({
     const [isReloading, setIsReloading] = useState(false);
     const [selectedWorkOrder, setSelectedWorkOrder] =
         useState<WorkOrder | null>(null);
+    const [openAssignWorkOrderId, setOpenAssignWorkOrderId] = useState<
+        number | null
+    >(null);
     const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
     const [selectedSpecimenForView, setSelectedSpecimenForView] =
         useState<any>(null);
@@ -730,9 +741,24 @@ export default function HistotechnologistWorkOrdersControl({
                                                                 ),
                                                             )}
 
-                                                        {/* Add Technician Dropdown */}
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger
+                                                        {/* Add Technician Dropdown (shadcn Combobox) */}
+                                                        <Popover
+                                                            open={
+                                                                openAssignWorkOrderId ===
+                                                                wo.id
+                                                            }
+                                                            onOpenChange={(
+                                                                isOpen,
+                                                            ) =>
+                                                                setOpenAssignWorkOrderId(
+                                                                    isOpen
+                                                                        ? wo.id
+                                                                        : null,
+                                                                )
+                                                            }
+                                                            modal={true}
+                                                        >
+                                                            <PopoverTrigger
                                                                 asChild
                                                             >
                                                                 <Button
@@ -743,43 +769,64 @@ export default function HistotechnologistWorkOrdersControl({
                                                                 >
                                                                     <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
                                                                 </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent
+                                                            </PopoverTrigger>
+                                                            <PopoverContent
+                                                                className="w-56 p-0"
                                                                 align="start"
-                                                                className="w-48"
                                                             >
-                                                                {unassignedTechs.length >
-                                                                0 ? (
-                                                                    unassignedTechs.map(
-                                                                        (t) => (
-                                                                            <DropdownMenuItem
-                                                                                key={
-                                                                                    t.id
-                                                                                }
-                                                                                onClick={() =>
-                                                                                    handleAssign(
-                                                                                        wo.id,
-                                                                                        t.id,
-                                                                                    )
-                                                                                }
-                                                                                className="cursor-pointer"
-                                                                            >
-                                                                                {
-                                                                                    t.name
-                                                                                }
-                                                                            </DropdownMenuItem>
-                                                                        ),
-                                                                    )
-                                                                ) : (
-                                                                    <div className="p-2 text-center text-xs text-muted-foreground">
-                                                                        Todos
-                                                                        los
-                                                                        técnicos
-                                                                        asignados
-                                                                    </div>
-                                                                )}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
+                                                                <Command>
+                                                                    <CommandInput placeholder="Buscar técnico..." />
+                                                                    <CommandList className="max-h-56">
+                                                                        <CommandEmpty>
+                                                                            No
+                                                                            se
+                                                                            encontraron
+                                                                            resultados.
+                                                                        </CommandEmpty>
+                                                                        <CommandGroup>
+                                                                            {unassignedTechs.length >
+                                                                            0 ? (
+                                                                                unassignedTechs.map(
+                                                                                    (
+                                                                                        t,
+                                                                                    ) => (
+                                                                                        <CommandItem
+                                                                                            key={
+                                                                                                t.id
+                                                                                            }
+                                                                                            value={
+                                                                                                t.name
+                                                                                            }
+                                                                                            onSelect={() => {
+                                                                                                handleAssign(
+                                                                                                    wo.id,
+                                                                                                    t.id,
+                                                                                                );
+                                                                                                setOpenAssignWorkOrderId(
+                                                                                                    null,
+                                                                                                );
+                                                                                            }}
+                                                                                            className="cursor-pointer"
+                                                                                        >
+                                                                                            {
+                                                                                                t.name
+                                                                                            }
+                                                                                        </CommandItem>
+                                                                                    ),
+                                                                                )
+                                                                            ) : (
+                                                                                <div className="p-2 text-center text-xs text-muted-foreground">
+                                                                                    Todos
+                                                                                    los
+                                                                                    técnicos
+                                                                                    asignados
+                                                                                </div>
+                                                                            )}
+                                                                        </CommandGroup>
+                                                                    </CommandList>
+                                                                </Command>
+                                                            </PopoverContent>
+                                                        </Popover>
                                                     </div>
                                                 </TableCell>
 
