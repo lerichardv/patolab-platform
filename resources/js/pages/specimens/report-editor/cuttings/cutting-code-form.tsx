@@ -1,9 +1,8 @@
 import { useForm } from '@inertiajs/react';
 import { Palette, Plus, Trash2 } from 'lucide-react';
 import React, { useEffect } from 'react';
-import reactColor from 'react-color';
+import { SwatchesPicker } from 'react-color';
 import type { ColorResult } from 'react-color';
-const { SwatchesPicker } = reactColor as any;
 import { toast } from 'sonner';
 import {
     store as storeCuttingCode,
