@@ -1,5 +1,13 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { Settings, Percent, Save } from 'lucide-react';
+import {
+    Settings,
+    Percent,
+    Save,
+    Check,
+    ChevronsUpDown,
+    X,
+} from 'lucide-react';
+import { useState } from 'react';
 import type { FormEventHandler } from 'react';
 import { toast } from 'sonner';
 import { update as updateSettings } from '@/actions/App/Http/Controllers/SettingController';
@@ -14,21 +22,213 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+
+interface Role {
+    id: number;
+    name: string;
+}
 
 interface Props {
     settings: {
         third_age_discount: string;
         fourth_age_discount: string;
+        pathologist_role_id?: string;
+        pathologist_technician_role_id?: number[];
     };
+    roles: Role[];
 }
 
-export default function SystemSettingsIndex({ settings }: Props) {
+function FormCombobox({
+    options,
+    value,
+    onChange,
+    placeholder,
+    emptyMessage = 'No se encontraron resultados.',
+    disabled = false,
+    multiple = false,
+}: {
+    options: { label: string; value: string }[];
+    value: string | string[];
+    onChange: (value: any) => void;
+    placeholder: string;
+    emptyMessage?: string;
+    disabled?: boolean;
+    multiple?: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+
+    const selectedValues = Array.isArray(value) ? value : value ? [value] : [];
+    const selectedOptions = options.filter((opt) =>
+        selectedValues.includes(opt.value),
+    );
+
+    return (
+        <Popover open={open} onOpenChange={setOpen} modal={true}>
+            <PopoverTrigger asChild className="w-full">
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="h-auto min-h-10 w-full justify-between px-3 py-1.5 text-left font-normal"
+                    disabled={disabled}
+                >
+                    <div className="flex max-h-24 max-w-[90%] flex-wrap items-center gap-1 overflow-y-auto pr-1">
+                        {selectedOptions.length > 0 ? (
+                            selectedOptions.map((opt) => (
+                                <span
+                                    key={opt.value}
+                                    className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
+                                >
+                                    {opt.label}
+                                    {multiple && (
+                                        <span
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const newValue =
+                                                    selectedValues.filter(
+                                                        (v) => v !== opt.value,
+                                                    );
+                                                onChange(newValue);
+                                            }}
+                                            className="ml-1 cursor-pointer rounded-full p-0.5 hover:bg-muted-foreground/20"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </span>
+                                    )}
+                                </span>
+                            ))
+                        ) : (
+                            <span className="text-muted-foreground">
+                                {placeholder}
+                            </span>
+                        )}
+                    </div>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent
+                className="z-[120] w-[var(--radix-popover-trigger-width)] p-0"
+                align="start"
+            >
+                <Command>
+                    <CommandInput placeholder={`Buscar...`} />
+                    <CommandList>
+                        {multiple && options.length > 0 && (
+                            <div className="flex items-center justify-between border-b border-border/60 bg-muted/40 px-3 py-2 text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onChange(options.map((o) => o.value));
+                                    }}
+                                    className="cursor-pointer font-medium text-primary transition-all hover:underline"
+                                >
+                                    Seleccionar todos
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onChange([]);
+                                    }}
+                                    className="cursor-pointer font-medium text-muted-foreground transition-all hover:text-destructive hover:underline"
+                                >
+                                    Deseleccionar todos
+                                </button>
+                            </div>
+                        )}
+                        <CommandEmpty>{emptyMessage}</CommandEmpty>
+                        <CommandGroup>
+                            {options.map((option) => {
+                                const isSelected = selectedValues.includes(
+                                    option.value,
+                                );
+
+                                return (
+                                    <CommandItem
+                                        key={option.value}
+                                        value={option.label}
+                                        onSelect={() => {
+                                            if (multiple) {
+                                                const newValue = isSelected
+                                                    ? selectedValues.filter(
+                                                          (v) =>
+                                                              v !==
+                                                              option.value,
+                                                      )
+                                                    : [
+                                                          ...selectedValues,
+                                                          option.value,
+                                                      ];
+                                                onChange(newValue);
+                                            } else {
+                                                onChange(option.value);
+                                                setOpen(false);
+                                            }
+                                        }}
+                                    >
+                                        {multiple ? (
+                                            <div
+                                                className={cn(
+                                                    'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-all',
+                                                    isSelected
+                                                        ? 'bg-primary text-primary-foreground'
+                                                        : 'opacity-50',
+                                                )}
+                                            >
+                                                <Check className="h-3 w-3 stroke-[3]" />
+                                            </div>
+                                        ) : (
+                                            <Check
+                                                className={cn(
+                                                    'mr-2 h-4 w-4 shrink-0',
+                                                    isSelected
+                                                        ? 'opacity-100'
+                                                        : 'opacity-0',
+                                                )}
+                                            />
+                                        )}
+                                        <span className="truncate">
+                                            {option.label}
+                                        </span>
+                                    </CommandItem>
+                                );
+                            })}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+export default function SystemSettingsIndex({ settings, roles = [] }: Props) {
     const { auth } = usePage<any>().props;
     const canEdit = auth.permissions?.includes('settings.edit');
 
     const { data, setData, put, processing, errors } = useForm({
         third_age_discount: settings.third_age_discount || '30',
         fourth_age_discount: settings.fourth_age_discount || '40',
+        pathologist_role_id: settings.pathologist_role_id
+            ? parseInt(settings.pathologist_role_id, 10)
+            : '',
+        pathologist_technician_role_id: settings.pathologist_technician_role_id
+            ? settings.pathologist_technician_role_id.map((id) =>
+                  typeof id === 'string' ? parseInt(id, 10) : id,
+              )
+            : [],
     });
 
     const handleSubmit: FormEventHandler = (e) => {
@@ -47,6 +247,11 @@ export default function SystemSettingsIndex({ settings }: Props) {
             },
         });
     };
+
+    const roleOptions = roles.map((role) => ({
+        label: role.name,
+        value: role.id.toString(),
+    }));
 
     return (
         <>
@@ -71,6 +276,7 @@ export default function SystemSettingsIndex({ settings }: Props) {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Patients Discounts */}
                     <Card className="overflow-hidden border border-muted bg-card/60 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-primary/20 hover:shadow-xl">
                         <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-transparent to-transparent pb-4">
                             <CardTitle className="flex items-center gap-2 text-lg font-semibold">
@@ -158,6 +364,84 @@ export default function SystemSettingsIndex({ settings }: Props) {
                                     </p>
                                     <InputError
                                         message={errors.fourth_age_discount}
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Roles Configuration */}
+                    <Card className="overflow-hidden border border-muted bg-card/60 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-primary/20 hover:shadow-xl">
+                        <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-transparent to-transparent pb-4">
+                            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                                <span className="flex h-2 w-2 rounded-full bg-primary" />
+                                Roles del Sistema
+                            </CardTitle>
+                            <CardDescription>
+                                Defina los roles asignados para los procesos y
+                                comisiones de patólogos y técnicos.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6 pt-6">
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                <div className="group space-y-2">
+                                    <Label className="text-sm font-semibold transition-colors group-focus-within:text-primary">
+                                        Rol de Patólogo
+                                    </Label>
+                                    <FormCombobox
+                                        options={roleOptions}
+                                        value={
+                                            data.pathologist_role_id
+                                                ? data.pathologist_role_id.toString()
+                                                : ''
+                                        }
+                                        onChange={(val) =>
+                                            setData(
+                                                'pathologist_role_id',
+                                                val ? parseInt(val, 10) : '',
+                                            )
+                                        }
+                                        placeholder="Seleccione el rol de patólogo"
+                                        disabled={!canEdit}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Rol utilizado para identificar a los
+                                        patólogos autorizados para firmar.
+                                    </p>
+                                    <InputError
+                                        message={errors.pathologist_role_id}
+                                    />
+                                </div>
+
+                                <div className="group space-y-2">
+                                    <Label className="text-sm font-semibold transition-colors group-focus-within:text-primary">
+                                        Roles de Técnicos de Patología
+                                    </Label>
+                                    <FormCombobox
+                                        options={roleOptions}
+                                        value={data.pathologist_technician_role_id.map(
+                                            (id) => id.toString(),
+                                        )}
+                                        onChange={(vals: string[]) =>
+                                            setData(
+                                                'pathologist_technician_role_id',
+                                                vals.map((v) =>
+                                                    parseInt(v, 10),
+                                                ),
+                                            )
+                                        }
+                                        placeholder="Seleccione los roles de técnicos"
+                                        disabled={!canEdit}
+                                        multiple={true}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Roles que se consideran para la
+                                        asignación técnica de las muestras.
+                                    </p>
+                                    <InputError
+                                        message={
+                                            errors.pathologist_technician_role_id
+                                        }
                                     />
                                 </div>
                             </div>

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Role;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\WorkOrder;
 use Illuminate\Http\Request;
@@ -95,9 +95,10 @@ class HistotechnologistWorkOrderController extends Controller
             ->orderBy('due_date', 'asc')
             ->get();
 
-        // Get all technicians for assignment
-        $techRole = Role::where('slug', 'technician_pathologist')->first();
-        $technicians = $techRole ? User::where('active', true)->where('role_id', $techRole->id)->get() : collect();
+        // Get all technicians for assignment based on configured setting
+        $setting = Setting::where('setting_key', 'pathologist_technician_role_id')->first();
+        $roleIds = $setting ? ($setting->setting_value_multiple ?? []) : [];
+        $technicians = User::where('active', true)->whereIn('role_id', $roleIds)->get();
 
         return Inertia::render('work-orders/control', [
             'workOrders' => $workOrders,

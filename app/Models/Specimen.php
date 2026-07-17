@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\SendSpecimenEmailJob;
 use App\Traits\Auditable;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,6 +19,19 @@ class Specimen extends Model
 {
     use Auditable;
     use HasFactory;
+
+    protected static function booted()
+    {
+        static::created(function ($specimen) {
+            SendSpecimenEmailJob::dispatch($specimen, 'created');
+        });
+
+        static::updated(function ($specimen) {
+            if ($specimen->wasChanged('status') && $specimen->status === 'finalized') {
+                SendSpecimenEmailJob::dispatch($specimen, 'finalized');
+            }
+        });
+    }
 
     protected $table = 'specimen';
 

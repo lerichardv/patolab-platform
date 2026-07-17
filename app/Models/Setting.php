@@ -14,6 +14,13 @@ class Setting extends Model
     protected $fillable = [
         'setting_key',
         'setting_value',
+        'has_multiple_values',
+        'setting_value_multiple',
         'description',
+    ];
+
+    protected $casts = [
+        'has_multiple_values' => 'boolean',
+        'setting_value_multiple' => 'array',
     ];
 }
