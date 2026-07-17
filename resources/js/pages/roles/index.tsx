@@ -276,6 +276,15 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Ver Todas las Órdenes de Trabajo',
+        description:
+            'Acceso a la pantalla de control y asignación de todas las órdenes de trabajo.',
+        module: 'Órdenes de Trabajo',
+        slugs: {
+            view: 'work_orders.admin_view',
+        },
+    },
+    {
         label: 'Plantillas de Muestra',
         description:
             'Plantillas prediseñadas para diagnósticos rápidos de muestras.',
