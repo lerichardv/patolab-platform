@@ -57,20 +57,8 @@ class SendSpecimenEmailJob implements ShouldQueue
         $to = $customer->email;
         $attachments = [];
 
-        // Attach the PatoLab logo as an inline attachment (CID)
-        $logoPath = public_path('images/patolab-logo-horizontal.png');
-        if (file_exists($logoPath)) {
-            $attachments[] = [
-                'content' => base64_encode(file_get_contents($logoPath)),
-                'filename' => 'patolab-logo-horizontal.png',
-                'contentId' => 'patolab-logo',
-            ];
-        } else {
-            Log::warning("SendSpecimenEmailJob: Logo not found at {$logoPath}. Inline header image may fail to render.");
-        }
-
         if ($this->type === 'created') {
-            $subject = "Registro de Muestra — Código: {$this->specimen->sequence_code}";
+            $subject = "Registro de Muestra — {$this->specimen->sequence_code}";
             $statusUrl = route('specimens.show-public', [
                 'specimen_code' => $this->specimen->sequence_code,
                 'token' => $this->specimen->access_token,
@@ -83,7 +71,7 @@ class SendSpecimenEmailJob implements ShouldQueue
             ])->render();
 
         } elseif ($this->type === 'finalized') {
-            $subject = "Reporte Listo — Código: {$this->specimen->sequence_code}";
+            $subject = "Reporte Listo — {$this->specimen->sequence_code}";
             $statusUrl = route('specimens.show-public', [
                 'specimen_code' => $this->specimen->sequence_code,
                 'token' => $this->specimen->access_token,

@@ -521,6 +521,13 @@ class SpecimenGroupController extends Controller
             $invoice->update(['invoice_file' => $pdfPath]);
         });
 
+        // Enviar email del grupo de muestras al cliente principal
+        try {
+            \App\Jobs\SendSpecimenGroupEmailJob::dispatch($group, 'created');
+        } catch (\Exception $e) {
+            Log::error('Error despachando el Job de email del grupo de muestras: '.$e->getMessage());
+        }
+
         // Enviar notificación de WhatsApp al paciente (cliente de facturación global)
         try {
             $customer = Customer::find($validated['global_customer_id']);

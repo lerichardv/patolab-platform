@@ -267,6 +267,8 @@ class ReportEditorController extends Controller
      */
     public function store(Request $request, Specimen $specimen)
     {
+        $this->authorizeSpecimenAccess($specimen);
+
         if ($specimen->report_id) {
             return redirect()->back()->with('error', 'Esta muestra ya tiene un reporte creado.');
         }
@@ -345,6 +347,8 @@ class ReportEditorController extends Controller
      */
     public function updateDate(Request $request, Specimen $specimen)
     {
+        $this->authorizeSpecimenAccess($specimen);
+
         $request->validate([
             'report_date' => 'required|date',
         ]);
@@ -372,6 +376,8 @@ class ReportEditorController extends Controller
      */
     public function applyTemplate(Request $request, Specimen $specimen)
     {
+        $this->authorizeSpecimenAccess($specimen);
+
         $request->validate([
             'template_id' => 'required|exists:specimen_type_templates,id',
         ]);
@@ -435,6 +441,8 @@ class ReportEditorController extends Controller
      */
     public function save(Request $request, Specimen $specimen)
     {
+        $this->authorizeSpecimenAccess($specimen);
+
         $request->validate([
             'report_date' => 'nullable|string',
             'macroscopy_html' => 'nullable|string',
@@ -550,6 +558,8 @@ class ReportEditorController extends Controller
      */
     public function transitionState(Request $request, Specimen $specimen)
     {
+        $this->authorizeSpecimenAccess($specimen);
+
         $request->validate([
             'status' => 'required|string|in:macroscopic_review,processing,microscopic_review,finalized',
         ]);
@@ -746,6 +756,8 @@ class ReportEditorController extends Controller
      */
     public function generateTempPdf(Specimen $specimen)
     {
+        $this->authorizeSpecimenAccess($specimen);
+
         [$hasMacroAccess, $hasMicroAccess] = $this->getUserAccess($specimen);
 
         if (! $hasMacroAccess && ! $hasMicroAccess) {
@@ -779,6 +791,8 @@ class ReportEditorController extends Controller
      */
     public function downloadPdf(Specimen $specimen)
     {
+        $this->authorizeSpecimenAccess($specimen);
+
         $specimen->load('report');
         if (! $specimen->report) {
             abort(404, 'No hay reporte asociado a esta muestra.');
@@ -804,6 +818,8 @@ class ReportEditorController extends Controller
      */
     public function uploadImage(Request $request, Specimen $specimen)
     {
+        $this->authorizeSpecimenAccess($specimen);
+
         $request->validate([
             'image' => 'required|image|max:10240', // 10 MB max
         ]);
@@ -825,6 +841,8 @@ class ReportEditorController extends Controller
      */
     public function updateProducts(Request $request, Specimen $specimen)
     {
+        $this->authorizeSpecimenAccess($specimen);
+
         $request->validate([
             'insumos' => 'nullable|array',
             'insumos.*.id' => 'required|exists:products,id',
@@ -1039,5 +1057,26 @@ class ReportEditorController extends Controller
             || ($collaborator ? (bool) $collaborator->microscopy_access : false);
 
         return [$hasMacroAccess, $hasMicroAccess];
+    }
+
+    /**
+     * Authorize that the current authenticated user is assigned to the specimen (either as a pathologist or collaborator).
+     */
+    private function authorizeSpecimenAccess(Specimen $specimen): void
+    {
+        $userId = auth()->id();
+
+        $isAssigned = DB::table('specimen_user')
+            ->where('specimen_id', $specimen->id)
+            ->where('user_id', $userId)
+            ->exists()
+            || DB::table('specimen_collaborators')
+            ->where('specimen_id', $specimen->id)
+            ->where('user_id', $userId)
+            ->exists();
+
+        if (! $isAssigned) {
+            abort(403, 'No estás asignado a esta muestra y no puedes acceder al editor de reportes.');
+        }
     }
 }

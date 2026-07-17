@@ -170,9 +170,9 @@ When deploying the project to a production server or container environment:
    ```
 
 7. **Queue Worker & Scheduler**:
-   Ensure a worker daemon is running if queue jobs are used, and schedule Laravel's cron task:
+   Running the queue worker is required to let the platform process jobs and send emails. Ensure a worker daemon is running in production:
    ```bash
-   php artisan queue:work --daemon
+   php artisan queue:work --queue=default --tries=3 --timeout=60
    ```
 
 8. **Chromium Path (for PDF Invoices)**:

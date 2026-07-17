@@ -23,10 +23,10 @@
             overflow: hidden;
         }
         .header {
-            background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+            background: #ffffff;
             padding: 30px 20px;
             text-align: center;
-            border-bottom: 4px solid #3b82f6;
+            border-bottom: 1px solid #e2e8f0;
         }
         .header img {
             max-height: 48px;
@@ -97,7 +97,7 @@
     <div class="email-container">
         <!-- Heading / Logo -->
         <div class="header">
-            <img src="cid:patolab-logo" alt="PatoLab Logo">
+            <img src="https://pathos.support/images/patolab-logo-horizontal.png" alt="PatoLab Logo">
         </div>
 
         <!-- Body Content -->

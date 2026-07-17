@@ -23,12 +23,16 @@ class Specimen extends Model
     protected static function booted()
     {
         static::created(function ($specimen) {
-            SendSpecimenEmailJob::dispatch($specimen, 'created');
+            if (! $specimen->group_id) {
+                SendSpecimenEmailJob::dispatch($specimen, 'created');
+            }
         });
 
         static::updated(function ($specimen) {
             if ($specimen->wasChanged('status') && $specimen->status === 'finalized') {
-                SendSpecimenEmailJob::dispatch($specimen, 'finalized');
+                if (! $specimen->group_id) {
+                    SendSpecimenEmailJob::dispatch($specimen, 'finalized');
+                }
             }
         });
     }

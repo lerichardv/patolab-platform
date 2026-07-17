@@ -3459,6 +3459,9 @@ export default function ReportWorkspace({
 		!!currentUserSpecimenRelation?.pivot?.microscopy_access ||
 		!!currentUserCollaboratorRelation?.pivot?.microscopy_access;
 
+	const isAssigned =
+		!!currentUserSpecimenRelation || !!currentUserCollaboratorRelation;
+
 	let accessBadgeLabel = 'Solo Lectura';
 	let accessBadgeStyle = {
 		backgroundColor: 'rgba(100, 116, 139, 0.15)',
@@ -3466,7 +3469,14 @@ export default function ReportWorkspace({
 		borderColor: 'rgba(100, 116, 139, 0.25)',
 	};
 
-	if (hasMacroAccess && hasMicroAccess) {
+	if (!isAssigned) {
+		accessBadgeLabel = 'No Asignado — Sin acceso de edición';
+		accessBadgeStyle = {
+			backgroundColor: 'rgba(239, 68, 68, 0.15)',
+			color: '#ef4444',
+			borderColor: 'rgba(239, 68, 68, 0.25)',
+		};
+	} else if (hasMacroAccess && hasMicroAccess) {
 		accessBadgeLabel = 'Acceso a Macro y Microscopía';
 		accessBadgeStyle = {
 			backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -5713,73 +5723,87 @@ export default function ReportWorkspace({
 							</span>
 							.
 						</p>
-						{templates && templates.length > 0 ? (
-							<div className="mb-6 text-left">
-								<label className="mb-2 block text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-									Seleccionar Plantilla de Reporte
-								</label>
-								<Select
-									value={selectedTemplateId}
-									onValueChange={setSelectedTemplateId}
-								>
-									<SelectTrigger className="h-12 w-full text-foreground">
-										<SelectValue placeholder="Seleccione una plantilla..." />
-									</SelectTrigger>
-									<SelectContent className="max-h-[300px]">
-										{templates.map((temp) => (
-											<SelectItem
-												key={temp.id}
-												value={String(temp.id)}
-												className="group"
-											>
-												<div className="flex flex-row flex-nowrap gap-3 py-1 text-left">
-													<span className="text-sm font-medium text-foreground group-focus:text-white group-data-[highlighted]:text-white">
-														{temp.user?.name ||
-															'Sin propietario'}
-													</span>
-													<span className="mt-0.5 text-xs text-muted-foreground group-focus:text-white/80 group-data-[highlighted]:text-white/80">
-														{
-															temp.specimen_type
-																?.name
-														}{' '}
-														-{' '}
-														{
-															temp
-																.specimen_type_examination
-																?.name
-														}
-													</span>
-												</div>
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-						) : (
-							<div className="mb-6 flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-left text-xs text-muted-foreground">
-								<Info className="h-5 w-5 shrink-0 text-muted-foreground" />
+						{!isAssigned ? (
+							<div className="mb-4 flex items-start gap-3 rounded-lg border border-destructive/25 bg-destructive/5 p-4 text-left text-xs text-destructive">
+								<Info className="h-5 w-5 shrink-0 text-destructive" />
 								<div>
-									<span className="mb-0.5 block font-semibold text-foreground">
-										Sin plantillas disponibles
+									<span className="mb-0.5 block font-semibold text-destructive">
+										Acceso no autorizado
 									</span>
-									No se encontraron plantillas para este tipo
-									de muestra y examen. Se creará un reporte en
-									blanco.
+									No estás asignado a esta muestra, por lo que no tienes permisos para iniciar o crear el reporte.
 								</div>
 							</div>
+						) : (
+							<>
+								{templates && templates.length > 0 ? (
+									<div className="mb-6 text-left">
+										<label className="mb-2 block text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+											Seleccionar Plantilla de Reporte
+										</label>
+										<Select
+											value={selectedTemplateId}
+											onValueChange={setSelectedTemplateId}
+										>
+											<SelectTrigger className="h-12 w-full text-foreground">
+												<SelectValue placeholder="Seleccione una plantilla..." />
+											</SelectTrigger>
+											<SelectContent className="max-h-[300px]">
+												{templates.map((temp) => (
+													<SelectItem
+														key={temp.id}
+														value={String(temp.id)}
+														className="group"
+													>
+														<div className="flex flex-row flex-nowrap gap-3 py-1 text-left">
+															<span className="text-sm font-medium text-foreground group-focus:text-white group-data-[highlighted]:text-white">
+																{temp.user?.name ||
+																	'Sin propietario'}
+															</span>
+															<span className="mt-0.5 text-xs text-muted-foreground group-focus:text-white/80 group-data-[highlighted]:text-white/80">
+																{
+																	temp.specimen_type
+																		?.name
+																}{' '}
+																-{' '}
+																{
+																	temp
+																		.specimen_type_examination
+																		?.name
+																}
+															</span>
+														</div>
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+								) : (
+									<div className="mb-6 flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-left text-xs text-muted-foreground">
+										<Info className="h-5 w-5 shrink-0 text-muted-foreground" />
+										<div>
+											<span className="mb-0.5 block font-semibold text-foreground">
+												Sin plantillas disponibles
+											</span>
+											No se encontraron plantillas para este tipo
+											de muestra y examen. Se creará un reporte en
+											blanco.
+										</div>
+									</div>
+								)}
+								<Button
+									size="lg"
+									onClick={handleCreateReport}
+									disabled={
+										templates &&
+										templates.length > 0 &&
+										!selectedTemplateId
+									}
+									className="w-full cursor-pointer font-semibold shadow-md shadow-primary/20 transition-transform hover:scale-[1.01] active:scale-[0.99]"
+								>
+									Crear Reporte
+								</Button>
+							</>
 						)}
-						<Button
-							size="lg"
-							onClick={handleCreateReport}
-							disabled={
-								templates &&
-								templates.length > 0 &&
-								!selectedTemplateId
-							}
-							className="w-full cursor-pointer font-semibold shadow-md shadow-primary/20 transition-transform hover:scale-[1.01] active:scale-[0.99]"
-						>
-							Crear Reporte
-						</Button>
 					</div>
 				</div>
 			</EditorLayout>
