@@ -26,6 +26,8 @@ import {
 import { index as caiRangesIndex } from '@/actions/App/Http/Controllers/CaiRangeController';
 import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
 import { index as customersIndex } from '@/actions/App/Http/Controllers/CustomerController';
+import { index as cuttingCodesIndex } from '@/actions/App/Http/Controllers/CuttingCodeController';
+import { index as histotechnologistWorkOrdersIndex } from '@/actions/App/Http/Controllers/HistotechnologistWorkOrderController';
 import { index as inventoriesIndex } from '@/actions/App/Http/Controllers/InventoryController';
 import { index as inventoryMovementsIndex } from '@/actions/App/Http/Controllers/InventoryMovementController';
 import { index as inventoryProvidersIndex } from '@/actions/App/Http/Controllers/InventoryProviderController';
@@ -34,7 +36,6 @@ import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceCo
 import { index as locationsIndex } from '@/actions/App/Http/Controllers/LocationController';
 import { index as myAssignmentsIndex } from '@/actions/App/Http/Controllers/MyAssignmentController';
 import { index as myWorkOrdersIndex } from '@/actions/App/Http/Controllers/MyWorkOrderController';
-import { index as histotechnologistWorkOrdersIndex } from '@/actions/App/Http/Controllers/HistotechnologistWorkOrderController';
 import { index as productsIndex } from '@/actions/App/Http/Controllers/ProductController';
 import { index as referrersIndex } from '@/actions/App/Http/Controllers/ReferrerController';
 import { index as referrerTypesIndex } from '@/actions/App/Http/Controllers/ReferrerTypeController';
@@ -42,7 +43,6 @@ import { index as rentalsIndex } from '@/actions/App/Http/Controllers/RentalCont
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
 import { index as sequencesIndex } from '@/actions/App/Http/Controllers/SequenceController';
 import { index as settingsSystemIndex } from '@/actions/App/Http/Controllers/SettingController';
-import { index as cuttingCodesIndex } from '@/actions/App/Http/Controllers/CuttingCodeController';
 import { index as specimenCategoriesIndex } from '@/actions/App/Http/Controllers/SpecimenCategoryController';
 import { index as specimensIndex } from '@/actions/App/Http/Controllers/SpecimenController';
 import { index as specimenTypesIndex } from '@/actions/App/Http/Controllers/SpecimenTypeController';

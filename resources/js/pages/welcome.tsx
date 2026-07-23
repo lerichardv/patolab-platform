@@ -40,7 +40,7 @@ export default function Welcome() {
                     <div className="mt-4 flex flex-col gap-4 sm:flex-row">
                         {auth.user ? (
                             <Link
-                                href={dashboard()}
+                                href={dashboard().url}
                                 className="inline-flex h-12 items-center justify-center rounded-xl border-2 border-[rgba(156,163,175,0.5)] bg-gradient-to-r from-[rgba(34,197,94,0.1)] to-[rgba(59,130,246,0.1)] px-8 text-sm font-semibold text-[rgb(30,64,175)] shadow-sm transition-all hover:scale-105 dark:border-[rgba(156,163,175,0.4)] dark:from-[rgba(74,222,128,0.15)] dark:to-[rgba(96,165,250,0.15)] dark:text-[rgb(147,197,253)]"
                             >
                                 Ir al Dashboard
@@ -48,13 +48,13 @@ export default function Welcome() {
                         ) : (
                             <>
                                 <Link
-                                    href={login()}
+                                    href={login().url}
                                     className="inline-flex h-12 items-center justify-center rounded-xl border-2 border-[rgba(156,163,175,0.5)] bg-gradient-to-r from-[rgba(34,197,94,0.1)] to-[rgba(59,130,246,0.1)] px-8 text-sm font-semibold text-[rgb(30,64,175)] shadow-sm transition-all hover:scale-105 dark:border-[rgba(156,163,175,0.4)] dark:from-[rgba(74,222,128,0.15)] dark:to-[rgba(96,165,250,0.15)] dark:text-[rgb(147,197,253)]"
                                 >
                                     Iniciar sesión
                                 </Link>
                                 <Link
-                                    href={register()}
+                                    href={register().url}
                                     className="inline-flex h-12 items-center justify-center rounded-xl border-2 border-border/50 bg-background px-8 text-sm font-semibold text-foreground shadow-sm transition-all hover:scale-105 hover:border-[rgba(156,163,175,0.5)] hover:bg-gradient-to-r hover:from-[rgba(34,197,94,0.1)] hover:to-[rgba(59,130,246,0.1)] hover:text-[rgb(30,64,175)] dark:hover:from-[rgba(74,222,128,0.15)] dark:hover:to-[rgba(96,165,250,0.15)] dark:hover:text-[rgb(147,197,253)]"
                                 >
                                     Crear cuenta

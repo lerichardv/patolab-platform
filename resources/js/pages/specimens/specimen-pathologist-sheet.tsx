@@ -69,6 +69,7 @@ export default function SpecimenPathologistSheet({
 
     const availableCollaborators = useMemo(() => {
         const sourceList = usersList.length > 0 ? usersList : pathologists;
+
         return sourceList.filter(
             (p) =>
                 !assignedCollaboratorIds.includes(p.id) &&

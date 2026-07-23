@@ -99,7 +99,7 @@ export default function Register() {
 
                         <div className="text-center text-sm text-muted-foreground">
                             ¿Ya tiene una cuenta?{' '}
-                            <TextLink href={login()} tabIndex={6}>
+                            <TextLink href={login().url} tabIndex={6}>
                                 Inicie sesión
                             </TextLink>
                         </div>

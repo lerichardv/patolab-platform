@@ -106,6 +106,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
 
         if (!data.phone || data.phone.trim() === '') {
             setError('phone', 'El campo teléfono es obligatorio.');
+
             return;
         }
 

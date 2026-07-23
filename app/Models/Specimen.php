@@ -71,6 +71,7 @@ class Specimen extends Model
         'report_id',
         'cancellation_reason',
         'cancelled_at',
+        'cancelled_by_id',
     ];
 
     protected $casts = [
@@ -82,6 +83,11 @@ class Specimen extends Model
     protected $appends = [
         'status_color',
     ];
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by_id');
+    }
 
     public function getStatusColorAttribute(): string
     {

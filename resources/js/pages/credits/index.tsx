@@ -1212,9 +1212,23 @@ export default function CreditsIndex({
                 group={selectedGroupForView}
                 open={isGroupViewSheetOpen}
                 onOpenChange={setIsGroupViewSheetOpen}
+                onViewSpecimenClick={(specimen) => {
+                    const specimenWithInvoice = {
+                        ...specimen,
+                        customerRelation:
+                            specimen.customerRelation ||
+                            selectedGroupForView?.customer,
+                        invoiceRelation: selectedGroupForView?.invoice,
+                        invoice_relation: selectedGroupForView?.invoice,
+                    };
+                    setIsGroupViewSheetOpen(false);
+                    setSelectedSpecimenForView(specimenWithInvoice);
+                    setIsSpecimenViewSheetOpen(true);
+                }}
             />
 
             <SpecimenViewSheet
+                specimenId={selectedSpecimenForView?.id}
                 specimen={selectedSpecimenForView}
                 open={isSpecimenViewSheetOpen}
                 onOpenChange={setIsSpecimenViewSheetOpen}

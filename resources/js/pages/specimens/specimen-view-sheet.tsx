@@ -24,61 +24,29 @@ import {
     Loader2,
     ClipboardList,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import HeadingSheet from '@/components/heading-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 interface Props {
-    specimen: any | null;
+    specimenId?: number | null;
+    specimen?: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onEditClick: () => void;
+    onEditClick?: () => void;
     preventCloseOnOutsideClick?: boolean;
     onEditInvoiceClick?: (invoice: any) => void;
     onAssignPathologistClick?: () => void;
 }
 
-const findSpecimenInProps = (
-    obj: any,
-    id: number,
-    visited = new Set(),
-): any => {
-    if (!obj || typeof obj !== 'object') {
-        return null;
-    }
-
-    if (visited.has(obj)) {
-        return null;
-    }
-
-    visited.add(obj);
-
-    if (obj.id === id && typeof obj.sequence_code === 'string') {
-        return obj;
-    }
-
-    for (const key of Object.keys(obj)) {
-        try {
-            const val = obj[key];
-            const result = findSpecimenInProps(val, id, visited);
-
-            if (result) {
-                return result;
-            }
-        } catch {
-            // Ignore potential getter errors
-        }
-    }
-
-    return null;
-};
-
 export default function SpecimenViewSheet({
+    specimenId: initialSpecimenId,
     specimen: initialSpecimen,
     open,
     onOpenChange,
@@ -90,15 +58,53 @@ export default function SpecimenViewSheet({
     const pageProps = usePage<any>().props;
     const { auth } = pageProps;
 
+    const targetId = initialSpecimenId || initialSpecimen?.id;
+
+    const [fetchedSpecimen, setFetchedSpecimen] = useState<any | null>(null);
+    const [loading, setLoading] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (open && targetId) {
+            setLoading(true);
+            fetch(`/specimens/${targetId}`, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
+                .then((res) => {
+                    if (!res.ok) {
+throw new Error('Error al cargar la muestra');
+}
+
+                    return res.json();
+                })
+                .then((data) => {
+                    setFetchedSpecimen(data);
+                })
+                .catch((err) => {
+                    console.error('Error fetching specimen details:', err);
+                })
+                .finally(() => {
+                    setLoading(false);
+                });
+        } else if (!open) {
+            setFetchedSpecimen(null);
+            setLoading(false);
+        }
+    }, [open, targetId]);
+
     const specimen = useMemo(() => {
-        if (!initialSpecimen) {
-            return null;
+        if (fetchedSpecimen) {
+            return fetchedSpecimen;
         }
 
-        const found = findSpecimenInProps(pageProps, initialSpecimen.id);
+        if (initialSpecimen) {
+            return initialSpecimen;
+        }
 
-        return found || initialSpecimen;
-    }, [pageProps, initialSpecimen]);
+        return null;
+    }, [initialSpecimen, fetchedSpecimen]);
 
     const [copied, setCopied] = useState(false);
     const [copiedGroup, setCopiedGroup] = useState(false);
@@ -159,8 +165,11 @@ export default function SpecimenViewSheet({
     const invoice =
         specimen.is_group && specimen.group && specimen.group.invoice
             ? specimen.group.invoice
-            : specimen.invoice_relation;
-    const credit = invoice?.credit_relation;
+            : specimen.invoice_relation || specimen.invoiceRelation;
+    const credit = invoice?.credit_relation || invoice?.creditRelation;
+
+    const customerRelation =
+        specimen.customer_relation || specimen.customerRelation;
 
     const formattedDate = specimen.created_at
         ? format(new Date(specimen.created_at), "dd 'de' MMMM, yyyy - HH:mm", {
@@ -409,14 +418,18 @@ export default function SpecimenViewSheet({
                                         Editar Factura
                                     </Button>
                                 )}
-                            {auth.permissions?.includes('specimens.edit') && (
-                                <Button
-                                    onClick={onEditClick}
-                                    className="flex items-center gap-2"
-                                >
-                                    <Edit className="h-4 w-4" /> Editar Muestra
-                                </Button>
-                            )}
+                            {onEditClick &&
+                                auth.permissions?.includes(
+                                    'specimens.edit',
+                                ) && (
+                                    <Button
+                                        onClick={onEditClick}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <Edit className="h-4 w-4" /> Editar
+                                        Muestra
+                                    </Button>
+                                )}
                         </div>
                     </div>
 
@@ -568,8 +581,7 @@ export default function SpecimenViewSheet({
                                             Paciente
                                         </span>
                                         <p className="text-sm font-medium">
-                                            {specimen.customer_relation?.name ||
-                                                'N/A'}
+                                            {customerRelation?.name || 'N/A'}
                                         </p>
                                     </div>
                                     <div className="space-y-1">
@@ -906,7 +918,13 @@ export default function SpecimenViewSheet({
                                         )}
                                 </div>
                                 <Separator />
-                                {specimen.users && specimen.users.length > 0 ? (
+                                {loading ? (
+                                    <div className="space-y-3">
+                                        <Skeleton className="h-8 w-full" />
+                                        <Skeleton className="h-8 w-full" />
+                                    </div>
+                                ) : specimen.users &&
+                                  specimen.users.length > 0 ? (
                                     <div className="overflow-hidden rounded-lg border border-border/85 bg-muted/5">
                                         <table className="w-full border-collapse text-left text-sm">
                                             <thead>
@@ -1037,8 +1055,13 @@ export default function SpecimenViewSheet({
                                         )}
                                 </div>
                                 <Separator />
-                                {specimen.collaborators &&
-                                specimen.collaborators.length > 0 ? (
+                                {loading ? (
+                                    <div className="space-y-3">
+                                        <Skeleton className="h-8 w-full" />
+                                        <Skeleton className="h-8 w-full" />
+                                    </div>
+                                ) : specimen.collaborators &&
+                                  specimen.collaborators.length > 0 ? (
                                     <div className="overflow-hidden rounded-lg border border-border/85 bg-muted/5">
                                         <table className="w-full border-collapse text-left text-sm">
                                             <thead>
@@ -1150,112 +1173,114 @@ export default function SpecimenViewSheet({
                                     Órdenes de Trabajo
                                 </h3>
                                 <Separator />
-                                {specimen.work_orders &&
-                                specimen.work_orders.length > 0 ? (
+                                {loading ? (
                                     <div className="space-y-3">
-                                        {specimen.work_orders.map(
-                                            (order: any) => {
-                                                const priorityLabel =
-                                                    order.priority === 1
-                                                        ? 'Alta'
-                                                        : order.priority === 2
-                                                          ? 'Media'
-                                                          : 'Baja';
+                                        <Skeleton className="h-12 w-full" />
+                                        <Skeleton className="h-12 w-full" />
+                                    </div>
+                                ) : (specimen.work_orders ||
+                                      specimen.workOrders) &&
+                                  (specimen.work_orders || specimen.workOrders)
+                                      .length > 0 ? (
+                                    <div className="space-y-3">
+                                        {(
+                                            specimen.work_orders ||
+                                            specimen.workOrders
+                                        ).map((order: any) => {
+                                            const priorityLabel =
+                                                order.priority === 1
+                                                    ? 'Alta'
+                                                    : order.priority === 2
+                                                      ? 'Media'
+                                                      : 'Baja';
 
-                                                const priorityColor =
-                                                    order.priority === 1
-                                                        ? 'bg-orange-500 text-white animate-pulse'
-                                                        : order.priority === 2
-                                                          ? 'bg-yellow-500 text-black'
-                                                          : 'bg-green-500 text-white';
+                                            const priorityColor =
+                                                order.priority === 1
+                                                    ? 'bg-orange-500 text-white animate-pulse'
+                                                    : order.priority === 2
+                                                      ? 'bg-yellow-500 text-black'
+                                                      : 'bg-green-500 text-white';
 
-                                                return (
-                                                    <div
-                                                        key={order.id}
-                                                        className="flex flex-col gap-3 rounded-lg border border-border/80 bg-muted/5 p-3.5 transition-colors hover:bg-muted/10"
-                                                    >
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div>
-                                                                <p className="text-sm font-semibold text-foreground">
-                                                                    {order.type
-                                                                        ?.name ||
-                                                                        'Tipo Desconocido'}
-                                                                </p>
-                                                                {order.due_date && (
-                                                                    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                                                                        <Clock className="h-3 w-3" />
-                                                                        Vence:{' '}
-                                                                        {format(
-                                                                            new Date(
-                                                                                order.due_date,
-                                                                            ),
-                                                                            'dd/MM/yyyy HH:mm',
-                                                                            {
-                                                                                locale: es,
-                                                                            },
-                                                                        )}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex shrink-0 flex-col items-end gap-1.5">
-                                                                <span className="inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold text-primary uppercase">
-                                                                    {
-                                                                        order.status
-                                                                    }
-                                                                </span>
-                                                                <span
-                                                                    className={cn(
-                                                                        'inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase',
-                                                                        priorityColor,
-                                                                    )}
-                                                                >
-                                                                    {
-                                                                        priorityLabel
-                                                                    }
-                                                                </span>
-                                                            </div>
-                                                        </div>
-
-                                                        {order.comments && (
-                                                            <p className="rounded bg-muted/40 p-2 text-xs text-muted-foreground italic">
-                                                                "
-                                                                {order.comments}
-                                                                "
+                                            return (
+                                                <div
+                                                    key={order.id}
+                                                    className="flex flex-col gap-3 rounded-lg border border-border/80 bg-muted/5 p-3.5 transition-colors hover:bg-muted/10"
+                                                >
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div>
+                                                            <p className="text-sm font-semibold text-foreground">
+                                                                {order.type
+                                                                    ?.name ||
+                                                                    'Tipo Desconocido'}
                                                             </p>
-                                                        )}
-
-                                                        {order.users &&
-                                                            order.users.length >
-                                                                0 && (
-                                                                <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
-                                                                    <span className="text-[10px] font-medium text-muted-foreground">
-                                                                        Técnicos
-                                                                        Asignados:
-                                                                    </span>
-                                                                    <div className="flex flex-wrap gap-1">
-                                                                        {order.users.map(
-                                                                            (
-                                                                                u: any,
-                                                                            ) => (
-                                                                                <span
-                                                                                    key={
-                                                                                        u.id
-                                                                                    }
-                                                                                    className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground"
-                                                                                >
-                                                                                    {
-                                                                                        u.name
-                                                                                    }
-                                                                                </span>
-                                                                            ),
-                                                                        )}
-                                                                    </div>
-                                                                </div>
+                                                            {order.due_date && (
+                                                                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                                    <Clock className="h-3 w-3" />
+                                                                    Vence:{' '}
+                                                                    {format(
+                                                                        new Date(
+                                                                            order.due_date,
+                                                                        ),
+                                                                        'dd/MM/yyyy HH:mm',
+                                                                        {
+                                                                            locale: es,
+                                                                        },
+                                                                    )}
+                                                                </p>
                                                             )}
+                                                        </div>
+                                                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                                            <span className="inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold text-primary uppercase">
+                                                                {order.status}
+                                                            </span>
+                                                            <span
+                                                                className={cn(
+                                                                    'inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase',
+                                                                    priorityColor,
+                                                                )}
+                                                            >
+                                                                {priorityLabel}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                );
-                                            },
-                                        )}
+
+                                                    {order.comments && (
+                                                        <p className="rounded bg-muted/40 p-2 text-xs text-muted-foreground italic">
+                                                            "{order.comments}"
+                                                        </p>
+                                                    )}
+
+                                                    {order.users &&
+                                                        order.users.length >
+                                                            0 && (
+                                                            <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
+                                                                <span className="text-[10px] font-medium text-muted-foreground">
+                                                                    Técnicos
+                                                                    Asignados:
+                                                                </span>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {order.users.map(
+                                                                        (
+                                                                            u: any,
+                                                                        ) => (
+                                                                            <span
+                                                                                key={
+                                                                                    u.id
+                                                                                }
+                                                                                className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground"
+                                                                            >
+                                                                                {
+                                                                                    u.name
+                                                                                }
+                                                                            </span>
+                                                                        ),
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-6 text-center">
@@ -1267,7 +1292,17 @@ export default function SpecimenViewSheet({
                                 )}
                             </div>
 
-                            {invoice ? (
+                            {loading ? (
+                                <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                    <Skeleton className="h-6 w-48" />
+                                    <Separator />
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-4 w-full" />
+                                        <Skeleton className="h-4 w-full" />
+                                        <Skeleton className="h-4 w-3/4" />
+                                    </div>
+                                </div>
+                            ) : invoice ? (
                                 <>
                                     {auth.permissions?.includes(
                                         'invoices.view',
@@ -1281,46 +1316,63 @@ export default function SpecimenViewSheet({
 
                                             <div className="space-y-4">
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    {(specimen.cancelled_at ||
-                                                        specimen.cancellation_reason) && (
-                                                        <div className="col-span-1 rounded-md border border-destructive/30 bg-destructive/5 p-3 sm:col-span-2">
-                                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
-                                                                <AlertCircle className="h-4 w-4" />
-                                                                <span>
-                                                                    Detalles de
-                                                                    Cancelación
-                                                                </span>
-                                                            </div>
-                                                            <div className="mt-2 space-y-1 text-xs">
-                                                                {specimen.cancelled_at && (
-                                                                    <div className="text-muted-foreground">
-                                                                        <span className="font-medium text-foreground">
-                                                                            Fecha:
-                                                                        </span>{' '}
-                                                                        {format(
-                                                                            new Date(
-                                                                                specimen.cancelled_at,
-                                                                            ),
-                                                                            "dd 'de' MMMM, yyyy - HH:mm",
+                                                    {specimen.status ===
+                                                        'cancelled' &&
+                                                        (specimen.cancelled_at ||
+                                                            specimen.cancellation_reason ||
+                                                            specimen.cancelled_by) && (
+                                                            <div className="col-span-1 rounded-md border border-destructive/30 bg-destructive/5 p-3 sm:col-span-2">
+                                                                <div className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
+                                                                    <AlertCircle className="h-4 w-4" />
+                                                                    <span>
+                                                                        Detalles
+                                                                        de
+                                                                        Cancelación
+                                                                    </span>
+                                                                </div>
+                                                                <div className="mt-2 space-y-1 text-xs">
+                                                                    {specimen.cancelled_at && (
+                                                                        <div className="text-muted-foreground">
+                                                                            <span className="font-medium text-foreground">
+                                                                                Fecha:
+                                                                            </span>{' '}
+                                                                            {format(
+                                                                                new Date(
+                                                                                    specimen.cancelled_at,
+                                                                                ),
+                                                                                "dd 'de' MMMM, yyyy - HH:mm",
+                                                                                {
+                                                                                    locale: es,
+                                                                                },
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                    {specimen.cancelled_by && (
+                                                                        <div className="text-muted-foreground">
+                                                                            <span className="font-medium text-foreground">
+                                                                                Cancelado
+                                                                                por:
+                                                                            </span>{' '}
                                                                             {
-                                                                                locale: es,
-                                                                            },
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                                {specimen.cancellation_reason && (
-                                                                    <div className="text-muted-foreground">
-                                                                        <span className="font-medium text-foreground">
-                                                                            Motivo:
-                                                                        </span>{' '}
-                                                                        {
-                                                                            specimen.cancellation_reason
-                                                                        }
-                                                                    </div>
-                                                                )}
+                                                                                specimen
+                                                                                    .cancelled_by
+                                                                                    .name
+                                                                            }
+                                                                        </div>
+                                                                    )}
+                                                                    {specimen.cancellation_reason && (
+                                                                        <div className="text-muted-foreground">
+                                                                            <span className="font-medium text-foreground">
+                                                                                Motivo:
+                                                                            </span>{' '}
+                                                                            {
+                                                                                specimen.cancellation_reason
+                                                                            }
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    )}
+                                                        )}
                                                     <div className="space-y-1">
                                                         <span className="text-xs text-muted-foreground">
                                                             Número de Factura

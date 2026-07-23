@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import AuthLayout from '@/layouts/auth-layout';
 import { login as loginRoute, register } from '@/routes';
 import { request as forgotPassword } from '@/routes/password';
 
@@ -64,7 +63,7 @@ export default function Login({
                             <Label htmlFor="password">Contraseña</Label>
                             {canResetPassword && (
                                 <Link
-                                    href={forgotPassword()}
+                                    href={forgotPassword().url}
                                     className="text-sm text-muted-foreground hover:text-primary"
                                 >
                                     ¿Olvidó su contraseña?
@@ -114,7 +113,7 @@ export default function Login({
                 <div className="text-center text-sm text-muted-foreground">
                     ¿No tiene una cuenta?{' '}
                     <Link
-                        href={register()}
+                        href={register().url}
                         className="underline underline-offset-4 hover:text-primary"
                     >
                         Regístrese

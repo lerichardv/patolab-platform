@@ -324,6 +324,9 @@ export default function InvoicesIndex({
     const [selectedSpecimenForView, setSelectedSpecimenForView] = useState<
         any | null
     >(null);
+    const [selectedSpecimenIdForView, setSelectedSpecimenIdForView] = useState<
+        number | null
+    >(null);
     const [isSpecimenViewSheetOpen, setIsSpecimenViewSheetOpen] =
         useState(false);
 
@@ -349,9 +352,11 @@ export default function InvoicesIndex({
         if (invoice.group?.specimens && invoice.group.specimens.length > 0) {
             return invoice.group.specimens;
         }
+
         if (invoice.specimen || invoice.specimen_id) {
             return [invoice.specimen || { id: invoice.specimen_id }];
         }
+
         return [];
     };
 
@@ -1343,6 +1348,14 @@ export default function InvoicesIndex({
                                                                                     const specimenWithInvoice =
                                                                                         {
                                                                                             ...specimen,
+                                                                                            customerRelation:
+                                                                                                specimen.customer_relation ||
+                                                                                                specimen.customerRelation ||
+                                                                                                invoice.customer,
+                                                                                            customer_relation:
+                                                                                                specimen.customer_relation ||
+                                                                                                specimen.customerRelation ||
+                                                                                                invoice.customer,
                                                                                             invoice_relation:
                                                                                                 {
                                                                                                     ...invoice,
@@ -1350,6 +1363,12 @@ export default function InvoicesIndex({
                                                                                                         undefined,
                                                                                                 },
                                                                                         };
+                                                                                    setSelectedSpecimenIdForView(
+                                                                                        specimen.id,
+                                                                                    );
+                                                                                    setIsSpecimenViewSheetOpen(
+                                                                                        true,
+                                                                                    );
                                                                                     setSelectedSpecimen(
                                                                                         specimenWithInvoice,
                                                                                     );
@@ -1436,18 +1455,14 @@ export default function InvoicesIndex({
                                                                     size="icon"
                                                                     className="h-5 w-5 hover:bg-muted"
                                                                     onClick={() => {
-                                                                        const specimenWithInvoice =
-                                                                            {
-                                                                                ...invoice.specimen,
-                                                                                invoice_relation:
-                                                                                    {
-                                                                                        ...invoice,
-                                                                                        specimen:
-                                                                                            undefined,
-                                                                                    },
-                                                                            };
+                                                                        setSelectedSpecimenIdForView(
+                                                                            invoice.specimen_id ||
+                                                                                invoice
+                                                                                    .specimen
+                                                                                    ?.id,
+                                                                        );
                                                                         setSelectedSpecimenForView(
-                                                                            specimenWithInvoice,
+                                                                            invoice.specimen,
                                                                         );
                                                                         setIsSpecimenViewSheetOpen(
                                                                             true,
@@ -1989,6 +2004,9 @@ export default function InvoicesIndex({
             />
 
             <SpecimenViewSheet
+                specimenId={
+                    selectedSpecimenIdForView || selectedSpecimenForView?.id
+                }
                 specimen={selectedSpecimenForView}
                 open={isSpecimenViewSheetOpen}
                 onOpenChange={setIsSpecimenViewSheetOpen}
@@ -2003,6 +2021,20 @@ export default function InvoicesIndex({
                 group={selectedGroupForView}
                 open={isGroupViewSheetOpen}
                 onOpenChange={setIsGroupViewSheetOpen}
+                onViewSpecimenClick={(specimen) => {
+                    const specimenWithInvoice = {
+                        ...specimen,
+                        customerRelation:
+                            specimen.customerRelation ||
+                            selectedGroupForView?.customer,
+                        invoiceRelation: selectedGroupForView?.invoice,
+                        invoice_relation: selectedGroupForView?.invoice,
+                    };
+                    setIsGroupViewSheetOpen(false);
+                    setSelectedSpecimenIdForView(specimen.id);
+                    setSelectedSpecimenForView(specimenWithInvoice);
+                    setIsSpecimenViewSheetOpen(true);
+                }}
             />
 
             <SpecimenGroupSheet

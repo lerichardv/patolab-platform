@@ -1503,6 +1503,7 @@ export default function MyAssignmentsIndex({
                                                                                 getDueDateInfo(
                                                                                     specimen,
                                                                                 );
+
                                                                             if (
                                                                                 !dueInfo ||
                                                                                 [

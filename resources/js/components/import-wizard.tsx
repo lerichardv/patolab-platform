@@ -645,9 +645,15 @@ export function ImportWizard({
 
     // ── Page title: show import % during step 3, completado on step 4 ──────────
     // Capture original title once on mount so re-renders don't overwrite it.
-    const originalTitleRef = useRef(document.title);
+    const originalTitleRef = useRef(
+        typeof document !== 'undefined' ? document.title : '',
+    );
 
     useEffect(() => {
+        if (typeof document === 'undefined') {
+return;
+}
+
         if (step === 3) {
             const status = paused ? '⏸ Pausado' : '⏳ Importando';
             document.title = `${progressPercentage}% — ${status} | ${title}`;

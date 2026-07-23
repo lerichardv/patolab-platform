@@ -147,7 +147,7 @@ class SpecimenController extends Controller
                 $q->whereDate('specimen.created_at', '<=', $dateToEnd);
             }
 
-            $q->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report'])
+            $q->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'cancelledBy'])
                 ->leftJoin(\DB::raw('(SELECT specimen_id, priority_id, MIN(`order`) as board_order FROM priorities_specimens_order GROUP BY specimen_id, priority_id) as pso'), function ($join) {
                     $join->on('specimen.id', '=', 'pso.specimen_id')
                         ->on('specimen.priority_id', '=', 'pso.priority_id');
@@ -1279,9 +1279,7 @@ class SpecimenController extends Controller
                 if ($value === 'cancelled') {
                     $updateData['cancellation_reason'] = $cancellationReason;
                     $updateData['cancelled_at'] = now();
-                } else {
-                    $updateData['cancellation_reason'] = null;
-                    $updateData['cancelled_at'] = null;
+                    $updateData['cancelled_by_id'] = auth()->id();
                 }
                 Specimen::whereIn('id', $ids)->update($updateData);
             } elseif ($action === 'change_priority') {
@@ -1395,6 +1393,35 @@ class SpecimenController extends Controller
             'specimen' => $specimen,
             'just_delivered' => $justDelivered,
         ]);
+    }
+
+    public function show(Specimen $specimen)
+    {
+        Gate::authorize('specimens.view');
+
+        $specimen->load([
+            'customerRelation',
+            'type',
+            'examination',
+            'category',
+            'referrerRelation',
+            'priority',
+            'invoiceRelation.creditRelation',
+            'invoiceRelation.transferBank',
+            'invoiceRelation.caiRange',
+            'users',
+            'collaborators',
+            'group.invoice.creditRelation',
+            'group.invoice.transferBank',
+            'group.invoice.caiRange',
+            'group.specimens',
+            'report',
+            'workOrders.task',
+            'workOrders.users',
+            'cancelledBy',
+        ]);
+
+        return response()->json($specimen);
     }
 
     public function generateReport(Specimen $specimen)

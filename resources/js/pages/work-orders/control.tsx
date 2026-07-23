@@ -45,6 +45,20 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Popover,
@@ -65,22 +79,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 import WorkOrderViewSheet from '../my-work-orders/work-order-view-sheet';
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command';
+import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 
 interface User {
     id: number;
@@ -215,6 +215,7 @@ const getDueDateInfo = (wo: WorkOrder) => {
                 same_day_cutoff_end
             ) {
                 const createdTime = format(createdAt, 'HH:mm:ss');
+
                 if (
                     createdTime >= same_day_cutoff_start &&
                     createdTime <= same_day_cutoff_end
@@ -350,6 +351,7 @@ export default function HistotechnologistWorkOrdersControl({
             setIsFullscreen(!!document.fullscreenElement);
         };
         document.addEventListener('fullscreenchange', handleFullscreenChange);
+
         return () => {
             document.removeEventListener(
                 'fullscreenchange',

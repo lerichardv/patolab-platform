@@ -23,13 +23,6 @@ import {
     editorStyles,
 } from '@/components/rich-text-editor';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
 import {
     Command,
     CommandEmpty,
@@ -45,6 +38,13 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface User {

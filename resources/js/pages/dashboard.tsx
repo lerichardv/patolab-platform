@@ -366,7 +366,7 @@ export default function Dashboard({
                                     </p>
                                     <div className="mt-4 flex justify-end border-t pt-4">
                                         <Link
-                                            href={invoicesIndex()}
+                                            href={invoicesIndex().url}
                                             className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 transition-all hover:gap-2 hover:underline dark:text-emerald-400"
                                         >
                                             Ver facturas{' '}
@@ -400,7 +400,7 @@ export default function Dashboard({
                                     </p>
                                     <div className="mt-4 flex justify-end border-t pt-4">
                                         <Link
-                                            href={customersIndex()}
+                                            href={customersIndex().url}
                                             className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 transition-all hover:gap-2 hover:underline dark:text-indigo-400"
                                         >
                                             Ver clientes{' '}
@@ -953,7 +953,7 @@ function TodaySpecimensList({
                             comenzar registrando una nueva muestra.
                         </p>
                         <Link
-                            href={specimensIndex()}
+                            href={specimensIndex().url}
                             className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
                         >
                             Ir a Muestras <ArrowRight className="size-3.5" />

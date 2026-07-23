@@ -9,6 +9,7 @@ import {
     FileImage,
     Copy,
     Check,
+    Eye,
 } from 'lucide-react';
 import * as React from 'react';
 import HeadingSheet from '@/components/heading-sheet';
@@ -21,21 +22,23 @@ interface Props {
     group: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onViewSpecimenClick?: (specimen: any) => void;
 }
 
 export default function SpecimenGroupViewSheet({
     group,
     open,
     onOpenChange,
+    onViewSpecimenClick,
 }: Props) {
-    if (!group) {
-        return null;
-    }
-
     const [copied, setCopied] = React.useState(false);
     const [copiedSpecimenId, setCopiedSpecimenId] = React.useState<
         number | null
     >(null);
+
+    if (!group) {
+        return null;
+    }
 
     const copyPublicLink = () => {
         if (!group.access_token) {
@@ -199,6 +202,21 @@ export default function SpecimenGroupViewSheet({
                                                                     specimen.sequence_code
                                                                 }
                                                             </span>
+                                                        )}
+                                                        {onViewSpecimenClick && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-5 w-5 hover:bg-muted"
+                                                                onClick={() =>
+                                                                    onViewSpecimenClick(
+                                                                        specimen,
+                                                                    )
+                                                                }
+                                                                title="Ver Muestra"
+                                                            >
+                                                                <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                            </Button>
                                                         )}
                                                         {isSpecPaid ===
                                                             true && (

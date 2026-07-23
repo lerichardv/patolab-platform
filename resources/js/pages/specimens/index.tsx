@@ -79,13 +79,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import InvoiceSheet from '../invoices/invoice-sheet';
@@ -658,10 +658,13 @@ export default function SpecimensIndex({
     };
 
     const confirmCancel = () => {
-        if (!specimenToCancel) return;
+        if (!specimenToCancel) {
+return;
+}
 
         if (!cancellationReason.trim()) {
             toast.error('El motivo de cancelación es obligatorio.');
+
             return;
         }
 
@@ -695,7 +698,9 @@ export default function SpecimensIndex({
     };
 
     const confirmReactivate = () => {
-        if (!specimenToReactivate) return;
+        if (!specimenToReactivate) {
+return;
+}
 
         router.post(
             '/specimens/bulk-action',
@@ -2551,7 +2556,10 @@ export default function SpecimensIndex({
                 open={isCancelDialogOpen}
                 onOpenChange={(open) => {
                     setIsCancelDialogOpen(open);
-                    if (!open) setCancellationReason('');
+
+                    if (!open) {
+setCancellationReason('');
+}
                 }}
             >
                 <AlertDialogContent>

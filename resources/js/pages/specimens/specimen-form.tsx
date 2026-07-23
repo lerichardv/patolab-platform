@@ -968,6 +968,7 @@ export default function SpecimenForm({
         if (specimen && specimen.report_id && isSpecimenTypeChanged) {
             const typeId = data.specimen_type;
             const examId = data.specimen_type_examination;
+
             if (typeId && examId) {
                 setIsLoadingTemplates(true);
                 fetch(
@@ -976,6 +977,7 @@ export default function SpecimenForm({
                     .then((res) => res.json())
                     .then((templatesList) => {
                         setAvailableTemplates(templatesList);
+
                         if (templatesList.length === 1) {
                             setData('template_id', String(templatesList[0].id));
                         } else {

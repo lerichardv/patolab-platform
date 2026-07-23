@@ -4,11 +4,11 @@ import { HocuspocusProvider } from '@hocuspocus/provider';
 import { Head, router } from '@inertiajs/react';
 
 import { ResizableNodeView, Extension, Node as TiptapNode } from '@tiptap/core';
+import BulletList from '@tiptap/extension-bullet-list';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
 import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
-import BulletList from '@tiptap/extension-bullet-list';
 import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
@@ -87,13 +87,13 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
 import {
     Popover,
     PopoverTrigger,
@@ -1538,6 +1538,7 @@ function EditorToolbar({
             .focus()
             .command(({ tr, state }) => {
                 const { from, to } = state.selection;
+
                 if (from === to) {
                     return false;
                 }
@@ -1561,6 +1562,7 @@ function EditorToolbar({
                 }
 
                 tr.insertText(newText, from, to);
+
                 return true;
             })
             .run();
@@ -1589,8 +1591,10 @@ function EditorToolbar({
             .focus()
             .command(({ tr, state, dispatch }) => {
                 const { $from } = state.selection;
+
                 for (let depth = $from.depth; depth > 0; depth--) {
                     const node = $from.node(depth);
+
                     if (node.type.name === 'bulletList') {
                         if (dispatch) {
                             const pos = $from.before(depth);
@@ -1599,9 +1603,11 @@ function EditorToolbar({
                                 listStyleType: style,
                             });
                         }
+
                         return true;
                     }
                 }
+
                 return false;
             })
             .run();
