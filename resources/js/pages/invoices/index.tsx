@@ -2172,6 +2172,17 @@ export default function InvoicesIndex({
                                         </p>
                                     </div>
 
+                                    {/* Notice about regenerated invoice */}
+                                    <div className="space-y-1.5 rounded-lg border border-amber-500/20 bg-amber-500/[0.03] p-4 dark:border-amber-900/30">
+                                        <h4 className="flex items-center gap-2 text-sm font-semibold text-amber-600 dark:text-amber-400">
+                                            <FileText className="h-4 w-4" />
+                                            Factura Cancelada
+                                        </h4>
+                                        <p className="text-xs text-muted-foreground leading-normal">
+                                            El archivo PDF de la factura se ha regenerado automáticamente con todos sus importes en cero (L. 0.00) y el sello "CANCELADO" en la parte inferior.
+                                        </p>
+                                    </div>
+
                                     <Separator />
 
                                     {/* Cancellation Details List */}

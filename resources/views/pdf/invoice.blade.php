@@ -675,7 +675,9 @@
                 <img class="round-seal" src="{{ public_path('images/sello.png') }}" alt="Sello PatoLab">
             @endif
 
-            @if($invoice->payment_type !== 'credit')
+            @if($invoice->invoice_type === 'cancelled')
+                <div class="pagado-stamp" style="border-color: #ef4444; color: #ef4444;">CANCELADO</div>
+            @elseif($invoice->payment_type !== 'credit')
                 <div class="pagado-stamp">PAGADO</div>
             @else
                 <div class="pagado-stamp" style="border-color: #ef4444; color: #ef4444;">AL CRÉDITO</div>

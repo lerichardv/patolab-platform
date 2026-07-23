@@ -635,47 +635,7 @@ class InvoiceController extends Controller
 
         if ($request->boolean('regenerate_pdf', true)) {
             try {
-                $invoice->load(['specimen.products', 'specimen.examination.prices', 'creditRelation', 'customer', 'caiRange', 'groupSpecimens.specimen.examination', 'groupSpecimens.specimen.customerRelation', 'groupSpecimens.specimen.examination.prices', 'groupSpecimens.specimen.products']);
-                $totalWords = $this->numberToSpanishWords($invoice->total);
-
-                $customer = $invoice->customer;
-                $caiRange = $invoice->caiRange;
-                $location = Location::find($caiRange->location_id);
-                $examination = null;
-                if ($invoice->specimen) {
-                    $examination = SpecimenTypeExamination::find($invoice->specimen->specimen_type_examination);
-                }
-
-                $htmlContent = view('pdf.invoice', compact('invoice', 'caiRange', 'customer', 'examination', 'location', 'totalWords'))->render();
-
-                if ($invoice->invoice_file && Storage::disk('public')->exists($invoice->invoice_file)) {
-                    Storage::disk('public')->delete($invoice->invoice_file);
-                }
-
-                $filename = 'invoice_'.$invoice->id.'_'.time().'.pdf';
-                $pdfPath = 'invoices/'.$filename;
-
-                $browsershot = Browsershot::html($htmlContent);
-
-                if (app()->environment('production')) {
-                    $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
-                        ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
-                        ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
-                        ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
-                }
-
-                $pdfContent = $browsershot->addChromiumArguments([
-                    'disable-crash-reporter',
-                    'disable-dev-shm-usage',
-                    'no-sandbox',
-                ])
-                    ->noSandbox()
-                    ->margins(10, 10, 10, 10)
-                    ->format('A4')
-                    ->pdf();
-
-                Storage::disk('public')->put($pdfPath, $pdfContent);
-                $invoice->update(['invoice_file' => $pdfPath]);
+                app(\App\Services\InvoicePdfService::class)->generateAndStoreInvoice($invoice);
             } catch (\Exception $e) {
                 \Log::warning('Error regenerating invoice PDF: '.$e->getMessage());
             }

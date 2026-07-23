@@ -840,3 +840,115 @@ test('specimen report updates template and resets Yjs state when specimen type i
     expect($dbReport->yjs_macroscopy_state)->toBeNull();
     expect($dbReport->yjs_microscopy_state)->toBeNull();
 });
+
+test('specimen bulk status cancellation updates invoice values to zero, deletes credit, and triggers pdf regeneration', function () {
+    $editRole = Role::create(['slug' => 'admin', 'name' => 'Admin']);
+    Gate::define('specimens.edit', fn () => true);
+
+    $user = User::factory()->create([
+        'role_id' => $editRole->id,
+        'active' => true,
+    ]);
+
+    $customer = Customer::factory()->create();
+    $location = Location::create(['name' => 'Principal', 'address' => 'Dirección', 'active' => true]);
+    $type = SpecimenType::create(['name' => 'Biopsia', 'active' => true]);
+    $examination = SpecimenTypeExamination::create([
+        'specimen_type' => $type->id,
+        'name' => 'Examen 1',
+        'code' => 'EX1',
+        'description' => 'Desc 1',
+        'active' => true,
+    ]);
+    $category = SpecimenCategory::create(['name' => 'Categoría', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Tipo de Referente', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Referente', 'referrer_type' => $referrerType->id, 'active' => true]);
+    $priority = Priority::create(['name' => 'Baja', 'color' => '#10b981', 'order' => 3, 'active' => true]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'BIO-0001-07-2026',
+        'customer' => $customer->id,
+        'location_id' => $location->id,
+        'specimen_type' => $type->id,
+        'specimen_type_examination' => $examination->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+        'anatomic_site' => 'Estómago',
+        'diagnosis' => 'Gastritis',
+        'active' => true,
+    ]);
+
+    $credit = Credit::create([
+        'customer_id' => $customer->id,
+        'credit_amount' => 500.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 500.00,
+        'specimen_id' => $specimen->id,
+    ]);
+
+    $caiRange = CaiRange::create([
+        'location_id' => $location->id,
+        'cai' => 'A1B2C3D4',
+        'full_prefix' => '000-001-01-',
+        'emission' => '000',
+        'establishment' => '001',
+        'document_type' => '01',
+        'start_number' => 1,
+        'end_number' => 1000,
+        'last_used_number' => 0,
+        'deadline' => '2027-12-31',
+        'status' => 'active',
+    ]);
+
+    $invoice = Invoice::create([
+        'full_invoice_number' => 'INV-001',
+        'invoice_number' => '001',
+        'cai_range_id' => $caiRange->id,
+        'customer_id' => $customer->id,
+        'specimen_id' => $specimen->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $credit->id,
+        'quantity' => 1,
+        'amount' => 500.00,
+        'discount' => 0.00,
+        'subtotal' => 500.00,
+        'total' => 500.00,
+        'total_paid' => 0.00,
+        'invoice_file' => 'invoices/some_test.pdf',
+    ]);
+
+    // Mock PDF service to avoid running Puppeteer
+    $pdfServiceMock = Mockery::mock(\App\Services\InvoicePdfService::class);
+    $pdfServiceMock->shouldReceive('generateAndStoreInvoice')
+        ->once()
+        ->with(Mockery::on(function ($arg) use ($invoice) {
+            return $arg->id === $invoice->id;
+        }))
+        ->andReturn('invoices/regenerated_test.pdf');
+    app()->instance(\App\Services\InvoicePdfService::class, $pdfServiceMock);
+
+    // Call bulkAction status update to 'cancelled'
+    $response = $this->actingAs($user)
+        ->post(route('specimens.bulk-action'), [
+            'ids' => [$specimen->id],
+            'action' => 'change_status',
+            'value' => 'cancelled',
+            'cancellation_reason' => 'Test cancellation reason',
+        ]);
+
+    $response->assertRedirect();
+    $specimen->refresh();
+    $invoice->refresh();
+
+    expect($specimen->status)->toBe('cancelled');
+    expect($specimen->cancellation_reason)->toBe('Test cancellation reason');
+
+    expect($invoice->invoice_type)->toBe('cancelled');
+    expect((float) $invoice->total)->toEqual(0.00);
+    expect((float) $invoice->amount)->toEqual(0.00);
+    expect((float) $invoice->subtotal)->toEqual(0.00);
+    expect($invoice->credit_payment_id)->toBeNull();
+
+    expect(Credit::find($credit->id))->toBeNull();
+});

@@ -538,40 +538,7 @@ class SpecimenController extends Controller
             }
 
             try {
-                $invoice->load(['specimen.products', 'creditRelation', 'specimen.type']);
-                $totalWords = $this->numberToSpanishWords($invoice->total);
-                $customer = Customer::findOrFail($specimen->customer);
-                $examination = SpecimenTypeExamination::findOrFail($specimen->specimen_type_examination);
-                $location = Location::findOrFail($caiRange->location_id);
-
-                $htmlContent = view('pdf.invoice', compact('invoice', 'caiRange', 'customer', 'examination', 'location', 'totalWords'))->render();
-
-                $filename = 'invoice_'.$invoice->id.'_'.time().'.pdf';
-                $pdfPath = 'invoices/'.$filename;
-
-                $browsershot = Browsershot::html($htmlContent);
-
-                if (app()->environment('production')) {
-                    $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
-                        ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
-                        ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
-                        ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
-                } elseif (env('PUPPETEER_EXECUTABLE_PATH')) {
-                    $browsershot->setChromePath(env('PUPPETEER_EXECUTABLE_PATH'));
-                }
-
-                $pdfContent = $browsershot->addChromiumArguments([
-                    'disable-crash-reporter',
-                    'disable-dev-shm-usage',
-                    'no-sandbox',
-                ])
-                    ->noSandbox()
-                    ->margins(10, 10, 10, 10)
-                    ->format('A4')
-                    ->pdf();
-
-                Storage::disk('public')->put($pdfPath, $pdfContent);
-                $invoice->update(['invoice_file' => $pdfPath]);
+                app(\App\Services\InvoicePdfService::class)->generateAndStoreInvoice($invoice);
             } catch (\Throwable $e) {
                 Log::warning('Error generating specimen invoice PDF: '.$e->getMessage());
             }
@@ -951,47 +918,7 @@ class SpecimenController extends Controller
 
         if ($request->boolean('regenerate_pdf', true) && $invoice) {
             try {
-                $invoice->load(['specimen.products', 'specimen.examination.prices', 'creditRelation', 'customer', 'caiRange', 'groupSpecimens.specimen.examination', 'groupSpecimens.specimen.customerRelation', 'groupSpecimens.specimen.examination.prices', 'groupSpecimens.specimen.products']);
-                $totalWords = $this->numberToSpanishWords($invoice->total);
-
-                $customer = $invoice->customer;
-                $caiRange = $invoice->caiRange;
-                $location = Location::find($caiRange->location_id);
-                $examination = null;
-                if ($invoice->specimen) {
-                    $examination = SpecimenTypeExamination::find($invoice->specimen->specimen_type_examination);
-                }
-
-                $htmlContent = view('pdf.invoice', compact('invoice', 'caiRange', 'customer', 'examination', 'location', 'totalWords'))->render();
-
-                if ($invoice->invoice_file && Storage::disk('public')->exists($invoice->invoice_file)) {
-                    Storage::disk('public')->delete($invoice->invoice_file);
-                }
-
-                $filename = 'invoice_'.$invoice->id.'_'.time().'.pdf';
-                $pdfPath = 'invoices/'.$filename;
-
-                $browsershot = Browsershot::html($htmlContent);
-
-                if (app()->environment('production')) {
-                    $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
-                        ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
-                        ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
-                        ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
-                }
-
-                $pdfContent = $browsershot->addChromiumArguments([
-                    'disable-crash-reporter',
-                    'disable-dev-shm-usage',
-                    'no-sandbox',
-                ])
-                    ->noSandbox()
-                    ->margins(10, 10, 10, 10)
-                    ->format('A4')
-                    ->pdf();
-
-                Storage::disk('public')->put($pdfPath, $pdfContent);
-                $invoice->update(['invoice_file' => $pdfPath]);
+                app(\App\Services\InvoicePdfService::class)->generateAndStoreInvoice($invoice);
             } catch (\Exception $e) {
                 \Log::warning('Error regenerating invoice PDF: '.$e->getMessage());
             }
@@ -1292,6 +1219,7 @@ class SpecimenController extends Controller
                     }
                     $allIds = $resolvedIds->unique()->toArray();
 
+                    $invoicesToRegenerate = [];
                     foreach ($allIds as $id) {
                         $specimen = Specimen::find($id);
                         if ($specimen) {
@@ -1321,6 +1249,7 @@ class SpecimenController extends Controller
                                     'invoice_type' => 'cancelled',
                                     'credit_payment_id' => null,
                                 ]);
+                                $invoicesToRegenerate[$invoice->id] = $invoice;
                             }
 
                             $credit = Credit::where('specimen_id', $specimen->id)->first();
@@ -1331,6 +1260,14 @@ class SpecimenController extends Controller
                             if ($credit) {
                                 $credit->delete();
                             }
+                        }
+                    }
+
+                    foreach ($invoicesToRegenerate as $invoiceToRegen) {
+                        try {
+                            app(\App\Services\InvoicePdfService::class)->generateAndStoreInvoice($invoiceToRegen);
+                        } catch (\Exception $e) {
+                            \Log::warning('Error regenerating invoice PDF during bulk cancellation: '.$e->getMessage());
                         }
                     }
                 }
