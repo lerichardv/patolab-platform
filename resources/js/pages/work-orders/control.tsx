@@ -1,12 +1,11 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { format } from 'date-fns';
+import { format, add, formatDistanceToNow, isPast } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
     Briefcase,
     Play,
     CheckCircle,
     Search,
-    MessageSquare,
     Clock,
     AlertCircle,
     Filter,
@@ -18,6 +17,7 @@ import {
     Plus,
     X,
     UserPlus,
+    CalendarClock,
 } from 'lucide-react';
 import * as React from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -120,6 +120,7 @@ interface WorkOrder {
     quantity: number;
     user_id: number | null;
     completed_by_id: number | null;
+    created_by_id: number | null;
     status: 'Enviada' | 'En Proceso' | 'Finalizada';
     priority: number; // 1 = Alta, 2 = Media, 3 = Baja
     comments: string | null;
@@ -141,7 +142,10 @@ interface WorkOrder {
     } | null;
     completed_by?: {
         name: string;
-    };
+    } | null;
+    created_by?: {
+        name: string;
+    } | null;
 }
 
 interface Props {
@@ -184,6 +188,106 @@ const STATUS_METADATA: Record<
     },
 };
 
+const getDueDateInfo = (wo: WorkOrder) => {
+    let dueDate: Date | null = null;
+
+    if (wo.due_date) {
+        dueDate = new Date(wo.due_date);
+    } else {
+        const targetConfig =
+            wo.task ||
+            wo.type ||
+            (wo.types && wo.types.length > 0 ? wo.types[0] : null);
+
+        if (targetConfig) {
+            const createdAt = new Date(wo.created_at);
+            const {
+                duration_unit,
+                duration_value,
+                same_day_rule_enabled,
+                same_day_cutoff_start,
+                same_day_cutoff_end,
+            } = targetConfig;
+
+            if (
+                same_day_rule_enabled &&
+                same_day_cutoff_start &&
+                same_day_cutoff_end
+            ) {
+                const createdTime = format(createdAt, 'HH:mm:ss');
+                if (
+                    createdTime >= same_day_cutoff_start &&
+                    createdTime <= same_day_cutoff_end
+                ) {
+                    dueDate = new Date(
+                        createdAt.getFullYear(),
+                        createdAt.getMonth(),
+                        createdAt.getDate(),
+                        23,
+                        59,
+                        59,
+                    );
+                }
+            }
+
+            if (!dueDate && duration_unit && duration_value) {
+                const unitMap: Record<string, string> = {
+                    minutes: 'minutes',
+                    hours: 'hours',
+                    days: 'days',
+                    weeks: 'weeks',
+                };
+                const duration = {
+                    [unitMap[duration_unit] || 'days']: duration_value,
+                };
+                dueDate = add(createdAt, duration);
+            }
+        }
+    }
+
+    if (!dueDate) {
+        return null;
+    }
+
+    const isCompleted = wo.status === 'Finalizada';
+
+    const dueDateFormatted = formatDistanceToNow(dueDate, {
+        addSuffix: true,
+        locale: es,
+    });
+    const fullDueDate = format(dueDate, 'dd/MM/yyyy HH:mm');
+
+    const isExpired = isPast(dueDate);
+    const isWithinOneDay =
+        dueDateFormatted.includes('1 día') ||
+        dueDateFormatted.includes('hora') ||
+        dueDateFormatted.includes('minuto');
+
+    let colorClass =
+        'bg-secondary text-secondary-foreground border-transparent';
+
+    if (!isCompleted) {
+        if (isExpired) {
+            colorClass =
+                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800/50';
+        } else if (isWithinOneDay) {
+            colorClass =
+                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800/50';
+        } else {
+            colorClass =
+                'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50';
+        }
+    }
+
+    return {
+        dueDateFormatted,
+        fullDueDate,
+        colorClass,
+        isExpired,
+        dueDate,
+    };
+};
+
 export default function HistotechnologistWorkOrdersControl({
     workOrders,
     technicians,
@@ -192,6 +296,7 @@ export default function HistotechnologistWorkOrdersControl({
     const { props } = usePage() as any;
     const containerRef = useRef<HTMLDivElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isDark, setIsDark] = useState(false);
 
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
         () => filters.status || ['Enviada', 'En Proceso', 'Finalizada'],
@@ -253,8 +358,31 @@ export default function HistotechnologistWorkOrdersControl({
         };
     }, []);
 
+    // Sync dark mode state client-side and react to mutations (theme changes)
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const updateDark = () => {
+            setIsDark(document.documentElement.classList.contains('dark'));
+        };
+
+        updateDark();
+
+        const observer = new MutationObserver(updateDark);
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class'],
+        });
+
+        return () => observer.disconnect();
+    }, []);
+
     const toggleFullscreen = () => {
-        if (!containerRef.current) return;
+        if (!containerRef.current) {
+            return;
+        }
 
         if (!document.fullscreenElement) {
             containerRef.current.requestFullscreen().catch((err) => {
@@ -370,7 +498,7 @@ export default function HistotechnologistWorkOrdersControl({
                     isFullscreen
                         ? 'h-screen w-screen overflow-y-auto p-6'
                         : 'h-full flex-1 p-4'
-                }`}
+                } ${isDark ? 'dark' : ''}`}
             >
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-2">
@@ -643,7 +771,7 @@ export default function HistotechnologistWorkOrdersControl({
                                     <TableHead className="w-[100px] text-center font-semibold">
                                         Prioridad
                                     </TableHead>
-                                    <TableHead className="w-[95px] text-center font-semibold">
+                                    <TableHead className="min-w-[170px] text-center font-semibold">
                                         Vencimiento
                                     </TableHead>
                                     <TableHead className="w-[100px] font-semibold">
@@ -658,7 +786,10 @@ export default function HistotechnologistWorkOrdersControl({
                                     <TableHead className="w-[80px] text-center font-semibold">
                                         Cantidad
                                     </TableHead>
-                                    <TableHead className="w-[100px] text-center font-semibold">
+                                    <TableHead className="w-[120px] text-left font-semibold">
+                                        Creado por
+                                    </TableHead>
+                                    <TableHead className="w-[400px] max-w-[400px] text-left font-semibold">
                                         Comentarios
                                     </TableHead>
                                     <TableHead className="sticky right-0 z-10 w-[150px] min-w-[150px] border-l border-border bg-card text-right font-semibold">
@@ -675,11 +806,11 @@ export default function HistotechnologistWorkOrdersControl({
                                         const sMeta =
                                             STATUS_METADATA[wo.status] ||
                                             STATUS_METADATA.Enviada;
-                                        const hasComments = !!wo.comments;
+                                        const dueInfo = getDueDateInfo(wo);
                                         const isOverdue = !!(
-                                            wo.due_date &&
-                                            wo.status !== 'Finalizada' &&
-                                            new Date(wo.due_date) <= new Date()
+                                            dueInfo &&
+                                            dueInfo.isExpired &&
+                                            wo.status !== 'Finalizada'
                                         );
 
                                         // Filter technicians not yet assigned to this work order
@@ -852,52 +983,80 @@ export default function HistotechnologistWorkOrdersControl({
                                                         </span>
                                                     </div>
                                                 </TableCell>
-                                                {/* Visual Day Calendar Tear-off Widget */}
+                                                {/* Visual Day Calendar Tear-off Widget + Inline Status Badge */}
                                                 <TableCell className="py-2.5">
-                                                    {wo.due_date ? (
-                                                        (() => {
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        {(() => {
                                                             const dueDate =
-                                                                new Date(
-                                                                    wo.due_date,
+                                                                dueInfo?.dueDate ||
+                                                                (wo.due_date
+                                                                    ? new Date(
+                                                                          wo.due_date,
+                                                                      )
+                                                                    : null);
+
+                                                            if (!dueDate) {
+                                                                return (
+                                                                    <span className="block text-center text-xs text-muted-foreground">
+                                                                        N/A
+                                                                    </span>
                                                                 );
+                                                            }
 
                                                             return (
-                                                                <div className="mx-auto flex max-w-[62px] min-w-[62px] flex-col items-center justify-center overflow-hidden rounded-md border border-muted-foreground/20 bg-background text-center shadow-xs">
-                                                                    <div
-                                                                        className="w-full py-0.5 text-[8.5px] leading-none font-bold tracking-wider text-white uppercase"
-                                                                        style={{
-                                                                            backgroundColor:
-                                                                                pMeta.color,
-                                                                        }}
-                                                                    >
-                                                                        {format(
-                                                                            dueDate,
-                                                                            'MMM',
-                                                                            {
-                                                                                locale: es,
-                                                                            },
-                                                                        )}
+                                                                <>
+                                                                    <div className="flex max-w-[62px] min-w-[62px] flex-col items-center justify-center overflow-hidden rounded-md border border-muted-foreground/20 bg-background text-center shadow-xs">
+                                                                        <div
+                                                                            className="w-full py-0.5 text-[8.5px] leading-none font-bold tracking-wider text-white uppercase"
+                                                                            style={{
+                                                                                backgroundColor:
+                                                                                    pMeta.color,
+                                                                            }}
+                                                                        >
+                                                                            {format(
+                                                                                dueDate,
+                                                                                'MMM',
+                                                                                {
+                                                                                    locale: es,
+                                                                                },
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="mt-0.5 px-1.5 py-0.5 text-base leading-none font-black text-foreground">
+                                                                            {format(
+                                                                                dueDate,
+                                                                                'dd',
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="mt-0.5 pb-1 text-[8.5px] leading-none text-muted-foreground">
+                                                                            {format(
+                                                                                dueDate,
+                                                                                'HH:mm',
+                                                                            )}
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="mt-0.5 px-1.5 py-0.5 text-base leading-none font-black text-foreground">
-                                                                        {format(
-                                                                            dueDate,
-                                                                            'dd',
+
+                                                                    {dueInfo &&
+                                                                        wo.status !==
+                                                                            'Finalizada' && (
+                                                                            <div
+                                                                                className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${dueInfo.colorClass}`}
+                                                                                title={`Vencimiento Estimado: ${dueInfo.fullDueDate}`}
+                                                                            >
+                                                                                <CalendarClock className="h-3 w-3 shrink-0" />
+                                                                                <span>
+                                                                                    {dueInfo.isExpired
+                                                                                        ? 'Vencida:'
+                                                                                        : 'Est:'}{' '}
+                                                                                    {
+                                                                                        dueInfo.dueDateFormatted
+                                                                                    }
+                                                                                </span>
+                                                                            </div>
                                                                         )}
-                                                                    </div>
-                                                                    <div className="mt-0.5 pb-1 text-[8.5px] leading-none text-muted-foreground">
-                                                                        {format(
-                                                                            dueDate,
-                                                                            'HH:mm',
-                                                                        )}
-                                                                    </div>
-                                                                </div>
+                                                                </>
                                                             );
-                                                        })()
-                                                    ) : (
-                                                        <span className="block text-center text-xs text-muted-foreground">
-                                                            N/A
-                                                        </span>
-                                                    )}
+                                                        })()}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="font-mono text-xs">
                                                     <div className="flex items-center gap-1.5">
@@ -969,30 +1128,16 @@ export default function HistotechnologistWorkOrdersControl({
                                                 <TableCell className="text-center font-semibold text-foreground">
                                                     {wo.quantity}
                                                 </TableCell>
-                                                <TableCell className="text-center">
-                                                    {hasComments ? (
-                                                        <Tooltip>
-                                                            <TooltipTrigger
-                                                                asChild
-                                                            >
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8 text-primary"
-                                                                >
-                                                                    <MessageSquare className="h-4 w-4" />
-                                                                </Button>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent className="max-w-xs">
-                                                                <p className="text-xs text-foreground">
-                                                                    {
-                                                                        wo.comments
-                                                                    }
-                                                                </p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground/45">
+                                                <TableCell className="text-left text-xs font-normal text-foreground">
+                                                    {wo.created_by?.name || (
+                                                        <span className="text-muted-foreground/45">
+                                                            -
+                                                        </span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="max-w-[400px] text-left text-xs font-normal break-words whitespace-normal">
+                                                    {wo.comments || (
+                                                        <span className="text-muted-foreground/45">
                                                             -
                                                         </span>
                                                     )}

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendSpecimenGroupEmailJob;
 use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
@@ -479,51 +480,57 @@ class SpecimenGroupController extends Controller
                 $caiRange->update(['status' => 'exhausted']);
             }
 
-            // Compile Group PDF Invoice
-            $invoice->load(['creditRelation']);
-            $totalWords = $this->numberToSpanishWords($invoice->total);
-            $customer = $globalCustomer;
-            $location = Location::findOrFail($caiRange->location_id);
+            try {
+                // Compile Group PDF Invoice
+                $invoice->load(['creditRelation']);
+                $totalWords = $this->numberToSpanishWords($invoice->total);
+                $customer = $globalCustomer;
+                $location = Location::findOrFail($caiRange->location_id);
 
-            // We pass the explicit specimens array to handle grouping inside layout
-            $htmlContent = view('pdf.invoice', [
-                'invoice' => $invoice,
-                'caiRange' => $caiRange,
-                'customer' => $customer,
-                'location' => $location,
-                'totalWords' => $totalWords,
-                'groupSpecimens' => $createdSpecimensDataForPdf,
-            ])->render();
+                // We pass the explicit specimens array to handle grouping inside layout
+                $htmlContent = view('pdf.invoice', [
+                    'invoice' => $invoice,
+                    'caiRange' => $caiRange,
+                    'customer' => $customer,
+                    'location' => $location,
+                    'totalWords' => $totalWords,
+                    'groupSpecimens' => $createdSpecimensDataForPdf,
+                ])->render();
 
-            $filename = 'invoice_'.$invoice->id.'_'.time().'.pdf';
-            $pdfPath = 'invoices/'.$filename;
+                $filename = 'invoice_'.$invoice->id.'_'.time().'.pdf';
+                $pdfPath = 'invoices/'.$filename;
 
-            $browsershot = Browsershot::html($htmlContent);
+                $browsershot = Browsershot::html($htmlContent);
 
-            if (app()->environment('production')) {
-                $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
-                    ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
-                    ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
-                    ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
+                if (app()->environment('production')) {
+                    $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
+                        ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
+                        ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
+                        ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
+                } elseif (env('PUPPETEER_EXECUTABLE_PATH')) {
+                    $browsershot->setChromePath(env('PUPPETEER_EXECUTABLE_PATH'));
+                }
+
+                $pdfContent = $browsershot->addChromiumArguments([
+                    'disable-crash-reporter',
+                    'disable-dev-shm-usage',
+                    'no-sandbox',
+                ])
+                    ->noSandbox()
+                    ->margins(10, 10, 10, 10)
+                    ->format('A4')
+                    ->pdf();
+
+                Storage::disk('public')->put($pdfPath, $pdfContent);
+                $invoice->update(['invoice_file' => $pdfPath]);
+            } catch (\Throwable $e) {
+                Log::warning('Error generating specimen group invoice PDF: '.$e->getMessage());
             }
-
-            $pdfContent = $browsershot->addChromiumArguments([
-                'disable-crash-reporter',
-                'disable-dev-shm-usage',
-                'no-sandbox',
-            ])
-                ->noSandbox()
-                ->margins(10, 10, 10, 10)
-                ->format('A4')
-                ->pdf();
-
-            Storage::disk('public')->put($pdfPath, $pdfContent);
-            $invoice->update(['invoice_file' => $pdfPath]);
         });
 
         // Enviar email del grupo de muestras al cliente principal
         try {
-            \App\Jobs\SendSpecimenGroupEmailJob::dispatch($group, 'created');
+            SendSpecimenGroupEmailJob::dispatch($group, 'created');
         } catch (\Exception $e) {
             Log::error('Error despachando el Job de email del grupo de muestras: '.$e->getMessage());
         }

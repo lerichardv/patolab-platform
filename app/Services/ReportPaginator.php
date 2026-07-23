@@ -532,9 +532,11 @@ class ReportPaginator
                     if ($itemHeight > $remaining) {
                         if ($currentHeight === 0.0) {
                             $startAttr = ($tag === 'ol' && $olStartIndex > 1) ? " start=\"{$olStartIndex}\"" : '';
+                            $listStyleAttr = ! empty($listData['listStyleType']) ? " data-list-style-type=\"{$listData['listStyleType']}\"" : '';
+                            $styleAttr = ! empty($listData['styleAttr']) ? " style=\"{$listData['styleAttr']}\"" : '';
                             $currentPage[] = [
                                 'type' => 'html',
-                                'html' => "<{$tag} class=\"section-content\"{$startAttr}>".$itemHtml."</{$tag}>",
+                                'html' => "<{$tag} class=\"section-content\"{$startAttr}{$listStyleAttr}{$styleAttr}>".$itemHtml."</{$tag}>",
                                 'height' => $itemHeight + 0.5 * $lineHeight,
                             ];
                             $currentHeight += $itemHeight + 0.5 * $lineHeight;
@@ -573,9 +575,11 @@ class ReportPaginator
                             $cost = $accumulatedHeight + ($isLastOfAll ? 0.5 * $lineHeight : 0.0);
 
                             $startAttr = ($tag === 'ol' && $olStartIndex > 1) ? " start=\"{$olStartIndex}\"" : '';
+                            $listStyleAttr = ! empty($listData['listStyleType']) ? " data-list-style-type=\"{$listData['listStyleType']}\"" : '';
+                            $styleAttr = ! empty($listData['styleAttr']) ? " style=\"{$listData['styleAttr']}\"" : '';
                             $currentPage[] = [
                                 'type' => 'html',
-                                'html' => "<{$tag} class=\"section-content\"{$startAttr}>".implode('', $itemsToFit)."</{$tag}>",
+                                'html' => "<{$tag} class=\"section-content\"{$startAttr}{$listStyleAttr}{$styleAttr}>".implode('', $itemsToFit)."</{$tag}>",
                                 'height' => $cost,
                             ];
                             $currentHeight += $cost;
@@ -993,13 +997,25 @@ class ReportPaginator
     public static function getImageHeight(string $blockHtml): float
     {
         preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $blockHtml, $srcMatch);
-        preg_match('/<img[^>]+height=["\'](\d+)["\']/i', $blockHtml, $heightMatch);
-        preg_match('/<img[^>]+width=["\'](\d+)["\']/i', $blockHtml, $widthMatch);
 
-        $height = isset($heightMatch[1]) ? (int) $heightMatch[1] : null;
-        $width = isset($widthMatch[1]) ? (int) $widthMatch[1] : null;
+        $attrWidth = null;
+        if (preg_match('/<img[^>]+width=["\'](\d+)["\']/i', $blockHtml, $wMatch)) {
+            $attrWidth = (int) $wMatch[1];
+        } elseif (preg_match('/width:\s*(\d+)px/i', $blockHtml, $swMatch)) {
+            $attrWidth = (int) $swMatch[1];
+        }
 
-        if (! $height && isset($srcMatch[1])) {
+        $attrHeight = null;
+        if (preg_match('/<img[^>]+height=["\'](\d+)["\']/i', $blockHtml, $hMatch)) {
+            $attrHeight = (int) $hMatch[1];
+        } elseif (preg_match('/height:\s*(\d+)px/i', $blockHtml, $shMatch)) {
+            $attrHeight = (int) $shMatch[1];
+        }
+
+        $rawWidth = null;
+        $rawHeight = null;
+
+        if (isset($srcMatch[1])) {
             $src = $srcMatch[1];
             $localPath = null;
 
@@ -1009,8 +1025,8 @@ class ReportPaginator
                     if ($imgData !== false) {
                         $info = @getimagesizefromstring($imgData);
                         if ($info) {
-                            $width = $info[0];
-                            $height = $info[1];
+                            $rawWidth = $info[0];
+                            $rawHeight = $info[1];
                         }
                     }
                 }
@@ -1027,35 +1043,52 @@ class ReportPaginator
                 if ($localPath && file_exists($localPath)) {
                     $info = @getimagesize($localPath);
                     if ($info) {
-                        $width = $info[0];
-                        $height = $info[1];
+                        $rawWidth = $info[0];
+                        $rawHeight = $info[1];
                     }
                 }
             }
         }
 
-        if ($height && $width) {
-            if ($width > 704) {
-                $height = (int) round($height * (704 / $width));
-            }
-            $heightMm = $height * 25.4 / 96;
+        $width = $attrWidth ?? $rawWidth ?? 704;
+        $height = $attrHeight;
 
-            return $heightMm + 7.94;
+        if (! $height) {
+            $aspect = ($rawWidth && $rawHeight && $rawWidth > 0) ? ($rawHeight / $rawWidth) : 1.0;
+            $height = (int) round($width * $aspect);
         }
 
-        return 47.64;
+        if ($width > 704) {
+            $height = (int) round($height * (704 / $width));
+        }
+
+        $heightMm = ($height * 25.4) / 96;
+
+        return $heightMm + 7.94;
     }
 
     public static function getImageAspectRatio(string $imgTag): float
     {
+        $attrWidth = null;
+        if (preg_match('/width=["\'](\d+)["\']/i', $imgTag, $wMatch)) {
+            $attrWidth = (int) $wMatch[1];
+        } elseif (preg_match('/width:\s*(\d+)px/i', $imgTag, $swMatch)) {
+            $attrWidth = (int) $swMatch[1];
+        }
+
+        $attrHeight = null;
+        if (preg_match('/height=["\'](\d+)["\']/i', $imgTag, $hMatch)) {
+            $attrHeight = (int) $hMatch[1];
+        } elseif (preg_match('/height:\s*(\d+)px/i', $imgTag, $shMatch)) {
+            $attrHeight = (int) $shMatch[1];
+        }
+
+        if ($attrWidth && $attrHeight && $attrWidth > 0) {
+            return $attrHeight / $attrWidth;
+        }
+
         preg_match('/src=["\']([^"\']+)["\']/i', $imgTag, $srcMatch);
-        preg_match('/height=["\'](\d+)["\']/i', $imgTag, $heightMatch);
-        preg_match('/width=["\'](\d+)["\']/i', $imgTag, $widthMatch);
-
-        $height = isset($heightMatch[1]) ? (int) $heightMatch[1] : null;
-        $width = isset($widthMatch[1]) ? (int) $widthMatch[1] : null;
-
-        if ((! $height || ! $width) && isset($srcMatch[1])) {
+        if (isset($srcMatch[1])) {
             $src = $srcMatch[1];
             $localPath = null;
 
@@ -1064,9 +1097,8 @@ class ReportPaginator
                     $imgData = @base64_decode($base64Matches[1]);
                     if ($imgData !== false) {
                         $info = @getimagesizefromstring($imgData);
-                        if ($info) {
-                            $width = $info[0];
-                            $height = $info[1];
+                        if ($info && $info[0] > 0) {
+                            return $info[1] / $info[0];
                         }
                     }
                 }
@@ -1082,16 +1114,11 @@ class ReportPaginator
 
                 if ($localPath && file_exists($localPath)) {
                     $info = @getimagesize($localPath);
-                    if ($info) {
-                        $width = $info[0];
-                        $height = $info[1];
+                    if ($info && $info[0] > 0) {
+                        return $info[1] / $info[0];
                     }
                 }
             }
-        }
-
-        if ($height && $width && $width > 0) {
-            return (float) $height / $width;
         }
 
         return 1.0;
@@ -1112,6 +1139,9 @@ class ReportPaginator
             return ['tag' => 'ul', 'items' => []];
         }
 
+        $listStyleType = $list->getAttribute('data-list-style-type') ?: null;
+        $styleAttr = $list->getAttribute('style') ?: null;
+
         $items = [];
         $liElements = $list->getElementsByTagName('li');
         foreach ($liElements as $li) {
@@ -1121,6 +1151,8 @@ class ReportPaginator
         return [
             'tag' => $tag,
             'items' => $items,
+            'listStyleType' => $listStyleType,
+            'styleAttr' => $styleAttr,
         ];
     }
 

@@ -138,7 +138,7 @@ class WorkOrderController extends Controller
             'work_order_type_id' => 'required|array|min:1',
             'work_order_type_id.*' => 'exists:work_order_types,id',
             'work_order_task_id' => 'required|exists:work_order_tasks,id',
-            'quantity' => 'nullable|integer|min:1',
+            'quantity' => 'nullable|integer|min:0',
             'user_ids' => 'nullable|array',
             'user_ids.*' => 'exists:users,id',
             'status' => 'required|in:Enviada,En Proceso,Finalizada',
@@ -186,6 +186,7 @@ class WorkOrderController extends Controller
                 'priority' => $validated['priority'],
                 'comments' => $validated['comments'] ?? null,
                 'due_date' => $dueDate,
+                'created_by_id' => auth()->id(),
             ]);
 
             // Sincronizar todos los usuarios/patólogos en la relación N:M

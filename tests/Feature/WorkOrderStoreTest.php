@@ -108,6 +108,7 @@ test('pathologist can create a work order', function () {
     // Check if work order was created in DB
     $workOrders = WorkOrder::all();
     expect($workOrders)->toHaveCount(1);
+    expect($workOrders->first()->created_by_id)->toBe($user->id);
 });
 
 test('pathologist can create a work order without assigning a technician', function () {
@@ -194,4 +195,5 @@ test('pathologist can create a work order without assigning a technician', funct
     $workOrders = WorkOrder::all();
     expect($workOrders)->toHaveCount(1);
     expect($workOrders->first()->user_id)->toBeNull();
+    expect($workOrders->first()->created_by_id)->toBe($user->id);
 });

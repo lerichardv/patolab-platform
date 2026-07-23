@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { store as storeWorkOrder } from '@/actions/App/Http/Controllers/WorkOrderController';
 import HeadingSheet from '@/components/heading-sheet';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Command,
@@ -15,8 +14,8 @@ import {
     CommandItem,
     CommandList,
 } from '@/components/ui/command';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberPicker } from '@/components/ui/number-picker';
 import {
     Popover,
     PopoverContent,
@@ -439,14 +438,11 @@ export default function WorkOrderForm({
 
                 <div className="grid gap-2">
                     <Label htmlFor="quantity">Cantidad</Label>
-                    <Input
+                    <NumberPicker
                         id="quantity"
-                        type="number"
-                        min="1"
                         value={data.quantity}
-                        onChange={(e) =>
-                            setData('quantity', parseInt(e.target.value) || 1)
-                        }
+                        onChange={(val) => setData('quantity', val)}
+                        min={0}
                     />
                     {errors.quantity && (
                         <p className="text-sm text-destructive">

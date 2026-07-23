@@ -89,6 +89,7 @@ class HistotechnologistWorkOrderController extends Controller
             'specimen.examination',
             'task',
             'completedBy',
+            'createdBy',
             'users',
         ])
             ->orderBy('priority', 'asc') // 1 = Alta, 2 = Media, 3 = Baja

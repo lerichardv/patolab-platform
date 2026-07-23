@@ -1071,9 +1071,9 @@ class ReportEditorController extends Controller
             ->where('user_id', $userId)
             ->exists()
             || DB::table('specimen_collaborators')
-            ->where('specimen_id', $specimen->id)
-            ->where('user_id', $userId)
-            ->exists();
+                ->where('specimen_id', $specimen->id)
+                ->where('user_id', $userId)
+                ->exists();
 
         if (! $isAssigned) {
             abort(403, 'No estás asignado a esta muestra y no puedes acceder al editor de reportes.');

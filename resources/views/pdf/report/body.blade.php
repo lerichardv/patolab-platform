@@ -230,6 +230,53 @@
             margin-bottom: 1.98mm;
         }
 
+        .section-content ul[data-list-style-type="disc"] {
+            list-style-type: disc;
+        }
+
+        .section-content ul[data-list-style-type="circle"] {
+            list-style-type: circle;
+        }
+
+        .section-content ul[data-list-style-type="square"] {
+            list-style-type: square;
+        }
+
+        .section-content ul[data-list-style-type="dash"],
+        .section-content ul[data-list-style-type="checkmark"],
+        .section-content ul[data-list-style-type="arrow"] {
+            list-style-type: none !important;
+        }
+
+        .section-content ul[data-list-style-type="dash"] > li,
+        .section-content ul[data-list-style-type="checkmark"] > li,
+        .section-content ul[data-list-style-type="arrow"] > li {
+            position: relative;
+        }
+
+        .section-content ul[data-list-style-type="dash"] > li::before {
+            content: "–";
+            position: absolute;
+            left: -4.2mm;
+        }
+
+        .section-content ul[data-list-style-type="checkmark"] > li::before {
+            content: "✓";
+            position: absolute;
+            left: -4.2mm;
+            color: #10b981;
+        }
+
+        .section-content ul[data-list-style-type="arrow"] > li::before {
+            content: "➢";
+            position: absolute;
+            left: -4.2mm;
+        }
+
+        .section-content ul[data-list-style-type="none"] {
+            list-style-type: none;
+        }
+
         .section-content ol {
             list-style-type: decimal;
             padding-left: 6.35mm;

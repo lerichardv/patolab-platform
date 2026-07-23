@@ -1,14 +1,19 @@
 <?php
 
 use App\Jobs\SendSpecimenEmailJob;
+use App\Jobs\SendSpecimenGroupEmailJob;
+use App\Models\CaiRange;
 use App\Models\Customer;
 use App\Models\Department;
+use App\Models\Invoice;
+use App\Models\Location;
 use App\Models\Municipality;
 use App\Models\Priority;
 use App\Models\Referrer;
 use App\Models\ReferrerType;
 use App\Models\Specimen;
 use App\Models\SpecimenCategory;
+use App\Models\SpecimenGroup;
 use App\Models\SpecimenReport;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
@@ -208,6 +213,7 @@ test('SendSpecimenEmailJob handles finalized email type with PDF report successf
                 if (count($attachs) !== 1) {
                     return false;
                 }
+
                 return $attachs[0]['filename'] === 'Reporte_BIO-0004-2026.pdf' && $attachs[0]['content'] === base64_encode('Dummy PDF Content');
             })
         )
@@ -251,13 +257,13 @@ test('SendSpecimenEmailJob skips sending when customer has no email address conf
 });
 
 test('SendSpecimenGroupEmailJob sends a group summary email to the main customer', function () {
-    $location = \App\Models\Location::create([
+    $location = Location::create([
         'name' => 'Main Lab',
         'code' => '001',
         'active' => true,
     ]);
 
-    $caiRange = \App\Models\CaiRange::create([
+    $caiRange = CaiRange::create([
         'location_id' => $location->id,
         'cai' => 'A1B2C3D4',
         'full_prefix' => '000-001-01-',
@@ -271,7 +277,7 @@ test('SendSpecimenGroupEmailJob sends a group summary email to the main customer
         'status' => 'active',
     ]);
 
-    $invoice = \App\Models\Invoice::create([
+    $invoice = Invoice::create([
         'full_invoice_number' => 'INV-001',
         'invoice_number' => '001',
         'cai_range_id' => $caiRange->id,
@@ -285,7 +291,7 @@ test('SendSpecimenGroupEmailJob sends a group summary email to the main customer
         'invoice_file' => 'invoices/test.pdf',
     ]);
 
-    $group = \App\Models\SpecimenGroup::create([
+    $group = SpecimenGroup::create([
         'name' => 'Test Group',
         'customer_id' => $this->customer->id,
         'invoice_id' => $invoice->id,
@@ -315,20 +321,20 @@ test('SendSpecimenGroupEmailJob sends a group summary email to the main customer
         )
         ->andReturn(true);
 
-    $job = new \App\Jobs\SendSpecimenGroupEmailJob($group, 'created');
+    $job = new SendSpecimenGroupEmailJob($group, 'created');
     $job->handle($mockResend);
 });
 
 test('specimen creation does not dispatch individual created email if it has a group_id', function () {
     Queue::fake();
 
-    $location = \App\Models\Location::create([
+    $location = Location::create([
         'name' => 'Main Lab 2',
         'code' => '002',
         'active' => true,
     ]);
 
-    $caiRange = \App\Models\CaiRange::create([
+    $caiRange = CaiRange::create([
         'location_id' => $location->id,
         'cai' => 'E5F6G7H8',
         'full_prefix' => '000-001-01-',
@@ -342,7 +348,7 @@ test('specimen creation does not dispatch individual created email if it has a g
         'status' => 'active',
     ]);
 
-    $invoice = \App\Models\Invoice::create([
+    $invoice = Invoice::create([
         'full_invoice_number' => 'INV-002',
         'invoice_number' => '002',
         'cai_range_id' => $caiRange->id,
@@ -356,7 +362,7 @@ test('specimen creation does not dispatch individual created email if it has a g
         'invoice_file' => 'invoices/test.pdf',
     ]);
 
-    $group = \App\Models\SpecimenGroup::create([
+    $group = SpecimenGroup::create([
         'name' => 'Test Group 2',
         'customer_id' => $this->customer->id,
         'invoice_id' => $invoice->id,

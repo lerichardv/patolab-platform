@@ -29,6 +29,9 @@ import {
     Check,
     Filter,
     Search,
+    Ban,
+    AlertCircle,
+    RotateCcw,
 } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -76,6 +79,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Popover,
     PopoverContent,
@@ -145,11 +149,15 @@ interface Props {
 }
 
 const getDueDateInfo = (specimen: Specimen) => {
-    if (
-        !specimen.category ||
-        !specimen.category.unit ||
-        !specimen.category.quantity
-    ) {
+    if (!specimen.category) {
+        return null;
+    }
+
+    const unit = specimen.category.intern_unit || specimen.category.unit;
+    const quantity =
+        specimen.category.intern_quantity || specimen.category.quantity;
+
+    if (!unit || !quantity) {
         return null;
     }
 
@@ -162,7 +170,7 @@ const getDueDateInfo = (specimen: Specimen) => {
     };
 
     const duration = {
-        [unitMap[specimen.category.unit] || 'days']: specimen.category.quantity,
+        [unitMap[unit] || 'days']: quantity,
     };
     const dueDate = add(createdAt, duration);
 
@@ -170,32 +178,16 @@ const getDueDateInfo = (specimen: Specimen) => {
         specimen.status,
     );
 
-    let colorClass =
-        'bg-secondary text-secondary-foreground border-transparent';
-
-    if (!isCompleted) {
-        if (isToday(dueDate)) {
-            colorClass =
-                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800/50';
-        } else if (isPast(dueDate)) {
-            colorClass =
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800/50';
-        } else {
-            colorClass =
-                'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50';
-        }
-    }
-
-    const timeDefined = `${specimen.category.quantity} ${
-        specimen.category.unit === 'minutes'
+    const timeDefined = `${quantity} ${
+        unit === 'minutes'
             ? 'minutos'
-            : specimen.category.unit === 'hours'
+            : unit === 'hours'
               ? 'horas'
-              : specimen.category.unit === 'days'
+              : unit === 'days'
                 ? 'días'
-                : specimen.category.unit === 'weeks'
+                : unit === 'weeks'
                   ? 'semanas'
-                  : specimen.category.unit
+                  : unit
     }`;
 
     const dueDateFormatted = formatDistanceToNow(dueDate, {
@@ -204,11 +196,34 @@ const getDueDateInfo = (specimen: Specimen) => {
     });
     const fullDueDate = format(dueDate, 'dd/MM/yyyy HH:mm');
 
+    const isExpired = isPast(dueDate);
+    const isWithinOneDay =
+        dueDateFormatted.includes('1 día') ||
+        dueDateFormatted.includes('hora') ||
+        dueDateFormatted.includes('minuto');
+
+    let colorClass =
+        'bg-secondary text-secondary-foreground border-transparent';
+
+    if (!isCompleted) {
+        if (isExpired) {
+            colorClass =
+                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800/50';
+        } else if (isWithinOneDay) {
+            colorClass =
+                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800/50';
+        } else {
+            colorClass =
+                'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50';
+        }
+    }
+
     return {
         timeDefined,
         dueDateFormatted,
         fullDueDate,
         colorClass,
+        isExpired,
     };
 };
 
@@ -278,6 +293,14 @@ export default function SpecimensIndex({
     const [specimenToDelete, setSpecimenToDelete] = useState<Specimen | null>(
         null,
     );
+    const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+    const [specimenToCancel, setSpecimenToCancel] = useState<Specimen | null>(
+        null,
+    );
+    const [cancellationReason, setCancellationReason] = useState('');
+    const [isReactivateDialogOpen, setIsReactivateDialogOpen] = useState(false);
+    const [specimenToReactivate, setSpecimenToReactivate] =
+        useState<Specimen | null>(null);
 
     const [isAssignSheetOpen, setIsAssignSheetOpen] = useState(false);
     const [selectedSpecimenForAssign, setSelectedSpecimenForAssign] =
@@ -623,6 +646,76 @@ export default function SpecimensIndex({
                 },
                 onError: () => {
                     toast.error('Error al actualizar las prioridades');
+                },
+            },
+        );
+    };
+
+    const handleCancelClick = (specimen: Specimen) => {
+        setCancellationReason('');
+        setSpecimenToCancel(specimen);
+        setIsCancelDialogOpen(true);
+    };
+
+    const confirmCancel = () => {
+        if (!specimenToCancel) return;
+
+        if (!cancellationReason.trim()) {
+            toast.error('El motivo de cancelación es obligatorio.');
+            return;
+        }
+
+        router.post(
+            '/specimens/bulk-action',
+            {
+                ids: [specimenToCancel.id],
+                action: 'change_status',
+                value: 'cancelled',
+                cancellation_reason: cancellationReason,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    toast.success('Muestra cancelada correctamente');
+                    setIsCancelDialogOpen(false);
+                    setSpecimenToCancel(null);
+                    setCancellationReason('');
+                },
+                onError: () => {
+                    toast.error('Error al cancelar la muestra');
+                },
+            },
+        );
+    };
+
+    const handleReactivateClick = (specimen: Specimen) => {
+        setSpecimenToReactivate(specimen);
+        setIsReactivateDialogOpen(true);
+    };
+
+    const confirmReactivate = () => {
+        if (!specimenToReactivate) return;
+
+        router.post(
+            '/specimens/bulk-action',
+            {
+                ids: [specimenToReactivate.id],
+                action: 'change_status',
+                value: 'received',
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    toast.success(
+                        'Muestra restablecida y su estado ahora es Recibida',
+                    );
+                    setIsReactivateDialogOpen(false);
+                    setSpecimenToReactivate(null);
+                },
+                onError: () => {
+                    toast.error('Error al restablecer la muestra');
                 },
             },
         );
@@ -1412,7 +1505,7 @@ export default function SpecimensIndex({
                                         {specimenTypes.map((type) => (
                                             <CommandItem
                                                 key={type.id}
-                                                value={type.name}
+                                                value={`${type.name} - ${type.id}`}
                                                 onSelect={() => {
                                                     handleSpecimenTypeChange(
                                                         type.id.toString(),
@@ -1529,7 +1622,7 @@ export default function SpecimensIndex({
                                             (exam) => (
                                                 <CommandItem
                                                     key={exam.id}
-                                                    value={exam.name}
+                                                    value={`${exam.name} - ${exam.id}`}
                                                     onSelect={() => {
                                                         const examId =
                                                             exam.id.toString();
@@ -2135,6 +2228,47 @@ export default function SpecimensIndex({
                                                                                                             </span>
                                                                                                         </DropdownMenuItem>
                                                                                                         {auth.permissions?.includes(
+                                                                                                            'specimens.edit',
+                                                                                                        ) &&
+                                                                                                            (specimen.status ===
+                                                                                                            'cancelled' ? (
+                                                                                                                <DropdownMenuItem
+                                                                                                                    onClick={(
+                                                                                                                        e,
+                                                                                                                    ) => {
+                                                                                                                        e.stopPropagation();
+                                                                                                                        handleReactivateClick(
+                                                                                                                            specimen,
+                                                                                                                        );
+                                                                                                                    }}
+                                                                                                                >
+                                                                                                                    <RotateCcw className="mr-2 h-4 w-4 text-primary" />
+                                                                                                                    <span>
+                                                                                                                        Reactivar
+                                                                                                                        a
+                                                                                                                        Recibida
+                                                                                                                    </span>
+                                                                                                                </DropdownMenuItem>
+                                                                                                            ) : (
+                                                                                                                <DropdownMenuItem
+                                                                                                                    variant="destructive"
+                                                                                                                    onClick={(
+                                                                                                                        e,
+                                                                                                                    ) => {
+                                                                                                                        e.stopPropagation();
+                                                                                                                        handleCancelClick(
+                                                                                                                            specimen,
+                                                                                                                        );
+                                                                                                                    }}
+                                                                                                                >
+                                                                                                                    <Ban className="mr-2 h-4 w-4" />
+                                                                                                                    <span>
+                                                                                                                        Cancelar
+                                                                                                                        muestra
+                                                                                                                    </span>
+                                                                                                                </DropdownMenuItem>
+                                                                                                            ))}
+                                                                                                        {auth.permissions?.includes(
                                                                                                             'specimens.delete',
                                                                                                         ) && (
                                                                                                             <DropdownMenuItem
@@ -2206,7 +2340,9 @@ export default function SpecimensIndex({
                                                                                                         title={`Fecha Estimada: ${dueInfo.fullDueDate}`}
                                                                                                     >
                                                                                                         <CalendarClock className="h-3 w-3" />{' '}
-                                                                                                        Est:{' '}
+                                                                                                        {dueInfo.isExpired
+                                                                                                            ? 'Vencida:'
+                                                                                                            : 'Est:'}{' '}
                                                                                                         {
                                                                                                             dueInfo.dueDateFormatted
                                                                                                         }
@@ -2406,6 +2542,99 @@ export default function SpecimensIndex({
                             className="bg-destructive text-white hover:bg-destructive/90"
                         >
                             Desactivar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={isCancelDialogOpen}
+                onOpenChange={(open) => {
+                    setIsCancelDialogOpen(open);
+                    if (!open) setCancellationReason('');
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                            <AlertCircle className="h-5 w-5" />
+                            ¿Cancelar muestra?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción cambiará el estado de la muestra{' '}
+                            <span className="font-mono font-semibold text-foreground">
+                                {specimenToCancel?.sequence_code ||
+                                    `#${specimenToCancel?.id}`}
+                            </span>{' '}
+                            a cancelada.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="my-2 space-y-1.5">
+                        <Label
+                            htmlFor="cancellation_reason"
+                            className="text-xs font-medium"
+                        >
+                            Motivo de cancelación{' '}
+                            <span className="text-destructive">*</span>
+                        </Label>
+                        <Textarea
+                            id="cancellation_reason"
+                            placeholder="Escriba el motivo de la cancelación (requerido)..."
+                            value={cancellationReason}
+                            onChange={(e) =>
+                                setCancellationReason(e.target.value)
+                            }
+                            rows={3}
+                            className="resize-none text-xs"
+                        />
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            onClick={() => setCancellationReason('')}
+                        >
+                            Volver
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmCancel}
+                            disabled={!cancellationReason.trim()}
+                            className="bg-destructive text-white hover:bg-destructive/90 disabled:opacity-50"
+                        >
+                            Cancelar muestra
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={isReactivateDialogOpen}
+                onOpenChange={setIsReactivateDialogOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-primary">
+                            <RotateCcw className="h-5 w-5 text-primary" />
+                            ¿Restablecer muestra?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción reactivará la muestra{' '}
+                            <span className="font-mono font-semibold text-foreground">
+                                {specimenToReactivate?.sequence_code ||
+                                    `#${specimenToReactivate?.id}`}
+                            </span>{' '}
+                            y su estado cambiará a{' '}
+                            <strong className="text-foreground">
+                                Recibida
+                            </strong>
+                            .
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmReactivate}
+                            className="bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                            Reactivar a Recibida
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

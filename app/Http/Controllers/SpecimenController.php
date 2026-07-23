@@ -28,6 +28,7 @@ use App\Models\User;
 use App\Services\ImageOptimizerService;
 use App\Services\ReportPdfService;
 use App\Services\WhatsAppService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -95,6 +96,9 @@ class SpecimenController extends Controller
                 if (is_array($decoded)) {
                     $dateFrom = $decoded['from'] ?? '';
                     $dateTo = $decoded['to'] ?? '';
+                    if ($dateTo && $dateTo < now()->toDateString()) {
+                        $dateTo = now()->toDateString();
+                    }
                 }
             } else {
                 $dateFrom = now()->subDays(14)->toDateString();
@@ -139,7 +143,8 @@ class SpecimenController extends Controller
                 $q->whereDate('specimen.created_at', '>=', $dateFrom);
             }
             if (! empty($dateTo)) {
-                $q->whereDate('specimen.created_at', '<=', $dateTo);
+                $dateToEnd = Carbon::parse($dateTo)->addDays(1)->toDateString();
+                $q->whereDate('specimen.created_at', '<=', $dateToEnd);
             }
 
             $q->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report'])
@@ -532,38 +537,44 @@ class SpecimenController extends Controller
                 $caiRange->update(['status' => 'exhausted']);
             }
 
-            $invoice->load(['specimen.products', 'creditRelation', 'specimen.type']);
-            $totalWords = $this->numberToSpanishWords($invoice->total);
-            $customer = Customer::findOrFail($specimen->customer);
-            $examination = SpecimenTypeExamination::findOrFail($specimen->specimen_type_examination);
-            $location = Location::findOrFail($caiRange->location_id);
+            try {
+                $invoice->load(['specimen.products', 'creditRelation', 'specimen.type']);
+                $totalWords = $this->numberToSpanishWords($invoice->total);
+                $customer = Customer::findOrFail($specimen->customer);
+                $examination = SpecimenTypeExamination::findOrFail($specimen->specimen_type_examination);
+                $location = Location::findOrFail($caiRange->location_id);
 
-            $htmlContent = view('pdf.invoice', compact('invoice', 'caiRange', 'customer', 'examination', 'location', 'totalWords'))->render();
+                $htmlContent = view('pdf.invoice', compact('invoice', 'caiRange', 'customer', 'examination', 'location', 'totalWords'))->render();
 
-            $filename = 'invoice_'.$invoice->id.'_'.time().'.pdf';
-            $pdfPath = 'invoices/'.$filename;
+                $filename = 'invoice_'.$invoice->id.'_'.time().'.pdf';
+                $pdfPath = 'invoices/'.$filename;
 
-            $browsershot = Browsershot::html($htmlContent);
+                $browsershot = Browsershot::html($htmlContent);
 
-            if (app()->environment('production')) {
-                $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
-                    ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
-                    ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
-                    ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
+                if (app()->environment('production')) {
+                    $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
+                        ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
+                        ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
+                        ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
+                } elseif (env('PUPPETEER_EXECUTABLE_PATH')) {
+                    $browsershot->setChromePath(env('PUPPETEER_EXECUTABLE_PATH'));
+                }
+
+                $pdfContent = $browsershot->addChromiumArguments([
+                    'disable-crash-reporter',
+                    'disable-dev-shm-usage',
+                    'no-sandbox',
+                ])
+                    ->noSandbox()
+                    ->margins(10, 10, 10, 10)
+                    ->format('A4')
+                    ->pdf();
+
+                Storage::disk('public')->put($pdfPath, $pdfContent);
+                $invoice->update(['invoice_file' => $pdfPath]);
+            } catch (\Throwable $e) {
+                Log::warning('Error generating specimen invoice PDF: '.$e->getMessage());
             }
-
-            $pdfContent = $browsershot->addChromiumArguments([
-                'disable-crash-reporter',
-                'disable-dev-shm-usage',
-                'no-sandbox',
-            ])
-                ->noSandbox()
-                ->margins(10, 10, 10, 10)
-                ->format('A4')
-                ->pdf();
-
-            Storage::disk('public')->put($pdfPath, $pdfContent);
-            $invoice->update(['invoice_file' => $pdfPath]);
         });
 
         // Enviar notificación de WhatsApp al paciente
@@ -1173,7 +1184,7 @@ class SpecimenController extends Controller
     public function assignCollaborator(Request $request, Specimen $specimen)
     {
         $isAssigned = $specimen->users()->where('user_id', auth()->id())->exists();
-        if (!Gate::allows('specimens.manage') && !$isAssigned) {
+        if (! Gate::allows('specimens.manage') && ! $isAssigned) {
             abort(403, 'No tienes permiso para gestionar colaboradores en esta muestra.');
         }
 
@@ -1204,7 +1215,7 @@ class SpecimenController extends Controller
     public function unassignCollaborator(Request $request, Specimen $specimen)
     {
         $isAssigned = $specimen->users()->where('user_id', auth()->id())->exists();
-        if (!Gate::allows('specimens.manage') && !$isAssigned) {
+        if (! Gate::allows('specimens.manage') && ! $isAssigned) {
             abort(403, 'No tienes permiso para gestionar colaboradores en esta muestra.');
         }
 
@@ -1222,25 +1233,57 @@ class SpecimenController extends Controller
         $validated = $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'integer|exists:specimen,id',
-            'action' => 'required|string|in:change_status,change_priority,assign_pathologist,unassign_pathologist,delete',
+            'action' => 'required|string|in:change_status,change_priority,assign_pathologist,unassign_pathologist,delete,assign_collaborator,unassign_collaborator',
             'value' => 'nullable',
+            'cancellation_reason' => 'nullable|string',
         ]);
+
+        if ($request->input('action') === 'change_status' && $request->input('value') === 'cancelled') {
+            $request->validate([
+                'cancellation_reason' => 'required|string',
+            ], [
+                'cancellation_reason.required' => 'El motivo de cancelación es obligatorio.',
+            ]);
+        }
 
         $ids = $validated['ids'];
         $action = $validated['action'];
         $value = $validated['value'] ?? null;
+        $cancellationReason = $validated['cancellation_reason'] ?? null;
 
         if (in_array($action, ['change_status', 'change_priority'])) {
             Gate::authorize('specimens.edit');
         } elseif (in_array($action, ['assign_pathologist', 'unassign_pathologist'])) {
             Gate::authorize('specimens.manage');
+        } elseif (in_array($action, ['assign_collaborator', 'unassign_collaborator'])) {
+            $isAssignedToAll = true;
+            if (! Gate::allows('specimens.manage')) {
+                foreach ($ids as $id) {
+                    $specimen = Specimen::find($id);
+                    if (! $specimen || ! $specimen->users()->where('user_id', auth()->id())->exists()) {
+                        $isAssignedToAll = false;
+                        break;
+                    }
+                }
+            }
+            if (! Gate::allows('specimens.manage') && ! $isAssignedToAll) {
+                abort(403, 'No tienes permiso para gestionar colaboradores en estas muestras.');
+            }
         } elseif ($action === 'delete') {
             Gate::authorize('specimens.delete');
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($ids, $action, $value) {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($ids, $action, $value, $cancellationReason) {
             if ($action === 'change_status') {
-                Specimen::whereIn('id', $ids)->update(['status' => $value]);
+                $updateData = ['status' => $value];
+                if ($value === 'cancelled') {
+                    $updateData['cancellation_reason'] = $cancellationReason;
+                    $updateData['cancelled_at'] = now();
+                } else {
+                    $updateData['cancellation_reason'] = null;
+                    $updateData['cancelled_at'] = null;
+                }
+                Specimen::whereIn('id', $ids)->update($updateData);
             } elseif ($action === 'change_priority') {
                 Specimen::whereIn('id', $ids)->update(['priority_id' => $value]);
 
@@ -1279,6 +1322,32 @@ class SpecimenController extends Controller
                     $specimen = Specimen::find($id);
                     if ($specimen) {
                         $specimen->users()->detach($value);
+                    }
+                }
+            } elseif ($action === 'assign_collaborator') {
+                $macroscopy = request()->boolean('macroscopy_access', false);
+                $microscopy = request()->boolean('microscopy_access', false);
+                foreach ($ids as $id) {
+                    $specimen = Specimen::find($id);
+                    if ($specimen) {
+                        if ($specimen->collaborators()->where('user_id', $value)->exists()) {
+                            $specimen->collaborators()->updateExistingPivot($value, [
+                                'macroscopy_access' => $macroscopy,
+                                'microscopy_access' => $microscopy,
+                            ]);
+                        } else {
+                            $specimen->collaborators()->attach($value, [
+                                'macroscopy_access' => $macroscopy,
+                                'microscopy_access' => $microscopy,
+                            ]);
+                        }
+                    }
+                }
+            } elseif ($action === 'unassign_collaborator') {
+                foreach ($ids as $id) {
+                    $specimen = Specimen::find($id);
+                    if ($specimen) {
+                        $specimen->collaborators()->detach($value);
                     }
                 }
             } elseif ($action === 'delete') {

@@ -22,6 +22,7 @@ class WorkOrder extends Model
         'quantity',
         'user_id',
         'completed_by_id',
+        'created_by_id',
         'status',
         'priority',
         'comments',
@@ -36,6 +37,7 @@ class WorkOrder extends Model
         'priority' => 'integer',
         'due_date' => 'datetime',
         'completed_at' => 'datetime',
+        'created_by_id' => 'integer',
     ];
 
     protected $appends = [
@@ -88,6 +90,14 @@ class WorkOrder extends Model
     public function completedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'completed_by_id');
+    }
+
+    /**
+     * Obtiene el usuario que creó la orden de trabajo.
+     */
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_id');
     }
 
     /**

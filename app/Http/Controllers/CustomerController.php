@@ -72,10 +72,10 @@ class CustomerController extends Controller
         Gate::authorize('patients.create');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'id_number' => 'required|string|unique:customers,id_number',
+            'id_number' => 'required|string',
             'type' => 'required|in:cliente,empresa',
             'age' => 'nullable|integer',
-            'phone' => 'nullable|string',
+            'phone' => 'required|string',
             'gender' => 'nullable|string',
             'state' => 'nullable|exists:departments,id',
             'city' => 'nullable|exists:municipalities,id',
@@ -102,10 +102,10 @@ class CustomerController extends Controller
         Gate::authorize('patients.edit');
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'id_number' => 'required|string|unique:customers,id_number,'.$customer->id,
+            'id_number' => 'required|string',
             'type' => 'required|in:cliente,empresa',
             'age' => 'nullable|integer',
-            'phone' => 'nullable|string',
+            'phone' => 'required|string',
             'gender' => 'nullable|string',
             'state' => 'nullable|exists:departments,id',
             'city' => 'nullable|exists:municipalities,id',
@@ -319,10 +319,10 @@ class CustomerController extends Controller
         try {
             $validated = validator($data, [
                 'name' => 'required|string|max:255',
-                'id_number' => 'required|string|unique:customers,id_number',
+                'id_number' => 'required|string',
                 'type' => 'required|in:cliente,empresa',
                 'age' => 'nullable|integer',
-                'phone' => 'nullable|string',
+                'phone' => 'required|string',
                 'gender' => 'nullable|string',
                 'state' => 'nullable|exists:departments,id',
                 'city' => 'nullable|exists:municipalities,id',

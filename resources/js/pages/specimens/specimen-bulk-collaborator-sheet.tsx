@@ -3,7 +3,6 @@ import { User, Trash2, Microscope, UserPlus } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import HeadingSheet from '@/components/heading-sheet';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
     Popover,
@@ -25,21 +24,25 @@ interface Props {
     selectedSpecimens: any[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    pathologists: any[];
+    usersList: any[];
+    pathologists?: any[];
     onSuccess?: () => void;
 }
 
-export default function SpecimenBulkPathologistSheet({
+export default function SpecimenBulkCollaboratorSheet({
     selectedSpecimens = [],
     open,
     onOpenChange,
+    usersList = [],
     pathologists = [],
     onSuccess,
 }: Props) {
-    const [selectedPathologistId, setSelectedPathologistId] =
+    const [selectedCollaboratorId, setSelectedCollaboratorId] =
         useState<string>('');
-    const [macroscopyAccess, setMacroscopyAccess] = useState<boolean>(false);
-    const [microscopyAccess, setMicroscopyAccess] = useState<boolean>(true);
+    const [collabMacroscopyAccess, setCollabMacroscopyAccess] =
+        useState<boolean>(true);
+    const [collabMicroscopyAccess, setCollabMicroscopyAccess] =
+        useState<boolean>(true);
 
     const specimenIds = useMemo(() => {
         return selectedSpecimens.map((s) => s.id);
@@ -53,32 +56,48 @@ export default function SpecimenBulkPathologistSheet({
         return selectedSpecimens.slice(0, 6);
     }, [selectedSpecimens]);
 
-    // Pathologists that are assigned to at least one of the selected specimens
-    const assignedPathologists = useMemo(() => {
+    const sourceList = useMemo(() => {
+        return usersList.length > 0 ? usersList : pathologists;
+    }, [usersList, pathologists]);
+
+    // Collaborators that are assigned to at least one of the selected specimens
+    const assignedCollaborators = useMemo(() => {
         const assignedIds = new Set<number>();
         selectedSpecimens.forEach((specimen) => {
-            specimen.users?.forEach((u: any) => {
-                assignedIds.add(u.id);
+            specimen.collaborators?.forEach((c: any) => {
+                assignedIds.add(c.id);
             });
         });
 
-        return pathologists.filter((p) => assignedIds.has(p.id));
-    }, [pathologists, selectedSpecimens]);
+        return sourceList.filter((p) => assignedIds.has(p.id));
+    }, [sourceList, selectedSpecimens]);
 
-    // Pathologists that are NOT assigned to all of the selected specimens
-    const availablePathologists = useMemo(() => {
-        return pathologists.filter((p) => {
-            // If not assigned to at least one specimen, or if we want to show it to add to the rest
-            // Let's show all pathologists that are not already assigned to *every* selected specimen
-            const assignedCount = selectedSpecimens.filter((specimen) =>
+    // Collaborators that are NOT assigned to all of the selected specimens
+    const availableCollaborators = useMemo(() => {
+        return sourceList.filter((p) => {
+            // Can't assign if they are already collaborator on all selected specimens
+            const isCollabOnAll = selectedSpecimens.every((specimen) =>
+                specimen.collaborators?.some((c: any) => c.id === p.id),
+            );
+
+            if (isCollabOnAll) {
+                return false;
+            }
+
+            // Also check if they are lead pathologist on all of them
+            const isLeadOnAll = selectedSpecimens.every((specimen) =>
                 specimen.users?.some((u: any) => u.id === p.id),
-            ).length;
+            );
 
-            return assignedCount < selectedSpecimens.length;
+            if (isLeadOnAll) {
+                return false;
+            }
+
+            return true;
         });
-    }, [pathologists, selectedSpecimens]);
+    }, [sourceList, selectedSpecimens]);
 
-    const handleAssign = (userId: string) => {
+    const handleAssignCollaborator = (userId: string) => {
         if (!userId || specimenIds.length === 0) {
             return;
         }
@@ -87,19 +106,19 @@ export default function SpecimenBulkPathologistSheet({
             '/specimens/bulk-action',
             {
                 ids: specimenIds,
-                action: 'assign_pathologist',
+                action: 'assign_collaborator',
                 value: userId,
-                macroscopy_access: macroscopyAccess,
-                microscopy_access: microscopyAccess,
+                macroscopy_access: collabMacroscopyAccess,
+                microscopy_access: collabMicroscopyAccess,
             },
             {
                 preserveScroll: true,
                 preserveState: true,
                 onSuccess: () => {
-                    toast.success('Patólogo asignado en lote correctamente');
-                    setSelectedPathologistId('');
-                    setMacroscopyAccess(false);
-                    setMicroscopyAccess(true);
+                    toast.success('Colaborador asignado en lote correctamente');
+                    setSelectedCollaboratorId('');
+                    setCollabMacroscopyAccess(true);
+                    setCollabMicroscopyAccess(true);
 
                     if (onSuccess) {
                         onSuccess();
@@ -108,34 +127,38 @@ export default function SpecimenBulkPathologistSheet({
                 onError: (errors) => {
                     const message =
                         Object.values(errors)[0] ||
-                        'Error al asignar patólogo en lote';
+                        'Error al asignar colaborador en lote';
                     toast.error(message);
                 },
             },
         );
     };
 
-    const handleToggleAccess = (
+    const handleToggleCollaboratorAccess = (
         userId: number,
         field: 'macroscopy' | 'microscopy',
         checked: boolean,
     ) => {
         const assignedSpecimens = selectedSpecimens.filter((specimen) =>
-            specimen.users?.some((u: any) => u.id === userId),
+            specimen.collaborators?.some((c: any) => c.id === userId),
         );
 
         const currentMacro = assignedSpecimens.every((specimen) => {
-            const u = specimen.users?.find((usr: any) => usr.id === userId);
+            const c = specimen.collaborators?.find(
+                (collab: any) => collab.id === userId,
+            );
 
-            return u?.pivot?.macroscopy_access
-                ? Boolean(u.pivot.macroscopy_access)
+            return c?.pivot?.macroscopy_access
+                ? Boolean(c.pivot.macroscopy_access)
                 : false;
         });
         const currentMicro = assignedSpecimens.every((specimen) => {
-            const u = specimen.users?.find((usr: any) => usr.id === userId);
+            const c = specimen.collaborators?.find(
+                (collab: any) => collab.id === userId,
+            );
 
-            return u?.pivot?.microscopy_access
-                ? Boolean(u.pivot.microscopy_access)
+            return c?.pivot?.microscopy_access
+                ? Boolean(c.pivot.microscopy_access)
                 : false;
         });
 
@@ -146,7 +169,7 @@ export default function SpecimenBulkPathologistSheet({
             '/specimens/bulk-action',
             {
                 ids: specimenIds,
-                action: 'assign_pathologist',
+                action: 'assign_collaborator',
                 value: userId.toString(),
                 macroscopy_access: macro,
                 microscopy_access: micro,
@@ -156,7 +179,7 @@ export default function SpecimenBulkPathologistSheet({
                 preserveState: true,
                 onSuccess: () => {
                     toast.success(
-                        'Permisos actualizados en lote correctamente',
+                        'Permisos de colaborador actualizados en lote',
                     );
 
                     if (onSuccess) {
@@ -173,7 +196,7 @@ export default function SpecimenBulkPathologistSheet({
         );
     };
 
-    const handleUnassign = (userId: number) => {
+    const handleUnassignCollaborator = (userId: number) => {
         if (specimenIds.length === 0) {
             return;
         }
@@ -182,14 +205,16 @@ export default function SpecimenBulkPathologistSheet({
             '/specimens/bulk-action',
             {
                 ids: specimenIds,
-                action: 'unassign_pathologist',
+                action: 'unassign_collaborator',
                 value: userId,
             },
             {
                 preserveScroll: true,
                 preserveState: true,
                 onSuccess: () => {
-                    toast.success('Patólogo desasignado en lote correctamente');
+                    toast.success(
+                        'Colaborador desasignado en lote correctamente',
+                    );
 
                     if (onSuccess) {
                         onSuccess();
@@ -198,7 +223,7 @@ export default function SpecimenBulkPathologistSheet({
                 onError: (errors) => {
                     const message =
                         Object.values(errors)[0] ||
-                        'Error al desasignar patólogo en lote';
+                        'Error al desasignar colaborador en lote';
                     toast.error(message);
                 },
             },
@@ -211,8 +236,8 @@ export default function SpecimenBulkPathologistSheet({
                 {/* Header */}
                 <div className="border-b pr-12 pb-4">
                     <HeadingSheet
-                        title="Asignar Patólogo en Bulk"
-                        description="Asigne o desasigne patólogos en lote para las muestras seleccionadas."
+                        title="Asignar Colaboradores en Lote"
+                        description="Asigne o desasigne colaboradores en lote para las muestras seleccionadas."
                     />
                 </div>
 
@@ -243,14 +268,14 @@ export default function SpecimenBulkPathologistSheet({
                                 </div>
                             ))}
 
-                            {selectedSpecimens.length > 4 && (
+                            {selectedSpecimens.length > 6 && (
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <button
                                             type="button"
                                             className="inline-flex cursor-pointer items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary shadow-sm transition-all hover:bg-primary/20 focus:outline-none"
                                         >
-                                            +{selectedSpecimens.length - 3} más
+                                            +{selectedSpecimens.length - 6} más
                                         </button>
                                     </PopoverTrigger>
                                     <PopoverContent
@@ -301,19 +326,19 @@ export default function SpecimenBulkPathologistSheet({
                     <div className="space-y-3.5 rounded-lg border border-border/60 bg-muted/20 p-4 shadow-sm">
                         <label className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
                             <UserPlus className="h-4 w-4 text-primary" />{' '}
-                            Asignar Nuevo Patólogo
+                            Asignar Nuevo Colaborador
                         </label>
-                        {availablePathologists.length > 0 ? (
+                        {availableCollaborators.length > 0 ? (
                             <div className="flex flex-col gap-4">
                                 <Select
-                                    value={selectedPathologistId}
-                                    onValueChange={setSelectedPathologistId}
+                                    value={selectedCollaboratorId}
+                                    onValueChange={setSelectedCollaboratorId}
                                 >
                                     <SelectTrigger className="h-11 w-full bg-background">
-                                        <SelectValue placeholder="Seleccione un patólogo para agregar a las muestras..." />
+                                        <SelectValue placeholder="Seleccione un colaborador para agregar a las muestras..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {availablePathologists.map((p) => (
+                                        {availableCollaborators.map((p) => (
                                             <SelectItem
                                                 key={p.id}
                                                 value={p.id.toString()}
@@ -328,14 +353,14 @@ export default function SpecimenBulkPathologistSheet({
                                     <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                                         <div className="flex items-center space-x-2">
                                             <Switch
-                                                id="new-macro-access"
-                                                checked={macroscopyAccess}
+                                                id="new-collab-macro-access"
+                                                checked={collabMacroscopyAccess}
                                                 onCheckedChange={
-                                                    setMacroscopyAccess
+                                                    setCollabMacroscopyAccess
                                                 }
                                             />
                                             <label
-                                                htmlFor="new-macro-access"
+                                                htmlFor="new-collab-macro-access"
                                                 className="cursor-pointer text-sm leading-none font-medium text-muted-foreground transition-colors hover:text-foreground"
                                             >
                                                 Acceso a Macroscopía
@@ -343,14 +368,14 @@ export default function SpecimenBulkPathologistSheet({
                                         </div>
                                         <div className="flex items-center space-x-2">
                                             <Switch
-                                                id="new-micro-access"
-                                                checked={microscopyAccess}
+                                                id="new-collab-micro-access"
+                                                checked={collabMicroscopyAccess}
                                                 onCheckedChange={
-                                                    setMicroscopyAccess
+                                                    setCollabMicroscopyAccess
                                                 }
                                             />
                                             <label
-                                                htmlFor="new-micro-access"
+                                                htmlFor="new-collab-micro-access"
                                                 className="cursor-pointer text-sm leading-none font-medium text-muted-foreground transition-colors hover:text-foreground"
                                             >
                                                 Acceso a Microscopía
@@ -361,9 +386,11 @@ export default function SpecimenBulkPathologistSheet({
                                     <Button
                                         type="button"
                                         onClick={() =>
-                                            handleAssign(selectedPathologistId)
+                                            handleAssignCollaborator(
+                                                selectedCollaboratorId,
+                                            )
                                         }
-                                        disabled={!selectedPathologistId}
+                                        disabled={!selectedCollaboratorId}
                                         className="h-10 px-5 font-semibold"
                                     >
                                         Asignar
@@ -372,26 +399,26 @@ export default function SpecimenBulkPathologistSheet({
                             </div>
                         ) : (
                             <div className="rounded-md border border-dashed bg-muted/40 p-3.5 text-center text-xs text-muted-foreground">
-                                Todos los patólogos disponibles ya están
+                                Todos los colaboradores disponibles ya están
                                 asignados a todas las muestras seleccionadas.
                             </div>
                         )}
                     </div>
 
-                    {/* Assigned Pathologists List Table */}
+                    {/* Assigned Collaborators List Table */}
                     <div className="flex min-h-0 flex-1 flex-col space-y-2.5">
                         <label className="text-sm font-semibold text-foreground">
-                            Patólogos Asignados (a una o más de las muestras
+                            Colaboradores Asignados (a una o más de las muestras
                             seleccionadas)
                         </label>
                         <div className="max-h-[300px] w-full overflow-y-auto rounded-lg border border-border/80 bg-card shadow-sm">
-                            {assignedPathologists.length > 0 ? (
+                            {assignedCollaborators.length > 0 ? (
                                 <div className="w-full overflow-x-auto">
                                     <table className="w-full border-collapse text-left text-sm">
                                         <thead className="sticky top-0 z-10 border-b bg-muted/95 backdrop-blur-sm">
                                             <tr className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                                 <th className="p-3.5">
-                                                    Patólogo y accesos
+                                                    Colaborador y accesos
                                                 </th>
                                                 <th className="p-3.5 text-center">
                                                     Asignaciones
@@ -402,14 +429,14 @@ export default function SpecimenBulkPathologistSheet({
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border/60">
-                                            {assignedPathologists.map(
+                                            {assignedCollaborators.map(
                                                 (user: any) => {
                                                     const assignedSpecimens =
                                                         selectedSpecimens.filter(
                                                             (specimen) =>
-                                                                specimen.users?.some(
-                                                                    (u: any) =>
-                                                                        u.id ===
+                                                                specimen.collaborators?.some(
+                                                                    (c: any) =>
+                                                                        c.id ===
                                                                         user.id,
                                                                 ),
                                                         );
@@ -419,19 +446,19 @@ export default function SpecimenBulkPathologistSheet({
                                                     const isMacroChecked =
                                                         assignedSpecimens.every(
                                                             (specimen) => {
-                                                                const u =
-                                                                    specimen.users?.find(
+                                                                const c =
+                                                                    specimen.collaborators?.find(
                                                                         (
-                                                                            usr: any,
+                                                                            collab: any,
                                                                         ) =>
-                                                                            usr.id ===
+                                                                            collab.id ===
                                                                             user.id,
                                                                     );
 
-                                                                return u?.pivot
+                                                                return c?.pivot
                                                                     ?.macroscopy_access
                                                                     ? Boolean(
-                                                                          u
+                                                                          c
                                                                               .pivot
                                                                               .macroscopy_access,
                                                                       )
@@ -442,19 +469,19 @@ export default function SpecimenBulkPathologistSheet({
                                                     const isMicroChecked =
                                                         assignedSpecimens.every(
                                                             (specimen) => {
-                                                                const u =
-                                                                    specimen.users?.find(
+                                                                const c =
+                                                                    specimen.collaborators?.find(
                                                                         (
-                                                                            usr: any,
+                                                                            collab: any,
                                                                         ) =>
-                                                                            usr.id ===
+                                                                            collab.id ===
                                                                             user.id,
                                                                     );
 
-                                                                return u?.pivot
+                                                                return c?.pivot
                                                                     ?.microscopy_access
                                                                     ? Boolean(
-                                                                          u
+                                                                          c
                                                                               .pivot
                                                                               .microscopy_access,
                                                                       )
@@ -495,7 +522,7 @@ export default function SpecimenBulkPathologistSheet({
                                                                                 onCheckedChange={(
                                                                                     checked,
                                                                                 ) =>
-                                                                                    handleToggleAccess(
+                                                                                    handleToggleCollaboratorAccess(
                                                                                         user.id,
                                                                                         'macroscopy',
                                                                                         checked,
@@ -516,7 +543,7 @@ export default function SpecimenBulkPathologistSheet({
                                                                                 onCheckedChange={(
                                                                                     checked,
                                                                                 ) =>
-                                                                                    handleToggleAccess(
+                                                                                    handleToggleCollaboratorAccess(
                                                                                         user.id,
                                                                                         'microscopy',
                                                                                         checked,
@@ -647,7 +674,7 @@ export default function SpecimenBulkPathologistSheet({
                                                                     size="icon"
                                                                     className="h-8 w-8 text-destructive transition-colors hover:bg-destructive/10 hover:text-destructive"
                                                                     onClick={() =>
-                                                                        handleUnassign(
+                                                                        handleUnassignCollaborator(
                                                                             user.id,
                                                                         )
                                                                     }
@@ -669,12 +696,12 @@ export default function SpecimenBulkPathologistSheet({
                                         <User className="h-6 w-6 text-muted-foreground" />
                                     </div>
                                     <h4 className="text-sm font-semibold text-foreground">
-                                        Sin patólogos asignados
+                                        Sin colaboradores asignados
                                     </h4>
                                     <p className="max-w-xs text-xs text-muted-foreground">
-                                        Ninguno de las muestras seleccionadas
-                                        tiene patólogos asignados. Utilice el
-                                        selector de arriba para añadir uno.
+                                        Ninguna de las muestras seleccionadas
+                                        tiene colaboradores asignados. Utilice
+                                        el selector de arriba para añadir uno.
                                     </p>
                                 </div>
                             )}

@@ -52,19 +52,20 @@ interface Props {
 }
 
 export default function CustomerForm({ customer, onSuccess }: Props) {
-    const { data, setData, post, put, processing, errors, reset } = useForm({
-        name: customer?.name || '',
-        id_number: customer?.id_number || '',
-        type: customer?.type || 'cliente',
-        age: customer?.age || '',
-        phone: customer?.phone || '',
-        secondary_phone: customer?.secondary_phone || '',
-        gender: customer?.gender || '',
-        state: customer?.state || '',
-        city: customer?.city || '',
-        address: customer?.address || '',
-        email: customer?.email || '',
-    });
+    const { data, setData, post, put, processing, errors, setError, reset } =
+        useForm({
+            name: customer?.name || '',
+            id_number: customer?.id_number || '',
+            type: customer?.type || 'cliente',
+            age: customer?.age || '',
+            phone: customer?.phone || '',
+            secondary_phone: customer?.secondary_phone || '',
+            gender: customer?.gender || '',
+            state: customer?.state || '',
+            city: customer?.city || '',
+            address: customer?.address || '',
+            email: customer?.email || '',
+        });
 
     const [departments, setDepartments] = useState<Department[]>([]);
     const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
@@ -102,6 +103,11 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
         e.stopPropagation();
+
+        if (!data.phone || data.phone.trim() === '') {
+            setError('phone', 'El campo teléfono es obligatorio.');
+            return;
+        }
 
         if (customer?.id) {
             put(updateCustomer(customer.id).url, {
@@ -213,7 +219,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                    <Label htmlFor="phone">Teléfono 1 (Opcional)</Label>
+                    <Label htmlFor="phone">Teléfono 1</Label>
                     <Input
                         id="phone"
                         value={data.phone}

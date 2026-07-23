@@ -25,6 +25,8 @@ import {
     AlertCircle,
     Coins,
     Microscope,
+    MoreVertical,
+    ClipboardList,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
@@ -53,6 +55,11 @@ import {
     DropdownMenuTrigger,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuSubContent,
+    DropdownMenuCheckboxItem,
+    DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
@@ -78,6 +85,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import SpecimenGroupSheet from '../specimens/specimen-group-sheet';
 import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
 import SpecimenSheet from '../specimens/specimen-sheet';
@@ -179,6 +187,9 @@ interface Props {
     activeLocationId: number | null;
     products: any[];
     settings?: Record<string, string>;
+    workOrderTypes?: any[];
+    workOrderTasks?: any[];
+    usersList?: any[];
 }
 
 function FormCombobox({
@@ -285,6 +296,9 @@ export default function InvoicesIndex({
     products,
     groups,
     settings,
+    workOrderTypes = [],
+    workOrderTasks = [],
+    usersList = [],
 }: Props) {
     const { props } = usePage() as any;
     const { auth } = props;
@@ -294,6 +308,8 @@ export default function InvoicesIndex({
     const canViewSpecimen = auth.permissions?.includes('specimens.view');
     const canEditSpecimen = auth.permissions?.includes('specimens.edit');
     const canManageInvoices = auth.permissions?.includes('invoices.manage');
+    const canCreateWorkOrders =
+        auth.permissions?.includes('work_orders.create');
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
@@ -317,6 +333,81 @@ export default function InvoicesIndex({
     const [isGroupViewSheetOpen, setIsGroupViewSheetOpen] = useState(false);
     const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
     const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
+
+    const [isWorkOrderSheetOpen, setIsWorkOrderSheetOpen] = useState(false);
+    const [selectedSpecimenForWorkOrder, setSelectedSpecimenForWorkOrder] =
+        useState<number | null>(null);
+    const [
+        selectedSpecimenIdsForWorkOrder,
+        setSelectedSpecimenIdsForWorkOrder,
+    ] = useState<number[] | null>(null);
+    const [groupSpecimenSelections, setGroupSpecimenSelections] = useState<
+        Record<number, number[]>
+    >({});
+
+    const getInvoiceSpecimens = (invoice: Invoice) => {
+        if (invoice.group?.specimens && invoice.group.specimens.length > 0) {
+            return invoice.group.specimens;
+        }
+        if (invoice.specimen || invoice.specimen_id) {
+            return [invoice.specimen || { id: invoice.specimen_id }];
+        }
+        return [];
+    };
+
+    const handleCreateWorkOrder = (specimenId: number) => {
+        setSelectedSpecimenForWorkOrder(specimenId);
+        setSelectedSpecimenIdsForWorkOrder(null);
+        setIsWorkOrderSheetOpen(true);
+    };
+
+    const handleCreateBulkWorkOrders = (specimenIds: number[]) => {
+        setSelectedSpecimenForWorkOrder(null);
+        setSelectedSpecimenIdsForWorkOrder(specimenIds);
+        setIsWorkOrderSheetOpen(true);
+    };
+
+    const getSelectedSpecimensForInvoice = (invoice: Invoice) => {
+        const allSpecimens = getInvoiceSpecimens(invoice);
+        const allIds = allSpecimens.map((s: any) => s.id).filter(Boolean);
+
+        if (groupSpecimenSelections[invoice.id] !== undefined) {
+            return groupSpecimenSelections[invoice.id];
+        }
+
+        return allIds;
+    };
+
+    const toggleSpecimenForInvoice = (
+        invoiceId: number,
+        specimenId: number,
+        allIds: number[],
+    ) => {
+        const current = groupSpecimenSelections[invoiceId] ?? allIds;
+        const isSelected = current.includes(specimenId);
+        const next = isSelected
+            ? current.filter((id) => id !== specimenId)
+            : [...current, specimenId];
+
+        setGroupSpecimenSelections((prev) => ({
+            ...prev,
+            [invoiceId]: next,
+        }));
+    };
+
+    const toggleAllSpecimensForInvoice = (
+        invoiceId: number,
+        allIds: number[],
+    ) => {
+        const current = groupSpecimenSelections[invoiceId] ?? allIds;
+        const isAllSelected = current.length === allIds.length;
+        const next = isAllSelected ? [] : allIds;
+
+        setGroupSpecimenSelections((prev) => ({
+            ...prev,
+            [invoiceId]: next,
+        }));
+    };
 
     useEffect(() => {
         if (flash.new_specimen_id) {
@@ -1535,19 +1626,296 @@ export default function InvoicesIndex({
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
-                                                {canManageInvoices && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() =>
-                                                            handleEditDetails(
-                                                                invoice,
-                                                            )
-                                                        }
-                                                        title="Editar Factura"
-                                                    >
-                                                        <Edit2 className="h-4 w-4" />
-                                                    </Button>
+                                                {(canManageInvoices ||
+                                                    canCreateWorkOrders) && (
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger
+                                                            asChild
+                                                        >
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                                title="Acciones"
+                                                            >
+                                                                <MoreVertical className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent
+                                                            align="end"
+                                                            className="w-52"
+                                                        >
+                                                            {canManageInvoices && (
+                                                                <DropdownMenuItem
+                                                                    onClick={() =>
+                                                                        handleEditDetails(
+                                                                            invoice,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Edit2 className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                    <span>
+                                                                        Editar
+                                                                        factura
+                                                                    </span>
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {(canCreateWorkOrders ||
+                                                                canManageInvoices) &&
+                                                                (() => {
+                                                                    const specimens =
+                                                                        getInvoiceSpecimens(
+                                                                            invoice,
+                                                                        );
+
+                                                                    if (
+                                                                        specimens.length ===
+                                                                            1 &&
+                                                                        specimens[0]
+                                                                            .id
+                                                                    ) {
+                                                                        return (
+                                                                            <DropdownMenuItem
+                                                                                onClick={() =>
+                                                                                    handleCreateWorkOrder(
+                                                                                        specimens[0]
+                                                                                            .id,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                                <span>
+                                                                                    Crear
+                                                                                    orden
+                                                                                    de
+                                                                                    trabajo
+                                                                                </span>
+                                                                            </DropdownMenuItem>
+                                                                        );
+                                                                    }
+
+                                                                    if (
+                                                                        specimens.length >
+                                                                        1
+                                                                    ) {
+                                                                        const allIds =
+                                                                            specimens
+                                                                                .map(
+                                                                                    (
+                                                                                        s: any,
+                                                                                    ) =>
+                                                                                        s.id,
+                                                                                )
+                                                                                .filter(
+                                                                                    Boolean,
+                                                                                );
+                                                                        const selectedIds =
+                                                                            getSelectedSpecimensForInvoice(
+                                                                                invoice,
+                                                                            );
+                                                                        const isAllSelected =
+                                                                            selectedIds.length ===
+                                                                                allIds.length &&
+                                                                            allIds.length >
+                                                                                0;
+
+                                                                        return (
+                                                                            <DropdownMenuSub>
+                                                                                <DropdownMenuSubTrigger>
+                                                                                    <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                                    <span>
+                                                                                        Crear
+                                                                                        orden
+                                                                                        de
+                                                                                        trabajo
+                                                                                    </span>
+                                                                                </DropdownMenuSubTrigger>
+                                                                                <DropdownMenuSubContent
+                                                                                    alignOffset={
+                                                                                        -4
+                                                                                    }
+                                                                                    className="w-64 p-0 shadow-lg"
+                                                                                    onClick={(
+                                                                                        e,
+                                                                                    ) =>
+                                                                                        e.stopPropagation()
+                                                                                    }
+                                                                                >
+                                                                                    <div className="flex items-center justify-between border-b border-border/60 bg-muted/40 px-3 py-2 text-xs">
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(
+                                                                                                e,
+                                                                                            ) => {
+                                                                                                e.stopPropagation();
+                                                                                                setGroupSpecimenSelections(
+                                                                                                    (
+                                                                                                        prev,
+                                                                                                    ) => ({
+                                                                                                        ...prev,
+                                                                                                        [invoice.id]:
+                                                                                                            allIds,
+                                                                                                    }),
+                                                                                                );
+                                                                                            }}
+                                                                                            className="cursor-pointer font-medium text-primary transition-all hover:underline"
+                                                                                        >
+                                                                                            Seleccionar
+                                                                                            todos
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={(
+                                                                                                e,
+                                                                                            ) => {
+                                                                                                e.stopPropagation();
+                                                                                                setGroupSpecimenSelections(
+                                                                                                    (
+                                                                                                        prev,
+                                                                                                    ) => ({
+                                                                                                        ...prev,
+                                                                                                        [invoice.id]:
+                                                                                                            [],
+                                                                                                    }),
+                                                                                                );
+                                                                                            }}
+                                                                                            className="cursor-pointer font-medium text-muted-foreground transition-all hover:text-destructive hover:underline"
+                                                                                        >
+                                                                                            Deseleccionar
+                                                                                            todos
+                                                                                        </button>
+                                                                                    </div>
+
+                                                                                    <div className="max-h-56 space-y-0.5 overflow-y-auto p-1">
+                                                                                        {specimens.map(
+                                                                                            (
+                                                                                                specimen: any,
+                                                                                            ) => {
+                                                                                                const isChecked =
+                                                                                                    selectedIds.includes(
+                                                                                                        specimen.id,
+                                                                                                    );
+                                                                                                const codeOrId =
+                                                                                                    specimen.sequence_code ||
+                                                                                                    specimen.id;
+                                                                                                const name =
+                                                                                                    specimen
+                                                                                                        .examination
+                                                                                                        ?.name ||
+                                                                                                    specimen
+                                                                                                        .type
+                                                                                                        ?.name ||
+                                                                                                    'Muestra';
+
+                                                                                                return (
+                                                                                                    <DropdownMenuItem
+                                                                                                        key={
+                                                                                                            specimen.id
+                                                                                                        }
+                                                                                                        onSelect={(
+                                                                                                            e,
+                                                                                                        ) => {
+                                                                                                            e.preventDefault();
+                                                                                                            toggleSpecimenForInvoice(
+                                                                                                                invoice.id,
+                                                                                                                specimen.id,
+                                                                                                                allIds,
+                                                                                                            );
+                                                                                                        }}
+                                                                                                        className="flex cursor-pointer items-center text-xs"
+                                                                                                    >
+                                                                                                        <div
+                                                                                                            className={cn(
+                                                                                                                'group mr-2 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-all',
+                                                                                                                isChecked
+                                                                                                                    ? 'border-primary bg-primary text-white'
+                                                                                                                    : 'border-muted-foreground/40 bg-transparent text-muted-foreground/20',
+                                                                                                            )}
+                                                                                                        >
+                                                                                                            <Check
+                                                                                                                className={cn(
+                                                                                                                    'h-2 w-2 stroke-[3]',
+                                                                                                                    isChecked
+                                                                                                                        ? 'stroke-white/80'
+                                                                                                                        : 'text-muted-foreground/50',
+                                                                                                                )}
+                                                                                                            />
+                                                                                                        </div>
+                                                                                                        <span className="truncate">
+                                                                                                            [
+                                                                                                            {
+                                                                                                                codeOrId
+                                                                                                            }
+
+                                                                                                            ]{' '}
+                                                                                                            {
+                                                                                                                name
+                                                                                                            }
+                                                                                                        </span>
+                                                                                                    </DropdownMenuItem>
+                                                                                                );
+                                                                                            },
+                                                                                        )}
+                                                                                    </div>
+
+                                                                                    <div className="border-t border-border/60 p-1">
+                                                                                        <DropdownMenuItem
+                                                                                            disabled={
+                                                                                                selectedIds.length ===
+                                                                                                0
+                                                                                            }
+                                                                                            onClick={() => {
+                                                                                                if (
+                                                                                                    selectedIds.length ===
+                                                                                                    1
+                                                                                                ) {
+                                                                                                    handleCreateWorkOrder(
+                                                                                                        selectedIds[0],
+                                                                                                    );
+                                                                                                } else if (
+                                                                                                    selectedIds.length >
+                                                                                                    1
+                                                                                                ) {
+                                                                                                    handleCreateBulkWorkOrders(
+                                                                                                        selectedIds,
+                                                                                                    );
+                                                                                                }
+                                                                                            }}
+                                                                                            className="justify-center text-xs font-semibold text-primary focus:bg-primary/10 focus:text-primary"
+                                                                                        >
+                                                                                            <ClipboardList className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                                                                                            <span>
+                                                                                                {selectedIds.length ===
+                                                                                                0
+                                                                                                    ? 'Sin seleccionadas'
+                                                                                                    : selectedIds.length ===
+                                                                                                        1
+                                                                                                      ? 'Crear 1 orden'
+                                                                                                      : `Crear ${selectedIds.length} órdenes`}
+                                                                                            </span>
+                                                                                        </DropdownMenuItem>
+                                                                                    </div>
+                                                                                </DropdownMenuSubContent>
+                                                                            </DropdownMenuSub>
+                                                                        );
+                                                                    }
+
+                                                                    return (
+                                                                        <DropdownMenuItem
+                                                                            disabled
+                                                                        >
+                                                                            <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                            <span>
+                                                                                Crear
+                                                                                orden
+                                                                                de
+                                                                                trabajo
+                                                                            </span>
+                                                                        </DropdownMenuItem>
+                                                                    );
+                                                                })()}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 )}
                                             </div>
                                         </TableCell>
@@ -1651,6 +2019,24 @@ export default function InvoicesIndex({
                 activeLocationId={activeLocationId}
                 products={products}
                 banks={banks}
+            />
+
+            {/* Work Order Creation Sheet */}
+            <WorkOrderSheet
+                specimenId={selectedSpecimenForWorkOrder}
+                specimenIds={selectedSpecimenIdsForWorkOrder}
+                workOrderTypes={workOrderTypes}
+                workOrderTasks={workOrderTasks}
+                usersList={usersList}
+                open={isWorkOrderSheetOpen}
+                onOpenChange={(open) => {
+                    setIsWorkOrderSheetOpen(open);
+
+                    if (!open) {
+                        setSelectedSpecimenForWorkOrder(null);
+                        setSelectedSpecimenIdsForWorkOrder(null);
+                    }
+                }}
             />
         </>
     );

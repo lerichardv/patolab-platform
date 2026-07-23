@@ -86,7 +86,8 @@ export default function SpecimenCollaboratorSheet({
                 },
                 onError: (errors) => {
                     const message =
-                        Object.values(errors)[0] || 'Error al asignar colaborador';
+                        Object.values(errors)[0] ||
+                        'Error al asignar colaborador';
                     toast.error(message);
                 },
             },
@@ -98,7 +99,9 @@ export default function SpecimenCollaboratorSheet({
         field: 'macroscopy' | 'microscopy',
         checked: boolean,
     ) => {
-        const targetCollab = specimen.collaborators?.find((c: any) => c.id === userId);
+        const targetCollab = specimen.collaborators?.find(
+            (c: any) => c.id === userId,
+        );
 
         if (!targetCollab) {
             return;
@@ -276,7 +279,10 @@ export default function SpecimenCollaboratorSheet({
                     <div className="space-y-4">
                         <div className="space-y-1">
                             <p className="text-xs text-muted-foreground">
-                                Los colaboradores pueden visualizar y editar el reporte de la muestra según los accesos otorgados, pero no generarán comisión por el diagnóstico.
+                                Los colaboradores pueden visualizar y editar el
+                                reporte de la muestra según los accesos
+                                otorgados, pero no generarán comisión por el
+                                diagnóstico.
                             </p>
                         </div>
 
@@ -290,7 +296,9 @@ export default function SpecimenCollaboratorSheet({
                                 <div className="flex flex-col gap-4">
                                     <Select
                                         value={selectedCollaboratorId}
-                                        onValueChange={setSelectedCollaboratorId}
+                                        onValueChange={
+                                            setSelectedCollaboratorId
+                                        }
                                     >
                                         <SelectTrigger className="h-11 w-full bg-background">
                                             <SelectValue placeholder="Seleccione un colaborador para agregar a la muestra..." />
@@ -312,7 +320,9 @@ export default function SpecimenCollaboratorSheet({
                                             <div className="flex items-center space-x-2">
                                                 <Switch
                                                     id="new-collab-macro-access-sheet"
-                                                    checked={collabMacroscopyAccess}
+                                                    checked={
+                                                        collabMacroscopyAccess
+                                                    }
                                                     onCheckedChange={
                                                         setCollabMacroscopyAccess
                                                     }
@@ -327,7 +337,9 @@ export default function SpecimenCollaboratorSheet({
                                             <div className="flex items-center space-x-2">
                                                 <Switch
                                                     id="new-collab-micro-access-sheet"
-                                                    checked={collabMicroscopyAccess}
+                                                    checked={
+                                                        collabMicroscopyAccess
+                                                    }
                                                     onCheckedChange={
                                                         setCollabMicroscopyAccess
                                                     }
@@ -344,7 +356,9 @@ export default function SpecimenCollaboratorSheet({
                                         <Button
                                             type="button"
                                             onClick={() =>
-                                                handleAssignCollaborator(selectedCollaboratorId)
+                                                handleAssignCollaborator(
+                                                    selectedCollaboratorId,
+                                                )
                                             }
                                             disabled={!selectedCollaboratorId}
                                             className="h-10 px-5 font-semibold"
@@ -355,14 +369,16 @@ export default function SpecimenCollaboratorSheet({
                                 </div>
                             ) : (
                                 <div className="rounded-md border border-dashed bg-muted/40 p-3.5 text-center text-xs text-muted-foreground">
-                                    No hay colaboradores disponibles para asignar.
+                                    No hay colaboradores disponibles para
+                                    asignar.
                                 </div>
                             )}
                         </div>
 
                         {/* Assigned Collaborators List Table */}
                         <div className="max-h-[300px] w-full overflow-y-auto rounded-lg border border-border/80 bg-card shadow-sm">
-                            {specimen.collaborators && specimen.collaborators.length > 0 ? (
+                            {specimen.collaborators &&
+                            specimen.collaborators.length > 0 ? (
                                 <div className="w-full overflow-x-auto">
                                     <table className="w-full border-collapse text-left text-sm">
                                         <thead className="sticky top-0 z-10 border-b bg-muted/95 backdrop-blur-sm">
@@ -379,111 +395,113 @@ export default function SpecimenCollaboratorSheet({
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border/60">
-                                            {specimen.collaborators.map((user: any) => (
-                                                <tr
-                                                    key={user.id}
-                                                    className="transition-colors hover:bg-muted/20"
-                                                >
-                                                    <td className="p-3.5 text-left">
-                                                        <div className="flex flex-col items-start gap-2.5">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-sm leading-tight font-semibold text-foreground">
-                                                                        {
-                                                                            user.name
-                                                                        }
-                                                                    </span>
-                                                                    <span className="text-xs font-normal text-muted-foreground">
-                                                                        {
-                                                                            user.email
-                                                                        }
-                                                                    </span>
+                                            {specimen.collaborators.map(
+                                                (user: any) => (
+                                                    <tr
+                                                        key={user.id}
+                                                        className="transition-colors hover:bg-muted/20"
+                                                    >
+                                                        <td className="p-3.5 text-left">
+                                                            <div className="flex flex-col items-start gap-2.5">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-sm leading-tight font-semibold text-foreground">
+                                                                            {
+                                                                                user.name
+                                                                            }
+                                                                        </span>
+                                                                        <span className="text-xs font-normal text-muted-foreground">
+                                                                            {
+                                                                                user.email
+                                                                            }
+                                                                        </span>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className="flex flex-nowrap items-start gap-3">
-                                                            <div className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1 text-[11px] transition-colors hover:bg-muted/50">
-                                                                <span className="font-medium text-muted-foreground">
-                                                                    Macroscopía
-                                                                </span>
-                                                                <Switch
-                                                                    checked={
-                                                                        user
-                                                                            .pivot
-                                                                            ?.macroscopy_access !==
-                                                                        undefined
-                                                                            ? Boolean(
-                                                                                  user
-                                                                                      .pivot
-                                                                                      .macroscopy_access,
-                                                                              )
-                                                                            : false
-                                                                    }
-                                                                    onCheckedChange={(
-                                                                        checked,
-                                                                    ) =>
-                                                                        handleToggleCollaboratorAccess(
-                                                                            user.id,
-                                                                            'macroscopy',
+                                                        </td>
+                                                        <td>
+                                                            <div className="flex flex-nowrap items-start gap-3">
+                                                                <div className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1 text-[11px] transition-colors hover:bg-muted/50">
+                                                                    <span className="font-medium text-muted-foreground">
+                                                                        Macroscopía
+                                                                    </span>
+                                                                    <Switch
+                                                                        checked={
+                                                                            user
+                                                                                .pivot
+                                                                                ?.macroscopy_access !==
+                                                                            undefined
+                                                                                ? Boolean(
+                                                                                      user
+                                                                                          .pivot
+                                                                                          .macroscopy_access,
+                                                                                  )
+                                                                                : false
+                                                                        }
+                                                                        onCheckedChange={(
                                                                             checked,
-                                                                        )
-                                                                    }
-                                                                    title="Alternar acceso a macroscopía"
-                                                                    className="scale-90"
-                                                                />
-                                                            </div>
-                                                            <div className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1 text-[11px] transition-colors hover:bg-muted/50">
-                                                                <span className="font-medium text-muted-foreground">
-                                                                    Microscopía
-                                                                </span>
-                                                                <Switch
-                                                                    checked={
-                                                                        user
-                                                                            .pivot
-                                                                            ?.microscopy_access !==
-                                                                        undefined
-                                                                            ? Boolean(
-                                                                                  user
-                                                                                      .pivot
-                                                                                      .microscopy_access,
-                                                                              )
-                                                                            : false
-                                                                    }
-                                                                    onCheckedChange={(
-                                                                        checked,
-                                                                    ) =>
-                                                                        handleToggleCollaboratorAccess(
-                                                                            user.id,
-                                                                            'microscopy',
+                                                                        ) =>
+                                                                            handleToggleCollaboratorAccess(
+                                                                                user.id,
+                                                                                'macroscopy',
+                                                                                checked,
+                                                                            )
+                                                                        }
+                                                                        title="Alternar acceso a macroscopía"
+                                                                        className="scale-90"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex items-center gap-2 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1 text-[11px] transition-colors hover:bg-muted/50">
+                                                                    <span className="font-medium text-muted-foreground">
+                                                                        Microscopía
+                                                                    </span>
+                                                                    <Switch
+                                                                        checked={
+                                                                            user
+                                                                                .pivot
+                                                                                ?.microscopy_access !==
+                                                                            undefined
+                                                                                ? Boolean(
+                                                                                      user
+                                                                                          .pivot
+                                                                                          .microscopy_access,
+                                                                                  )
+                                                                                : false
+                                                                        }
+                                                                        onCheckedChange={(
                                                                             checked,
-                                                                        )
-                                                                    }
-                                                                    title="Alternar acceso a microscopía"
-                                                                    className="scale-90"
-                                                                />
+                                                                        ) =>
+                                                                            handleToggleCollaboratorAccess(
+                                                                                user.id,
+                                                                                'microscopy',
+                                                                                checked,
+                                                                            )
+                                                                        }
+                                                                        title="Alternar acceso a microscopía"
+                                                                        className="scale-90"
+                                                                    />
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-3.5 text-right">
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-destructive transition-colors hover:bg-destructive/10 hover:text-destructive"
-                                                            onClick={() =>
-                                                                handleUnassignCollaborator(
-                                                                    user.id,
-                                                                )
-                                                            }
-                                                            title="Eliminar asignación"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                                        </td>
+                                                        <td className="p-3.5 text-right">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-destructive transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                                                onClick={() =>
+                                                                    handleUnassignCollaborator(
+                                                                        user.id,
+                                                                    )
+                                                                }
+                                                                title="Eliminar asignación"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ),
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -496,7 +514,8 @@ export default function SpecimenCollaboratorSheet({
                                         Sin colaboradores asignados
                                     </h4>
                                     <p className="max-w-xs text-xs text-muted-foreground">
-                                        Esta muestra no tiene ningún colaborador asignado actualmente.
+                                        Esta muestra no tiene ningún colaborador
+                                        asignado actualmente.
                                     </p>
                                 </div>
                             )}

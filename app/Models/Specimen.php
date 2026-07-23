@@ -69,11 +69,14 @@ class Specimen extends Model
         'is_group',
         'group_id',
         'report_id',
+        'cancellation_reason',
+        'cancelled_at',
     ];
 
     protected $casts = [
         'active' => 'boolean',
         'is_group' => 'boolean',
+        'cancelled_at' => 'datetime',
     ];
 
     protected $appends = [

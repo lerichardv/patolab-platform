@@ -1,0 +1,30 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('specimen', function (Blueprint $table) {
+            $table->string('cancellation_reason')->after('report_id')->nullable();
+            $table->timestamp('cancelled_at')->after('cancellation_reason')->nullable();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('specimen', function (Blueprint $table) {
+            $table->dropColumn('cancellation_reason');
+            $table->dropColumn('cancelled_at');
+        });
+    }
+};

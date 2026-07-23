@@ -1,5 +1,12 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { format, add, startOfWeek, endOfWeek } from 'date-fns';
+import {
+    format,
+    add,
+    startOfWeek,
+    endOfWeek,
+    formatDistanceToNow,
+    isPast,
+} from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
     ClipboardList,
@@ -51,6 +58,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,8 +80,9 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
-import SpecimenViewSheet from '../specimens/specimen-view-sheet';
+import SpecimenBulkCollaboratorSheet from '../specimens/specimen-bulk-collaborator-sheet';
 import SpecimenCollaboratorSheet from '../specimens/specimen-collaborator-sheet';
+import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 
 interface Specimen {
     id: number;
@@ -160,15 +170,14 @@ const STATUS_LABELS: Record<string, string> = {
     cancelled: 'Cancelada',
 };
 
-// Calculate the due date based on specimen category configuration
 const getDueDate = (specimen: Specimen): Date => {
     const createdAt = new Date(specimen.created_at);
 
-    if (
-        !specimen.category ||
-        !specimen.category.intern_unit ||
-        !specimen.category.intern_quantity
-    ) {
+    const unit = specimen.category?.intern_unit || specimen.category?.unit;
+    const quantity =
+        specimen.category?.intern_quantity || specimen.category?.quantity;
+
+    if (!unit || !quantity) {
         return createdAt;
     }
 
@@ -180,11 +189,65 @@ const getDueDate = (specimen: Specimen): Date => {
     };
 
     const duration = {
-        [unitMap[specimen.category.intern_unit] || 'days']:
-            specimen.category.intern_quantity,
+        [unitMap[unit] || 'days']: quantity,
     };
 
     return add(createdAt, duration);
+};
+
+const getDueDateInfo = (specimen: Specimen) => {
+    if (!specimen.category) {
+        return null;
+    }
+
+    const unit = specimen.category.intern_unit || specimen.category.unit;
+    const quantity =
+        specimen.category.intern_quantity || specimen.category.quantity;
+
+    if (!unit || !quantity) {
+        return null;
+    }
+
+    const dueDate = getDueDate(specimen);
+    const isCompleted = ['finalized', 'delivered', 'cancelled'].includes(
+        specimen.status,
+    );
+
+    const dueDateFormatted = formatDistanceToNow(dueDate, {
+        addSuffix: true,
+        locale: es,
+    });
+    const fullDueDate = format(dueDate, 'dd/MM/yyyy HH:mm');
+
+    const isExpired = isPast(dueDate);
+    const isWithinOneDay =
+        dueDateFormatted.includes('1 día') ||
+        dueDateFormatted.includes('hora') ||
+        dueDateFormatted.includes('minuto');
+
+    let colorClass =
+        'bg-secondary text-secondary-foreground border-transparent';
+
+    if (!isCompleted) {
+        if (isExpired) {
+            colorClass =
+                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800/50';
+        } else if (isWithinOneDay) {
+            colorClass =
+                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800/50';
+        } else {
+            colorClass =
+                'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50';
+        }
+    }
+
+    return {
+        dueDateFormatted,
+        fullDueDate,
+        colorClass,
+        isExpired,
+        dueDate,
+    };
 };
 
 function CopyButton({ text }: { text: string }) {
@@ -243,12 +306,21 @@ export default function MyAssignmentsIndex({
     const [selectedSpecimenForWorkOrder, setSelectedSpecimenForWorkOrder] =
         useState<number | null>(null);
     const [isWorkOrderSheetOpen, setIsWorkOrderSheetOpen] = useState(false);
-    const [selectedSpecimenForCollaborator, setSelectedSpecimenForCollaborator] =
-        useState<Specimen | null>(null);
-    const [isCollaboratorSheetOpen, setIsCollaboratorSheetOpen] = useState(false);
+    const [
+        selectedSpecimenForCollaborator,
+        setSelectedSpecimenForCollaborator,
+    ] = useState<Specimen | null>(null);
+    const [isCollaboratorSheetOpen, setIsCollaboratorSheetOpen] =
+        useState(false);
+    const [isBulkCollaboratorSheetOpen, setIsBulkCollaboratorSheetOpen] =
+        useState(false);
 
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+    const selectedSpecimens = useMemo(() => {
+        return specimens.filter((s) => selectedIds.includes(s.id));
+    }, [specimens, selectedIds]);
 
     const toggleSelectSpecimen = (id: number) => {
         setSelectedIds((prev) =>
@@ -1043,16 +1115,52 @@ export default function MyAssignmentsIndex({
                             )}
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                            <Button
-                                disabled={selectedIds.length === 0}
-                                onClick={() => {
-                                    setSelectedSpecimenForWorkOrder(null);
-                                    setIsWorkOrderSheetOpen(true);
-                                }}
-                                className="flex h-8 w-full items-center gap-2 bg-emerald-600 px-3 text-xs text-white transition-colors hover:bg-emerald-700 sm:w-auto sm:px-4"
-                            >
-                                <Plus className="h-4 w-4" /> Crear Orden en Lote
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        disabled={selectedIds.length === 0}
+                                        className="flex h-8 w-full items-center gap-2 px-3 text-xs sm:w-auto sm:px-4"
+                                    >
+                                        <Layers className="h-4 w-4" /> Acciones
+                                        en Bulk{' '}
+                                        <ChevronDown className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                    align="end"
+                                    className="w-56"
+                                >
+                                    <DropdownMenuLabel>
+                                        Acciones en Lote
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+
+                                    <DropdownMenuItem
+                                        onClick={() => {
+                                            setSelectedSpecimenForWorkOrder(
+                                                null,
+                                            );
+                                            setIsWorkOrderSheetOpen(true);
+                                        }}
+                                        className="cursor-pointer"
+                                    >
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        <span>Crear Orden en Lote</span>
+                                    </DropdownMenuItem>
+
+                                    <DropdownMenuItem
+                                        onClick={() => {
+                                            setIsBulkCollaboratorSheetOpen(
+                                                true,
+                                            );
+                                        }}
+                                        className="cursor-pointer"
+                                    >
+                                        <UserPlus className="mr-2 h-4 w-4" />
+                                        <span>Asignar Colaboradores</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     </div>
                 )}
@@ -1250,20 +1358,51 @@ export default function MyAssignmentsIndex({
                                                                 <TableCell className="font-mono text-xs font-semibold text-primary">
                                                                     <div className="flex flex-col gap-1 py-1">
                                                                         {(() => {
-                                                                            const isPathologist = specimen.users?.some((u: any) => u.id === props.auth?.user?.id);
-                                                                            const isCollaborator = specimen.collaborators?.some((c: any) => c.id === props.auth?.user?.id);
+                                                                            const isPathologist =
+                                                                                specimen.users?.some(
+                                                                                    (
+                                                                                        u: any,
+                                                                                    ) =>
+                                                                                        u.id ===
+                                                                                        props
+                                                                                            .auth
+                                                                                            ?.user
+                                                                                            ?.id,
+                                                                                );
+                                                                            const isCollaborator =
+                                                                                specimen.collaborators?.some(
+                                                                                    (
+                                                                                        c: any,
+                                                                                    ) =>
+                                                                                        c.id ===
+                                                                                        props
+                                                                                            .auth
+                                                                                            ?.user
+                                                                                            ?.id,
+                                                                                );
 
-                                                                            if (!isPathologist && !isCollaborator) return null;
+                                                                            if (
+                                                                                !isPathologist &&
+                                                                                !isCollaborator
+                                                                            ) {
+                                                                                return null;
+                                                                            }
 
                                                                             return (
                                                                                 <div className="flex flex-wrap gap-1">
                                                                                     {isPathologist && (
-                                                                                        <Badge variant="outline" className="text-[8px] px-1 py-0 bg-blue-500/10 text-blue-500 border-blue-500/20 font-semibold uppercase">
+                                                                                        <Badge
+                                                                                            variant="outline"
+                                                                                            className="border-blue-500/20 bg-blue-500/10 px-1 py-0 text-[8px] font-semibold text-blue-500 uppercase"
+                                                                                        >
                                                                                             Patólogo
                                                                                         </Badge>
                                                                                     )}
                                                                                     {isCollaborator && (
-                                                                                        <Badge variant="outline" className="text-[8px] px-1 py-0 bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-semibold uppercase">
+                                                                                        <Badge
+                                                                                            variant="outline"
+                                                                                            className="border-emerald-500/20 bg-emerald-500/10 px-1 py-0 text-[8px] font-semibold text-emerald-500 uppercase"
+                                                                                        >
                                                                                             Colaborador
                                                                                         </Badge>
                                                                                     )}
@@ -1310,54 +1449,91 @@ export default function MyAssignmentsIndex({
                                                                         </div>
                                                                     </div>
                                                                 </TableCell>
-                                                                {/* Visual Day Calendar Tear-off Widget */}
+                                                                {/* Visual Day Calendar Tear-off Widget + Inline Status Badge */}
                                                                 <TableCell className="py-2.5">
-                                                                    {(() => {
-                                                                        const isLight =
-                                                                            [
-                                                                                'yellow',
-                                                                                '#ffff00',
-                                                                                '#facc15',
-                                                                                '#eab308',
-                                                                                '#ffeb3b',
-                                                                            ].includes(
-                                                                                priorityColor
-                                                                                    .toLowerCase()
-                                                                                    .trim(),
-                                                                            );
+                                                                    <div className="flex items-center gap-2">
+                                                                        {(() => {
+                                                                            const isLight =
+                                                                                [
+                                                                                    'yellow',
+                                                                                    '#ffff00',
+                                                                                    '#facc15',
+                                                                                    '#eab308',
+                                                                                    '#ffeb3b',
+                                                                                ].includes(
+                                                                                    priorityColor
+                                                                                        .toLowerCase()
+                                                                                        .trim(),
+                                                                                );
 
-                                                                        return (
-                                                                            <div className="mx-auto flex max-w-[62px] min-w-[62px] flex-col items-center justify-center overflow-hidden rounded-md border border-muted-foreground/20 bg-background text-center shadow-xs">
+                                                                            return (
+                                                                                <div className="flex max-w-[62px] min-w-[62px] flex-col items-center justify-center overflow-hidden rounded-md border border-muted-foreground/20 bg-background text-center shadow-xs">
+                                                                                    <div
+                                                                                        className={`w-full py-0.5 text-[8.5px] leading-none font-bold tracking-wider uppercase ${isLight ? 'text-neutral-900' : 'text-white'}`}
+                                                                                        style={{
+                                                                                            backgroundColor:
+                                                                                                priorityColor,
+                                                                                        }}
+                                                                                    >
+                                                                                        {format(
+                                                                                            dueDate,
+                                                                                            'MMM',
+                                                                                            {
+                                                                                                locale: es,
+                                                                                            },
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div className="mt-0.5 px-1.5 py-0.5 text-base leading-none font-black text-foreground">
+                                                                                        {format(
+                                                                                            dueDate,
+                                                                                            'dd',
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div className="mt-0.5 pb-1 text-[8.5px] leading-none text-muted-foreground">
+                                                                                        {format(
+                                                                                            dueDate,
+                                                                                            'HH:mm',
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                        {(() => {
+                                                                            const dueInfo =
+                                                                                getDueDateInfo(
+                                                                                    specimen,
+                                                                                );
+                                                                            if (
+                                                                                !dueInfo ||
+                                                                                [
+                                                                                    'finalized',
+                                                                                    'delivered',
+                                                                                    'cancelled',
+                                                                                ].includes(
+                                                                                    specimen.status,
+                                                                                )
+                                                                            ) {
+                                                                                return null;
+                                                                            }
+
+                                                                            return (
                                                                                 <div
-                                                                                    className={`w-full py-0.5 text-[8.5px] leading-none font-bold tracking-wider uppercase ${isLight ? 'text-neutral-900' : 'text-white'}`}
-                                                                                    style={{
-                                                                                        backgroundColor:
-                                                                                            priorityColor,
-                                                                                    }}
+                                                                                    className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${dueInfo.colorClass}`}
+                                                                                    title={`Vencimiento Interno: ${dueInfo.fullDueDate}`}
                                                                                 >
-                                                                                    {format(
-                                                                                        dueDate,
-                                                                                        'MMM',
+                                                                                    <CalendarClock className="h-3 w-3 shrink-0" />
+                                                                                    <span>
+                                                                                        {dueInfo.isExpired
+                                                                                            ? 'Vencida:'
+                                                                                            : 'Est:'}{' '}
                                                                                         {
-                                                                                            locale: es,
-                                                                                        },
-                                                                                    )}
+                                                                                            dueInfo.dueDateFormatted
+                                                                                        }
+                                                                                    </span>
                                                                                 </div>
-                                                                                <div className="mt-0.5 px-1.5 py-0.5 text-base leading-none font-black text-foreground">
-                                                                                    {format(
-                                                                                        dueDate,
-                                                                                        'dd',
-                                                                                    )}
-                                                                                </div>
-                                                                                <div className="mt-0.5 pb-1 text-[8.5px] leading-none text-muted-foreground">
-                                                                                    {format(
-                                                                                        dueDate,
-                                                                                        'HH:mm',
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })()}
+                                                                            );
+                                                                        })()}
+                                                                    </div>
                                                                 </TableCell>
                                                                 <TableCell className="font-medium text-foreground">
                                                                     {specimen
@@ -1573,6 +1749,13 @@ export default function MyAssignmentsIndex({
                 open={isCollaboratorSheetOpen}
                 onOpenChange={setIsCollaboratorSheetOpen}
                 pathologists={usersList}
+            />
+
+            <SpecimenBulkCollaboratorSheet
+                selectedSpecimens={selectedSpecimens}
+                open={isBulkCollaboratorSheetOpen}
+                onOpenChange={setIsBulkCollaboratorSheetOpen}
+                usersList={usersList}
             />
 
             <Dialog

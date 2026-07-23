@@ -21,6 +21,10 @@ use App\Models\SpecimenCategory;
 use App\Models\SpecimenGroup;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
+use App\Models\User;
+use App\Models\WorkOrderTask;
+use App\Models\WorkOrderType;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -85,6 +89,9 @@ class InvoiceController extends Controller
                 if (is_array($decoded)) {
                     $dateFrom = $decoded['from'] ?? '';
                     $dateTo = $decoded['to'] ?? '';
+                    if ($dateTo && $dateTo < now()->toDateString()) {
+                        $dateTo = now()->toDateString();
+                    }
                 }
             } else {
                 $dateFrom = now()->subDays(14)->toDateString();
@@ -132,7 +139,8 @@ class InvoiceController extends Controller
             $query->whereDate('invoices.created_at', '>=', $dateFrom);
         }
         if (! empty($dateTo)) {
-            $query->whereDate('invoices.created_at', '<=', $dateTo);
+            $dateToEnd = Carbon::parse($dateTo)->addDays(1)->toDateString();
+            $query->whereDate('invoices.created_at', '<=', $dateToEnd);
         }
 
         // Filter by specimen group
@@ -252,6 +260,9 @@ class InvoiceController extends Controller
             'products' => $products,
             'groups' => SpecimenGroup::orderBy('name', 'asc')->get(),
             'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
+            'workOrderTypes' => WorkOrderType::orderBy('name')->get(),
+            'workOrderTasks' => WorkOrderTask::orderBy('name')->get(),
+            'usersList' => User::where('active', true)->orderBy('name')->get(),
         ]);
     }
 
@@ -313,6 +324,9 @@ class InvoiceController extends Controller
                 if (is_array($decoded)) {
                     $dateFromExport = $decoded['from'] ?? '';
                     $dateToExport = $decoded['to'] ?? '';
+                    if ($dateToExport && $dateToExport < now()->toDateString()) {
+                        $dateToExport = now()->toDateString();
+                    }
                 }
             } else {
                 $dateFromExport = now()->subDays(14)->toDateString();
@@ -324,7 +338,8 @@ class InvoiceController extends Controller
             $query->whereDate('invoices.created_at', '>=', $dateFromExport);
         }
         if (! empty($dateToExport)) {
-            $query->whereDate('invoices.created_at', '<=', $dateToExport);
+            $dateToExportEnd = Carbon::parse($dateToExport)->addDays(1)->toDateString();
+            $query->whereDate('invoices.created_at', '<=', $dateToExportEnd);
         }
 
         // Sorting

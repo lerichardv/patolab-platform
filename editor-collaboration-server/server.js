@@ -10,6 +10,7 @@ import { TiptapTransformer } from '@hocuspocus/transformer';
 import { mergeAttributes, Node } from '@tiptap/core';
 import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
+import BulletList from '@tiptap/extension-bullet-list';
 import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
 import { generateJSON, generateHTML } from '@tiptap/html';
@@ -157,8 +158,33 @@ const ImageGrid = Node.create({
 	},
 });
 
+const CustomBulletList = BulletList.extend({
+	addAttributes() {
+		return {
+			...this.parent?.(),
+			listStyleType: {
+				default: 'disc',
+				parseHTML: element =>
+					element.getAttribute('data-list-style-type') ||
+					element.style.listStyleType ||
+					'disc',
+				renderHTML: attributes => {
+					return {
+						style: `list-style-type: ${attributes.listStyleType}`,
+						'data-list-style-type': attributes.listStyleType,
+					};
+				},
+			},
+		};
+	},
+});
+
 const extensions = [
-	StarterKit.configure({ undoRedo: false }),
+	StarterKit.configure({
+		undoRedo: false,
+		bulletList: false,
+	}),
+	CustomBulletList,
 	CustomImage.configure({
 		allowBase64: false,
 		resize: {
