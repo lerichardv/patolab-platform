@@ -27,6 +27,9 @@ import {
     Microscope,
     MoreVertical,
     ClipboardList,
+    MessageSquare,
+    Calendar,
+    AlertOctagon,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
@@ -318,6 +321,12 @@ export default function InvoicesIndex({
     );
     const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null);
     const [search, setSearch] = useState(filters.search || '');
+    const [isCancellationReasonSheetOpen, setIsCancellationReasonSheetOpen] =
+        useState(false);
+    const [
+        selectedInvoiceForCancellationReason,
+        setSelectedInvoiceForCancellationReason,
+    ] = useState<any | null>(null);
 
     const [isSpecimenSheetOpen, setIsSpecimenSheetOpen] = useState(false);
     const [selectedSpecimen, setSelectedSpecimen] = useState<any | null>(null);
@@ -693,6 +702,17 @@ export default function InvoicesIndex({
                     className="rounded-full border-sky-200 bg-sky-50 px-2.5 py-0.5 text-sky-700 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-400"
                 >
                     Otro Cobro
+                </Badge>
+            );
+        }
+
+        if (type === 'cancelled') {
+            return (
+                <Badge
+                    variant="outline"
+                    className="rounded-full border-red-200 bg-red-50 px-2.5 py-0.5 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400"
+                >
+                    Cancelada
                 </Badge>
             );
         }
@@ -1260,6 +1280,25 @@ export default function InvoicesIndex({
                                             <div className="flex items-center gap-1.5">
                                                 {getInvoiceTypeBadge(
                                                     invoice.invoice_type,
+                                                )}
+                                                {invoice.invoice_type ===
+                                                    'cancelled' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-5 w-5 hover:bg-muted"
+                                                        onClick={() => {
+                                                            setSelectedInvoiceForCancellationReason(
+                                                                invoice,
+                                                            );
+                                                            setIsCancellationReasonSheetOpen(
+                                                                true,
+                                                            );
+                                                        }}
+                                                        title="Ver Motivo de Cancelación"
+                                                    >
+                                                        <MessageSquare className="h-3.5 w-3.5 text-red-500 hover:text-red-700" />
+                                                    </Button>
                                                 )}
                                                 {/* {invoice.invoice_type ===
 													'credit payment' &&
@@ -2070,6 +2109,150 @@ export default function InvoicesIndex({
                     }
                 }}
             />
+
+            {/* Cancellation Reason Sheet */}
+            <Sheet
+                open={isCancellationReasonSheetOpen}
+                onOpenChange={setIsCancellationReasonSheetOpen}
+            >
+                <SheetContent className="sm:max-w-md">
+                    <HeadingSheet
+                        title="Motivo de Cancelación"
+                        description="Detalles sobre la cancelación de la factura y su muestra asociada."
+                    />
+                    <Separator className="my-4" />
+                    {selectedInvoiceForCancellationReason &&
+                        (() => {
+                            const getCancellationDetails = (inv: any) => {
+                                if (!inv) return null;
+                                if (inv.specimen) {
+                                    return inv.specimen;
+                                }
+                                if (
+                                    inv.group?.specimens &&
+                                    inv.group.specimens.length > 0
+                                ) {
+                                    const cancelledSpecimen =
+                                        inv.group.specimens.find(
+                                            (s: any) =>
+                                                s.status === 'cancelled' ||
+                                                s.cancellation_reason,
+                                        );
+                                    return (
+                                        cancelledSpecimen ||
+                                        inv.group.specimens[0]
+                                    );
+                                }
+                                return null;
+                            };
+
+                            const cancelledSpecimen = getCancellationDetails(
+                                selectedInvoiceForCancellationReason,
+                            );
+                            if (!cancelledSpecimen) {
+                                return (
+                                    <div className="py-6 text-center text-sm text-muted-foreground">
+                                        No se encontraron detalles de
+                                        cancelación.
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div className="space-y-6 px-5">
+                                    {/* Cancellation Reason */}
+                                    <div className="space-y-2 rounded-lg border border-red-500/20 bg-red-500/[0.02] p-4 dark:border-red-900/30">
+                                        <h4 className="flex items-center gap-2 text-sm font-semibold text-red-600 dark:text-red-400">
+                                            <AlertOctagon className="h-4 w-4" />
+                                            Motivo
+                                        </h4>
+                                        <p className="text-sm text-foreground">
+                                            {cancelledSpecimen.cancellation_reason ||
+                                                'No especificado'}
+                                        </p>
+                                    </div>
+
+                                    <Separator />
+
+                                    {/* Cancellation Details List */}
+                                    <div className="space-y-4 text-sm">
+                                        {cancelledSpecimen.cancelled_at && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="flex items-center gap-1.5 text-muted-foreground">
+                                                    <Calendar className="h-4 w-4" />
+                                                    Fecha de Cancelación:
+                                                </span>
+                                                <span className="font-medium text-foreground">
+                                                    {format(
+                                                        new Date(
+                                                            cancelledSpecimen.cancelled_at,
+                                                        ),
+                                                        'PPP p',
+                                                        { locale: es },
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {cancelledSpecimen.cancelled_by && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="flex items-center gap-1.5 text-muted-foreground">
+                                                    <User className="h-4 w-4" />
+                                                    Cancelado por:
+                                                </span>
+                                                <span className="font-medium text-foreground">
+                                                    {
+                                                        cancelledSpecimen
+                                                            .cancelled_by.name
+                                                    }
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {selectedInvoiceForCancellationReason
+                                            .group?.specimens &&
+                                        selectedInvoiceForCancellationReason
+                                            .group.specimens.length > 0 ? (
+                                            <div className="space-y-2">
+                                                <span className="flex items-center gap-1.5 text-muted-foreground">
+                                                    <Microscope className="h-4 w-4" />
+                                                    Muestras afectadas:
+                                                </span>
+                                                <div className="flex flex-wrap gap-1.5 pl-5">
+                                                    {selectedInvoiceForCancellationReason.group.specimens.map(
+                                                        (spec: any) => (
+                                                            <span
+                                                                key={spec.id}
+                                                                className="rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-xs font-semibold text-primary"
+                                                            >
+                                                                {spec.sequence_code ||
+                                                                    `#${spec.id}`}
+                                                            </span>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            cancelledSpecimen.sequence_code && (
+                                                <div className="flex items-center justify-between">
+                                                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                                                        <Microscope className="h-4 w-4" />
+                                                        Muestra afectada:
+                                                    </span>
+                                                    <span className="font-mono text-xs font-semibold text-primary">
+                                                        {
+                                                            cancelledSpecimen.sequence_code
+                                                        }
+                                                    </span>
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                </SheetContent>
+            </Sheet>
         </>
     );
 }

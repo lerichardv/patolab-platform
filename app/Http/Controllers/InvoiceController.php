@@ -48,6 +48,7 @@ class InvoiceController extends Controller
             'specimen.category',
             'specimen.referrerRelation',
             'specimen.priority',
+            'specimen.cancelledBy',
             'creditRelation',
             'rental',
             'group.specimens.customerRelation',
@@ -55,9 +56,11 @@ class InvoiceController extends Controller
             'group.specimens.category',
             'group.specimens.referrerRelation',
             'group.specimens.priority',
+            'group.specimens.cancelledBy',
             'groupSpecimens.specimen.examination.prices',
             'groupSpecimens.specimen.customerRelation',
             'groupSpecimens.specimen.products',
+            'groupSpecimens.specimen.cancelledBy',
         ]);
 
         // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)

@@ -651,8 +651,8 @@ export function ImportWizard({
 
     useEffect(() => {
         if (typeof document === 'undefined') {
-return;
-}
+            return;
+        }
 
         if (step === 3) {
             const status = paused ? '⏸ Pausado' : '⏳ Importando';

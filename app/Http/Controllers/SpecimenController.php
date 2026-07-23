@@ -1276,12 +1276,65 @@ class SpecimenController extends Controller
         \Illuminate\Support\Facades\DB::transaction(function () use ($ids, $action, $value, $cancellationReason) {
             if ($action === 'change_status') {
                 $updateData = ['status' => $value];
+                $allIds = $ids;
                 if ($value === 'cancelled') {
                     $updateData['cancellation_reason'] = $cancellationReason;
                     $updateData['cancelled_at'] = now();
                     $updateData['cancelled_by_id'] = auth()->id();
+
+                    $resolvedIds = collect($ids);
+                    foreach ($ids as $id) {
+                        $spec = Specimen::find($id);
+                        if ($spec && $spec->is_group && $spec->group_id) {
+                            $groupSpecimenIds = Specimen::where('group_id', $spec->group_id)->pluck('id')->toArray();
+                            $resolvedIds = $resolvedIds->merge($groupSpecimenIds);
+                        }
+                    }
+                    $allIds = $resolvedIds->unique()->toArray();
+
+                    foreach ($allIds as $id) {
+                        $specimen = Specimen::find($id);
+                        if ($specimen) {
+                            $invoice = $specimen->invoiceRelation;
+                            if (! $invoice && $specimen->is_group && $specimen->group) {
+                                $invoice = $specimen->group->invoice;
+                            }
+
+                            if ($invoice) {
+                                $invoice->update([
+                                    'quantity' => 0,
+                                    'amount' => 0.00,
+                                    'discount' => 0.00,
+                                    'subtotal' => 0.00,
+                                    'exempt_amount' => 0.00,
+                                    'tax_exempt_amount' => 0.00,
+                                    'taxable_amount_15' => 0.00,
+                                    'taxable_amount_18' => 0.00,
+                                    'isv_15' => 0.00,
+                                    'isv_18' => 0.00,
+                                    'total' => 0.00,
+                                    'total_paid' => 0.00,
+                                    'cash_value' => 0.00,
+                                    'check_value' => 0.00,
+                                    'card_value_charged' => 0.00,
+                                    'transfer_value' => 0.00,
+                                    'invoice_type' => 'cancelled',
+                                    'credit_payment_id' => null,
+                                ]);
+                            }
+
+                            $credit = Credit::where('specimen_id', $specimen->id)->first();
+                            if (! $credit && $specimen->is_group && $specimen->group_id) {
+                                $credit = Credit::where('group_id', $specimen->group_id)->first();
+                            }
+
+                            if ($credit) {
+                                $credit->delete();
+                            }
+                        }
+                    }
                 }
-                Specimen::whereIn('id', $ids)->update($updateData);
+                Specimen::whereIn('id', $allIds)->update($updateData);
             } elseif ($action === 'change_priority') {
                 Specimen::whereIn('id', $ids)->update(['priority_id' => $value]);
 

@@ -74,8 +74,8 @@ export default function SpecimenViewSheet({
             })
                 .then((res) => {
                     if (!res.ok) {
-throw new Error('Error al cargar la muestra');
-}
+                        throw new Error('Error al cargar la muestra');
+                    }
 
                     return res.json();
                 })

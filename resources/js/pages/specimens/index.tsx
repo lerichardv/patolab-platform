@@ -298,9 +298,29 @@ export default function SpecimensIndex({
         null,
     );
     const [cancellationReason, setCancellationReason] = useState('');
-    const [isReactivateDialogOpen, setIsReactivateDialogOpen] = useState(false);
-    const [specimenToReactivate, setSpecimenToReactivate] =
-        useState<Specimen | null>(null);
+
+    const specimensInGroupToCancel = useMemo(() => {
+        if (!specimenToCancel || !specimenToCancel.group_id) {
+            return [];
+        }
+
+        const list: Specimen[] = [];
+        const seenIds = new Set<number>();
+
+        priorities.forEach((priority) => {
+            priority.specimens.forEach((specimen) => {
+                if (
+                    specimen.group_id === specimenToCancel.group_id &&
+                    !seenIds.has(specimen.id)
+                ) {
+                    list.push(specimen);
+                    seenIds.add(specimen.id);
+                }
+            });
+        });
+
+        return list;
+    }, [specimenToCancel, priorities]);
 
     const [isAssignSheetOpen, setIsAssignSheetOpen] = useState(false);
     const [selectedSpecimenForAssign, setSelectedSpecimenForAssign] =
@@ -659,8 +679,8 @@ export default function SpecimensIndex({
 
     const confirmCancel = () => {
         if (!specimenToCancel) {
-return;
-}
+            return;
+        }
 
         if (!cancellationReason.trim()) {
             toast.error('El motivo de cancelación es obligatorio.');
@@ -687,40 +707,6 @@ return;
                 },
                 onError: () => {
                     toast.error('Error al cancelar la muestra');
-                },
-            },
-        );
-    };
-
-    const handleReactivateClick = (specimen: Specimen) => {
-        setSpecimenToReactivate(specimen);
-        setIsReactivateDialogOpen(true);
-    };
-
-    const confirmReactivate = () => {
-        if (!specimenToReactivate) {
-return;
-}
-
-        router.post(
-            '/specimens/bulk-action',
-            {
-                ids: [specimenToReactivate.id],
-                action: 'change_status',
-                value: 'received',
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: () => {
-                    toast.success(
-                        'Muestra restablecida y su estado ahora es Recibida',
-                    );
-                    setIsReactivateDialogOpen(false);
-                    setSpecimenToReactivate(null);
-                },
-                onError: () => {
-                    toast.error('Error al restablecer la muestra');
                 },
             },
         );
@@ -2235,26 +2221,13 @@ return;
                                                                                                         {auth.permissions?.includes(
                                                                                                             'specimens.edit',
                                                                                                         ) &&
-                                                                                                            (specimen.status ===
-                                                                                                            'cancelled' ? (
-                                                                                                                <DropdownMenuItem
-                                                                                                                    onClick={(
-                                                                                                                        e,
-                                                                                                                    ) => {
-                                                                                                                        e.stopPropagation();
-                                                                                                                        handleReactivateClick(
-                                                                                                                            specimen,
-                                                                                                                        );
-                                                                                                                    }}
-                                                                                                                >
-                                                                                                                    <RotateCcw className="mr-2 h-4 w-4 text-primary" />
-                                                                                                                    <span>
-                                                                                                                        Reactivar
-                                                                                                                        a
-                                                                                                                        Recibida
-                                                                                                                    </span>
-                                                                                                                </DropdownMenuItem>
-                                                                                                            ) : (
+                                                                                                            ![
+                                                                                                                'cancelled',
+                                                                                                                'finalized',
+                                                                                                                'delivered',
+                                                                                                            ].includes(
+                                                                                                                specimen.status,
+                                                                                                            ) && (
                                                                                                                 <DropdownMenuItem
                                                                                                                     variant="destructive"
                                                                                                                     onClick={(
@@ -2272,7 +2245,7 @@ return;
                                                                                                                         muestra
                                                                                                                     </span>
                                                                                                                 </DropdownMenuItem>
-                                                                                                            ))}
+                                                                                                            )}
                                                                                                         {auth.permissions?.includes(
                                                                                                             'specimens.delete',
                                                                                                         ) && (
@@ -2558,8 +2531,8 @@ return;
                     setIsCancelDialogOpen(open);
 
                     if (!open) {
-setCancellationReason('');
-}
+                        setCancellationReason('');
+                    }
                 }}
             >
                 <AlertDialogContent>
@@ -2568,13 +2541,53 @@ setCancellationReason('');
                             <AlertCircle className="h-5 w-5" />
                             ¿Cancelar muestra?
                         </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Esta acción cambiará el estado de la muestra{' '}
-                            <span className="font-mono font-semibold text-foreground">
-                                {specimenToCancel?.sequence_code ||
-                                    `#${specimenToCancel?.id}`}
-                            </span>{' '}
-                            a cancelada.
+                        <AlertDialogDescription className="space-y-3">
+                            <div>
+                                Esta acción cambiará el estado de la muestra{' '}
+                                <span className="font-mono font-semibold text-foreground">
+                                    {specimenToCancel?.sequence_code ||
+                                        `#${specimenToCancel?.id}`}
+                                </span>{' '}
+                                a cancelada.
+                            </div>
+                            {specimenToCancel?.group_id && (
+                                <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-3 text-amber-800 dark:border-amber-900/30 dark:text-amber-400">
+                                    <div className="font-semibold text-amber-900 dark:text-amber-300">
+                                        Muestras de Grupo Detectadas
+                                    </div>
+                                    <p className="mt-1 text-xs leading-normal">
+                                        Esta muestra forma parte de un grupo de
+                                        muestras. Al cancelarla,{' '}
+                                        <strong className="font-semibold">
+                                            todas las muestras de este grupo se
+                                            cancelarán
+                                        </strong>{' '}
+                                        debido a que pertenecen a la misma
+                                        factura:
+                                    </p>
+                                    <ul className="mt-2 space-y-1 pl-1 text-[11px]">
+                                        {specimensInGroupToCancel.map(
+                                            (spec) => (
+                                                <li
+                                                    key={spec.id}
+                                                    className="flex items-center gap-1.5 font-mono"
+                                                >
+                                                    <span className="h-1 w-1 rounded-full bg-amber-500" />
+                                                    <span className="font-semibold text-amber-900 dark:text-amber-300">
+                                                        {spec.sequence_code ||
+                                                            `#${spec.id}`}
+                                                    </span>
+                                                    <span className="text-[10px] text-amber-700 dark:text-amber-500">
+                                                        ({spec.type?.name} -{' '}
+                                                        {spec.examination?.name}
+                                                        )
+                                                    </span>
+                                                </li>
+                                            ),
+                                        )}
+                                    </ul>
+                                </div>
+                            )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="my-2 space-y-1.5">
@@ -2608,41 +2621,6 @@ setCancellationReason('');
                             className="bg-destructive text-white hover:bg-destructive/90 disabled:opacity-50"
                         >
                             Cancelar muestra
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            <AlertDialog
-                open={isReactivateDialogOpen}
-                onOpenChange={setIsReactivateDialogOpen}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2 text-primary">
-                            <RotateCcw className="h-5 w-5 text-primary" />
-                            ¿Restablecer muestra?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Esta acción reactivará la muestra{' '}
-                            <span className="font-mono font-semibold text-foreground">
-                                {specimenToReactivate?.sequence_code ||
-                                    `#${specimenToReactivate?.id}`}
-                            </span>{' '}
-                            y su estado cambiará a{' '}
-                            <strong className="text-foreground">
-                                Recibida
-                            </strong>
-                            .
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={confirmReactivate}
-                            className="bg-primary text-primary-foreground hover:bg-primary/90"
-                        >
-                            Reactivar a Recibida
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
