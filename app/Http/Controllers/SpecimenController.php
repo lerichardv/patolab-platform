@@ -1229,25 +1229,9 @@ class SpecimenController extends Controller
                             }
 
                             if ($invoice) {
+                                // Update status to cancelled first
                                 $invoice->update([
-                                    'quantity' => 0,
-                                    'amount' => 0.00,
-                                    'discount' => 0.00,
-                                    'subtotal' => 0.00,
-                                    'exempt_amount' => 0.00,
-                                    'tax_exempt_amount' => 0.00,
-                                    'taxable_amount_15' => 0.00,
-                                    'taxable_amount_18' => 0.00,
-                                    'isv_15' => 0.00,
-                                    'isv_18' => 0.00,
-                                    'total' => 0.00,
-                                    'total_paid' => 0.00,
-                                    'cash_value' => 0.00,
-                                    'check_value' => 0.00,
-                                    'card_value_charged' => 0.00,
-                                    'transfer_value' => 0.00,
                                     'invoice_type' => 'cancelled',
-                                    'credit_payment_id' => null,
                                 ]);
                                 $invoicesToRegenerate[$invoice->id] = $invoice;
                             }
@@ -1269,6 +1253,27 @@ class SpecimenController extends Controller
                         } catch (\Exception $e) {
                             \Log::warning('Error regenerating invoice PDF during bulk cancellation: '.$e->getMessage());
                         }
+
+                        // Now update the numeric values to zero in the database
+                        $invoiceToRegen->update([
+                            'quantity' => 0,
+                            'amount' => 0.00,
+                            'discount' => 0.00,
+                            'subtotal' => 0.00,
+                            'exempt_amount' => 0.00,
+                            'tax_exempt_amount' => 0.00,
+                            'taxable_amount_15' => 0.00,
+                            'taxable_amount_18' => 0.00,
+                            'isv_15' => 0.00,
+                            'isv_18' => 0.00,
+                            'total' => 0.00,
+                            'total_paid' => 0.00,
+                            'cash_value' => 0.00,
+                            'check_value' => 0.00,
+                            'card_value_charged' => 0.00,
+                            'transfer_value' => 0.00,
+                            'credit_payment_id' => null,
+                        ]);
                     }
                 }
                 Specimen::whereIn('id', $allIds)->update($updateData);

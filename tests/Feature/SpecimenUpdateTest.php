@@ -923,7 +923,9 @@ test('specimen bulk status cancellation updates invoice values to zero, deletes 
     $pdfServiceMock->shouldReceive('generateAndStoreInvoice')
         ->once()
         ->with(Mockery::on(function ($arg) use ($invoice) {
-            return $arg->id === $invoice->id;
+            return $arg->id === $invoice->id 
+                && (float)$arg->total === 500.00 
+                && $arg->invoice_type === 'cancelled';
         }))
         ->andReturn('invoices/regenerated_test.pdf');
     app()->instance(\App\Services\InvoicePdfService::class, $pdfServiceMock);
