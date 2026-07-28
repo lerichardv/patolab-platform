@@ -25,7 +25,6 @@ import { toast } from 'sonner';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
-import InvoicePreviewDialog from '@/components/invoice-preview-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -93,6 +92,7 @@ import SpecimenTypeForm from '../specimen-types/specimen-type-form';
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    group?: any;
     specimenTypes: any[];
     examinations: any[];
     categories: any[];
@@ -220,6 +220,7 @@ function FormCombobox({
 export default function SpecimenGroupSheet({
     open,
     onOpenChange,
+    group = null,
     specimenTypes,
     examinations,
     categories,
@@ -369,27 +370,6 @@ export default function SpecimenGroupSheet({
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
 
-    // Reset whole form when opened
-    useEffect(() => {
-        if (open) {
-            setCurrentStep(1);
-            setGlobalCustomerId('');
-            setSpecimens([]);
-            setIsFormDirty(false);
-            setPaymentType('');
-            setProofOfPayment(null);
-            setCustomAmountEnabled(false);
-            setCustomAmount('0');
-            setCustomAmountReason('');
-            setHasInitialPayment(false);
-            setInitialPaymentAmount('');
-            setInitialPaymentType('cash');
-            resetDetailedPayments();
-            setShowInvoiceModal(false);
-            setInvoiceUrl(null);
-        }
-    }, [open]);
-
     const resetDetailedPayments = () => {
         setCashValue('');
         setCheckNumber('');
@@ -402,6 +382,156 @@ export default function SpecimenGroupSheet({
         setTransferValue('');
         setTransferAuthorizationCode('');
     };
+
+    // Reset whole form when opened
+    useEffect(() => {
+        if (open) {
+            if (group) {
+                setCurrentStep(1);
+                setGlobalCustomerId(group.customer_id?.toString() || '');
+                if (group.customer) {
+                    setSelectedGlobalCustomerData({
+                        id: group.customer.id,
+                        name: group.customer.name,
+                        id_number: group.customer.id_number || null,
+                        phone: group.customer.phone || null,
+                        email: group.customer.email || null,
+                        gender: group.customer.gender || null,
+                        type: group.customer.type || null,
+                        age: group.customer.age || null,
+                    });
+                } else {
+                    setSelectedGlobalCustomerData(null);
+                }
+
+                // Map specimens
+                const existingSpecimens = (group.specimens || []).map(
+                    (s: any) => {
+                        const breakdown = s.invoice_group_specimen || {};
+
+                        return {
+                            id: s.id,
+                            client_id: s.id.toString(),
+                            customer: s.customer,
+                            customer_name:
+                                s.customer_relation?.name || 'Desconocido',
+                            specimen_type: s.specimen_type,
+                            specimen_type_name: s.type?.name || '',
+                            specimen_type_examination:
+                                s.specimen_type_examination,
+                            specimen_type_examination_name:
+                                s.examination?.name || '',
+                            specimen_category: s.specimen_category,
+                            referrer: s.referrer,
+                            anatomic_site: s.anatomic_site || '',
+                            diagnosis: s.diagnosis || '',
+                            clinical_notes: s.clinical_notes || '',
+                            status: s.status,
+                            priority_id: s.priority_id,
+                            medical_order_file: s.medical_order_file,
+                            agregar_insumos: (s.products || []).length > 0,
+                            insumos: (s.products || []).map((p: any) => ({
+                                id: p.id,
+                                quantity: p.pivot?.quantity || 1,
+                                price: p.pivot?.price || p.price || 0,
+                                name: p.name,
+                            })),
+                            isExisting: true,
+
+                            selected_price:
+                                breakdown.selected_price?.toString() || '0',
+                            custom_specimen_price:
+                                breakdown.custom_specimen_price?.toString() ||
+                                '0',
+                            quantity: breakdown.quantity ?? 1,
+                            age_discount_type:
+                                breakdown.age_discount_type || null,
+                            age_discount_amount:
+                                breakdown.age_discount_amount?.toString() ||
+                                '0',
+                            additional_discount_enabled:
+                                !!breakdown.additional_discount_enabled,
+                            additional_discount:
+                                breakdown.additional_discount?.toString() ||
+                                '0',
+                        };
+                    },
+                );
+                setSpecimens(existingSpecimens);
+
+                const invoice =
+                    group.invoice ||
+                    group.invoiceRelation ||
+                    group.invoice_relation ||
+                    group.invoice_data ||
+                    (group.full_invoice_number ? group : {});
+                setPaymentType(invoice.payment_type || 'cash');
+                setPaymentMethodDate(
+                    invoice.payment_method_date
+                        ? invoice.payment_method_date.split('T')[0]
+                        : new Date().toISOString().split('T')[0],
+                );
+                setCustomAmountEnabled(
+                    !!invoice.custom_amount &&
+                        parseFloat(invoice.custom_amount) > 0,
+                );
+                setCustomAmount(invoice.custom_amount?.toString() || '0');
+                setCustomAmountReason(invoice.custom_amount_reason || '');
+
+                const initialPaid = parseFloat(invoice.total_paid) || 0;
+                setHasInitialPayment(
+                    invoice.payment_type === 'credit' && initialPaid > 0,
+                );
+                setInitialPaymentAmount(
+                    invoice.payment_type === 'credit' && initialPaid > 0
+                        ? initialPaid.toString()
+                        : '',
+                );
+                setInitialPaymentType(
+                    invoice.proof_of_payment &&
+                        invoice.proof_of_payment !== 'Efectivo'
+                        ? 'credit card'
+                        : 'cash',
+                );
+
+                setCashValue(invoice.cash_value?.toString() || '');
+                setCheckNumber(invoice.check_number || '');
+                setCheckValue(invoice.check_value?.toString() || '');
+                setCardLast4(invoice.card_last_4 || '');
+                setCardValueCharged(
+                    invoice.card_value_charged?.toString() || '',
+                );
+                setCardExpiration(invoice.card_expiration || '');
+                setCardAuthorizationCode(invoice.card_authorization_code || '');
+                setTransferBankId(invoice.transfer_bank_id?.toString() || '');
+                setTransferValue(invoice.transfer_value?.toString() || '');
+                setTransferAuthorizationCode(
+                    invoice.transfer_authorization_code || '',
+                );
+
+                setIsFormDirty(false);
+                setShowInvoiceModal(false);
+                setInvoiceUrl(null);
+            } else {
+                setCurrentStep(1);
+                setGlobalCustomerId('');
+                setSelectedGlobalCustomerData(null);
+                setSpecimens([]);
+                setIsFormDirty(false);
+                setPaymentType('');
+                setProofOfPayment(null);
+                setCustomAmountEnabled(false);
+                setCustomAmount('0');
+                setCustomAmountReason('');
+                setHasInitialPayment(false);
+                setInitialPaymentAmount('');
+                setInitialPaymentType('cash');
+                resetDetailedPayments();
+                setShowInvoiceModal(false);
+                setInvoiceUrl(null);
+            }
+        }
+    }, [open, group]);
 
     // Warn on refresh or navigation
     useEffect(() => {
@@ -1291,7 +1421,12 @@ export default function SpecimenGroupSheet({
                 hasInitialPayment &&
                 initialPaymentType !== 'cash');
 
-        if (isProofRequired && !proofOfPayment) {
+        const hasExistingProof =
+            group &&
+            group.invoice?.proof_of_payment &&
+            group.invoice?.payment_type === paymentType;
+
+        if (isProofRequired && !proofOfPayment && !hasExistingProof) {
             toast.error('El comprobante de pago es obligatorio.');
 
             return;
@@ -1356,6 +1491,7 @@ export default function SpecimenGroupSheet({
 
             // Specimens list
             specimens: specimens.map((s) => ({
+                id: s.id,
                 customer: s.customer,
                 specimen_type: s.specimen_type,
                 specimen_type_examination: s.specimen_type_examination,
@@ -1391,21 +1527,19 @@ export default function SpecimenGroupSheet({
             }
         });
 
-        router.post('/specimen-groups', payload, {
-            onSuccess: (page: any) => {
+        const postUrl = group
+            ? `/specimen-groups/${group.id}/add-specimens`
+            : '/specimen-groups';
+        router.post(postUrl, payload, {
+            onSuccess: () => {
                 setProcessing(false);
                 setIsFormDirty(false);
-                const url = page.props.flash?.new_invoice_url;
-
-                if (url) {
-                    setInvoiceUrl(url);
-                    setShowInvoiceModal(true);
-                } else {
-                    onOpenChange(false);
-                }
+                onOpenChange(false);
 
                 toast.success(
-                    'Muestras agrupadas creadas y facturadas con éxito',
+                    group
+                        ? 'Muestras agregadas al grupo y factura actualizada con éxito'
+                        : 'Muestras agrupadas creadas y facturadas con éxito',
                 );
             },
             onError: (err) => {
@@ -1415,7 +1549,9 @@ export default function SpecimenGroupSheet({
                 toast.error(
                     typeof firstErr === 'string'
                         ? firstErr
-                        : 'Error al registrar el grupo de muestras',
+                        : group
+                          ? 'Error al actualizar el grupo de muestras'
+                          : 'Error al registrar el grupo de muestras',
                 );
             },
         });
@@ -1458,8 +1594,16 @@ export default function SpecimenGroupSheet({
             <Sheet open={open} onOpenChange={handleOpenChange}>
                 <SheetContent className="w-full overflow-y-auto sm:max-w-[90vw] md:max-w-[1000px] lg:max-w-[1200px]">
                     <HeadingSheet
-                        title="Crear Muestra Agrupada"
-                        description="Registre múltiples muestras asignadas a la misma factura grupal con una gestión integral de precios e insumos."
+                        title={
+                            group
+                                ? 'Agregar Muestras a Grupo'
+                                : 'Crear Muestra Agrupada'
+                        }
+                        description={
+                            group
+                                ? 'Agregue más muestras a un grupo existente y actualice la facturación.'
+                                : 'Registre múltiples muestras asignadas a la misma factura grupal con una gestión integral de precios e insumos.'
+                        }
                     />
 
                     {/* Wizard Steps indicator */}
@@ -1551,6 +1695,7 @@ export default function SpecimenGroupSheet({
                                     <AsyncCustomerCombobox
                                         placeholder="Seleccionar cliente"
                                         value={globalCustomerId}
+                                        disabled={!!group}
                                         initialCustomer={
                                             selectedGlobalCustomerData
                                         }
@@ -1563,16 +1708,18 @@ export default function SpecimenGroupSheet({
                                         }}
                                     />
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setCustomerSheetSource('global');
-                                        setIsCustomerSheetOpen(true);
-                                    }}
-                                    className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                >
-                                    <Plus className="h-3 w-3" /> Nuevo
-                                </button>
+                                {!group && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCustomerSheetSource('global');
+                                            setIsCustomerSheetOpen(true);
+                                        }}
+                                        className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+                                    >
+                                        <Plus className="h-3 w-3" /> Nuevo
+                                    </button>
+                                )}
                             </div>
 
                             {selectedGlobalCustomer && (
@@ -1748,6 +1895,9 @@ export default function SpecimenGroupSheet({
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
+                                                                    disabled={
+                                                                        !!spec.isExisting
+                                                                    }
                                                                     onClick={() =>
                                                                         handleEditNestedSpecimen(
                                                                             spec,
@@ -1760,6 +1910,9 @@ export default function SpecimenGroupSheet({
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
+                                                                    disabled={
+                                                                        !!spec.isExisting
+                                                                    }
                                                                     onClick={() =>
                                                                         handleDeleteNestedSpecimen(
                                                                             spec.client_id,
@@ -4697,21 +4850,6 @@ export default function SpecimenGroupSheet({
                     </AlertDialog>
                 </SheetContent>
             </Sheet>
-
-            <InvoicePreviewDialog
-                open={showInvoiceModal}
-                onOpenChange={(open) => {
-                    setShowInvoiceModal(open);
-
-                    if (!open) {
-                        setInvoiceUrl(null);
-                        onOpenChange(false);
-                    }
-                }}
-                invoiceUrl={invoiceUrl}
-                isGroup={true}
-                zClass="z-[120]"
-            />
         </>
     );
 }

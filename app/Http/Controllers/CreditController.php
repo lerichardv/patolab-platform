@@ -377,6 +377,8 @@ class CreditController extends Controller
     public function pay(Request $request, Credit $credit)
     {
         Gate::authorize('credits.manage');
+        $isSocialSecurity = $request->boolean('is_social_security');
+
         $validated = $request->validate([
             'amount_paid' => [
                 'required',
@@ -384,11 +386,12 @@ class CreditController extends Controller
                 'min:0.01',
                 function ($attribute, $value, $fail) use ($credit) {
                     if ($value > $credit->amount_remaining) {
-                        $fail('El monto a pagar (L. '.number_format($value, 2).') no puede ser mayor que el saldo restante (L. '.number_format($credit->amount_remaining, 2).').');
+                        $fail('El monto (L. '.number_format($value, 2).') no puede ser mayor que el saldo restante (L. '.number_format($credit->amount_remaining, 2).').');
                     }
                 },
             ],
-            'payment_type' => 'required|in:cash,credit card,bank transfer,check',
+            'payment_type' => $isSocialSecurity ? 'required|in:n/a' : 'required|in:cash,credit card,bank transfer,check',
+            'is_social_security' => 'nullable|boolean',
             'payment_method_date' => 'nullable|date',
             'cash_value' => 'nullable|numeric|min:0',
             'check_number' => 'nullable|string|max:100',
@@ -401,7 +404,7 @@ class CreditController extends Controller
             'transfer_value' => 'nullable|numeric|min:0',
             'transfer_authorization_code' => 'nullable|string|max:100',
             'proof_of_payment' => [
-                $request->input('payment_type') === 'cash' ? 'nullable' : 'required',
+                ($isSocialSecurity || $request->input('payment_type') === 'cash') ? 'nullable' : 'required',
                 'file',
                 function ($attribute, $value, $fail) {
                     if ($value instanceof UploadedFile) {
@@ -456,7 +459,7 @@ class CreditController extends Controller
 
         $invoice = null;
 
-        DB::transaction(function () use ($request, $validated, $credit, &$invoice) {
+        DB::transaction(function () use ($request, $validated, $credit, $isSocialSecurity, &$invoice) {
             $caiRange = CaiRange::where('status', 'active')->first();
             if (! $caiRange) {
                 throw new \Exception('No hay un rango CAI activo configurado en el sistema.');
@@ -482,24 +485,27 @@ class CreditController extends Controller
 
             $amountPaid = (float) $validated['amount_paid'];
 
-            if ($credit->is_group) {
-                foreach ($validated['specimens'] as $item) {
-                    $dbRow = DB::table('credit_invoice_specimens')
-                        ->where('credit_id', $credit->id)
-                        ->where('specimen_id', $item['id'])
-                        ->first();
+            // Update specimen payment quantities only if NOT social security invoice
+            if (! $isSocialSecurity) {
+                if ($credit->is_group) {
+                    foreach ($validated['specimens'] as $item) {
+                        $dbRow = DB::table('credit_invoice_specimens')
+                            ->where('credit_id', $credit->id)
+                            ->where('specimen_id', $item['id'])
+                            ->first();
 
-                    $newQtyPaid = $dbRow->quantity_paid + (int) $item['quantity'];
-                    $isPaid = $newQtyPaid >= $dbRow->quantity ? 1 : 0;
+                        $newQtyPaid = $dbRow->quantity_paid + (int) $item['quantity'];
+                        $isPaid = $newQtyPaid >= $dbRow->quantity ? 1 : 0;
 
-                    DB::table('credit_invoice_specimens')
-                        ->where('credit_id', $credit->id)
-                        ->where('specimen_id', $item['id'])
-                        ->update([
-                            'quantity_paid' => $newQtyPaid,
-                            'is_paid' => $isPaid,
-                            'updated_at' => now(),
-                        ]);
+                        DB::table('credit_invoice_specimens')
+                            ->where('credit_id', $credit->id)
+                            ->where('specimen_id', $item['id'])
+                            ->update([
+                                'quantity_paid' => $newQtyPaid,
+                                'is_paid' => $isPaid,
+                                'updated_at' => now(),
+                            ]);
+                    }
                 }
             }
 
@@ -510,18 +516,18 @@ class CreditController extends Controller
                 'cai_range_id' => $caiRange->id,
                 'customer_id' => $credit->customer_id,
                 'specimen_id' => $credit->is_group ? null : $originalInvoice->specimen_id,
-                'payment_type' => $validated['payment_type'],
+                'payment_type' => $isSocialSecurity ? 'n/a' : $validated['payment_type'],
                 'payment_method_date' => $request->input('payment_method_date'),
-                'cash_value' => $request->input('cash_value'),
-                'check_number' => $request->input('check_number'),
-                'check_value' => $request->input('check_value'),
-                'card_last_4' => $request->input('card_last_4'),
-                'card_value_charged' => $request->input('card_value_charged'),
-                'card_expiration' => $request->input('card_expiration'),
-                'card_authorization_code' => $request->input('card_authorization_code'),
-                'transfer_bank_id' => $request->input('transfer_bank_id') ?: null,
-                'transfer_value' => $request->input('transfer_value'),
-                'transfer_authorization_code' => $request->input('transfer_authorization_code'),
+                'cash_value' => $isSocialSecurity ? null : $request->input('cash_value'),
+                'check_number' => $isSocialSecurity ? null : $request->input('check_number'),
+                'check_value' => $isSocialSecurity ? null : $request->input('check_value'),
+                'card_last_4' => $isSocialSecurity ? null : $request->input('card_last_4'),
+                'card_value_charged' => $isSocialSecurity ? null : $request->input('card_value_charged'),
+                'card_expiration' => $isSocialSecurity ? null : $request->input('card_expiration'),
+                'card_authorization_code' => $isSocialSecurity ? null : $request->input('card_authorization_code'),
+                'transfer_bank_id' => $isSocialSecurity ? null : ($request->input('transfer_bank_id') ?: null),
+                'transfer_value' => $isSocialSecurity ? null : $request->input('transfer_value'),
+                'transfer_authorization_code' => $isSocialSecurity ? null : $request->input('transfer_authorization_code'),
                 'credit_payment_id' => $credit->id,
                 'amount' => $amountPaid,
                 'discount' => 0.00,
@@ -533,21 +539,23 @@ class CreditController extends Controller
                 'isv_15' => 0.00,
                 'isv_18' => 0.00,
                 'total' => $amountPaid,
-                'total_paid' => $amountPaid,
+                'total_paid' => $isSocialSecurity ? 0.00 : $amountPaid,
                 'proof_of_payment' => $proofOfPaymentPath,
                 'invoice_file' => '',
-                'invoice_type' => 'credit payment',
+                'invoice_type' => $isSocialSecurity ? 'social security' : 'credit payment',
                 'is_group' => $credit->is_group ? true : false,
                 'group_id' => $credit->is_group ? $credit->group_id : null,
             ]);
 
-            // Update credit values
-            $credit->update([
-                'amount_paid' => $credit->amount_paid + $amountPaid,
-                'amount_remaining' => $credit->amount_remaining - $amountPaid,
-                'last_payment_date' => now(),
-            ]);
-            $credit->refresh();
+            // Update credit values only if NOT social security
+            if (! $isSocialSecurity) {
+                $credit->update([
+                    'amount_paid' => $credit->amount_paid + $amountPaid,
+                    'amount_remaining' => $credit->amount_remaining - $amountPaid,
+                    'last_payment_date' => now(),
+                ]);
+                $credit->refresh();
+            }
 
             // Increment CAI Range
             $caiRange->increment('last_used_number');
@@ -604,7 +612,7 @@ class CreditController extends Controller
         });
 
         return redirect()->back()->with([
-            'success' => 'Pago de crédito registrado con éxito.',
+            'success' => $isSocialSecurity ? 'Factura para seguro social generada con éxito.' : 'Pago de crédito registrado con éxito.',
             'new_invoice_id' => $invoice->id,
             'new_invoice_url' => asset('storage/'.$invoice->invoice_file),
         ]);

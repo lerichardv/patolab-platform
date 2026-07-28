@@ -965,6 +965,16 @@ export default function SpecimenForm({
         );
     }, [specimen, data.specimen_type, data.specimen_type_examination]);
 
+    const isGroupSpecimen = React.useMemo(() => {
+        if (!specimen) {
+            return false;
+        }
+
+        return Boolean(
+            specimen.is_group || specimen.group_id || specimen.group,
+        );
+    }, [specimen]);
+
     React.useEffect(() => {
         if (specimen && specimen.report_id && isSpecimenTypeChanged) {
             const typeId = data.specimen_type;
@@ -1250,7 +1260,9 @@ export default function SpecimenForm({
             onSuccess: () => {
                 toast.success(
                     specimen
-                        ? 'Muestra actualizada'
+                        ? isGroupSpecimen
+                            ? 'Muestra actualizada y factura de grupo regenerada'
+                            : 'Muestra actualizada'
                         : 'Muestra creada y facturada',
                 );
                 setIsFacturating(false);
@@ -5438,15 +5450,30 @@ export default function SpecimenForm({
                 <AlertDialogContent className="max-w-[450px]">
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            ¿Actualizar muestra y regenerar factura?
+                            {isGroupSpecimen
+                                ? '¿Actualizar muestra y regenerar factura del grupo?'
+                                : '¿Actualizar muestra y regenerar factura?'}
                         </AlertDialogTitle>
                         <AlertDialogDescription asChild>
                             <div className="space-y-3 text-sm text-muted-foreground">
-                                <p>
-                                    Se guardarán los cambios de la muestra y se
-                                    regenerará la factura PDF correspondiente
-                                    con los nuevos datos.
-                                </p>
+                                {isGroupSpecimen ? (
+                                    <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3.5 text-xs text-blue-900 dark:text-blue-200">
+                                        <span className="mb-1 block font-semibold">
+                                            ℹ️ Factura de Grupo de Muestras:
+                                        </span>
+                                        Debido a que esta muestra pertenece a un
+                                        grupo de muestras, al guardar los
+                                        cambios se regenerará la factura PDF de
+                                        todo el grupo para asegurar que contenga
+                                        los datos más recientes y actualizados.
+                                    </div>
+                                ) : (
+                                    <p>
+                                        Se guardarán los cambios de la muestra y
+                                        se regenerará la factura PDF
+                                        correspondiente con los nuevos datos.
+                                    </p>
+                                )}
                                 {isSpecimenTypeChanged && (
                                     <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
                                         <span className="mb-1 block font-semibold">

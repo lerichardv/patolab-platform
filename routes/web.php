@@ -133,6 +133,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimens/{specimen}/unassign-collaborator', [SpecimenController::class, 'unassignCollaborator'])->name('specimens.unassign-collaborator');
     Route::get('my-assignments', [MyAssignmentController::class, 'index'])->name('my-assignments.index');
     Route::post('specimen-groups', [SpecimenGroupController::class, 'store'])->name('specimen-groups.store');
+    Route::post('specimen-groups/{group}/add-specimens', [SpecimenGroupController::class, 'addSpecimens'])->name('specimen-groups.add-specimens');
+    Route::get('specimen-groups/search', [SpecimenGroupController::class, 'search'])->name('specimen-groups.search');
+    Route::get('specimen-groups/{group}/details', [SpecimenGroupController::class, 'details'])->name('specimen-groups.details');
 
     // Specimen Report Editor routes
     Route::get('specimens/templates/available', [ReportEditorController::class, 'getAvailableTemplates'])->name('specimens.templates.available');

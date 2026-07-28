@@ -60,6 +60,8 @@ class InvoiceController extends Controller
             'group.specimens.referrerRelation',
             'group.specimens.priority',
             'group.specimens.cancelledBy',
+            'group.specimens.invoiceGroupSpecimen',
+            'group.specimens.products',
             'groupSpecimens.specimen.type',
             'groupSpecimens.specimen.examination.prices',
             'groupSpecimens.specimen.customerRelation',

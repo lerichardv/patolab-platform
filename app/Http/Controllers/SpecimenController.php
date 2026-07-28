@@ -132,7 +132,32 @@ class SpecimenController extends Controller
                 $q->where('specimen.created_at', '<=', $dateTo.' 23:59:59');
             }
 
-            $q->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'cancelledBy'])
+            $q->with([
+                'customerRelation',
+                'type',
+                'examination',
+                'category',
+                'referrerRelation',
+                'invoiceRelation.creditRelation',
+                'invoiceRelation.transferBank',
+                'users',
+                'collaborators',
+                'group.customer',
+                'group.invoice.creditRelation',
+                'group.invoice.transferBank',
+                'group.invoice.caiRange',
+                'group.specimens.type',
+                'group.specimens.customerRelation',
+                'group.specimens.examination.prices',
+                'group.specimens.category',
+                'group.specimens.referrerRelation',
+                'group.specimens.priority',
+                'group.specimens.cancelledBy',
+                'group.specimens.invoiceGroupSpecimen',
+                'group.specimens.products',
+                'report',
+                'cancelledBy',
+            ])
                 ->leftJoin(\DB::raw('(SELECT specimen_id, priority_id, MIN(`order`) as board_order FROM priorities_specimens_order GROUP BY specimen_id, priority_id) as pso'), function ($join) {
                     $join->on('specimen.id', '=', 'pso.specimen_id')
                         ->on('specimen.priority_id', '=', 'pso.priority_id');
@@ -652,9 +677,8 @@ class SpecimenController extends Controller
             'regenerate_pdf' => 'nullable|boolean',
         ]);
 
-        $invoice = $specimen->is_group && $specimen->group
-            ? $specimen->group->invoice
-            : $specimen->invoiceRelation;
+        $group = $specimen->group ?? ($specimen->group_id ? SpecimenGroup::find($specimen->group_id) : null);
+        $invoice = $group ? $group->invoice : $specimen->invoiceRelation;
 
         if ($invoice) {
             $oldPaymentType = $invoice->payment_type;
@@ -913,9 +937,8 @@ class SpecimenController extends Controller
             }
         });
 
-        $invoice = $specimen->is_group && $specimen->group
-            ? $specimen->group->invoice
-            : $specimen->invoiceRelation;
+        $group = $specimen->group ?? ($specimen->group_id ? SpecimenGroup::find($specimen->group_id) : null);
+        $invoice = $group ? $group->invoice : $specimen->invoiceRelation;
 
         if ($request->boolean('regenerate_pdf', true) && $invoice) {
             try {

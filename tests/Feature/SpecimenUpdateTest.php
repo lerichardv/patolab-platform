@@ -955,3 +955,77 @@ test('specimen bulk status cancellation updates invoice values to zero, deletes 
 
     expect(Credit::find($credit->id))->toBeNull();
 });
+
+test('credit payment for social security stores invoice with payment_type n/a, invoice_type social security, total_paid 0 and does not change credit balance', function () {
+    $editRole = Role::create(['slug' => 'admin', 'name' => 'Admin']);
+    $user = User::factory()->create(['role_id' => $editRole->id, 'active' => true]);
+
+    $customer = Customer::factory()->create();
+    $location = Location::create([
+        'name' => 'Loc Main',
+        'code' => '001',
+        'address' => 'Test',
+        'phone' => '12345678',
+        'email' => 'test@example.com',
+        'active' => true,
+    ]);
+
+    $caiRange = CaiRange::create([
+        'location_id' => $location->id,
+        'cai' => 'A1B2C3D4-SOC',
+        'full_prefix' => '000-001-01-',
+        'emission' => '000',
+        'establishment' => '001',
+        'document_type' => '01',
+        'start_number' => 1,
+        'end_number' => 1000,
+        'last_used_number' => 1,
+        'deadline' => '2027-12-31',
+        'status' => 'active',
+    ]);
+
+    $credit = Credit::create([
+        'customer_id' => $customer->id,
+        'credit_amount' => 1000.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 1000.00,
+    ]);
+
+    $originalInvoice = Invoice::create([
+        'full_invoice_number' => '000-001-01-00000001',
+        'invoice_number' => '00000001',
+        'cai_range_id' => $caiRange->id,
+        'customer_id' => $customer->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $credit->id,
+        'quantity' => 1,
+        'amount' => 1000.00,
+        'discount' => 0.00,
+        'subtotal' => 1000.00,
+        'total' => 1000.00,
+        'total_paid' => 0.00,
+        'invoice_file' => 'invoices/test.pdf',
+        'invoice_type' => 'specimen',
+    ]);
+
+    $response = $this->actingAs($user)->post(route('credits.pay', $credit->id), [
+        'amount_paid' => '500.00',
+        'payment_type' => 'n/a',
+        'is_social_security' => true,
+        'invoice_type' => 'social security',
+    ]);
+
+    $response->assertRedirect();
+
+    $newInvoice = Invoice::where('invoice_type', 'social security')->first();
+    expect($newInvoice)->not->toBeNull();
+    expect($newInvoice->payment_type)->toBe('n/a');
+    expect((float) $newInvoice->total)->toEqual(500.00);
+    expect((float) $newInvoice->total_paid)->toEqual(0.00);
+
+    // Verify credit remains untouched
+    $credit->refresh();
+    expect((float) $credit->amount_paid)->toEqual(0.00);
+    expect((float) $credit->amount_remaining)->toEqual(1000.00);
+});
+

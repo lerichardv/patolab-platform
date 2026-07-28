@@ -105,6 +105,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import SpecimenGroupSheet from '../specimens/specimen-group-sheet';
+import SelectSpecimenGroupDialog from '@/components/select-specimen-group-dialog';
 import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
 import SpecimenSheet from '../specimens/specimen-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
@@ -360,6 +361,10 @@ export default function InvoicesIndex({
     const [isGroupViewSheetOpen, setIsGroupViewSheetOpen] = useState(false);
     const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
     const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
+    const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
+    const [specimenSearchQuery, setSpecimenSearchQuery] = useState('');
+    const [isSelectGroupDialogOpen, setIsSelectGroupDialogOpen] =
+        useState(false);
 
     const [isWorkOrderSheetOpen, setIsWorkOrderSheetOpen] = useState(false);
     const [selectedSpecimenForWorkOrder, setSelectedSpecimenForWorkOrder] =
@@ -767,6 +772,15 @@ export default function InvoicesIndex({
                         Crédito
                     </Badge>
                 );
+            case 'n/a':
+                return (
+                    <Badge
+                        variant="outline"
+                        className="rounded-full border-slate-200 bg-slate-50 px-2.5 py-0.5 text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400"
+                    >
+                        N/A
+                    </Badge>
+                );
             default:
                 return (
                     <Badge
@@ -809,6 +823,17 @@ export default function InvoicesIndex({
                     className="rounded-full border-red-200 bg-red-50 px-2.5 py-0.5 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400"
                 >
                     Cancelada
+                </Badge>
+            );
+        }
+
+        if (type === 'social security') {
+            return (
+                <Badge
+                    variant="outline"
+                    className="rounded-full border-teal-200 bg-teal-50 px-2.5 py-0.5 text-teal-700 dark:border-teal-900/50 dark:bg-teal-950/30 dark:text-teal-400"
+                >
+                    Seguro Social
                 </Badge>
             );
         }
@@ -937,6 +962,14 @@ export default function InvoicesIndex({
                                         <Layers className="mr-2 h-4 w-4 text-muted-foreground" />
                                         <span>Grupo de Muestras</span>
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setIsSelectGroupDialogOpen(true)
+                                        }
+                                    >
+                                        <Plus className="mr-2 h-4 w-4 text-muted-foreground" />
+                                        <span>Agregar a Grupo Existente</span>
+                                    </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
@@ -1028,6 +1061,7 @@ export default function InvoicesIndex({
                                     <SelectItem value="credit">
                                         Crédito
                                     </SelectItem>
+                                    <SelectItem value="n/a">N/A</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -1094,6 +1128,9 @@ export default function InvoicesIndex({
                                     </SelectItem>
                                     <SelectItem value="credit payment">
                                         Pago de Crédito
+                                    </SelectItem>
+                                    <SelectItem value="social security">
+                                        Seguro Social
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
@@ -1458,7 +1495,17 @@ export default function InvoicesIndex({
                                                             >
                                                                 <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                                             </Button>
-                                                            <DropdownMenu>
+                                                            <DropdownMenu
+                                                                onOpenChange={(
+                                                                    open,
+                                                                ) => {
+                                                                    if (!open) {
+                                                                        setSpecimenSearchQuery(
+                                                                            '',
+                                                                        );
+                                                                    }
+                                                                }}
+                                                            >
                                                                 <DropdownMenuTrigger
                                                                     asChild
                                                                 >
@@ -1473,67 +1520,163 @@ export default function InvoicesIndex({
                                                                 </DropdownMenuTrigger>
                                                                 <DropdownMenuContent
                                                                     align="start"
-                                                                    className="w-64"
+                                                                    className="w-64 p-0"
                                                                 >
-                                                                    {invoice.group.specimens?.map(
-                                                                        (
-                                                                            specimen: any,
-                                                                        ) => (
-                                                                            <DropdownMenuItem
-                                                                                key={
-                                                                                    specimen.id
-                                                                                }
-                                                                                onClick={() => {
-                                                                                    const specimenWithInvoice =
-                                                                                        {
-                                                                                            ...specimen,
-                                                                                            customerRelation:
-                                                                                                specimen.customer_relation ||
-                                                                                                specimen.customerRelation ||
-                                                                                                invoice.customer,
-                                                                                            customer_relation:
-                                                                                                specimen.customer_relation ||
-                                                                                                specimen.customerRelation ||
-                                                                                                invoice.customer,
-                                                                                            invoice_relation:
-                                                                                                {
-                                                                                                    ...invoice,
-                                                                                                    specimen:
-                                                                                                        undefined,
-                                                                                                },
-                                                                                        };
-                                                                                    setSelectedSpecimenIdForView(
-                                                                                        specimen.id,
-                                                                                    );
-                                                                                    setIsSpecimenViewSheetOpen(
-                                                                                        true,
-                                                                                    );
-                                                                                    setSelectedSpecimen(
-                                                                                        specimenWithInvoice,
-                                                                                    );
-                                                                                    setIsSpecimenSheetOpen(
-                                                                                        true,
-                                                                                    );
-                                                                                }}
-                                                                                className="group cursor-pointer"
-                                                                            >
-                                                                                <div className="flex w-full flex-col gap-0.5">
-                                                                                    <span className="font-mono text-xs font-semibold text-primary transition-colors group-hover:text-white group-focus:text-white">
-                                                                                        {specimen.sequence_code ||
-                                                                                            'Sin código'}
-                                                                                    </span>
-                                                                                    <span className="truncate text-[10px] text-muted-foreground transition-colors group-hover:text-white/90 group-focus:text-white/90">
-                                                                                        {specimen
-                                                                                            .customer_relation
-                                                                                            ?.name ||
-                                                                                            invoice
-                                                                                                .customer
-                                                                                                ?.name ||
-                                                                                            'Sin cliente'}
-                                                                                    </span>
+                                                                    {(() => {
+                                                                        const filteredSpecimens =
+                                                                            (
+                                                                                invoice
+                                                                                    .group
+                                                                                    .specimens ||
+                                                                                []
+                                                                            ).filter(
+                                                                                (
+                                                                                    s: any,
+                                                                                ) =>
+                                                                                    (
+                                                                                        s.sequence_code ||
+                                                                                        ''
+                                                                                    )
+                                                                                        .toLowerCase()
+                                                                                        .includes(
+                                                                                            specimenSearchQuery.toLowerCase(),
+                                                                                        ),
+                                                                            );
+
+                                                                        return (
+                                                                            <>
+                                                                                <div className="border-b border-border/50 p-2">
+                                                                                    <div className="relative">
+                                                                                        <Search className="absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                                                                        <Input
+                                                                                            placeholder="Buscar código..."
+                                                                                            value={
+                                                                                                specimenSearchQuery
+                                                                                            }
+                                                                                            onChange={(
+                                                                                                e,
+                                                                                            ) =>
+                                                                                                setSpecimenSearchQuery(
+                                                                                                    e
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                                )
+                                                                                            }
+                                                                                            className="h-8 pl-8 text-xs focus-visible:ring-1 focus-visible:ring-ring"
+                                                                                            onClick={(
+                                                                                                e,
+                                                                                            ) =>
+                                                                                                e.stopPropagation()
+                                                                                            }
+                                                                                            onKeyDown={(
+                                                                                                e,
+                                                                                            ) =>
+                                                                                                e.stopPropagation()
+                                                                                            }
+                                                                                        />
+                                                                                    </div>
                                                                                 </div>
-                                                                            </DropdownMenuItem>
-                                                                        ),
+                                                                                <div className="max-h-[250px] overflow-y-auto p-1">
+                                                                                    {filteredSpecimens.length ===
+                                                                                    0 ? (
+                                                                                        <div className="p-4 text-center text-xs text-muted-foreground">
+                                                                                            No
+                                                                                            se
+                                                                                            encontraron
+                                                                                            muestras
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        filteredSpecimens.map(
+                                                                                            (
+                                                                                                specimen: any,
+                                                                                            ) => (
+                                                                                                <DropdownMenuItem
+                                                                                                    key={
+                                                                                                        specimen.id
+                                                                                                    }
+                                                                                                    onClick={() => {
+                                                                                                        const specimenWithInvoice =
+                                                                                                            {
+                                                                                                                ...specimen,
+                                                                                                                customerRelation:
+                                                                                                                    specimen.customer_relation ||
+                                                                                                                    specimen.customerRelation ||
+                                                                                                                    invoice.customer,
+                                                                                                                customer_relation:
+                                                                                                                    specimen.customer_relation ||
+                                                                                                                    specimen.customerRelation ||
+                                                                                                                    invoice.customer,
+                                                                                                                invoice_relation:
+                                                                                                                    {
+                                                                                                                        ...invoice,
+                                                                                                                        specimen:
+                                                                                                                            undefined,
+                                                                                                                    },
+                                                                                                            };
+                                                                                                        setSelectedSpecimen(
+                                                                                                            specimenWithInvoice,
+                                                                                                        );
+                                                                                                        setIsSpecimenSheetOpen(
+                                                                                                            true,
+                                                                                                        );
+                                                                                                    }}
+                                                                                                    className="group cursor-pointer"
+                                                                                                >
+                                                                                                    <div className="flex w-full flex-col gap-0.5">
+                                                                                                        <span className="font-mono text-xs font-semibold text-primary transition-colors group-hover:text-white group-focus:text-white">
+                                                                                                            {specimen.sequence_code ||
+                                                                                                                'Sin código'}
+                                                                                                        </span>
+                                                                                                        <span className="truncate text-[10px] text-muted-foreground transition-colors group-hover:text-white/90 group-focus:text-white/90">
+                                                                                                            {specimen
+                                                                                                                .customer_relation
+                                                                                                                ?.name ||
+                                                                                                                invoice
+                                                                                                                    .customer
+                                                                                                                    ?.name ||
+                                                                                                                'Sin cliente'}
+                                                                                                        </span>
+                                                                                                    </div>
+                                                                                                </DropdownMenuItem>
+                                                                                            ),
+                                                                                        )
+                                                                                    )}
+                                                                                </div>
+                                                                            </>
+                                                                        );
+                                                                    })()}
+                                                                    {invoice
+                                                                        .group
+                                                                        .specimens
+                                                                        ?.length >
+                                                                        0 && (
+                                                                        <>
+                                                                            <DropdownMenuSeparator />
+                                                                            <div className="p-1">
+                                                                                <DropdownMenuItem
+                                                                                    onClick={() => {
+                                                                                        setSelectedGroup(
+                                                                                            {
+                                                                                                ...invoice.group,
+                                                                                                invoice:
+                                                                                                    invoice,
+                                                                                            },
+                                                                                        );
+                                                                                        setIsGroupSheetOpen(
+                                                                                            true,
+                                                                                        );
+                                                                                    }}
+                                                                                    className="group flex cursor-pointer items-center justify-center gap-1.5 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-white"
+                                                                                >
+                                                                                    <Plus className="h-3.5 w-3.5" />
+                                                                                    <span>
+                                                                                        Agregar
+                                                                                        más
+                                                                                        muestras
+                                                                                    </span>
+                                                                                </DropdownMenuItem>
+                                                                            </div>
+                                                                        </>
                                                                     )}
                                                                 </DropdownMenuContent>
                                                             </DropdownMenu>
@@ -2240,7 +2383,14 @@ export default function InvoicesIndex({
 
             <SpecimenGroupSheet
                 open={isGroupSheetOpen}
-                onOpenChange={setIsGroupSheetOpen}
+                onOpenChange={(open) => {
+                    setIsGroupSheetOpen(open);
+
+                    if (!open) {
+                        setSelectedGroup(null);
+                    }
+                }}
+                group={selectedGroup}
                 specimenTypes={specimenTypes}
                 examinations={examinations}
                 categories={categories}
@@ -2252,6 +2402,15 @@ export default function InvoicesIndex({
                 activeLocationId={activeLocationId}
                 products={products}
                 banks={banks}
+            />
+
+            <SelectSpecimenGroupDialog
+                open={isSelectGroupDialogOpen}
+                onOpenChange={setIsSelectGroupDialogOpen}
+                onConfirm={(groupDetails) => {
+                    setSelectedGroup(groupDetails);
+                    setIsGroupSheetOpen(true);
+                }}
             />
 
             {/* Work Order Creation Sheet */}
@@ -2405,8 +2564,8 @@ export default function InvoicesIndex({
                         (() => {
                             const getCancellationDetails = (inv: any) => {
                                 if (!inv) {
-return null;
-}
+                                    return null;
+                                }
 
                                 if (inv.specimen) {
                                     return inv.specimen;

@@ -92,6 +92,7 @@ import { cn } from '@/lib/utils';
 import InvoiceSheet from '../invoices/invoice-sheet';
 import SpecimenBulkPathologistSheet from './specimen-bulk-pathologist-sheet';
 import SpecimenGroupSheet from './specimen-group-sheet';
+import SelectSpecimenGroupDialog from '@/components/select-specimen-group-dialog';
 import SpecimenPathologistSheet from './specimen-pathologist-sheet';
 import SpecimenSheet from './specimen-sheet';
 import SpecimenViewSheet from './specimen-view-sheet';
@@ -117,6 +118,7 @@ interface Specimen {
     users?: any[];
     group?: any;
     group_id?: any;
+    is_group?: any;
 }
 
 interface Priority {
@@ -287,6 +289,9 @@ export default function SpecimensIndex({
     );
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
+    const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
+    const [isSelectGroupDialogOpen, setIsSelectGroupDialogOpen] =
+        useState(false);
     const [selectedSpecimen, setSelectedSpecimen] = useState<Specimen | null>(
         null,
     );
@@ -743,7 +748,7 @@ export default function SpecimensIndex({
         : null;
 
     useEffect(() => {
-        if (flash.new_invoice_url && flash.new_specimen_id) {
+        if (flash.new_invoice_url) {
             setInvoiceUrl(flash.new_invoice_url);
 
             if (flash.new_payment_invoice_url) {
@@ -1418,6 +1423,15 @@ export default function SpecimensIndex({
                                     >
                                         <Layers className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
                                         <span>Grupo de Muestras</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() =>
+                                            setIsSelectGroupDialogOpen(true)
+                                        }
+                                        className="group cursor-pointer"
+                                    >
+                                        <Plus className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                        <span>Agregar a Grupo Existente</span>
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -2223,6 +2237,31 @@ export default function SpecimensIndex({
                                                                                                                 Reporte
                                                                                                             </span>
                                                                                                         </DropdownMenuItem>
+                                                                                                        {specimen.is_group &&
+                                                                                                            specimen.group && (
+                                                                                                                <DropdownMenuItem
+                                                                                                                    onClick={(
+                                                                                                                        e,
+                                                                                                                    ) => {
+                                                                                                                        e.stopPropagation();
+                                                                                                                        setSelectedGroup(
+                                                                                                                            specimen.group,
+                                                                                                                        );
+                                                                                                                        setIsGroupSheetOpen(
+                                                                                                                            true,
+                                                                                                                        );
+                                                                                                                    }}
+                                                                                                                >
+                                                                                                                    <Plus className="mr-2 h-4 w-4" />
+                                                                                                                    <span>
+                                                                                                                        Agregar
+                                                                                                                        más
+                                                                                                                        muestras
+                                                                                                                        al
+                                                                                                                        grupo
+                                                                                                                    </span>
+                                                                                                                </DropdownMenuItem>
+                                                                                                            )}
                                                                                                         {auth.permissions?.includes(
                                                                                                             'specimens.edit',
                                                                                                         ) &&
@@ -2424,7 +2463,14 @@ export default function SpecimensIndex({
 
             <SpecimenGroupSheet
                 open={isGroupSheetOpen}
-                onOpenChange={setIsGroupSheetOpen}
+                onOpenChange={(open) => {
+                    setIsGroupSheetOpen(open);
+
+                    if (!open) {
+                        setSelectedGroup(null);
+                    }
+                }}
+                group={selectedGroup}
                 specimenTypes={specimenTypes}
                 examinations={examinations}
                 categories={categories}
@@ -2436,6 +2482,15 @@ export default function SpecimensIndex({
                 activeLocationId={activeLocationId}
                 products={products}
                 banks={banks}
+            />
+
+            <SelectSpecimenGroupDialog
+                open={isSelectGroupDialogOpen}
+                onOpenChange={setIsSelectGroupDialogOpen}
+                onConfirm={(groupDetails) => {
+                    setSelectedGroup(groupDetails);
+                    setIsGroupSheetOpen(true);
+                }}
             />
 
             <SpecimenViewSheet

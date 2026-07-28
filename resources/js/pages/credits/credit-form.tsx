@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/select';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 interface Customer {
@@ -140,6 +141,8 @@ const getPaymentTypeLabel = (type: string) => {
             return 'Transferencia Bancaria';
         case 'check':
             return 'Cheque';
+        case 'n/a':
+            return 'N/A (Seguro Social)';
         default:
             return type;
     }
@@ -184,6 +187,7 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
         transfer_authorization_code: '',
         proof_of_payment: null as File | null,
         invoice_type: 'credit payment',
+        is_social_security: false,
         specimens: [] as { id: number; quantity: number }[],
     });
 
@@ -494,31 +498,33 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
     };
 
     const isProofRequired =
-        data.payment_type !== '' && data.payment_type !== 'cash';
+        !data.is_social_security &&
+        data.payment_type !== '' &&
+        data.payment_type !== 'cash';
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
         e.stopPropagation();
 
         if (credit.is_group && data.specimens.length === 0) {
-            toast.error('Debe seleccionar al menos una muestra para pagar');
+            toast.error('Debe seleccionar al menos una muestra para facturar');
 
             return;
         }
 
         if (parseFloat(data.amount_paid) <= 0) {
-            toast.error('El monto a pagar debe ser mayor que cero');
+            toast.error('El monto debe ser mayor que cero');
 
             return;
         }
 
         if (parseFloat(data.amount_paid) > remainingVal) {
-            toast.error('El monto a pagar no puede superar el saldo pendiente');
+            toast.error('El monto no puede superar el saldo pendiente');
 
             return;
         }
 
-        if (!data.payment_type) {
+        if (!data.is_social_security && !data.payment_type) {
             toast.error('Debe configurar el método de pago antes de continuar');
 
             return;
@@ -537,7 +543,11 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
         setShowConfirm(false);
         post(payCredit(credit.id).url, {
             onSuccess: () => {
-                toast.success('Pago de crédito registrado con éxito');
+                toast.success(
+                    data.is_social_security
+                        ? 'Factura para seguro social generada con éxito'
+                        : 'Pago de crédito registrado con éxito',
+                );
                 onSuccess();
                 reset();
             },
@@ -946,6 +956,43 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
                                 {errors.payment_type}
                             </p>
                         )}
+                    </div>
+                </div>
+
+                {/* Social Security invoice wrapper */}
+                <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="space-y-0.5">
+                            <Label
+                                htmlFor="is_social_security"
+                                className="cursor-pointer text-sm font-semibold"
+                            >
+                                Factura para seguro social
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                Genera una factura para el Seguro Social sin
+                                registrar ingreso ni abonar al saldo del
+                                crédito.
+                            </p>
+                        </div>
+                        <Switch
+                            id="is_social_security"
+                            checked={data.is_social_security}
+                            onCheckedChange={(checked) => {
+                                setData((d) => ({
+                                    ...d,
+                                    is_social_security: checked,
+                                    invoice_type: checked
+                                        ? 'social security'
+                                        : 'credit payment',
+                                    payment_type: checked
+                                        ? 'n/a'
+                                        : d.payment_type === 'n/a'
+                                          ? ''
+                                          : d.payment_type,
+                                }));
+                            }}
+                        />
                     </div>
                 </div>
 
@@ -1485,11 +1532,14 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
                 <AlertDialogContent className="max-w-[450px]">
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Confirmación de Abono
+                            {data.is_social_security
+                                ? 'Confirmar Factura para Seguro Social'
+                                : 'Confirmación de Abono'}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Revise detalladamente los importes antes de
-                            registrar este abono al crédito.
+                            {data.is_social_security
+                                ? 'Se generará la factura para el Seguro Social por el monto seleccionado. Este proceso no modificará el saldo del crédito.'
+                                : 'Revise detalladamente los importes antes de registrar este abono al crédito.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
 
@@ -1512,7 +1562,7 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
                         </div>
                         <div className="flex justify-between border-b pb-2">
                             <span className="font-medium text-muted-foreground">
-                                Monto de Abono:
+                                Monto de Factura:
                             </span>
                             <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                                 L.{' '}
@@ -1521,7 +1571,7 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
                         </div>
                         <div className="flex justify-between border-b pb-2">
                             <span className="font-medium text-muted-foreground">
-                                Saldo Pendiente Anterior:
+                                Saldo Pendiente Actual:
                             </span>
                             <span className="font-semibold text-foreground">
                                 L. {remainingVal.toFixed(2)}
@@ -1529,15 +1579,20 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
                         </div>
                         <div className="flex justify-between border-b pb-2 text-base font-bold">
                             <span className="text-primary">
-                                Nuevo Saldo Pendiente:
+                                {data.is_social_security
+                                    ? 'Saldo Pendiente (Sin Cambios):'
+                                    : 'Nuevo Saldo Pendiente:'}
                             </span>
                             <span className="text-destructive">
                                 L.{' '}
-                                {Math.max(
-                                    0,
-                                    remainingVal -
-                                        (parseFloat(data.amount_paid) || 0),
-                                ).toFixed(2)}
+                                {data.is_social_security
+                                    ? remainingVal.toFixed(2)
+                                    : Math.max(
+                                          0,
+                                          remainingVal -
+                                              (parseFloat(data.amount_paid) ||
+                                                  0),
+                                      ).toFixed(2)}
                             </span>
                         </div>
                     </div>
@@ -1549,7 +1604,11 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
                             disabled={processing}
                         >
                             {processing && <Spinner className="mr-2" />}
-                            {processing ? 'Registrando...' : 'Confirmar Pago'}
+                            {processing
+                                ? 'Procesando...'
+                                : data.is_social_security
+                                  ? 'Generar Factura'
+                                  : 'Confirmar Pago'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
