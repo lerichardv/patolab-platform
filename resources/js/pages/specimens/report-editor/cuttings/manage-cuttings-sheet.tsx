@@ -99,6 +99,7 @@ interface Props {
     users: User[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    canEdit?: boolean;
 }
 
 const getCuttingsSuffixes = (cuttings: Cutting[]) => {
@@ -156,6 +157,7 @@ export default function ManageCuttingsSheet({
     users,
     open,
     onOpenChange,
+    canEdit = true,
 }: Props) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -199,12 +201,20 @@ export default function ManageCuttingsSheet({
     });
 
     const toggleSelect = (id: number) => {
+        if (!canEdit) {
+            return;
+        }
+
         setSelectedIds((prev) =>
             prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
         );
     };
 
     const toggleAll = () => {
+        if (!canEdit) {
+            return;
+        }
+
         const filteredIds = filteredCuttings.map((c) => c.id);
         const allSelected =
             filteredIds.length > 0 &&
@@ -235,6 +245,10 @@ export default function ManageCuttingsSheet({
     const handleBulkStatusChange = (
         nextStatus: 'processing' | 'macroscopy' | 'delivered',
     ) => {
+        if (!canEdit) {
+            return;
+        }
+
         if (selectedIds.length === 0) {
             return;
         }
@@ -258,6 +272,10 @@ export default function ManageCuttingsSheet({
     };
 
     const handleBulkResponsibleChange = (nextResponsibleId: string) => {
+        if (!canEdit) {
+            return;
+        }
+
         if (selectedIds.length === 0) {
             return;
         }
@@ -284,28 +302,48 @@ export default function ManageCuttingsSheet({
     };
 
     const handleCreate = () => {
+        if (!canEdit) {
+            return;
+        }
+
         setSelectedCutting(null);
         setIsDuplicateMode(false);
         setIsFormOpen(true);
     };
 
     const handleEdit = (cutting: Cutting) => {
+        if (!canEdit) {
+            return;
+        }
+
         setSelectedCutting(cutting);
         setIsDuplicateMode(false);
         setIsFormOpen(true);
     };
 
     const handleDuplicate = (cutting: Cutting) => {
+        if (!canEdit) {
+            return;
+        }
+
         setSelectedCutting(cutting);
         setIsDuplicateMode(true);
         setIsFormOpen(true);
     };
 
     const handleDeleteClick = (cutting: Cutting) => {
+        if (!canEdit) {
+            return;
+        }
+
         setCuttingToDelete(cutting);
     };
 
     const confirmDelete = () => {
+        if (!canEdit) {
+            return;
+        }
+
         if (cuttingToDelete) {
             router.delete(destroyCutting(cuttingToDelete.id).url, {
                 onSuccess: () => {
@@ -320,6 +358,10 @@ export default function ManageCuttingsSheet({
         cutting: Cutting,
         nextStatus: 'processing' | 'macroscopy' | 'delivered',
     ) => {
+        if (!canEdit) {
+            return;
+        }
+
         setLoadingCuttingId(cutting.id);
         router.put(
             updateStatusCutting(cutting.id).url,
@@ -371,6 +413,7 @@ export default function ManageCuttingsSheet({
                                 </div>
                                 <Button
                                     onClick={handleCreate}
+                                    disabled={!canEdit}
                                     className="h-9 gap-1.5 self-end sm:self-auto"
                                 >
                                     <Plus className="h-4 w-4" /> Registrar Corte
@@ -478,12 +521,19 @@ export default function ManageCuttingsSheet({
                                             <TableHead className="w-[50px] text-center">
                                                 <div
                                                     className={cn(
-                                                        'mx-auto flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm border border-primary transition-all',
+                                                        'mx-auto flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-all',
+                                                        canEdit
+                                                            ? 'cursor-pointer'
+                                                            : 'pointer-events-none opacity-40',
                                                         isAllSelected
                                                             ? 'border-primary bg-primary text-primary-foreground'
                                                             : 'opacity-50 hover:opacity-80',
                                                     )}
-                                                    onClick={toggleAll}
+                                                    onClick={
+                                                        canEdit
+                                                            ? toggleAll
+                                                            : undefined
+                                                    }
                                                 >
                                                     <Check className="h-3 w-3 stroke-[3]" />
                                                 </div>
@@ -531,17 +581,23 @@ export default function ManageCuttingsSheet({
                                                     <TableCell className="w-[50px] text-center align-middle">
                                                         <div
                                                             className={cn(
-                                                                'mx-auto flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm border border-primary transition-all',
+                                                                'mx-auto flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-all',
+                                                                canEdit
+                                                                    ? 'cursor-pointer'
+                                                                    : 'pointer-events-none opacity-40',
                                                                 selectedIds.includes(
                                                                     c.id,
                                                                 )
                                                                     ? 'border-primary bg-primary text-primary-foreground'
                                                                     : 'opacity-50 hover:opacity-80',
                                                             )}
-                                                            onClick={() =>
-                                                                toggleSelect(
-                                                                    c.id,
-                                                                )
+                                                            onClick={
+                                                                canEdit
+                                                                    ? () =>
+                                                                          toggleSelect(
+                                                                              c.id,
+                                                                          )
+                                                                    : undefined
                                                             }
                                                         >
                                                             <Check className="h-3 w-3 stroke-[3]" />
@@ -706,6 +762,9 @@ export default function ManageCuttingsSheet({
                                                                 <Loader2 className="mr-1 h-4 w-4 animate-spin text-slate-500" />
                                                             ) : (
                                                                 <Select
+                                                                    disabled={
+                                                                        !canEdit
+                                                                    }
                                                                     value={
                                                                         c.status
                                                                     }
@@ -746,6 +805,9 @@ export default function ManageCuttingsSheet({
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
+                                                                disabled={
+                                                                    !canEdit
+                                                                }
                                                                 className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                                                                 onClick={() =>
                                                                     handleDuplicate(
@@ -759,6 +821,9 @@ export default function ManageCuttingsSheet({
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
+                                                                disabled={
+                                                                    !canEdit
+                                                                }
                                                                 className="h-8 w-8 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                                                                 onClick={() =>
                                                                     handleEdit(
@@ -772,6 +837,9 @@ export default function ManageCuttingsSheet({
                                                             <Button
                                                                 variant="ghost"
                                                                 size="icon"
+                                                                disabled={
+                                                                    !canEdit
+                                                                }
                                                                 className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                                                 onClick={() =>
                                                                     handleDeleteClick(

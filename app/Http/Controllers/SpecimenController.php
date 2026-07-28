@@ -25,10 +25,11 @@ use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
+use App\Services\DateFilterService;
 use App\Services\ImageOptimizerService;
+use App\Services\InvoicePdfService;
 use App\Services\ReportPdfService;
 use App\Services\WhatsAppService;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -38,7 +39,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Spatie\Browsershot\Browsershot;
 
 class SpecimenController extends Controller
 {
@@ -87,35 +87,21 @@ class SpecimenController extends Controller
         }
 
         // 4. Date Range Filter
-        $dateCookie = $request->cookie("date_filter_specimens_user_{$userId}");
-        $dateFrom = $request->get('date_from');
-        $dateTo = $request->get('date_to');
-        if (! $request->has('date_from') && ! $request->has('date_to')) {
-            if ($dateCookie) {
-                $decoded = json_decode($dateCookie, true);
-                if (is_array($decoded)) {
-                    $dateFrom = $decoded['from'] ?? '';
-                    $dateTo = $decoded['to'] ?? '';
-                    if ($dateTo && $dateTo < now()->toDateString()) {
-                        $dateTo = now()->toDateString();
-                    }
-                }
-            } else {
-                $dateFrom = now()->subDays(14)->toDateString();
-                $dateTo = now()->toDateString();
-            }
-        }
-        $isValidDate = function ($date) {
-            return ! empty($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date);
-        };
-        if ($dateFrom && ! $isValidDate($dateFrom)) {
-            $dateFrom = now()->subDays(14)->toDateString();
-        }
-        if ($dateTo && ! $isValidDate($dateTo)) {
-            $dateTo = now()->toDateString();
-        }
+        $resolvedDates = DateFilterService::resolveFilter(
+            $request->cookie("date_filter_specimens_user_{$userId}"),
+            $request->get('date_from'),
+            $request->get('date_to')
+        );
+        $dateFrom = $resolvedDates['from'];
+        $dateTo = $resolvedDates['to'];
+
         if ($request->has('date_from') || $request->has('date_to')) {
-            cookie()->queue(cookie("date_filter_specimens_user_{$userId}", json_encode(['from' => $dateFrom ?? '', 'to' => $dateTo ?? '']), 525600, null, null, null, false));
+            cookie()->queue(DateFilterService::getCookieToQueue(
+                "date_filter_specimens_user_{$userId}",
+                $dateFrom,
+                $dateTo,
+                $resolvedDates['range']
+            ));
         }
 
         $priorities = Priority::orderBy('order', 'desc')->get();
@@ -140,11 +126,10 @@ class SpecimenController extends Controller
 
             // Filter by date range
             if (! empty($dateFrom)) {
-                $q->whereDate('specimen.created_at', '>=', $dateFrom);
+                $q->where('specimen.created_at', '>=', $dateFrom.' 00:00:00');
             }
             if (! empty($dateTo)) {
-                $dateToEnd = Carbon::parse($dateTo)->addDays(1)->toDateString();
-                $q->whereDate('specimen.created_at', '<=', $dateToEnd);
+                $q->where('specimen.created_at', '<=', $dateTo.' 23:59:59');
             }
 
             $q->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'cancelledBy'])
@@ -538,7 +523,7 @@ class SpecimenController extends Controller
             }
 
             try {
-                app(\App\Services\InvoicePdfService::class)->generateAndStoreInvoice($invoice);
+                app(InvoicePdfService::class)->generateAndStoreInvoice($invoice);
             } catch (\Throwable $e) {
                 Log::warning('Error generating specimen invoice PDF: '.$e->getMessage());
             }
@@ -884,6 +869,11 @@ class SpecimenController extends Controller
                         'transfer_bank_id' => $request->input('initial_payment_type') === 'bank transfer' ? $request->input('transfer_bank_id') : null,
                         'transfer_value' => $request->input('initial_payment_type') === 'bank transfer' ? $initialPaymentAmount : null,
                         'transfer_authorization_code' => $request->input('initial_payment_type') === 'bank transfer' ? $request->input('transfer_authorization_code') : null,
+                        'tax_exempt_amount' => $invoice->subtotal,
+                        'taxable_amount_15' => 0.00,
+                        'taxable_amount_18' => 0.00,
+                        'isv_15' => 0.00,
+                        'isv_18' => 0.00,
                     ]);
                 } else {
                     $invoice->update([
@@ -902,6 +892,11 @@ class SpecimenController extends Controller
                         'transfer_bank_id' => $newPaymentType === 'bank transfer' ? $request->input('transfer_bank_id') : null,
                         'transfer_value' => $newPaymentType === 'bank transfer' ? $invoice->total : null,
                         'transfer_authorization_code' => $newPaymentType === 'bank transfer' ? $request->input('transfer_authorization_code') : null,
+                        'tax_exempt_amount' => $invoice->subtotal,
+                        'taxable_amount_15' => 0.00,
+                        'taxable_amount_18' => 0.00,
+                        'isv_15' => 0.00,
+                        'isv_18' => 0.00,
                     ]);
                 }
             }
@@ -909,6 +904,12 @@ class SpecimenController extends Controller
             // Sync invoice customer to match specimen's customer
             if ($invoice && ! $specimen->is_group && $invoice->customer_id != $validated['customer']) {
                 $invoice->update(['customer_id' => $validated['customer']]);
+                if ($invoice->credit_payment_id) {
+                    $credit = Credit::find($invoice->credit_payment_id);
+                    if ($credit) {
+                        $credit->update(['customer_id' => $validated['customer']]);
+                    }
+                }
             }
         });
 
@@ -918,7 +919,7 @@ class SpecimenController extends Controller
 
         if ($request->boolean('regenerate_pdf', true) && $invoice) {
             try {
-                app(\App\Services\InvoicePdfService::class)->generateAndStoreInvoice($invoice);
+                app(InvoicePdfService::class)->generateAndStoreInvoice($invoice);
             } catch (\Exception $e) {
                 \Log::warning('Error regenerating invoice PDF: '.$e->getMessage());
             }
@@ -1249,7 +1250,7 @@ class SpecimenController extends Controller
 
                     foreach ($invoicesToRegenerate as $invoiceToRegen) {
                         try {
-                            app(\App\Services\InvoicePdfService::class)->generateAndStoreInvoice($invoiceToRegen);
+                            app(InvoicePdfService::class)->generateAndStoreInvoice($invoiceToRegen);
                         } catch (\Exception $e) {
                             \Log::warning('Error regenerating invoice PDF during bulk cancellation: '.$e->getMessage());
                         }

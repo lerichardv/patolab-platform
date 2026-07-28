@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Location;
 use App\Models\Rental;
+use App\Services\DateFilterService;
 use Illuminate\Http\File;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -57,22 +58,21 @@ class RentalController extends Controller
 
         // Resolve date range from request, cookie, or default
         $userId = auth()->id();
-        $dateFrom = $request->get('date_from');
-        $dateTo = $request->get('date_to');
+        $resolvedDates = DateFilterService::resolveFilter(
+            $request->cookie("date_filter_rentals_user_{$userId}"),
+            $request->get('date_from'),
+            $request->get('date_to')
+        );
+        $dateFrom = $resolvedDates['from'];
+        $dateTo = $resolvedDates['to'];
 
-        if (! $request->has('date_from') && ! $request->has('date_to')) {
-            $cookieName = "date_filter_rentals_user_{$userId}";
-            $cookieVal = $request->cookie($cookieName);
-            if ($cookieVal) {
-                $decoded = json_decode($cookieVal, true);
-                if (is_array($decoded)) {
-                    $dateFrom = $decoded['from'] ?? '';
-                    $dateTo = $decoded['to'] ?? '';
-                }
-            } else {
-                $dateFrom = now()->subDays(14)->toDateString();
-                $dateTo = now()->toDateString();
-            }
+        if ($request->has('date_from') || $request->has('date_to')) {
+            cookie()->queue(DateFilterService::getCookieToQueue(
+                "date_filter_rentals_user_{$userId}",
+                $dateFrom,
+                $dateTo,
+                $resolvedDates['range']
+            ));
         }
 
         if (! empty($dateFrom)) {

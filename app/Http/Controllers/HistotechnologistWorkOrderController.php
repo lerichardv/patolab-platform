@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\WorkOrder;
+use App\Services\DateFilterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class HistotechnologistWorkOrderController extends Controller
@@ -41,32 +43,21 @@ class HistotechnologistWorkOrderController extends Controller
         }
 
         // 2. Date Range Filter
-        $dateCookie = $request->cookie("date_filter_histotechnologist_work_orders_user_{$userId}");
-        $dateFrom = $request->get('date_from');
-        $dateTo = $request->get('date_to');
-        if (! $request->has('date_from') && ! $request->has('date_to')) {
-            if ($dateCookie) {
-                $decoded = json_decode($dateCookie, true);
-                if (is_array($decoded)) {
-                    $dateFrom = $decoded['from'] ?? '';
-                    $dateTo = $decoded['to'] ?? '';
-                }
-            } else {
-                $dateFrom = now()->subDays(14)->toDateString();
-                $dateTo = now()->toDateString();
-            }
-        }
-        $isValidDate = function ($date) {
-            return ! empty($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date);
-        };
-        if ($dateFrom && ! $isValidDate($dateFrom)) {
-            $dateFrom = now()->subDays(14)->toDateString();
-        }
-        if ($dateTo && ! $isValidDate($dateTo)) {
-            $dateTo = now()->toDateString();
-        }
+        $resolvedDates = DateFilterService::resolveFilter(
+            $request->cookie("date_filter_histotechnologist_work_orders_user_{$userId}"),
+            $request->get('date_from'),
+            $request->get('date_to')
+        );
+        $dateFrom = $resolvedDates['from'];
+        $dateTo = $resolvedDates['to'];
+
         if ($request->has('date_from') || $request->has('date_to')) {
-            cookie()->queue(cookie("date_filter_histotechnologist_work_orders_user_{$userId}", json_encode(['from' => $dateFrom ?? '', 'to' => $dateTo ?? '']), 525600, null, null, null, false));
+            cookie()->queue(DateFilterService::getCookieToQueue(
+                "date_filter_histotechnologist_work_orders_user_{$userId}",
+                $dateFrom,
+                $dateTo,
+                $resolvedDates['range']
+            ));
         }
 
         // Base Query (All work orders)
@@ -119,6 +110,12 @@ class HistotechnologistWorkOrderController extends Controller
     {
         Gate::authorize('work_orders.admin_view');
 
+        if ($workOrder->status === 'Finalizada') {
+            throw ValidationException::withMessages([
+                'status' => 'No se pueden asignar técnicos a una orden de trabajo finalizada.',
+            ]);
+        }
+
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
         ]);
@@ -139,6 +136,12 @@ class HistotechnologistWorkOrderController extends Controller
     public function unassignTechnician(WorkOrder $workOrder, User $user)
     {
         Gate::authorize('work_orders.admin_view');
+
+        if ($workOrder->status === 'Finalizada') {
+            throw ValidationException::withMessages([
+                'status' => 'No se pueden desasignar técnicos de una orden de trabajo finalizada.',
+            ]);
+        }
 
         $workOrder->users()->detach($user->id);
 

@@ -11,6 +11,7 @@ use App\Models\Location;
 use App\Models\Specimen;
 use App\Models\SpecimenGroup;
 use App\Models\SpecimenType;
+use App\Services\DateFilterService;
 use Carbon\CarbonInterval;
 use Illuminate\Http\File;
 use Illuminate\Http\Request;
@@ -96,22 +97,21 @@ class CreditController extends Controller
 
         // Resolve date range from request, cookie, or default
         $userId = auth()->id();
-        $dateFrom = $request->get('date_from');
-        $dateTo = $request->get('date_to');
+        $resolvedDates = DateFilterService::resolveFilter(
+            $request->cookie("date_filter_credits_user_{$userId}"),
+            $request->get('date_from'),
+            $request->get('date_to')
+        );
+        $dateFrom = $resolvedDates['from'];
+        $dateTo = $resolvedDates['to'];
 
-        if (! $request->has('date_from') && ! $request->has('date_to')) {
-            $cookieName = "date_filter_credits_user_{$userId}";
-            $cookieVal = $request->cookie($cookieName);
-            if ($cookieVal) {
-                $decoded = json_decode($cookieVal, true);
-                if (is_array($decoded)) {
-                    $dateFrom = $decoded['from'] ?? '';
-                    $dateTo = $decoded['to'] ?? '';
-                }
-            } else {
-                $dateFrom = now()->subDays(14)->toDateString();
-                $dateTo = now()->toDateString();
-            }
+        if ($request->has('date_from') || $request->has('date_to')) {
+            cookie()->queue(DateFilterService::getCookieToQueue(
+                "date_filter_credits_user_{$userId}",
+                $dateFrom,
+                $dateTo,
+                $resolvedDates['range']
+            ));
         }
 
         if (! empty($dateFrom)) {
@@ -229,22 +229,21 @@ class CreditController extends Controller
 
         // Resolve date range from request, cookie, or default for export
         $userId = auth()->id();
-        $dateFromExport = $request->get('date_from');
-        $dateToExport = $request->get('date_to');
+        $resolvedDates = DateFilterService::resolveFilter(
+            $request->cookie("date_filter_credits_user_{$userId}"),
+            $request->get('date_from'),
+            $request->get('date_to')
+        );
+        $dateFromExport = $resolvedDates['from'];
+        $dateToExport = $resolvedDates['to'];
 
-        if (! $request->has('date_from') && ! $request->has('date_to')) {
-            $cookieName = "date_filter_credits_user_{$userId}";
-            $cookieVal = $request->cookie($cookieName);
-            if ($cookieVal) {
-                $decoded = json_decode($cookieVal, true);
-                if (is_array($decoded)) {
-                    $dateFromExport = $decoded['from'] ?? '';
-                    $dateToExport = $decoded['to'] ?? '';
-                }
-            } else {
-                $dateFromExport = now()->subDays(14)->toDateString();
-                $dateToExport = now()->toDateString();
-            }
+        if ($request->has('date_from') || $request->has('date_to')) {
+            cookie()->queue(DateFilterService::getCookieToQueue(
+                "date_filter_credits_user_{$userId}",
+                $dateFromExport,
+                $dateToExport,
+                $resolvedDates['range']
+            ));
         }
 
         if (! empty($dateFromExport)) {

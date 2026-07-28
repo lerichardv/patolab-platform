@@ -254,6 +254,7 @@ export default function SpecimenForm({
                       name: specimen.customerRelation.name,
                       id_number: specimen.customerRelation.id_number,
                       phone: specimen.customerRelation.phone,
+                      email: specimen.customerRelation.email,
                       gender: specimen.customerRelation.gender,
                       type: specimen.customerRelation.type,
                       age: specimen.customerRelation.age,

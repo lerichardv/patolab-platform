@@ -4092,6 +4092,10 @@ export default function ReportWorkspace({
     });
 
     const handleHeadingToggle = (key: string, value: boolean) => {
+        if (!isAssigned) {
+            return;
+        }
+
         const updated = { ...headingsToggles, [key]: value };
         setHeadingsToggles(updated);
 
@@ -7417,6 +7421,9 @@ export default function ReportWorkspace({
                                                                                                         )
                                                                                                     }
                                                                                                     className="scale-75"
+                                                                                                    disabled={
+                                                                                                        !isAssigned
+                                                                                                    }
                                                                                                 />
                                                                                             </div>
                                                                                         </TooltipTrigger>
@@ -7542,6 +7549,9 @@ export default function ReportWorkspace({
                                                                                                         )
                                                                                                     }
                                                                                                     className="scale-75"
+                                                                                                    disabled={
+                                                                                                        !isAssigned
+                                                                                                    }
                                                                                                 />
                                                                                             </div>
                                                                                         </TooltipTrigger>
@@ -7668,6 +7678,9 @@ export default function ReportWorkspace({
                                                                                                             )
                                                                                                         }
                                                                                                         className="scale-75"
+                                                                                                        disabled={
+                                                                                                            !isAssigned
+                                                                                                        }
                                                                                                     />
                                                                                                 </div>
                                                                                             </TooltipTrigger>
@@ -7882,6 +7895,9 @@ export default function ReportWorkspace({
                                                                                                         )
                                                                                                     }
                                                                                                     className="scale-75"
+                                                                                                    disabled={
+                                                                                                        !isAssigned
+                                                                                                    }
                                                                                                 />
                                                                                             </div>
                                                                                         </TooltipTrigger>
@@ -8181,6 +8197,9 @@ export default function ReportWorkspace({
                                                                                                         )
                                                                                                     }
                                                                                                     className="scale-75"
+                                                                                                    disabled={
+                                                                                                        !isAssigned
+                                                                                                    }
                                                                                                 />
                                                                                             </div>
                                                                                         </TooltipTrigger>
@@ -8305,6 +8324,9 @@ export default function ReportWorkspace({
                                                                                                         )
                                                                                                     }
                                                                                                     className="scale-75"
+                                                                                                    disabled={
+                                                                                                        !isAssigned
+                                                                                                    }
                                                                                                 />
                                                                                             </div>
                                                                                         </TooltipTrigger>
@@ -8429,6 +8451,9 @@ export default function ReportWorkspace({
                                                                                                         )
                                                                                                     }
                                                                                                     className="scale-75"
+                                                                                                    disabled={
+                                                                                                        !isAssigned
+                                                                                                    }
                                                                                                 />
                                                                                             </div>
                                                                                         </TooltipTrigger>
@@ -8682,6 +8707,7 @@ export default function ReportWorkspace({
                     users={users}
                     open={isManageCuttingsOpen}
                     onOpenChange={setIsManageCuttingsOpen}
+                    canEdit={isAssigned}
                 />
 
                 <AlertDialog

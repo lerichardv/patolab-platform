@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
+import InvoicePreviewDialog from '@/components/invoice-preview-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -365,6 +366,9 @@ export default function SpecimenGroupSheet({
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = useState(false);
     const [processing, setProcessing] = useState(false);
 
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+
     // Reset whole form when opened
     useEffect(() => {
         if (open) {
@@ -381,6 +385,8 @@ export default function SpecimenGroupSheet({
             setInitialPaymentAmount('');
             setInitialPaymentType('cash');
             resetDetailedPayments();
+            setShowInvoiceModal(false);
+            setInvoiceUrl(null);
         }
     }, [open]);
 
@@ -1386,10 +1392,18 @@ export default function SpecimenGroupSheet({
         });
 
         router.post('/specimen-groups', payload, {
-            onSuccess: () => {
+            onSuccess: (page: any) => {
                 setProcessing(false);
                 setIsFormDirty(false);
-                onOpenChange(false);
+                const url = page.props.flash?.new_invoice_url;
+
+                if (url) {
+                    setInvoiceUrl(url);
+                    setShowInvoiceModal(true);
+                } else {
+                    onOpenChange(false);
+                }
+
                 toast.success(
                     'Muestras agrupadas creadas y facturadas con éxito',
                 );
@@ -4683,6 +4697,21 @@ export default function SpecimenGroupSheet({
                     </AlertDialog>
                 </SheetContent>
             </Sheet>
+
+            <InvoicePreviewDialog
+                open={showInvoiceModal}
+                onOpenChange={(open) => {
+                    setShowInvoiceModal(open);
+
+                    if (!open) {
+                        setInvoiceUrl(null);
+                        onOpenChange(false);
+                    }
+                }}
+                invoiceUrl={invoiceUrl}
+                isGroup={true}
+                zClass="z-[120]"
+            />
         </>
     );
 }

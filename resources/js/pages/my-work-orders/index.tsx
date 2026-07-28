@@ -454,7 +454,11 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                     );
                                     setCookie(
                                         `date_filter_my_work_orders_user_${userId}`,
-                                        JSON.stringify(defaultRange),
+                                        JSON.stringify({
+                                            range: '14_days',
+                                            from: defaultRange.from,
+                                            to: defaultRange.to,
+                                        }),
                                     );
                                 }
 
@@ -622,7 +626,7 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                                     <div className="mt-0.5 pb-1 text-[8.5px] leading-none text-muted-foreground">
                                                                         {format(
                                                                             dueDate,
-                                                                            'HH:mm',
+                                                                            'h:mm a',
                                                                         )}
                                                                     </div>
                                                                 </div>

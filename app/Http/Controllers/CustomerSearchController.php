@@ -27,7 +27,7 @@ class CustomerSearchController extends Controller
             $selectedCustomers = Customer::where('active', true)
                 ->whereIn('id', $selectedIds)
                 ->orderBy('name')
-                ->get(['id', 'name', 'id_number', 'phone', 'gender', 'type', 'age']);
+                ->get(['id', 'name', 'id_number', 'phone', 'gender', 'type', 'age', 'email']);
         }
 
         // Only run a text search when the query is at least 4 characters
@@ -41,7 +41,7 @@ class CustomerSearchController extends Controller
                 ->when(! empty($selectedIds), fn ($query) => $query->whereNotIn('id', $selectedIds))
                 ->orderBy('name')
                 ->limit(15)
-                ->get(['id', 'name', 'id_number', 'phone', 'gender', 'type', 'age']);
+                ->get(['id', 'name', 'id_number', 'phone', 'gender', 'type', 'age', 'email']);
         }
 
         return response()->json([

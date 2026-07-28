@@ -17,6 +17,7 @@ use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
+use App\Services\InvoicePdfService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -919,16 +920,16 @@ test('specimen bulk status cancellation updates invoice values to zero, deletes 
     ]);
 
     // Mock PDF service to avoid running Puppeteer
-    $pdfServiceMock = Mockery::mock(\App\Services\InvoicePdfService::class);
+    $pdfServiceMock = Mockery::mock(InvoicePdfService::class);
     $pdfServiceMock->shouldReceive('generateAndStoreInvoice')
         ->once()
         ->with(Mockery::on(function ($arg) use ($invoice) {
-            return $arg->id === $invoice->id 
-                && (float)$arg->total === 500.00 
+            return $arg->id === $invoice->id
+                && (float) $arg->total === 500.00
                 && $arg->invoice_type === 'cancelled';
         }))
         ->andReturn('invoices/regenerated_test.pdf');
-    app()->instance(\App\Services\InvoicePdfService::class, $pdfServiceMock);
+    app()->instance(InvoicePdfService::class, $pdfServiceMock);
 
     // Call bulkAction status update to 'cancelled'
     $response = $this->actingAs($user)

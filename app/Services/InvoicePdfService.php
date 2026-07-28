@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\Invoice;
 use App\Models\Location;
 use App\Models\SpecimenTypeExamination;
-use App\Models\Customer;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Browsershot\Browsershot;
 
@@ -26,7 +24,7 @@ class InvoicePdfService
             'groupSpecimens.specimen.examination',
             'groupSpecimens.specimen.customerRelation',
             'groupSpecimens.specimen.examination.prices',
-            'groupSpecimens.specimen.products'
+            'groupSpecimens.specimen.products',
         ]);
 
         $totalWords = $this->numberToSpanishWords((float) $invoice->total);

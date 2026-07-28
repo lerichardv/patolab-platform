@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use App\Traits\Auditable;
+use App\Services\ResendService;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Traits\Auditable;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -13,7 +14,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
 #[Fillable(['name', 'email', 'password', 'active', 'role_id', 'user_signature'])]
@@ -122,5 +125,63 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Send the password reset notification.
+     *
+     * @param  string  $token
+     * @return void
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        $resetUrl = route('password.reset', [
+            'token' => $token,
+            'email' => $this->email,
+        ]);
+
+        $expire = config('auth.passwords.users.expire', 60);
+
+        $htmlContent = view('emails.password_reset', [
+            'resetUrl' => $resetUrl,
+            'expire' => $expire,
+            'user' => $this,
+        ])->render();
+
+        try {
+            $resend = app(ResendService::class);
+            $resend->sendEmail($this->email, 'Restablecer Contraseña — PatoLab', $htmlContent);
+        } catch (\Exception $e) {
+            Log::error('Error sending password reset email: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Send the email verification notification.
+     *
+     * @return void
+     */
+    public function sendEmailVerificationNotification()
+    {
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(config('auth.verification.expire', 60)),
+            [
+                'id' => $this->getKey(),
+                'hash' => sha1($this->getEmailForVerification()),
+            ]
+        );
+
+        $htmlContent = view('emails.email_verification', [
+            'verificationUrl' => $verificationUrl,
+            'user' => $this,
+        ])->render();
+
+        try {
+            $resend = app(ResendService::class);
+            $resend->sendEmail($this->email, 'Verificar Dirección de Correo — PatoLab', $htmlContent);
+        } catch (\Exception $e) {
+            Log::error('Error sending verification email: '.$e->getMessage());
+        }
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderTask;
 use App\Models\WorkOrderType;
+use App\Services\DateFilterService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -34,36 +35,22 @@ class WorkOrderController extends Controller
         }
 
         // 2. Date Range Filter
-        $dateCookie = $request->cookie('date_filter_admin_work_orders');
-        $dateFrom = $request->get('date_from');
-        $dateTo = $request->get('date_to');
-
-        if (! $request->has('date_from') && ! $request->has('date_to')) {
-            if ($dateCookie) {
-                $decoded = json_decode($dateCookie, true);
-                if (is_array($decoded)) {
-                    $dateFrom = $decoded['from'] ?? '';
-                    $dateTo = $decoded['to'] ?? '';
-                }
-            } else {
-                $dateFrom = Carbon::now()->subDays(14)->toDateString();
-                $dateTo = Carbon::now()->toDateString();
-            }
-        }
-
-        $isValidDate = function ($date) {
-            return ! empty($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date);
-        };
-
-        if ($dateFrom && ! $isValidDate($dateFrom)) {
-            $dateFrom = Carbon::now()->subDays(14)->toDateString();
-        }
-        if ($dateTo && ! $isValidDate($dateTo)) {
-            $dateTo = Carbon::now()->toDateString();
-        }
+        $userId = auth()->id();
+        $resolvedDates = DateFilterService::resolveFilter(
+            $request->cookie("date_filter_admin_work_orders_user_{$userId}"),
+            $request->get('date_from'),
+            $request->get('date_to')
+        );
+        $dateFrom = $resolvedDates['from'];
+        $dateTo = $resolvedDates['to'];
 
         if ($request->has('date_from') || $request->has('date_to')) {
-            cookie()->queue(cookie('date_filter_admin_work_orders', json_encode(['from' => $dateFrom ?? '', 'to' => $dateTo ?? '']), 525600, null, null, null, false));
+            cookie()->queue(DateFilterService::getCookieToQueue(
+                "date_filter_admin_work_orders_user_{$userId}",
+                $dateFrom,
+                $dateTo,
+                $resolvedDates['range']
+            ));
         }
 
         if (! empty($dateFrom)) {

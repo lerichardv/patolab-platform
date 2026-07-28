@@ -24,6 +24,8 @@ use App\Models\SpecimenTypeExamination;
 use App\Models\User;
 use App\Models\WorkOrderTask;
 use App\Models\WorkOrderType;
+use App\Services\DateFilterService;
+use App\Services\InvoicePdfService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -31,7 +33,6 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Spatie\Browsershot\Browsershot;
 
 class InvoiceController extends Controller
 {
@@ -85,36 +86,21 @@ class InvoiceController extends Controller
         $userId = auth()->id();
 
         // 4. Date Range Filter
-        $dateCookie = $request->cookie("date_filter_invoices_user_{$userId}");
-        $dateFrom = $request->get('date_from');
-        $dateTo = $request->get('date_to');
+        $resolvedDates = DateFilterService::resolveFilter(
+            $request->cookie("date_filter_invoices_user_{$userId}"),
+            $request->get('date_from'),
+            $request->get('date_to')
+        );
+        $dateFrom = $resolvedDates['from'];
+        $dateTo = $resolvedDates['to'];
 
-        if (! $request->has('date_from') && ! $request->has('date_to')) {
-            if ($dateCookie) {
-                $decoded = json_decode($dateCookie, true);
-                if (is_array($decoded)) {
-                    $dateFrom = $decoded['from'] ?? '';
-                    $dateTo = $decoded['to'] ?? '';
-                    if ($dateTo && $dateTo < now()->toDateString()) {
-                        $dateTo = now()->toDateString();
-                    }
-                }
-            } else {
-                $dateFrom = now()->subDays(14)->toDateString();
-                $dateTo = now()->toDateString();
-            }
-        }
-        $isValidDate = function ($date) {
-            return ! empty($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date);
-        };
-        if ($dateFrom && ! $isValidDate($dateFrom)) {
-            $dateFrom = now()->subDays(14)->toDateString();
-        }
-        if ($dateTo && ! $isValidDate($dateTo)) {
-            $dateTo = now()->toDateString();
-        }
         if ($request->has('date_from') || $request->has('date_to')) {
-            cookie()->queue(cookie("date_filter_invoices_user_{$userId}", json_encode(['from' => $dateFrom ?? '', 'to' => $dateTo ?? '']), 525600, null, null, null, false));
+            cookie()->queue(DateFilterService::getCookieToQueue(
+                "date_filter_invoices_user_{$userId}",
+                $dateFrom,
+                $dateTo,
+                $resolvedDates['range']
+            ));
         }
 
         // Filter by payment type
@@ -319,25 +305,21 @@ class InvoiceController extends Controller
 
         // Resolve date range from request, cookie, or default for export
         $userId = auth()->id();
-        $dateFromExport = $request->get('date_from');
-        $dateToExport = $request->get('date_to');
+        $resolvedDates = DateFilterService::resolveFilter(
+            $request->cookie("date_filter_invoices_user_{$userId}"),
+            $request->get('date_from'),
+            $request->get('date_to')
+        );
+        $dateFromExport = $resolvedDates['from'];
+        $dateToExport = $resolvedDates['to'];
 
-        if (! $request->has('date_from') && ! $request->has('date_to')) {
-            $cookieName = "date_filter_invoices_user_{$userId}";
-            $cookieVal = $request->cookie($cookieName);
-            if ($cookieVal) {
-                $decoded = json_decode($cookieVal, true);
-                if (is_array($decoded)) {
-                    $dateFromExport = $decoded['from'] ?? '';
-                    $dateToExport = $decoded['to'] ?? '';
-                    if ($dateToExport && $dateToExport < now()->toDateString()) {
-                        $dateToExport = now()->toDateString();
-                    }
-                }
-            } else {
-                $dateFromExport = now()->subDays(14)->toDateString();
-                $dateToExport = now()->toDateString();
-            }
+        if ($request->has('date_from') || $request->has('date_to')) {
+            cookie()->queue(DateFilterService::getCookieToQueue(
+                "date_filter_invoices_user_{$userId}",
+                $dateFromExport,
+                $dateToExport,
+                $resolvedDates['range']
+            ));
         }
 
         if (! empty($dateFromExport)) {
@@ -540,7 +522,31 @@ class InvoiceController extends Controller
         $groupSpecimensData = $validated['group_specimens'] ?? null;
         unset($validated['group_specimens']);
 
+        // Calculate tax/exempt fields based on invoice type
+        if ($invoice->invoice_type === 'rental' || $invoice->rental_id) {
+            $validated['tax_exempt_amount'] = (float) ($validated['custom_amount'] ?? 0.00);
+            $validated['taxable_amount_15'] = (float) $validated['subtotal'];
+            $validated['taxable_amount_18'] = 0.00;
+            $validated['isv_15'] = round((float) $validated['subtotal'] * 0.15, 2);
+            $validated['isv_18'] = 0.00;
+            $validated['total'] = (float) $validated['subtotal'] + $validated['isv_15'] + $validated['tax_exempt_amount'];
+        } else {
+            $validated['tax_exempt_amount'] = (float) $validated['subtotal'];
+            $validated['taxable_amount_15'] = 0.00;
+            $validated['taxable_amount_18'] = 0.00;
+            $validated['isv_15'] = 0.00;
+            $validated['isv_18'] = 0.00;
+        }
+
         $invoice->update($validated);
+
+        // Sync customer to related models
+        if (! $invoice->is_group && $invoice->specimen) {
+            $invoice->specimen->update(['customer' => $validated['customer_id']]);
+        } elseif ($invoice->is_group && $invoice->group) {
+            $invoice->group->update(['customer_id' => $validated['customer_id']]);
+            $invoice->group->customers()->sync([$validated['customer_id']]);
+        }
 
         if ($groupSpecimensData) {
             foreach ($groupSpecimensData as $item) {
@@ -574,6 +580,10 @@ class InvoiceController extends Controller
                     'discount' => $discountVal,
                     'subtotal' => $subtotalVal,
                     'exempt_amount' => $totalVal,
+                    'taxable_amount_15' => 0.00,
+                    'taxable_amount_18' => 0.00,
+                    'isv_15' => 0.00,
+                    'isv_18' => 0.00,
                     'total' => $totalVal,
                     'selected_price' => $item['selected_price'],
                     'custom_specimen_price' => $item['selected_price'] === 'custom' ? $priceVal : 0.00,
@@ -594,6 +604,10 @@ class InvoiceController extends Controller
                         'discount' => $discountVal,
                         'subtotal' => $subtotalVal,
                         'exempt_amount' => $totalVal,
+                        'taxable_amount_15' => 0.00,
+                        'taxable_amount_18' => 0.00,
+                        'isv_15' => 0.00,
+                        'isv_18' => 0.00,
                         'total' => $totalVal,
                         'selected_price' => $item['selected_price'],
                         'custom_specimen_price' => $item['selected_price'] === 'custom' ? $priceVal : 0.00,
@@ -622,6 +636,10 @@ class InvoiceController extends Controller
                             'discount' => (float) $validated['discount'],
                             'subtotal' => (float) $validated['subtotal'],
                             'exempt_amount' => (float) $validated['total'],
+                            'taxable_amount_15' => 0.00,
+                            'taxable_amount_18' => 0.00,
+                            'isv_15' => 0.00,
+                            'isv_18' => 0.00,
                             'total' => (float) $validated['total'],
                         ]);
                     }
@@ -638,7 +656,7 @@ class InvoiceController extends Controller
 
         if ($request->boolean('regenerate_pdf', true)) {
             try {
-                app(\App\Services\InvoicePdfService::class)->generateAndStoreInvoice($invoice);
+                app(InvoicePdfService::class)->generateAndStoreInvoice($invoice);
             } catch (\Exception $e) {
                 \Log::warning('Error regenerating invoice PDF: '.$e->getMessage());
             }

@@ -217,7 +217,7 @@ const getDueDateInfo = (specimen: Specimen) => {
         addSuffix: true,
         locale: es,
     });
-    const fullDueDate = format(dueDate, 'dd/MM/yyyy HH:mm');
+    const fullDueDate = format(dueDate, 'dd/MM/yyyy h:mm a');
 
     const isExpired = isPast(dueDate);
     const isWithinOneDay =
@@ -765,7 +765,11 @@ export default function MyAssignmentsIndex({
                                     );
                                     setCookie(
                                         `date_filter_my_assignments_user_${userId}`,
-                                        JSON.stringify(defaultRange),
+                                        JSON.stringify({
+                                            range: '14_days',
+                                            from: defaultRange.from,
+                                            to: defaultRange.to,
+                                        }),
                                     );
                                 }
 
@@ -1492,7 +1496,7 @@ export default function MyAssignmentsIndex({
                                                                                     <div className="mt-0.5 pb-1 text-[8.5px] leading-none text-muted-foreground">
                                                                                         {format(
                                                                                             dueDate,
-                                                                                            'HH:mm',
+                                                                                            'h:mm a',
                                                                                         )}
                                                                                     </div>
                                                                                 </div>
@@ -1861,7 +1865,7 @@ export default function MyAssignmentsIndex({
                                                                 new Date(
                                                                     order.due_date,
                                                                 ),
-                                                                'dd/MM/yyyy HH:mm',
+                                                                'dd/MM/yyyy h:mm a',
                                                                 { locale: es },
                                                             )}
                                                         </p>

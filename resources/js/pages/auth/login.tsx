@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { login as loginRoute, register } from '@/routes';
+import { login as loginRoute } from '@/routes';
 import { request as forgotPassword } from '@/routes/password';
 
 export default function Login({
@@ -108,16 +108,6 @@ export default function Login({
                     >
                         Iniciar sesión
                     </Button>
-                </div>
-
-                <div className="text-center text-sm text-muted-foreground">
-                    ¿No tiene una cuenta?{' '}
-                    <Link
-                        href={register().url}
-                        className="underline underline-offset-4 hover:text-primary"
-                    >
-                        Regístrese
-                    </Link>
                 </div>
             </form>
         </>

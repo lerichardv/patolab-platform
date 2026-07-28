@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
+import { toast } from 'sonner';
 import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceController';
 import { index as rentalsIndex } from '@/actions/App/Http/Controllers/RentalController';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
@@ -43,7 +44,18 @@ import {
     getLast2WeeksRange,
 } from '@/components/date-range-picker';
 import HeadingSheet from '@/components/heading-sheet';
+import InvoicePreviewDialog from '@/components/invoice-preview-dialog';
 import { Pagination } from '@/components/pagination';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -66,6 +78,7 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Popover,
     PopoverContent,
@@ -88,6 +101,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import SpecimenGroupSheet from '../specimens/specimen-group-sheet';
@@ -96,19 +110,6 @@ import SpecimenSheet from '../specimens/specimen-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 import InvoiceSheet from './invoice-sheet';
 import InvoiceViewSheet from './invoice-view-sheet';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
 
 interface Invoice {
     id: number;
@@ -363,6 +364,13 @@ export default function InvoicesIndex({
     const [isWorkOrderSheetOpen, setIsWorkOrderSheetOpen] = useState(false);
     const [selectedSpecimenForWorkOrder, setSelectedSpecimenForWorkOrder] =
         useState<number | null>(null);
+
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+    const [paymentInvoiceUrl, setPaymentInvoiceUrl] = useState<string | null>(
+        null,
+    );
+    const [isGroupInvoice, setIsGroupInvoice] = useState(false);
     const [
         selectedSpecimenIdsForWorkOrder,
         setSelectedSpecimenIdsForWorkOrder,
@@ -379,10 +387,15 @@ export default function InvoicesIndex({
         if (!specimenToCancel || !specimenToCancel.group_id) {
             return [];
         }
-        const invoice = invoices.data.find(inv => 
-            (inv.specimen_id === specimenToCancel.id) || 
-            (inv.group?.specimens?.some((s: any) => s.id === specimenToCancel.id))
+
+        const invoice = invoices.data.find(
+            (inv) =>
+                inv.specimen_id === specimenToCancel.id ||
+                inv.group?.specimens?.some(
+                    (s: any) => s.id === specimenToCancel.id,
+                ),
         );
+
         return invoice?.group?.specimens || [];
     }, [specimenToCancel, invoices.data]);
 
@@ -515,6 +528,19 @@ export default function InvoicesIndex({
             }
         }
     }, [flash.new_specimen_id, invoices.data]);
+
+    useEffect(() => {
+        if (flash.new_invoice_url) {
+            setInvoiceUrl(flash.new_invoice_url);
+            setPaymentInvoiceUrl(flash.new_payment_invoice_url || null);
+            setIsGroupInvoice(!flash.new_specimen_id);
+            setShowInvoiceModal(true);
+        }
+    }, [
+        flash.new_invoice_url,
+        flash.new_payment_invoice_url,
+        flash.new_specimen_id,
+    ]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const [showLeftShadow, setShowLeftShadow] = useState(false);
@@ -838,7 +864,11 @@ export default function InvoicesIndex({
                                     );
                                     setCookie(
                                         `date_filter_invoices_user_${userId}`,
-                                        JSON.stringify(defaultRange),
+                                        JSON.stringify({
+                                            range: '14_days',
+                                            from: defaultRange.from,
+                                            to: defaultRange.to,
+                                        }),
                                     );
                                 }
 
@@ -1287,7 +1317,7 @@ export default function InvoicesIndex({
                                                                   new Date(
                                                                       invoice.created_at,
                                                                   ),
-                                                                  'HH:mm a',
+                                                                  'h:mm a',
                                                                   {
                                                                       locale: es,
                                                                   },
@@ -1785,16 +1815,57 @@ export default function InvoicesIndex({
                                                                 </DropdownMenuItem>
                                                             )}
                                                             {canEditSpecimen &&
-                                                                invoice.invoice_type !== 'cancelled' &&
-                                                                ((invoice.specimen && !['cancelled', 'finalized', 'delivered'].includes(invoice.specimen.status)) ||
-                                                                 (invoice.group?.specimens?.some((s: any) => !['cancelled', 'finalized', 'delivered'].includes(s.status)))) && (
+                                                                invoice.invoice_type !==
+                                                                    'cancelled' &&
+                                                                ((invoice.specimen &&
+                                                                    ![
+                                                                        'cancelled',
+                                                                        'finalized',
+                                                                        'delivered',
+                                                                    ].includes(
+                                                                        invoice
+                                                                            .specimen
+                                                                            .status,
+                                                                    )) ||
+                                                                    invoice.group?.specimens?.some(
+                                                                        (
+                                                                            s: any,
+                                                                        ) =>
+                                                                            ![
+                                                                                'cancelled',
+                                                                                'finalized',
+                                                                                'delivered',
+                                                                            ].includes(
+                                                                                s.status,
+                                                                            ),
+                                                                    )) && (
                                                                     <DropdownMenuItem
                                                                         variant="destructive"
-                                                                        onClick={(e) => {
+                                                                        onClick={(
+                                                                            e,
+                                                                        ) => {
                                                                             e.stopPropagation();
-                                                                            const specimen = invoice.specimen || invoice.group?.specimens?.find((s: any) => !['cancelled', 'finalized', 'delivered'].includes(s.status));
-                                                                            if (specimen) {
-                                                                                handleCancelClick(specimen);
+                                                                            const specimen =
+                                                                                invoice.specimen ||
+                                                                                invoice.group?.specimens?.find(
+                                                                                    (
+                                                                                        s: any,
+                                                                                    ) =>
+                                                                                        ![
+                                                                                            'cancelled',
+                                                                                            'finalized',
+                                                                                            'delivered',
+                                                                                        ].includes(
+                                                                                            s.status,
+                                                                                        ),
+                                                                                );
+
+                                                                            if (
+                                                                                specimen
+                                                                            ) {
+                                                                                handleCancelClick(
+                                                                                    specimen,
+                                                                                );
                                                                             }
                                                                         }}
                                                                     >
@@ -2227,15 +2298,19 @@ export default function InvoicesIndex({
                                 </span>{' '}
                                 a cancelada.
                             </div>
-                            
+
                             {/* Notice about regenerated invoice (before cancel) */}
                             <div className="space-y-1.5 rounded-lg border border-amber-500/20 bg-amber-500/[0.03] p-3 text-left">
                                 <h4 className="flex items-center gap-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
                                     <FileText className="h-3.5 w-3.5" />
                                     Factura a Regenerar
                                 </h4>
-                                <p className="text-[11px] text-muted-foreground leading-normal">
-                                    El archivo PDF de la factura se regenerará automáticamente con sus importes originales y el sello "CANCELADO" en la parte inferior. En la base de datos, los valores se actualizarán a cero.
+                                <p className="text-[11px] leading-normal text-muted-foreground">
+                                    El archivo PDF de la factura se regenerará
+                                    automáticamente con sus importes originales
+                                    y el sello "CANCELADO" en la parte inferior.
+                                    En la base de datos, los valores se
+                                    actualizarán a cero.
                                 </p>
                             </div>
 
@@ -2329,10 +2404,14 @@ export default function InvoicesIndex({
                     {selectedInvoiceForCancellationReason &&
                         (() => {
                             const getCancellationDetails = (inv: any) => {
-                                if (!inv) return null;
+                                if (!inv) {
+return null;
+}
+
                                 if (inv.specimen) {
                                     return inv.specimen;
                                 }
+
                                 if (
                                     inv.group?.specimens &&
                                     inv.group.specimens.length > 0
@@ -2343,17 +2422,20 @@ export default function InvoicesIndex({
                                                 s.status === 'cancelled' ||
                                                 s.cancellation_reason,
                                         );
+
                                     return (
                                         cancelledSpecimen ||
                                         inv.group.specimens[0]
                                     );
                                 }
+
                                 return null;
                             };
 
                             const cancelledSpecimen = getCancellationDetails(
                                 selectedInvoiceForCancellationReason,
                             );
+
                             if (!cancelledSpecimen) {
                                 return (
                                     <div className="py-6 text-center text-sm text-muted-foreground">
@@ -2392,7 +2474,7 @@ export default function InvoicesIndex({
                                                         new Date(
                                                             cancelledSpecimen.cancelled_at,
                                                         ),
-                                                        'PPP p',
+                                                        'PPP h:mm a',
                                                         { locale: es },
                                                     )}
                                                 </span>
@@ -2458,6 +2540,20 @@ export default function InvoicesIndex({
                         })()}
                 </SheetContent>
             </Sheet>
+            <InvoicePreviewDialog
+                open={showInvoiceModal}
+                onOpenChange={(open) => {
+                    setShowInvoiceModal(open);
+
+                    if (!open) {
+                        setInvoiceUrl(null);
+                        setPaymentInvoiceUrl(null);
+                    }
+                }}
+                invoiceUrl={invoiceUrl}
+                paymentInvoiceUrl={paymentInvoiceUrl}
+                isGroup={isGroupInvoice}
+            />
         </>
     );
 }

@@ -45,6 +45,7 @@ import {
     setCookie,
     getLast2WeeksRange,
 } from '@/components/date-range-picker';
+import InvoicePreviewDialog from '@/components/invoice-preview-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -333,9 +334,6 @@ export default function SpecimensIndex({
     const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
     const [paymentInvoiceUrl, setPaymentInvoiceUrl] = useState<string | null>(
         null,
-    );
-    const [activePdf, setActivePdf] = useState<'invoice' | 'payment_invoice'>(
-        'invoice',
     );
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
@@ -745,7 +743,7 @@ export default function SpecimensIndex({
         : null;
 
     useEffect(() => {
-        if (flash.new_invoice_url) {
+        if (flash.new_invoice_url && flash.new_specimen_id) {
             setInvoiceUrl(flash.new_invoice_url);
 
             if (flash.new_payment_invoice_url) {
@@ -754,10 +752,13 @@ export default function SpecimensIndex({
                 setPaymentInvoiceUrl(null);
             }
 
-            setActivePdf('invoice');
             setShowInvoiceModal(true);
         }
-    }, [flash.new_invoice_url, flash.new_payment_invoice_url]);
+    }, [
+        flash.new_invoice_url,
+        flash.new_payment_invoice_url,
+        flash.new_specimen_id,
+    ]);
 
     useEffect(() => {
         if (flash.new_specimen_id) {
@@ -1369,7 +1370,11 @@ export default function SpecimensIndex({
                                     );
                                     setCookie(
                                         `date_filter_specimens_user_${userId}`,
-                                        JSON.stringify(defaultRange),
+                                        JSON.stringify({
+                                            range: '14_days',
+                                            from: defaultRange.from,
+                                            to: defaultRange.to,
+                                        }),
                                     );
                                 }
 
@@ -2626,8 +2631,7 @@ export default function SpecimensIndex({
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* DIÁLOGO DE IMPRESIÓN/VISTA PREVIA DE FACTURA */}
-            <AlertDialog
+            <InvoicePreviewDialog
                 open={showInvoiceModal}
                 onOpenChange={(open) => {
                     setShowInvoiceModal(open);
@@ -2635,105 +2639,11 @@ export default function SpecimensIndex({
                     if (!open) {
                         setInvoiceUrl(null);
                         setPaymentInvoiceUrl(null);
-                        setActivePdf('invoice');
                     }
                 }}
-            >
-                <AlertDialogContent
-                    className="z-[100] w-full max-w-[700px]"
-                    overlayClassName="z-[100]"
-                >
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-primary" />{' '}
-                            Factura Generada con Éxito
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            La muestra ha sido registrada y la factura se generó
-                            en formato PDF. Puede descargarla, imprimirla o
-                            visualizarla a continuación.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-
-                    {paymentInvoiceUrl && (
-                        <div className="mt-2 flex gap-2">
-                            <Button
-                                type="button"
-                                variant={
-                                    activePdf === 'invoice'
-                                        ? 'default'
-                                        : 'outline'
-                                }
-                                size="sm"
-                                onClick={() => setActivePdf('invoice')}
-                                className="flex-1"
-                            >
-                                Factura de Crédito
-                            </Button>
-                            <Button
-                                type="button"
-                                variant={
-                                    activePdf === 'payment_invoice'
-                                        ? 'default'
-                                        : 'outline'
-                                }
-                                size="sm"
-                                onClick={() => setActivePdf('payment_invoice')}
-                                className="flex-1"
-                            >
-                                Recibo de Pago Inicial
-                            </Button>
-                        </div>
-                    )}
-
-                    {(activePdf === 'invoice'
-                        ? invoiceUrl
-                        : paymentInvoiceUrl) && (
-                        <div className="my-4 overflow-hidden rounded-lg border bg-muted">
-                            <iframe
-                                src={
-                                    activePdf === 'invoice'
-                                        ? invoiceUrl!
-                                        : paymentInvoiceUrl!
-                                }
-                                className="h-[400px] w-full border-none"
-                                title="Factura PDF"
-                            />
-                        </div>
-                    )}
-
-                    <AlertDialogFooter className="flex flex-col gap-2 sm:flex-row">
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setShowInvoiceModal(false);
-                                setInvoiceUrl(null);
-                                setPaymentInvoiceUrl(null);
-                                setActivePdf('invoice');
-                            }}
-                            className="sm:order-1"
-                        >
-                            Cerrar
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                const url =
-                                    activePdf === 'invoice'
-                                        ? invoiceUrl
-                                        : paymentInvoiceUrl;
-
-                                if (url) {
-                                    window.open(url, '_blank');
-                                }
-                            }}
-                            className="sm:order-2"
-                        >
-                            <ExternalLink className="mr-2 h-4 w-4" /> Abrir en
-                            pestaña nueva
-                        </Button>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                invoiceUrl={invoiceUrl}
+                paymentInvoiceUrl={paymentInvoiceUrl}
+            />
         </>
     );
 }

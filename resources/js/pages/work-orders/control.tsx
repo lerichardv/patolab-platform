@@ -256,7 +256,7 @@ const getDueDateInfo = (wo: WorkOrder) => {
         addSuffix: true,
         locale: es,
     });
-    const fullDueDate = format(dueDate, 'dd/MM/yyyy HH:mm');
+    const fullDueDate = format(dueDate, 'dd/MM/yyyy h:mm a');
 
     const isExpired = isPast(dueDate);
     const isWithinOneDay =
@@ -710,7 +710,11 @@ export default function HistotechnologistWorkOrdersControl({
                                     );
                                     setCookie(
                                         `date_filter_histotechnologist_work_orders_user_${userId}`,
-                                        JSON.stringify(defaultRange),
+                                        JSON.stringify({
+                                            range: '14_days',
+                                            from: defaultRange.from,
+                                            to: defaultRange.to,
+                                        }),
                                     );
                                 }
 
@@ -857,109 +861,115 @@ export default function HistotechnologistWorkOrdersControl({
                                                                                 user.name
                                                                             }
                                                                         </span>
-                                                                        <button
-                                                                            type="button"
-                                                                            className="rounded-full p-0.5 hover:bg-accent hover:text-accent-foreground"
-                                                                            onClick={() =>
-                                                                                handleUnassign(
-                                                                                    wo.id,
-                                                                                    user.id,
-                                                                                )
-                                                                            }
-                                                                            title={`Desasignar ${user.name}`}
-                                                                        >
-                                                                            <X className="h-3 w-3" />
-                                                                        </button>
+                                                                        {wo.status !==
+                                                                            'Finalizada' && (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="rounded-full p-0.5 hover:bg-accent hover:text-accent-foreground"
+                                                                                onClick={() =>
+                                                                                    handleUnassign(
+                                                                                        wo.id,
+                                                                                        user.id,
+                                                                                    )
+                                                                                }
+                                                                                title={`Desasignar ${user.name}`}
+                                                                            >
+                                                                                <X className="h-3 w-3" />
+                                                                            </button>
+                                                                        )}
                                                                     </Badge>
                                                                 ),
                                                             )}
 
                                                         {/* Add Technician Dropdown (shadcn Combobox) */}
-                                                        <Popover
-                                                            open={
-                                                                openAssignWorkOrderId ===
-                                                                wo.id
-                                                            }
-                                                            onOpenChange={(
-                                                                isOpen,
-                                                            ) =>
-                                                                setOpenAssignWorkOrderId(
-                                                                    isOpen
-                                                                        ? wo.id
-                                                                        : null,
-                                                                )
-                                                            }
-                                                            modal={true}
-                                                        >
-                                                            <PopoverTrigger
-                                                                asChild
+                                                        {wo.status !==
+                                                            'Finalizada' && (
+                                                            <Popover
+                                                                open={
+                                                                    openAssignWorkOrderId ===
+                                                                    wo.id
+                                                                }
+                                                                onOpenChange={(
+                                                                    isOpen,
+                                                                ) =>
+                                                                    setOpenAssignWorkOrderId(
+                                                                        isOpen
+                                                                            ? wo.id
+                                                                            : null,
+                                                                    )
+                                                                }
+                                                                modal={true}
                                                             >
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-6 w-6 rounded-full border border-dashed border-muted-foreground/30 hover:border-foreground"
-                                                                    title="Asignar técnico"
+                                                                <PopoverTrigger
+                                                                    asChild
                                                                 >
-                                                                    <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
-                                                                </Button>
-                                                            </PopoverTrigger>
-                                                            <PopoverContent
-                                                                className="w-56 p-0"
-                                                                align="start"
-                                                            >
-                                                                <Command>
-                                                                    <CommandInput placeholder="Buscar técnico..." />
-                                                                    <CommandList className="max-h-56">
-                                                                        <CommandEmpty>
-                                                                            No
-                                                                            se
-                                                                            encontraron
-                                                                            resultados.
-                                                                        </CommandEmpty>
-                                                                        <CommandGroup>
-                                                                            {unassignedTechs.length >
-                                                                            0 ? (
-                                                                                unassignedTechs.map(
-                                                                                    (
-                                                                                        t,
-                                                                                    ) => (
-                                                                                        <CommandItem
-                                                                                            key={
-                                                                                                t.id
-                                                                                            }
-                                                                                            value={
-                                                                                                t.name
-                                                                                            }
-                                                                                            onSelect={() => {
-                                                                                                handleAssign(
-                                                                                                    wo.id,
-                                                                                                    t.id,
-                                                                                                );
-                                                                                                setOpenAssignWorkOrderId(
-                                                                                                    null,
-                                                                                                );
-                                                                                            }}
-                                                                                            className="cursor-pointer"
-                                                                                        >
-                                                                                            {
-                                                                                                t.name
-                                                                                            }
-                                                                                        </CommandItem>
-                                                                                    ),
-                                                                                )
-                                                                            ) : (
-                                                                                <div className="p-2 text-center text-xs text-muted-foreground">
-                                                                                    Todos
-                                                                                    los
-                                                                                    técnicos
-                                                                                    asignados
-                                                                                </div>
-                                                                            )}
-                                                                        </CommandGroup>
-                                                                    </CommandList>
-                                                                </Command>
-                                                            </PopoverContent>
-                                                        </Popover>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6 rounded-full border border-dashed border-muted-foreground/30 hover:border-foreground"
+                                                                        title="Asignar técnico"
+                                                                    >
+                                                                        <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                    </Button>
+                                                                </PopoverTrigger>
+                                                                <PopoverContent
+                                                                    className="w-56 p-0"
+                                                                    align="start"
+                                                                >
+                                                                    <Command>
+                                                                        <CommandInput placeholder="Buscar técnico..." />
+                                                                        <CommandList className="max-h-56">
+                                                                            <CommandEmpty>
+                                                                                No
+                                                                                se
+                                                                                encontraron
+                                                                                resultados.
+                                                                            </CommandEmpty>
+                                                                            <CommandGroup>
+                                                                                {unassignedTechs.length >
+                                                                                0 ? (
+                                                                                    unassignedTechs.map(
+                                                                                        (
+                                                                                            t,
+                                                                                        ) => (
+                                                                                            <CommandItem
+                                                                                                key={
+                                                                                                    t.id
+                                                                                                }
+                                                                                                value={
+                                                                                                    t.name
+                                                                                                }
+                                                                                                onSelect={() => {
+                                                                                                    handleAssign(
+                                                                                                        wo.id,
+                                                                                                        t.id,
+                                                                                                    );
+                                                                                                    setOpenAssignWorkOrderId(
+                                                                                                        null,
+                                                                                                    );
+                                                                                                }}
+                                                                                                className="cursor-pointer"
+                                                                                            >
+                                                                                                {
+                                                                                                    t.name
+                                                                                                }
+                                                                                            </CommandItem>
+                                                                                        ),
+                                                                                    )
+                                                                                ) : (
+                                                                                    <div className="p-2 text-center text-xs text-muted-foreground">
+                                                                                        Todos
+                                                                                        los
+                                                                                        técnicos
+                                                                                        asignados
+                                                                                    </div>
+                                                                                )}
+                                                                            </CommandGroup>
+                                                                        </CommandList>
+                                                                    </Command>
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        )}
                                                     </div>
                                                 </TableCell>
 
@@ -987,7 +997,7 @@ export default function HistotechnologistWorkOrdersControl({
                                                 </TableCell>
                                                 {/* Visual Day Calendar Tear-off Widget + Inline Status Badge */}
                                                 <TableCell className="py-2.5">
-                                                    <div className="flex items-center justify-center gap-2">
+                                                    <div className="flex items-center justify-start gap-2">
                                                         {(() => {
                                                             const dueDate =
                                                                 dueInfo?.dueDate ||
@@ -1032,7 +1042,7 @@ export default function HistotechnologistWorkOrdersControl({
                                                                         <div className="mt-0.5 pb-1 text-[8.5px] leading-none text-muted-foreground">
                                                                             {format(
                                                                                 dueDate,
-                                                                                'HH:mm',
+                                                                                'h:mm a',
                                                                             )}
                                                                         </div>
                                                                     </div>
