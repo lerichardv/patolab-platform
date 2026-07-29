@@ -78,7 +78,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import { cn, addWithoutWeekends } from '@/lib/utils';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import SpecimenBulkCollaboratorSheet from '../specimens/specimen-bulk-collaborator-sheet';
 import SpecimenCollaboratorSheet from '../specimens/specimen-collaborator-sheet';
@@ -181,18 +181,7 @@ const getDueDate = (specimen: Specimen): Date => {
         return createdAt;
     }
 
-    const unitMap: Record<string, string> = {
-        minutes: 'minutes',
-        hours: 'hours',
-        days: 'days',
-        weeks: 'weeks',
-    };
-
-    const duration = {
-        [unitMap[unit] || 'days']: quantity,
-    };
-
-    return add(createdAt, duration);
+    return addWithoutWeekends(createdAt, quantity, unit);
 };
 
 const getDueDateInfo = (specimen: Specimen) => {

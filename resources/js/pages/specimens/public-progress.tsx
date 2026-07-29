@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import GuestLayout from '@/layouts/guest-layout';
+import { addWithoutWeekends } from '@/lib/utils';
 
 interface Props {
     specimen: any;
@@ -96,18 +97,11 @@ export default function PublicProgress({ specimen }: Props) {
         }
 
         const createdAt = new Date(specimen.created_at);
-        const unitMap: Record<string, string> = {
-            minutes: 'minutes',
-            hours: 'hours',
-            days: 'days',
-            weeks: 'weeks',
-        };
-        const duration = {
-            [unitMap[specimen.category.unit] || 'days']:
-                specimen.category.quantity,
-        };
-
-        return add(createdAt, duration);
+        return addWithoutWeekends(
+            createdAt,
+            specimen.category.quantity,
+            specimen.category.unit,
+        );
     };
 
     const estimatedDate = getEstimatedDate();

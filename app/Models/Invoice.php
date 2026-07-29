@@ -22,6 +22,7 @@ class Invoice extends Model
         'specimen_id',
         'payment_type',
         'credit_payment_id',
+        'created_by_id',
         'quantity',
         'amount',
         'discount',
@@ -135,5 +136,13 @@ class Invoice extends Model
     public function groupSpecimens(): HasMany
     {
         return $this->hasMany(InvoiceGroupSpecimen::class, 'invoice_id');
+    }
+
+    /**
+     * Get the user who created this invoice.
+     */
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_id');
     }
 }

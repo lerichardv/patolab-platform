@@ -22,6 +22,7 @@ import {
 import * as React from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { addWithoutWeekends } from '@/lib/utils';
 import {
     assignTechnician,
     unassignTechnician,
@@ -232,16 +233,11 @@ const getDueDateInfo = (wo: WorkOrder) => {
             }
 
             if (!dueDate && duration_unit && duration_value) {
-                const unitMap: Record<string, string> = {
-                    minutes: 'minutes',
-                    hours: 'hours',
-                    days: 'days',
-                    weeks: 'weeks',
-                };
-                const duration = {
-                    [unitMap[duration_unit] || 'days']: duration_value,
-                };
-                dueDate = add(createdAt, duration);
+                dueDate = addWithoutWeekends(
+                    createdAt,
+                    duration_value,
+                    duration_unit,
+                );
             }
         }
     }

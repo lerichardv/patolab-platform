@@ -515,6 +515,7 @@ class CreditController extends Controller
                 'invoice_number' => $invoiceNumber,
                 'cai_range_id' => $caiRange->id,
                 'customer_id' => $credit->customer_id,
+                'created_by_id' => auth()->id(),
                 'specimen_id' => $credit->is_group ? null : $originalInvoice->specimen_id,
                 'payment_type' => $isSocialSecurity ? 'n/a' : $validated['payment_type'],
                 'payment_method_date' => $request->input('payment_method_date'),

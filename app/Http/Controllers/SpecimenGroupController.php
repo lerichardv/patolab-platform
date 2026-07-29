@@ -210,6 +210,7 @@ class SpecimenGroupController extends Controller
                 'invoice_number' => $invoiceNumber,
                 'cai_range_id' => $caiRange->id,
                 'customer_id' => $validated['global_customer_id'],
+                'created_by_id' => auth()->id(),
                 'specimen_id' => null, // Left null since it is linked to a group
                 'payment_type' => $validated['payment_type'],
                 'credit_payment_id' => $creditId,

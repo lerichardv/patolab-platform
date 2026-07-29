@@ -65,15 +65,16 @@ export default function SpecimenGroupViewSheet({
     const invoice = group.invoice;
     const specimens = group.specimens || [];
 
+    const credit = group.credit || invoice?.credit_relation;
+
     // Build a set of paid specimen IDs from the group's credit (if any)
     const paidSpecimenIds = new Set<number>(
-        (group.credit?.credit_invoice_specimens || [])
+        (credit?.credit_invoice_specimens || [])
             .filter((s: any) => s.is_paid)
             .map((s: any) => s.specimen_id),
     );
     const hasCreditInfo =
-        group.credit &&
-        (group.credit.credit_invoice_specimens || []).length > 0;
+        credit && (credit.credit_invoice_specimens || []).length > 0;
 
     const getPaymentTypeLabel = (type: string) => {
         const labels: Record<string, string> = {

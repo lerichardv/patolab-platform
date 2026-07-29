@@ -1,0 +1,614 @@
+import { Head, router, usePage } from '@inertiajs/react';
+import { format } from 'date-fns';
+import debounce from 'lodash/debounce';
+import { Eye, Search, Download, FileSpreadsheet, Layers } from 'lucide-react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import * as React from 'react';
+import { index as deliveryReportIndex } from '@/actions/App/Http/Controllers/Reports/DeliveryReportController';
+import AsyncCustomerCombobox from '@/components/async-customer-combobox';
+import {
+    DateRangePicker,
+    setCookie,
+    getLast2WeeksRange,
+} from '@/components/date-range-picker';
+import { Pagination } from '@/components/pagination';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import SpecimenViewSheet from '../../specimens/specimen-view-sheet';
+
+interface SpecimenReportRow {
+    id: number;
+    sequence_code: string;
+    customer_relation?: {
+        name: string;
+        id_number: string;
+    };
+    type?: {
+        name: string;
+    };
+    examination?: {
+        name: string;
+    };
+    category?: {
+        name: string;
+    };
+    created_at: string;
+    expected_internal_finalization_date: string | null;
+    expected_finalization_date: string | null;
+    status: string;
+    status_color?: string;
+}
+
+interface PaginatedData {
+    data: SpecimenReportRow[];
+    links: {
+        url: string | null;
+        label: string;
+        active: boolean;
+    }[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    from: number;
+    to: number;
+}
+
+interface SummaryItem {
+    specimen_type_name: string;
+    examination_name: string;
+    total: number;
+}
+
+interface Props {
+    specimens: PaginatedData;
+    summary: SummaryItem[];
+    filters: {
+        search?: string;
+        customer_id?: string;
+        specimen_type_id?: string;
+        examination_id?: string;
+        date_from?: string;
+        date_to?: string;
+    };
+    selectedCustomer?: {
+        id: number;
+        name: string;
+    } | null;
+    specimenTypes: {
+        id: number;
+        name: string;
+    }[];
+    examinations: any[];
+}
+
+export default function DeliveryReportIndex({
+    specimens,
+    summary,
+    filters,
+    selectedCustomer,
+    specimenTypes,
+    examinations,
+}: Props) {
+    const { props } = usePage() as any;
+    const { auth } = props;
+
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [selectedSpecimenId, setSelectedSpecimenId] = useState<number | null>(
+        null,
+    );
+    const [search, setSearch] = useState(filters.search || '');
+
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const handleFilterChange = useCallback(
+        (key: string, value: string) => {
+            const newFilters = { ...filters, [key]: value };
+
+            if (value === 'all' || value === '') {
+                delete newFilters[key as keyof typeof filters];
+            }
+
+            const userId = auth?.user?.id;
+
+            if (userId) {
+                if (key === 'specimen_type_id') {
+                    setCookie(
+                        `specimen_type_filter_report_delivery_user_${userId}`,
+                        value,
+                    );
+
+                    const examId = filters.examination_id || 'all';
+
+                    if (value !== 'all' && examId !== 'all') {
+                        const hasValidExam = examinations.some(
+                            (exam) =>
+                                exam.id.toString() === examId &&
+                                exam.specimen_type?.toString() === value,
+                        );
+
+                        if (!hasValidExam) {
+                            delete newFilters.examination_id;
+                        }
+                    } else if (value === 'all') {
+                        delete newFilters.examination_id;
+                    }
+                }
+            }
+
+            router.get(deliveryReportIndex().url, newFilters, {
+                preserveState: true,
+                replace: true,
+            });
+        },
+        [filters, auth?.user?.id, examinations],
+    );
+
+    const handleExport = () => {
+        const queryParams = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                queryParams.append(key, String(value));
+            }
+        });
+        window.location.href = `/reports/delivery/export?${queryParams.toString()}`;
+    };
+
+    const debouncedSearch = useMemo(
+        () =>
+            debounce((value: string) => {
+                handleFilterChange('search', value);
+            }, 300),
+        [handleFilterChange],
+    );
+
+    useEffect(() => {
+        if (search !== filters.search) {
+            debouncedSearch(search);
+        }
+
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [search, filters.search, debouncedSearch]);
+
+    const handleViewDetails = (id: number) => {
+        setSelectedSpecimenId(id);
+        setIsSheetOpen(true);
+    };
+
+    const examinationOptions = useMemo(() => {
+        const selectedSpecimenType = filters.specimen_type_id || 'all';
+
+        const filtered =
+            selectedSpecimenType === 'all'
+                ? examinations
+                : examinations.filter(
+                      (exam) =>
+                          exam.specimen_type?.toString() ===
+                          selectedSpecimenType,
+                  );
+
+        return [
+            { label: 'Todos los exámenes', value: 'all' },
+            ...filtered.map((exam) => ({
+                label: exam.name,
+                value: exam.id.toString(),
+            })),
+        ];
+    }, [examinations, filters.specimen_type_id]);
+
+    const activeSummary = useMemo(() => {
+        return summary.filter((item) => item.total > 0);
+    }, [summary]);
+
+    const summaryGrandTotal = useMemo(() => {
+        return summary.reduce((acc, curr) => acc + curr.total, 0);
+    }, [summary]);
+
+    return (
+        <>
+            <Head title="Reporte: Hojas de Entrega" />
+            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+                {/* Header */}
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <FileSpreadsheet className="h-6 w-6 text-primary" />
+                            <h1 className="text-2xl font-bold tracking-tight">
+                                Reporte: Hoja de Entrega de Muestras
+                            </h1>
+                        </div>
+                        <p className="text-muted-foreground">
+                            Consulte y exporte las muestras cuya entrega está
+                            programada dentro del rango de fechas seleccionado.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            className="h-10 gap-2"
+                            onClick={() => {
+                                const userId = auth?.user?.id;
+
+                                if (userId) {
+                                    const defaultRange = getLast2WeeksRange();
+                                    setCookie(
+                                        `date_filter_report_delivery_user_${userId}`,
+                                        JSON.stringify({
+                                            range: '14_days',
+                                            from: defaultRange.from,
+                                            to: defaultRange.to,
+                                        }),
+                                    );
+                                }
+
+                                router.get(
+                                    deliveryReportIndex().url,
+                                    {},
+                                    { preserveState: false },
+                                );
+                            }}
+                        >
+                            Limpiar filtros
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="h-10 gap-2"
+                            onClick={handleExport}
+                        >
+                            <Download className="h-4 w-4" />
+                            <span>Exportar a Excel</span>
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Filters Area */}
+                <div className="flex w-full flex-col gap-4 rounded-lg border bg-card p-4">
+                    {/* Row 1: Search and Date Range */}
+                    <div className="flex flex-col gap-4 md:flex-row md:items-end">
+                        <div className="relative w-full">
+                            <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Buscar por código muestra, cliente, ID/RTN..."
+                                className="w-full pl-8"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex w-full max-w-xs flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                Fecha Estimada de Entrega
+                            </span>
+                            <DateRangePicker
+                                cookieKey={`date_filter_report_delivery_user_${auth?.user?.id}`}
+                                value={{
+                                    from: filters.date_from || '',
+                                    to: filters.date_to || '',
+                                }}
+                                onChange={(range) => {
+                                    const newFilters = { ...filters };
+
+                                    if (range.from) {
+                                        newFilters.date_from = range.from;
+                                    } else {
+                                        delete newFilters.date_from;
+                                    }
+
+                                    if (range.to) {
+                                        newFilters.date_to = range.to;
+                                    } else {
+                                        delete newFilters.date_to;
+                                    }
+
+                                    router.get(
+                                        deliveryReportIndex().url,
+                                        newFilters,
+                                        {
+                                            preserveState: true,
+                                            replace: true,
+                                        },
+                                    );
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Row 2: Advanced filters */}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                        {/* Customer */}
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                Cliente
+                            </span>
+                            <AsyncCustomerCombobox
+                                value={filters.customer_id || ''}
+                                onChange={(id) =>
+                                    handleFilterChange('customer_id', id || '')
+                                }
+                                placeholder="Filtrar por cliente"
+                                initialCustomer={selectedCustomer || undefined}
+                                allowClear
+                            />
+                        </div>
+
+                        {/* Specimen Type */}
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                Tipo de Muestra
+                            </span>
+                            <Select
+                                value={filters.specimen_type_id || 'all'}
+                                onValueChange={(val) =>
+                                    handleFilterChange('specimen_type_id', val)
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Tipo de Muestra" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        Todos los tipos
+                                    </SelectItem>
+                                    {specimenTypes.map((type) => (
+                                        <SelectItem
+                                            key={type.id}
+                                            value={type.id.toString()}
+                                        >
+                                            {type.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Examination */}
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                Examen / Análisis
+                            </span>
+                            <Select
+                                value={filters.examination_id || 'all'}
+                                onValueChange={(val) =>
+                                    handleFilterChange('examination_id', val)
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Todos los exámenes" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {examinationOptions.map((opt) => (
+                                        <SelectItem
+                                            key={opt.value}
+                                            value={opt.value}
+                                        >
+                                            {opt.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Table Content */}
+                <div className="space-y-4">
+                    <div
+                        ref={containerRef}
+                        className="rounded-md border bg-card"
+                    >
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="min-w-[180px]">
+                                        Cliente/Empresa
+                                    </TableHead>
+                                    <TableHead className="min-w-[120px]">
+                                        ID/RTN
+                                    </TableHead>
+                                    <TableHead className="min-w-[200px]">
+                                        Tipo de Muestra-Análisis
+                                    </TableHead>
+                                    <TableHead className="min-w-[120px]">
+                                        Categoría
+                                    </TableHead>
+                                    <TableHead className="min-w-[140px] text-center font-mono text-xs">
+                                        Código de la Muestra
+                                    </TableHead>
+                                    <TableHead className="min-w-[110px] text-center">
+                                        Fecha de Ingreso
+                                    </TableHead>
+                                    <TableHead className="min-w-[140px] text-center">
+                                        Fecha Estimada Interna
+                                    </TableHead>
+                                    <TableHead className="min-w-[160px] bg-yellow-500/10 text-center font-bold text-yellow-950 dark:bg-yellow-500/20 dark:text-yellow-100">
+                                        Fecha Estimada de Entrega
+                                    </TableHead>
+                                    <TableHead className="min-w-[80px] text-right">
+                                        Total
+                                    </TableHead>
+                                    <TableHead className="w-[60px] text-center">
+                                        Ver
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {specimens.data.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={10}
+                                            className="h-24 text-center text-muted-foreground"
+                                        >
+                                            No se encontraron muestras.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    specimens.data.map((row) => {
+                                        const service = `${row.type?.name || 'N/A'} - ${row.examination?.name || 'N/A'}`;
+                                        const expectedInternal =
+                                            row.expected_internal_finalization_date
+                                                ? format(
+                                                      new Date(
+                                                          row.expected_internal_finalization_date,
+                                                      ),
+                                                      'd/M/yy',
+                                                  )
+                                                : 'N/A';
+                                        const expectedDelivery =
+                                            row.expected_finalization_date
+                                                ? format(
+                                                      new Date(
+                                                          row.expected_finalization_date,
+                                                      ),
+                                                      'd/M/yy',
+                                                  )
+                                                : 'N/A';
+
+                                        return (
+                                            <TableRow key={row.id}>
+                                                <TableCell className="font-medium">
+                                                    {row.customer_relation
+                                                        ?.name ?? 'N/A'}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {row.customer_relation
+                                                        ?.id_number ?? 'N/A'}
+                                                </TableCell>
+                                                <TableCell className="text-xs">
+                                                    {service}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline">
+                                                        {row.category?.name ??
+                                                            'N/A'}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-center font-mono text-xs font-semibold">
+                                                    {row.sequence_code}
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    {format(
+                                                        new Date(
+                                                            row.created_at,
+                                                        ),
+                                                        'd/M/yy',
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-center text-xs text-muted-foreground">
+                                                    {expectedInternal}
+                                                </TableCell>
+                                                <TableCell className="bg-yellow-500/[0.02] text-center font-bold">
+                                                    {expectedDelivery}
+                                                </TableCell>
+                                                <TableCell className="text-right font-medium">
+                                                    1
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7"
+                                                        onClick={() =>
+                                                            handleViewDetails(
+                                                                row.id,
+                                                            )
+                                                        }
+                                                        title="Ver Detalle Muestra"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    <Pagination
+                        links={specimens.links}
+                        meta={{
+                            from: specimens.from,
+                            to: specimens.to,
+                            total: specimens.total,
+                        }}
+                    />
+                </div>
+
+                {/* Summary Breakdown table */}
+                {activeSummary.length > 0 && (
+                    <div className="mt-8 max-w-lg rounded-lg border bg-card p-6 shadow-sm">
+                        <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-primary">
+                            <Layers className="h-5 w-5" />
+                            Resumen por tipo de Muestra y Análisis
+                        </h3>
+                        <div className="overflow-hidden rounded-md border bg-card">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Tipo de Muestra</TableHead>
+                                        <TableHead>Tipo de Análisis</TableHead>
+                                        <TableHead className="w-[100px] text-right">
+                                            Total
+                                        </TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {activeSummary.map((item, idx) => (
+                                        <TableRow key={idx}>
+                                            <TableCell className="text-xs font-medium">
+                                                {item.specimen_type_name}
+                                            </TableCell>
+                                            <TableCell className="text-xs">
+                                                {item.examination_name}
+                                            </TableCell>
+                                            <TableCell className="text-right font-semibold">
+                                                {item.total}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    <TableRow className="bg-primary/5 font-bold text-primary hover:bg-primary/5">
+                                        <TableCell
+                                            colSpan={2}
+                                            className="text-right"
+                                        >
+                                            Total
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {summaryGrandTotal}
+                                        </TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Specimen View Drawer */}
+            {selectedSpecimenId && (
+                <SpecimenViewSheet
+                    specimenId={selectedSpecimenId}
+                    open={isSheetOpen}
+                    onOpenChange={setIsSheetOpen}
+                />
+            )}
+        </>
+    );
+}

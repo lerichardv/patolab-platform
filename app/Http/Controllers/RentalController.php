@@ -317,6 +317,7 @@ class RentalController extends Controller
                 'invoice_number' => $invoiceNumber,
                 'cai_range_id' => $caiRange->id,
                 'customer_id' => $validated['customer_id'],
+                'created_by_id' => auth()->id(),
                 'specimen_id' => null,
                 'payment_type' => $validated['payment_type'],
                 'credit_payment_id' => $creditId,

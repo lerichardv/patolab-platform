@@ -46,6 +46,7 @@ import {
     getLast2WeeksRange,
 } from '@/components/date-range-picker';
 import InvoicePreviewDialog from '@/components/invoice-preview-dialog';
+import SelectSpecimenGroupDialog from '@/components/select-specimen-group-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -88,11 +89,11 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { cn } from '@/lib/utils';
+import { cn, addWithoutWeekends } from '@/lib/utils';
 import InvoiceSheet from '../invoices/invoice-sheet';
+import SpecimenBulkCollaboratorSheet from './specimen-bulk-collaborator-sheet';
 import SpecimenBulkPathologistSheet from './specimen-bulk-pathologist-sheet';
 import SpecimenGroupSheet from './specimen-group-sheet';
-import SelectSpecimenGroupDialog from '@/components/select-specimen-group-dialog';
 import SpecimenPathologistSheet from './specimen-pathologist-sheet';
 import SpecimenSheet from './specimen-sheet';
 import SpecimenViewSheet from './specimen-view-sheet';
@@ -172,10 +173,7 @@ const getDueDateInfo = (specimen: Specimen) => {
         weeks: 'weeks',
     };
 
-    const duration = {
-        [unitMap[unit] || 'days']: quantity,
-    };
-    const dueDate = add(createdAt, duration);
+    const dueDate = addWithoutWeekends(createdAt, quantity, unit);
 
     const isCompleted = ['finalized', 'delivered', 'cancelled'].includes(
         specimen.status,
@@ -346,6 +344,8 @@ export default function SpecimensIndex({
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
     const [isBulkAssignSheetOpen, setIsBulkAssignSheetOpen] = useState(false);
+    const [isBulkCollaboratorSheetOpen, setIsBulkCollaboratorSheetOpen] =
+        useState(false);
 
     const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
     const [isInvoiceSheetOpen, setIsInvoiceSheetOpen] = useState(false);
@@ -1907,6 +1907,24 @@ export default function SpecimensIndex({
                                             </DropdownMenuItem>
                                         )}
 
+                                        {/* Asignar Colaboradores in Bulk */}
+                                        {auth.permissions?.includes(
+                                            'specimens.manage',
+                                        ) && (
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setIsBulkCollaboratorSheetOpen(
+                                                        true,
+                                                    )
+                                                }
+                                            >
+                                                <UserPlus className="mr-2 h-4 w-4" />
+                                                <span>
+                                                    Asignar Colaboradores
+                                                </span>
+                                            </DropdownMenuItem>
+                                        )}
+
                                         {auth.permissions?.includes(
                                             'specimens.delete',
                                         ) && (
@@ -2529,6 +2547,14 @@ export default function SpecimensIndex({
                 selectedSpecimens={selectedSpecimens}
                 open={isBulkAssignSheetOpen}
                 onOpenChange={setIsBulkAssignSheetOpen}
+                pathologists={pathologists}
+            />
+
+            <SpecimenBulkCollaboratorSheet
+                selectedSpecimens={selectedSpecimens}
+                open={isBulkCollaboratorSheetOpen}
+                onOpenChange={setIsBulkCollaboratorSheetOpen}
+                usersList={usersList}
                 pathologists={pathologists}
             />
 

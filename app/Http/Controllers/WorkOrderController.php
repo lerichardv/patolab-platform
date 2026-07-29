@@ -155,9 +155,15 @@ class WorkOrderController extends Controller
                 $dueDate = Carbon::today()->endOfDay();
             } else {
                 if ($task->duration_unit === 'hours') {
-                    $dueDate = $now->copy()->addHours($task->duration_value);
+                    $dueDate = $now->copy();
+                    for ($i = 0; $i < $task->duration_value; $i++) {
+                        $dueDate->addHour();
+                        while ($dueDate->isWeekend()) {
+                            $dueDate->addDay();
+                        }
+                    }
                 } else {
-                    $dueDate = $now->copy()->addDays($task->duration_value);
+                    $dueDate = $now->copy()->addWeekdays($task->duration_value);
                 }
             }
         }

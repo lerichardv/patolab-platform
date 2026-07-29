@@ -82,6 +82,8 @@ class Specimen extends Model
 
     protected $appends = [
         'status_color',
+        'expected_finalization_date',
+        'expected_internal_finalization_date',
     ];
 
     public function cancelledBy(): BelongsTo
@@ -131,14 +133,65 @@ class Specimen extends Model
 
         switch ($unit) {
             case 'minutes':
-                return $createdAt->addMinutes($quantity);
+                for ($i = 0; $i < $quantity; $i++) {
+                    $createdAt->addMinute();
+                    while ($createdAt->isWeekend()) {
+                        $createdAt->addDay();
+                    }
+                }
+
+                return $createdAt;
             case 'hours':
-                return $createdAt->addHours($quantity);
+                for ($i = 0; $i < $quantity; $i++) {
+                    $createdAt->addHour();
+                    while ($createdAt->isWeekend()) {
+                        $createdAt->addDay();
+                    }
+                }
+
+                return $createdAt;
             case 'weeks':
-                return $createdAt->addWeeks($quantity);
+                return $createdAt->addWeekdays($quantity * 5);
             case 'days':
             default:
-                return $createdAt->addDays($quantity);
+                return $createdAt->addWeekdays($quantity);
+        }
+    }
+
+    public function getExpectedInternalFinalizationDateAttribute(): ?Carbon
+    {
+        if (! $this->category || ! $this->category->intern_unit || ! $this->category->intern_quantity || ! $this->created_at) {
+            return null;
+        }
+
+        $createdAt = Carbon::parse($this->created_at);
+        $unit = $this->category->intern_unit;
+        $quantity = $this->category->intern_quantity;
+
+        switch ($unit) {
+            case 'minutes':
+                for ($i = 0; $i < $quantity; $i++) {
+                    $createdAt->addMinute();
+                    while ($createdAt->isWeekend()) {
+                        $createdAt->addDay();
+                    }
+                }
+
+                return $createdAt;
+            case 'hours':
+                for ($i = 0; $i < $quantity; $i++) {
+                    $createdAt->addHour();
+                    while ($createdAt->isWeekend()) {
+                        $createdAt->addDay();
+                    }
+                }
+
+                return $createdAt;
+            case 'weeks':
+                return $createdAt->addWeekdays($quantity * 5);
+            case 'days':
+            default:
+                return $createdAt->addWeekdays($quantity);
         }
     }
 

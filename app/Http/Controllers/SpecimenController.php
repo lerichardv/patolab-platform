@@ -508,6 +508,7 @@ class SpecimenController extends Controller
                 'invoice_number' => $invoiceNumber,
                 'cai_range_id' => $caiRange->id,
                 'customer_id' => $specimen->customer,
+                'created_by_id' => auth()->id(),
                 'specimen_id' => $specimen->id,
                 'payment_type' => $validated['payment_type'],
                 'credit_payment_id' => $creditId,

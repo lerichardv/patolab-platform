@@ -22,6 +22,8 @@ import {
     Receipt,
     Settings,
     Tv,
+    FileSpreadsheet,
+    BarChart3,
 } from 'lucide-react';
 import { index as caiRangesIndex } from '@/actions/App/Http/Controllers/CaiRangeController';
 import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
@@ -40,6 +42,10 @@ import { index as productsIndex } from '@/actions/App/Http/Controllers/ProductCo
 import { index as referrersIndex } from '@/actions/App/Http/Controllers/ReferrerController';
 import { index as referrerTypesIndex } from '@/actions/App/Http/Controllers/ReferrerTypeController';
 import { index as rentalsIndex } from '@/actions/App/Http/Controllers/RentalController';
+import { index as billingSummaryReportIndex } from '@/actions/App/Http/Controllers/Reports/BillingSummaryReportController';
+import { index as deliveryReportIndex } from '@/actions/App/Http/Controllers/Reports/DeliveryReportController';
+import { index as creditGroupReportIndex } from '@/actions/App/Http/Controllers/Reports/CreditGroupReportController';
+import { index as cuttingsReportIndex } from '@/actions/App/Http/Controllers/Reports/CuttingsReportController';
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
 import { index as sequencesIndex } from '@/actions/App/Http/Controllers/SequenceController';
 import { index as settingsSystemIndex } from '@/actions/App/Http/Controllers/SettingController';
@@ -305,6 +311,37 @@ const adminNavItems: NavItem[] = [
                 href: settingsSystemIndex(),
                 icon: Settings,
                 permission: 'settings.view',
+            },
+        ],
+    },
+    {
+        title: 'Reportes',
+        href: '#',
+        icon: BarChart3,
+        items: [
+            {
+                title: 'Agrupación de Créditos',
+                href: creditGroupReportIndex(),
+                icon: FileSpreadsheet,
+                permission: 'invoices.view',
+            },
+            {
+                title: 'Resumen de Facturación',
+                href: billingSummaryReportIndex(),
+                icon: FileSpreadsheet,
+                permission: 'invoices.view',
+            },
+            {
+                title: 'Reporte de Entrega',
+                href: deliveryReportIndex(),
+                icon: FileSpreadsheet,
+                permission: 'invoices.view',
+            },
+            {
+                title: 'Relación de Biopsias (Cortes)',
+                href: cuttingsReportIndex(),
+                icon: FileSpreadsheet,
+                permission: 'invoices.view',
             },
         ],
     },

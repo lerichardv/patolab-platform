@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+import { cn, addWithoutWeekends } from '@/lib/utils';
 
 interface Props {
     specimenId?: number | null;
@@ -188,18 +188,11 @@ export default function SpecimenViewSheet({
         }
 
         const createdAt = new Date(specimen.created_at);
-        const unitMap: Record<string, string> = {
-            minutes: 'minutes',
-            hours: 'hours',
-            days: 'days',
-            weeks: 'weeks',
-        };
-        const duration = {
-            [unitMap[specimen.category.intern_unit] || 'days']:
-                specimen.category.intern_quantity,
-        };
-
-        return add(createdAt, duration);
+        return addWithoutWeekends(
+            createdAt,
+            specimen.category.intern_quantity,
+            specimen.category.intern_unit,
+        );
     };
 
     const getClientEstimatedDate = () => {
@@ -213,18 +206,11 @@ export default function SpecimenViewSheet({
         }
 
         const createdAt = new Date(specimen.created_at);
-        const unitMap: Record<string, string> = {
-            minutes: 'minutes',
-            hours: 'hours',
-            days: 'days',
-            weeks: 'weeks',
-        };
-        const duration = {
-            [unitMap[specimen.category.unit] || 'days']:
-                specimen.category.quantity,
-        };
-
-        return add(createdAt, duration);
+        return addWithoutWeekends(
+            createdAt,
+            specimen.category.quantity,
+            specimen.category.unit,
+        );
     };
 
     const estimatedDate = getEstimatedDate();

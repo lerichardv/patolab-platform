@@ -1028,4 +1028,3 @@ test('credit payment for social security stores invoice with payment_type n/a, i
     expect((float) $credit->amount_paid)->toEqual(0.00);
     expect((float) $credit->amount_remaining)->toEqual(1000.00);
 });
-

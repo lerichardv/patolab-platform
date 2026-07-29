@@ -389,6 +389,7 @@ export default function SpecimenGroupSheet({
             if (group) {
                 setCurrentStep(1);
                 setGlobalCustomerId(group.customer_id?.toString() || '');
+
                 if (group.customer) {
                     setSelectedGlobalCustomerData({
                         id: group.customer.id,
