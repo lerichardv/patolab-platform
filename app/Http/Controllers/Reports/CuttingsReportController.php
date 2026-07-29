@@ -213,7 +213,7 @@ class CuttingsReportController extends Controller
             return [
                 'created_at' => $cutting->created_at ? $cutting->created_at->format('d/m/Y h:i A') : 'N/A',
                 'sequence_code' => $specimen->sequence_code ?? 'N/A',
-                'type_exam' => ($specimen && $specimen->type) ? ($specimen->type->name . ' - ' . ($specimen->examination->name ?? 'N/A')) : 'N/A',
+                'type_exam' => ($specimen && $specimen->type) ? ($specimen->type->name.' - '.($specimen->examination->name ?? 'N/A')) : 'N/A',
                 'number_of_cuttings' => $cutting->number_of_cuttings,
                 'cuttings_description' => $cutting->cuttings_description ?: 'N/A',
                 'number_of_cassettes' => $numberOfCassettes,
@@ -235,7 +235,7 @@ class CuttingsReportController extends Controller
             'Descripción Cortes',
             '# Casetes',
             'T. ESPECIALES (Señalar)',
-            'Rango de Casetes',
+            'Código de Casete',
             'Total Laminas',
             'Estado',
             'Comentarios',
@@ -276,8 +276,8 @@ class CuttingsReportController extends Controller
             $request->get('date_from'),
             $request->get('date_to')
         );
-        $dateSubtitle = ($resolvedDates['from'] && $resolvedDates['to']) 
-            ? "Del " . $this->formatDateSpanish($resolvedDates['from']) . " al " . $this->formatDateSpanish($resolvedDates['to']) 
+        $dateSubtitle = ($resolvedDates['from'] && $resolvedDates['to'])
+            ? 'Del '.$this->formatDateSpanish($resolvedDates['from']).' al '.$this->formatDateSpanish($resolvedDates['to'])
             : 'Todo el Historial';
 
         // Define column widths
