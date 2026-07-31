@@ -43,9 +43,9 @@ import { index as referrersIndex } from '@/actions/App/Http/Controllers/Referrer
 import { index as referrerTypesIndex } from '@/actions/App/Http/Controllers/ReferrerTypeController';
 import { index as rentalsIndex } from '@/actions/App/Http/Controllers/RentalController';
 import { index as billingSummaryReportIndex } from '@/actions/App/Http/Controllers/Reports/BillingSummaryReportController';
-import { index as deliveryReportIndex } from '@/actions/App/Http/Controllers/Reports/DeliveryReportController';
 import { index as creditGroupReportIndex } from '@/actions/App/Http/Controllers/Reports/CreditGroupReportController';
 import { index as cuttingsReportIndex } from '@/actions/App/Http/Controllers/Reports/CuttingsReportController';
+import { index as deliveryReportIndex } from '@/actions/App/Http/Controllers/Reports/DeliveryReportController';
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
 import { index as sequencesIndex } from '@/actions/App/Http/Controllers/SequenceController';
 import { index as settingsSystemIndex } from '@/actions/App/Http/Controllers/SettingController';

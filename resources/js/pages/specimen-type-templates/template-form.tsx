@@ -303,7 +303,7 @@ export default function TemplateForm({
             microscopy_html: true,
             comments_notes_html: true,
             protocols_html: true,
-            legend_html: true,
+            legend_html: false,
         }) as Record<string, boolean>,
     });
 
@@ -349,7 +349,7 @@ export default function TemplateForm({
                 microscopy_html: true,
                 comments_notes_html: true,
                 protocols_html: true,
-                legend_html: true,
+                legend_html: false,
             }) as Record<string, boolean>,
         });
 

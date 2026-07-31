@@ -81,7 +81,7 @@ class CustomerController extends Controller
             'city' => 'nullable|exists:municipalities,id',
             'secondary_phone' => 'nullable|string',
             'address' => 'nullable|string',
-            'email' => 'nullable|email',
+            'email' => 'required|email',
         ]);
 
         $customer = Customer::create($validated);
@@ -111,7 +111,7 @@ class CustomerController extends Controller
             'city' => 'nullable|exists:municipalities,id',
             'secondary_phone' => 'nullable|string',
             'address' => 'nullable|string',
-            'email' => 'nullable|email',
+            'email' => (! empty($customer->email) ? 'required' : 'nullable').'|email',
         ]);
 
         $customer->update($validated);
@@ -328,7 +328,7 @@ class CustomerController extends Controller
                 'city' => 'nullable|exists:municipalities,id',
                 'secondary_phone' => 'nullable|string',
                 'address' => 'nullable|string',
-                'email' => 'nullable|email',
+                'email' => 'required|email',
             ])->validate();
 
             $validated['active'] = true;

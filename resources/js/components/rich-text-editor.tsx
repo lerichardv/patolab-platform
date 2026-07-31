@@ -1,4 +1,5 @@
 import { ResizableNodeView } from '@tiptap/core';
+import BulletList from '@tiptap/extension-bullet-list';
 import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
@@ -28,10 +29,17 @@ import {
     Redo2,
     Trash2,
     Highlighter,
+    CaseSensitive,
     X,
 } from 'lucide-react';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     Popover,
     PopoverTrigger,
@@ -59,9 +67,71 @@ export const editorStyles = `
   .tiptap h4, .preview-content h4 { font-size: 0.95rem; font-weight: 600; margin-top: 0.5rem; margin-bottom: 0.25rem; color: #4b5563; }
 
   /* ── Lists ── */
-  .tiptap ul, .preview-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
-  .tiptap ol, .preview-content ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.5rem; }
-  .tiptap li, .preview-content li { margin-bottom: 0.15rem; }
+  .tiptap ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+  .preview-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+  
+  .tiptap ul[data-list-style-type="disc"], .preview-content ul[data-list-style-type="disc"] { list-style-type: disc; }
+  .tiptap ul[data-list-style-type="circle"], .preview-content ul[data-list-style-type="circle"] { list-style-type: circle; }
+  .tiptap ul[data-list-style-type="square"], .preview-content ul[data-list-style-type="square"] { list-style-type: square; }
+  .tiptap ul[data-list-style-type="none"], .preview-content ul[data-list-style-type="none"] { list-style-type: none; }
+  
+  .tiptap ul[data-list-style-type="dash"],
+  .tiptap ul[data-list-style-type="checkmark"],
+  .tiptap ul[data-list-style-type="arrow"],
+  .preview-content ul[data-list-style-type="dash"],
+  .preview-content ul[data-list-style-type="checkmark"],
+  .preview-content ul[data-list-style-type="arrow"] {
+      list-style-type: none !important;
+  }
+
+  .tiptap ul[data-list-style-type="dash"] > li,
+  .tiptap ul[data-list-style-type="checkmark"] > li,
+  .tiptap ul[data-list-style-type="arrow"] > li,
+  .preview-content ul[data-list-style-type="dash"] > li,
+  .preview-content ul[data-list-style-type="checkmark"] > li,
+  .preview-content ul[data-list-style-type="arrow"] > li {
+      position: relative;
+  }
+
+  .tiptap ul[data-list-style-type="dash"] > li::before {
+      content: "–";
+      position: absolute;
+      left: -1rem;
+  }
+  .tiptap ul[data-list-style-type="checkmark"] > li::before {
+      content: "✓";
+      position: absolute;
+      left: -1rem;
+      color: #10b981;
+  }
+  .tiptap ul[data-list-style-type="arrow"] > li::before {
+      content: "➢";
+      position: absolute;
+      left: -1rem;
+  }
+
+  .preview-content ul[data-list-style-type="dash"] > li::before {
+      content: "–";
+      position: absolute;
+      left: -1rem;
+  }
+  .preview-content ul[data-list-style-type="checkmark"] > li::before {
+      content: "✓";
+      position: absolute;
+      left: -1rem;
+      color: #10b981;
+  }
+  .preview-content ul[data-list-style-type="arrow"] > li::before {
+      content: "➢";
+      position: absolute;
+      left: -1rem;
+  }
+  
+  .tiptap ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+  .preview-content ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+  
+  .tiptap li { margin-bottom: 0.15rem; }
+  .preview-content li { margin-bottom: 0.15rem; }
 
   /* ── Inline marks ── */
   .tiptap u, .preview-content u { text-decoration: underline; }
@@ -478,7 +548,6 @@ const CustomImage = Image.extend({
             pill.style.display = 'none';
 
             let naturalWidth = 0;
-            let naturalHeight = 0;
 
             const nodeView = new ResizableNodeView({
                 element: el,
@@ -499,7 +568,7 @@ const CustomImage = Image.extend({
 
                     pill.innerText = `${width}px × ${height}px${percentStr}`;
                 },
-                onCommit: (width, height) => {
+                onCommit: (width) => {
                     const pos = getPos();
 
                     if (pos === undefined) {
@@ -519,7 +588,7 @@ const CustomImage = Image.extend({
                         pill.style.display = 'none';
                     }, 1500);
                 },
-                onUpdate: (updatedNode, _decorations, _innerDecorations) => {
+                onUpdate: (updatedNode) => {
                     if (updatedNode.type !== node.type) {
                         return false;
                     }
@@ -566,7 +635,6 @@ const CustomImage = Image.extend({
                 dom.style.visibility = '';
                 dom.style.pointerEvents = '';
                 naturalWidth = el.naturalWidth;
-                naturalHeight = el.naturalHeight;
             };
 
             return nodeView;
@@ -592,6 +660,27 @@ const HIGHLIGHT_COLORS = [
     { name: 'Negro', color: '#000000' },
 ];
 
+const CustomBulletList = BulletList.extend({
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+            listStyleType: {
+                default: 'disc',
+                parseHTML: (element) =>
+                    element.getAttribute('data-list-style-type') ||
+                    element.style.listStyleType ||
+                    'disc',
+                renderHTML: (attributes) => {
+                    return {
+                        style: `list-style-type: ${attributes.listStyleType}`,
+                        'data-list-style-type': attributes.listStyleType,
+                    };
+                },
+            },
+        };
+    },
+});
+
 const sharedExtensions = [
     CustomImage.configure({
         allowBase64: false,
@@ -602,6 +691,7 @@ const sharedExtensions = [
     }),
     TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
     Highlight.configure({ multicolor: true }),
+    CustomBulletList,
 ];
 
 function ToolbarDivider() {
@@ -714,6 +804,102 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
         input.click();
     };
 
+    const activeSelectionText = editor
+        ? editor.state.doc.textBetween(
+              editor.state.selection.from,
+              editor.state.selection.to,
+              '\n',
+          )
+        : '';
+    const hasSelection = activeSelectionText.trim().length > 0;
+
+    const transformTextCase = (
+        type: 'uppercase' | 'lowercase' | 'capitalize' | 'sentence',
+    ) => {
+        if (!editor) {
+            return;
+        }
+
+        editor
+            .chain()
+            .focus()
+            .command(({ tr, state }) => {
+                const { from, to } = state.selection;
+
+                if (from === to) {
+                    return false;
+                }
+
+                const text = state.doc.textBetween(from, to, '\n');
+                let newText = '';
+
+                if (type === 'uppercase') {
+                    newText = text.toUpperCase();
+                } else if (type === 'lowercase') {
+                    newText = text.toLowerCase();
+                } else if (type === 'capitalize') {
+                    newText = text.replace(/\b\w/g, (c) => c.toUpperCase());
+                } else if (type === 'sentence') {
+                    newText = text
+                        .toLowerCase()
+                        .replace(
+                            /(^\s*|[.!?]\s+)([a-z])/g,
+                            (m, p1, p2) => p1 + p2.toUpperCase(),
+                        );
+                }
+
+                tr.insertText(newText, from, to);
+
+                return true;
+            })
+            .run();
+    };
+
+    const applyBulletListStyle = (
+        style:
+            | 'disc'
+            | 'circle'
+            | 'square'
+            | 'dash'
+            | 'checkmark'
+            | 'arrow'
+            | 'none',
+    ) => {
+        if (!editor) {
+            return;
+        }
+
+        if (!editor.isActive('bulletList')) {
+            editor.chain().focus().toggleBulletList().run();
+        }
+
+        editor
+            .chain()
+            .focus()
+            .command(({ tr, state, dispatch }) => {
+                const { $from } = state.selection;
+
+                for (let depth = $from.depth; depth > 0; depth--) {
+                    const node = $from.node(depth);
+
+                    if (node.type.name === 'bulletList') {
+                        if (dispatch) {
+                            const pos = $from.before(depth);
+                            tr.setNodeMarkup(pos, undefined, {
+                                ...node.attrs,
+                                listStyleType: style,
+                            });
+                        }
+
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+            .run();
+    };
+
     const inTable = editor?.isActive('table');
 
     return (
@@ -821,6 +1007,63 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
                         </div>
                     </PopoverContent>
                 </Popover>
+
+                <DropdownMenu>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    disabled={!editor}
+                                    className={cn(
+                                        'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-sm transition-colors focus:outline-hidden',
+                                        'hover:bg-accent hover:text-accent-foreground',
+                                        'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40',
+                                    )}
+                                >
+                                    <CaseSensitive className="h-3.5 w-3.5 text-foreground" />
+                                </button>
+                            </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="py-1 text-xs">
+                            Transformar texto (mayúsculas, minúsculas, etc.)
+                        </TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent
+                        align="start"
+                        onCloseAutoFocus={(e) => e.preventDefault()}
+                        className="w-48 bg-popover text-popover-foreground"
+                    >
+                        <DropdownMenuItem
+                            onClick={() => transformTextCase('uppercase')}
+                            disabled={!editor || !hasSelection}
+                            className="cursor-pointer"
+                        >
+                            <span>MAYÚSCULAS</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => transformTextCase('lowercase')}
+                            disabled={!editor || !hasSelection}
+                            className="cursor-pointer"
+                        >
+                            <span>minúsculas</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => transformTextCase('capitalize')}
+                            disabled={!editor || !hasSelection}
+                            className="cursor-pointer"
+                        >
+                            <span>Capitalizar palabras</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => transformTextCase('sentence')}
+                            disabled={!editor || !hasSelection}
+                            className="cursor-pointer"
+                        >
+                            <span>Tipo oración</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
                 <ToolbarDivider />
 
@@ -965,15 +1208,113 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
 
                 <ToolbarDivider />
 
-                <ToolbarBtn
-                    onClick={() =>
-                        editor?.chain().focus().toggleBulletList().run()
-                    }
-                    active={editor?.isActive('bulletList')}
-                    title="Lista de viñetas"
-                >
-                    <List className="h-3.5 w-3.5" />
-                </ToolbarBtn>
+                <DropdownMenu>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    disabled={!editor}
+                                    className={cn(
+                                        'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-sm transition-colors focus:outline-hidden',
+                                        editor?.isActive('bulletList')
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
+                                            : 'hover:bg-accent hover:text-accent-foreground',
+                                        'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40',
+                                    )}
+                                >
+                                    <List className="h-3.5 w-3.5" />
+                                </button>
+                            </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="py-1 text-xs">
+                            Lista de viñetas
+                        </TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent
+                        align="start"
+                        onCloseAutoFocus={(e) => e.preventDefault()}
+                        className="w-44 bg-popover text-popover-foreground"
+                    >
+                        <DropdownMenuItem
+                            onClick={() => applyBulletListStyle('disc')}
+                            className="flex cursor-pointer items-center justify-between"
+                        >
+                            <span>Puntos (Disc)</span>
+                            <span className="text-xs text-muted-foreground">
+                                •
+                            </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => applyBulletListStyle('circle')}
+                            className="flex cursor-pointer items-center justify-between"
+                        >
+                            <span>Círculos (Circle)</span>
+                            <span className="text-xs text-muted-foreground">
+                                ○
+                            </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => applyBulletListStyle('square')}
+                            className="flex cursor-pointer items-center justify-between"
+                        >
+                            <span>Cuadrados (Square)</span>
+                            <span className="text-xs text-muted-foreground">
+                                ■
+                            </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => applyBulletListStyle('dash')}
+                            className="flex cursor-pointer items-center justify-between"
+                        >
+                            <span>Guiones (Dash)</span>
+                            <span className="text-xs text-muted-foreground">
+                                –
+                            </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => applyBulletListStyle('checkmark')}
+                            className="flex cursor-pointer items-center justify-between"
+                        >
+                            <span>Checkmarks (Check)</span>
+                            <span className="text-xs text-muted-foreground">
+                                ✓
+                            </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => applyBulletListStyle('arrow')}
+                            className="flex cursor-pointer items-center justify-between"
+                        >
+                            <span>Flechas (Arrow)</span>
+                            <span className="text-xs text-muted-foreground">
+                                ➢
+                            </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => applyBulletListStyle('none')}
+                            className="flex cursor-pointer items-center justify-between"
+                        >
+                            <span>Ninguno (None)</span>
+                            <span className="text-[10px] text-muted-foreground">
+                                Ninguno
+                            </span>
+                        </DropdownMenuItem>
+                        {editor?.isActive('bulletList') && (
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    editor
+                                        ?.chain()
+                                        .focus()
+                                        .toggleBulletList()
+                                        .run();
+                                }}
+                                className="cursor-pointer text-destructive focus:text-destructive"
+                            >
+                                Quitar lista
+                            </DropdownMenuItem>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <ToolbarBtn
                     onClick={() =>
                         editor?.chain().focus().toggleOrderedList().run()
@@ -1106,7 +1447,9 @@ export function RichTextEditorArea({
 
     const editor = useEditor({
         extensions: [
-            StarterKit,
+            StarterKit.configure({
+                bulletList: false,
+            }),
             TableKit.configure({
                 table: { resizable: true },
             }),

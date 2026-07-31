@@ -44,10 +44,10 @@
             page-break-after: avoid;
         }
 
-        /* Content height budget (48 lines max at 3.97mm/line = 190.56mm) */
+        /* Content height budget (adjusted to 205.00mm) */
         .page-content {
             width: 100%;
-            height: 190.50mm;
+            height: 205.00mm;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -57,8 +57,8 @@
         /* Header styling (normal flow inside page) */
         header.report-header {
             width: 100%;
-            height: 34.93mm;
-            margin-bottom: 3.97mm;
+            height: 27.0mm;
+            margin-bottom: 2.5mm;
         }
 
         .header-table {
@@ -79,13 +79,19 @@
         }
 
         .header-logo-img {
-            height: 20mm;
+            height: 16mm;
             width: auto;
             margin-left: auto;
             margin-right: auto;
 			margin-top: -4mm;
 			margin-bottom: 2mm;
         }
+		.report-pre-title {
+			font-size: 2.5mm;
+			line-height: 5mm;
+			text-align: center;
+			font-style: italic;
+		}
 
         .header-code-cell {
             position: absolute;
@@ -395,8 +401,8 @@
             max-width: 100%;
             height: auto;
             border-radius: 1.06mm;
-            margin-top: 1.32mm;
-            margin-bottom: 1.32mm;
+            margin-top: 0.50mm;
+            margin-bottom: 0.50mm;
             display: block;
         }
 
@@ -425,13 +431,13 @@
         /* ── Image Grid ── */
         .section-content div[data-type="image-grid"] {
             display: grid;
-            gap: 3.18mm;
-            margin-top: 2.65mm;
-            margin-bottom: 2.65mm;
+            gap: 1.50mm;
+            margin-top: 1.00mm;
+            margin-bottom: 1.00mm;
             width: 100%;
             border: 0.26mm solid #e2e8f0;
             border-radius: 2.12mm;
-            padding: 2.65mm;
+            padding: 1.00mm;
             background-color: rgba(248, 250, 252, 0.1);
         }
 

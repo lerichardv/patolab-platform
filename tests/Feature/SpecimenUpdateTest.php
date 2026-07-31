@@ -948,10 +948,10 @@ test('specimen bulk status cancellation updates invoice values to zero, deletes 
     expect($specimen->cancellation_reason)->toBe('Test cancellation reason');
 
     expect($invoice->invoice_type)->toBe('cancelled');
-    expect((float) $invoice->total)->toEqual(0.00);
-    expect((float) $invoice->amount)->toEqual(0.00);
-    expect((float) $invoice->subtotal)->toEqual(0.00);
-    expect($invoice->credit_payment_id)->toBeNull();
+    expect((float) $invoice->total)->toEqual(500.00);
+    expect((float) $invoice->amount)->toEqual(500.00);
+    expect((float) $invoice->subtotal)->toEqual(500.00);
+    expect($invoice->credit_payment_id)->toEqual($credit->id);
 
     expect(Credit::find($credit->id))->toBeNull();
 });

@@ -69,7 +69,7 @@ class CuttingsReportController extends Controller
         // Transform results
         $cuttings->through(function ($cutting) use ($workOrderTypes) {
             $specimen = $cutting->specimen;
-            $numberOfCassettes = $specimen ? $specimen->cuttings->pluck('code_id')->unique()->count() : 0;
+            $numberOfCassettes = 1;
             $range = $cutting->code?->code ?? '';
 
             $specialStains = [];
@@ -192,7 +192,7 @@ class CuttingsReportController extends Controller
         // Format Cuttings Data
         $formattedCuttings = $cuttings->map(function ($cutting) use ($workOrderTypes) {
             $specimen = $cutting->specimen;
-            $numberOfCassettes = $specimen ? $specimen->cuttings->pluck('code_id')->unique()->count() : 0;
+            $numberOfCassettes = 1;
             $range = $cutting->code?->code ?? '';
 
             $specialStains = [];
@@ -344,27 +344,18 @@ class CuttingsReportController extends Controller
         $sheet->getStyle('A6')->getFont()->setBold(true)->setSize(14)->setName('Calibri');
         $sheet->getStyle('A6')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        // Doctor Info styling (Row 7)
-        $sheet->mergeCells('A7:L7');
-        $exportingUser = auth()->user();
-        $roleName = $exportingUser->role?->name ?? 'N/A';
-        $sheet->setCellValue('A7', "Nombre del Medico Responsable: {$exportingUser->name}                  Rol: {$roleName}");
-        $sheet->getStyle('A7')->getFont()->setBold(true)->setSize(11)->setName('Calibri');
-        $sheet->getStyle('A7')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-
         // Adjust row heights
         foreach (range(1, 4) as $r) {
             $sheet->getRowDimension($r)->setRowHeight(30);
         }
         $sheet->getRowDimension(5)->setRowHeight(25); // Title
         $sheet->getRowDimension(6)->setRowHeight(22); // Subtitle
-        $sheet->getRowDimension(7)->setRowHeight(22); // Doctor
-        $sheet->getRowDimension(8)->setRowHeight(10); // Spacing
-        $sheet->getRowDimension(9)->setRowHeight(28); // Header row
+        $sheet->getRowDimension(7)->setRowHeight(10); // Spacing
+        $sheet->getRowDimension(8)->setRowHeight(28); // Header row
 
-        // Set Headers at row 9
+        // Set Headers at row 8
         foreach ($headers as $colIndex => $headerText) {
-            $sheet->setCellValue([$colIndex + 1, 9], $headerText);
+            $sheet->setCellValue([$colIndex + 1, 8], $headerText);
         }
 
         $headerStyle = [
@@ -390,10 +381,10 @@ class CuttingsReportController extends Controller
                 ],
             ],
         ];
-        $sheet->getStyle('A9:L9')->applyFromArray($headerStyle);
+        $sheet->getStyle('A8:L8')->applyFromArray($headerStyle);
 
-        // Populate data starting at row 10
-        $rowNum = 10;
+        // Populate data starting at row 9
+        $rowNum = 9;
         foreach ($formattedCuttings as $row) {
             foreach (array_values($row) as $colIndex => $val) {
                 $sheet->setCellValue([$colIndex + 1, $rowNum], $val);

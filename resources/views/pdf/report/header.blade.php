@@ -21,6 +21,7 @@
             <div class="specimen-badge">N° {{ $specimen->sequence_code }}</div>
         </div>
     </div>
-    <div class="report-title">INFORME DE MUESTRA {{ $specimen->sequence_code }}</div>
+    <div class="report-pre-title">Calidad diagnóstica a su servicio</div>
+    <div class="report-title">INFORME DE ANATOMÍA PATOLÓGICA</div>
     <div class="header-divider"></div>
 </header>

@@ -203,10 +203,10 @@ class BillingSummaryReportController extends Controller
             'B' => 16,  // ID/RTN
             'C' => 30,  // Cliente/Empresa
             'D' => 24,  // # Factura
-            'E' => 16,  // Total Pagado (Gross)
-            'F' => 14,  // ISV 15%
-            'G' => 14,  // Descuento
-            'H' => 16,  // Total Neto
+            'E' => 14,  // ISV 15%
+            'F' => 14,  // Descuento
+            'G' => 16,  // Total
+            'H' => 16,  // Total Pagado
             'I' => 30,  // Servicio
             'J' => 20,  // # de la Muestra
             'K' => 24,  // Usuario
@@ -297,10 +297,10 @@ class BillingSummaryReportController extends Controller
             'ID/RTN',
             'Cliente/Empresa',
             '# Factura',
-            'Total Pagado',
             'ISV 15%',
             'Descuento',
-            'Total Neto',
+            'Total',
+            'Total Pagado',
             'Servicio',
             '# de la Muestra',
             'Usuario',
@@ -344,11 +344,12 @@ class BillingSummaryReportController extends Controller
             $sheet->setCellValue('B'.$rowNum, $row['customer_id_number']);
             $sheet->setCellValue('C'.$rowNum, $row['customer_name']);
             $sheet->setCellValue('D'.$rowNum, $row['invoice_number']);
-            $sheet->setCellValue('E'.$rowNum, $row['gross_amount']);
-            $sheet->setCellValue('F'.$rowNum, $row['isv_15']);
-            $sheet->setCellValue('G'.$rowNum, $row['discount']);
+            $sheet->setCellValue('E'.$rowNum, $row['isv_15']);
+            $sheet->setCellValue('F'.$rowNum, $row['discount']);
+            $sheet->setCellValue('G'.$rowNum, $row['gross_amount']);
             $sheet->setCellValue('H'.$rowNum, $row['net_amount']);
-            $sheet->setCellValue('I'.$rowNum, $row['service']);
+            $qty = $row['quantity'] ?? 1;
+            $sheet->setCellValue('I'.$rowNum, "({$qty}) ".$row['service']);
             $sheet->setCellValue('J'.$rowNum, $row['specimen_code']);
             $sheet->setCellValue('K'.$rowNum, $row['username']);
             $sheet->setCellValue('L'.$rowNum, $paymentLabel);
@@ -391,13 +392,39 @@ class BillingSummaryReportController extends Controller
                         'color' => ['argb' => '000000'],
                     ],
                     'bottom' => [
-                        'borderStyle' => Border::BORDER_DOUBLE,
+                        'borderStyle' => Border::BORDER_THIN,
                         'color' => ['argb' => '000000'],
                     ],
                 ],
             ];
             $sheet->getStyle('D'.$rowNum.':H'.$rowNum)->applyFromArray($totalRowStyle);
             $sheet->getStyle('E'.$rowNum.':H'.$rowNum)->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+            $sheet->getRowDimension($rowNum)->setRowHeight(22);
+            $rowNum++;
+
+            // Add Pendiente de Pago row
+            $sheet->setCellValue('D'.$rowNum, 'Pendiente de Pago');
+            $sheet->setCellValue('H'.$rowNum, '=G'.($rowNum - 1).'-H'.($rowNum - 1));
+
+            $pendingRowStyle = [
+                'font' => [
+                    'bold' => true,
+                    'size' => 11,
+                    'name' => 'Calibri',
+                    'color' => ['argb' => 'FF0000'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_RIGHT,
+                ],
+                'borders' => [
+                    'bottom' => [
+                        'borderStyle' => Border::BORDER_DOUBLE,
+                        'color' => ['argb' => '000000'],
+                    ],
+                ],
+            ];
+            $sheet->getStyle('D'.$rowNum.':H'.$rowNum)->applyFromArray($pendingRowStyle);
+            $sheet->getStyle('H'.$rowNum)->getNumberFormat()->setFormatCode('"L. " #,##0.00');
             $sheet->getRowDimension($rowNum)->setRowHeight(22);
             $rowNum++;
         } else {
@@ -514,11 +541,12 @@ class BillingSummaryReportController extends Controller
             $sheet->setCellValue('B'.$rowNum, $row['customer_id_number']);
             $sheet->setCellValue('C'.$rowNum, $row['customer_name']);
             $sheet->setCellValue('D'.$rowNum, $row['invoice_number']);
-            $sheet->setCellValue('E'.$rowNum, $row['gross_amount']);
-            $sheet->setCellValue('F'.$rowNum, $row['isv_15']);
-            $sheet->setCellValue('G'.$rowNum, $row['discount']);
+            $sheet->setCellValue('E'.$rowNum, $row['isv_15']);
+            $sheet->setCellValue('F'.$rowNum, $row['discount']);
+            $sheet->setCellValue('G'.$rowNum, $row['gross_amount']);
             $sheet->setCellValue('H'.$rowNum, $row['net_amount']);
-            $sheet->setCellValue('I'.$rowNum, $row['service']);
+            $qty = $row['quantity'] ?? 1;
+            $sheet->setCellValue('I'.$rowNum, "({$qty}) ".$row['service']);
             $sheet->setCellValue('J'.$rowNum, $row['specimen_code']);
             $sheet->setCellValue('K'.$rowNum, $row['username']);
             $sheet->setCellValue('L'.$rowNum, $paymentLabel);
@@ -546,6 +574,7 @@ class BillingSummaryReportController extends Controller
             $sheet->setCellValue('H'.$rowNum, '=SUM(H'.$cancelledStartRow.':H'.($rowNum - 1).')');
 
             $sheet->getStyle('D'.$rowNum.':H'.$rowNum)->applyFromArray($totalRowStyle);
+            $sheet->getStyle('D'.$rowNum.':H'.$rowNum)->getBorders()->getBottom()->setBorderStyle(Border::BORDER_DOUBLE);
             $sheet->getStyle('E'.$rowNum.':H'.$rowNum)->getNumberFormat()->setFormatCode('"L. " #,##0.00');
             $sheet->getRowDimension($rowNum)->setRowHeight(22);
         } else {
@@ -577,6 +606,8 @@ class BillingSummaryReportController extends Controller
             'specimen.examination',
             'groupSpecimens.specimen.type',
             'groupSpecimens.specimen.examination',
+            'creditInvoiceSpecimens.specimen.type',
+            'creditInvoiceSpecimens.specimen.examination',
             'createdBy',
         ]);
 
@@ -669,26 +700,57 @@ class BillingSummaryReportController extends Controller
     {
         $rows = [];
         foreach ($invoices as $invoice) {
-            if ($invoice->is_group && $invoice->groupSpecimens->count() > 0) {
-                foreach ($invoice->groupSpecimens as $igs) {
-                    $rows[] = [
-                        'id' => 'igs-'.$igs->id,
-                        'invoice_id' => $invoice->id,
-                        'invoice' => $invoice,
-                        'date' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
-                        'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
-                        'customer_name' => $invoice->customer?->name ?? 'N/A',
-                        'invoice_number' => $invoice->full_invoice_number,
-                        'gross_amount' => (float) ($igs->subtotal + $igs->discount),
-                        'isv_15' => (float) $igs->isv_15,
-                        'discount' => (float) $igs->discount,
-                        'net_amount' => (float) $igs->total,
-                        'service' => ($igs->specimen?->type?->name ?? 'N/A').' - '.($igs->specimen?->examination?->name ?? 'N/A'),
-                        'specimen_code' => $igs->specimen?->sequence_code ?? 'N/A',
-                        'username' => $invoice->createdBy?->name ?? 'N/A',
-                        'payment_type' => $invoice->payment_type,
-                        'is_cancelled' => $invoice->invoice_type === 'cancelled',
-                    ];
+            if ($invoice->is_group) {
+                if ($invoice->payment_type === 'credit') {
+                    if ($invoice->creditInvoiceSpecimens->count() > 0) {
+                        foreach ($invoice->creditInvoiceSpecimens as $cis) {
+                            $quantity = $cis->quantity ?? 1;
+                            $rows[] = [
+                                'id' => 'cis-'.$cis->id,
+                                'invoice_id' => $invoice->id,
+                                'invoice' => $invoice,
+                                'date' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
+                                'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
+                                'customer_name' => $invoice->customer?->name ?? 'N/A',
+                                'invoice_number' => $invoice->full_invoice_number,
+                                'gross_amount' => (float) $cis->total,
+                                'isv_15' => (float) $cis->isv_15,
+                                'discount' => (float) $cis->discount,
+                                'net_amount' => $cis->is_paid ? (float) $cis->total : 0.0,
+                                'service' => ($cis->specimen?->type?->name ?? 'N/A').' - '.($cis->specimen?->examination?->name ?? 'N/A'),
+                                'specimen_code' => $cis->specimen?->sequence_code ?? 'N/A',
+                                'username' => $invoice->createdBy?->name ?? 'N/A',
+                                'payment_type' => $invoice->payment_type,
+                                'is_cancelled' => $invoice->invoice_type === 'cancelled',
+                                'quantity' => $quantity,
+                            ];
+                        }
+                    }
+                } else {
+                    if ($invoice->groupSpecimens->count() > 0) {
+                        foreach ($invoice->groupSpecimens as $igs) {
+                            $quantity = $igs->quantity ?? 1;
+                            $rows[] = [
+                                'id' => 'igs-'.$igs->id,
+                                'invoice_id' => $invoice->id,
+                                'invoice' => $invoice,
+                                'date' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
+                                'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
+                                'customer_name' => $invoice->customer?->name ?? 'N/A',
+                                'invoice_number' => $invoice->full_invoice_number,
+                                'gross_amount' => (float) $igs->total,
+                                'isv_15' => (float) $igs->isv_15,
+                                'discount' => (float) $igs->discount,
+                                'net_amount' => (float) $igs->total,
+                                'service' => ($igs->specimen?->type?->name ?? 'N/A').' - '.($igs->specimen?->examination?->name ?? 'N/A'),
+                                'specimen_code' => $igs->specimen?->sequence_code ?? 'N/A',
+                                'username' => $invoice->createdBy?->name ?? 'N/A',
+                                'payment_type' => $invoice->payment_type,
+                                'is_cancelled' => $invoice->invoice_type === 'cancelled',
+                                'quantity' => $quantity,
+                            ];
+                        }
+                    }
                 }
             } else {
                 $service = 'N/A';
@@ -700,11 +762,7 @@ class BillingSummaryReportController extends Controller
                     $service = $invoice->description ?? 'Alquiler';
                 }
 
-                $gross = (float) ($invoice->subtotal + $invoice->discount);
-                if ($invoice->invoice_type === 'rental' || $invoice->rental_id) {
-                    $gross += (float) ($invoice->tax_exempt_amount ?? 0);
-                }
-
+                $quantity = $invoice->quantity ?? 1;
                 $rows[] = [
                     'id' => 'inv-'.$invoice->id,
                     'invoice_id' => $invoice->id,
@@ -713,15 +771,16 @@ class BillingSummaryReportController extends Controller
                     'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
                     'customer_name' => $invoice->customer?->name ?? 'N/A',
                     'invoice_number' => $invoice->full_invoice_number,
-                    'gross_amount' => $gross,
+                    'gross_amount' => (float) $invoice->total,
                     'isv_15' => (float) $invoice->isv_15,
                     'discount' => (float) $invoice->discount,
-                    'net_amount' => (float) $invoice->total,
+                    'net_amount' => (float) $invoice->total_paid,
                     'service' => $service,
                     'specimen_code' => $specimenCode,
                     'username' => $invoice->createdBy?->name ?? 'N/A',
                     'payment_type' => $invoice->payment_type,
                     'is_cancelled' => $invoice->invoice_type === 'cancelled',
+                    'quantity' => $quantity,
                 ];
             }
         }

@@ -104,8 +104,18 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
         e.preventDefault();
         e.stopPropagation();
 
+        const isEmailRequired =
+            !customer?.id ||
+            (!!customer?.email && customer.email.trim() !== '');
+
         if (!data.phone || data.phone.trim() === '') {
             setError('phone', 'El campo teléfono es obligatorio.');
+
+            return;
+        }
+
+        if (isEmailRequired && (!data.email || data.email.trim() === '')) {
+            setError('email', 'El campo correo es obligatorio.');
 
             return;
         }
@@ -220,7 +230,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                    <Label htmlFor="phone">Teléfono 1</Label>
+                    <Label htmlFor="phone">Teléfono 1 *</Label>
                     <Input
                         id="phone"
                         value={data.phone}
@@ -305,7 +315,13 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
             </div>
 
             <div className="space-y-2">
-                <Label htmlFor="email">Correo (Opcional)</Label>
+                <Label htmlFor="email">
+                    Correo{' '}
+                    {!customer?.id ||
+                    (!!customer?.email && customer.email.trim() !== '')
+                        ? '*'
+                        : '(Opcional)'}
+                </Label>
                 <Input
                     id="email"
                     type="email"

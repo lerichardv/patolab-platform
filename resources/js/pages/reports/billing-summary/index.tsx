@@ -50,6 +50,7 @@ interface BillingReportRow {
     username: string;
     payment_type: string;
     is_cancelled: boolean;
+    quantity: number;
 }
 
 interface PaginatedData {
@@ -562,9 +563,6 @@ export default function BillingSummaryReportIndex({
                                         <TableHead className="min-w-[120px] text-center">
                                             Tipo Pago
                                         </TableHead>
-                                        <TableHead className="min-w-[110px] text-right">
-                                            Total Pagado
-                                        </TableHead>
                                         <TableHead className="min-w-[90px] text-right">
                                             ISV 15%
                                         </TableHead>
@@ -572,7 +570,10 @@ export default function BillingSummaryReportIndex({
                                             Descuento
                                         </TableHead>
                                         <TableHead className="min-w-[110px] text-right">
-                                            Total Neto
+                                            Total
+                                        </TableHead>
+                                        <TableHead className="min-w-[110px] text-right">
+                                            Total Pagado
                                         </TableHead>
                                         <TableHead className="w-[60px] text-center">
                                             Ver
@@ -613,7 +614,17 @@ export default function BillingSummaryReportIndex({
                                                     {row.invoice_number}
                                                 </TableCell>
                                                 <TableCell className="text-xs">
-                                                    {row.service}
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold"
+                                                        >
+                                                            {row.quantity ?? 1}
+                                                        </Badge>
+                                                        <span>
+                                                            {row.service}
+                                                        </span>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-center font-mono text-xs">
                                                     {row.specimen_code}
@@ -624,15 +635,6 @@ export default function BillingSummaryReportIndex({
                                                 <TableCell className="text-center">
                                                     {getPaymentBadge(
                                                         row.payment_type,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    L.{' '}
-                                                    {row.gross_amount.toLocaleString(
-                                                        'es-HN',
-                                                        {
-                                                            minimumFractionDigits: 2,
-                                                        },
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-right">
@@ -654,6 +656,15 @@ export default function BillingSummaryReportIndex({
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-right font-bold text-primary">
+                                                    L.{' '}
+                                                    {row.gross_amount.toLocaleString(
+                                                        'es-HN',
+                                                        {
+                                                            minimumFractionDigits: 2,
+                                                        },
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
                                                     L.{' '}
                                                     {row.net_amount.toLocaleString(
                                                         'es-HN',
@@ -689,7 +700,7 @@ export default function BillingSummaryReportIndex({
                             <div className="flex flex-col items-end gap-2 border-t pt-4 pr-10">
                                 <div className="grid grid-cols-2 gap-x-8 text-right text-sm">
                                     <span className="text-muted-foreground">
-                                        Total Emitido (Bruto):
+                                        Total Facturado:
                                     </span>
                                     <span className="font-semibold text-foreground">
                                         L.{' '}
@@ -718,8 +729,19 @@ export default function BillingSummaryReportIndex({
                                             },
                                         )}
                                     </span>
+                                    <span className="text-muted-foreground">
+                                        Pendiente de Pago:
+                                    </span>
+                                    <span className="font-semibold text-rose-600 dark:text-rose-400">
+                                        L.{' '}
+                                        {(
+                                            totals.gross - totals.net
+                                        ).toLocaleString('es-HN', {
+                                            minimumFractionDigits: 2,
+                                        })}
+                                    </span>
                                     <span className="border-t pt-1 font-bold text-primary">
-                                        Total Neto Emitido:
+                                        Total Pagado:
                                     </span>
                                     <span className="border-t pt-1 font-bold text-primary">
                                         L.{' '}
@@ -828,7 +850,17 @@ export default function BillingSummaryReportIndex({
                                                     {row.invoice_number}
                                                 </TableCell>
                                                 <TableCell className="text-xs">
-                                                    {row.service}
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold"
+                                                        >
+                                                            {row.quantity ?? 1}
+                                                        </Badge>
+                                                        <span>
+                                                            {row.service}
+                                                        </span>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-center font-mono text-xs">
                                                     {row.specimen_code}
@@ -846,7 +878,7 @@ export default function BillingSummaryReportIndex({
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     L.{' '}
-                                                    {row.gross_amount.toLocaleString(
+                                                    {row.net_amount.toLocaleString(
                                                         'es-HN',
                                                         {
                                                             minimumFractionDigits: 2,
@@ -873,7 +905,7 @@ export default function BillingSummaryReportIndex({
                                                 </TableCell>
                                                 <TableCell className="text-right font-bold text-destructive">
                                                     L.{' '}
-                                                    {row.net_amount.toLocaleString(
+                                                    {row.gross_amount.toLocaleString(
                                                         'es-HN',
                                                         {
                                                             minimumFractionDigits: 2,
@@ -907,7 +939,7 @@ export default function BillingSummaryReportIndex({
                             <div className="flex flex-col items-end gap-2 border-t pt-4 pr-10">
                                 <div className="grid grid-cols-2 gap-x-8 text-right text-sm">
                                     <span className="text-muted-foreground">
-                                        Total Anulado (Bruto):
+                                        Total Facturado Anulado:
                                     </span>
                                     <span className="font-semibold text-foreground">
                                         L.{' '}
@@ -943,7 +975,7 @@ export default function BillingSummaryReportIndex({
                                         )}
                                     </span>
                                     <span className="border-t pt-1 font-bold text-destructive">
-                                        Total Neto Anulado:
+                                        Total Pagado Anulado:
                                     </span>
                                     <span className="border-t pt-1 font-bold text-destructive">
                                         L.{' '}

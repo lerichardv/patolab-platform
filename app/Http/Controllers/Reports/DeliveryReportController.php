@@ -433,6 +433,10 @@ class DeliveryReportController extends Controller
                        $specimen->specimen_type_examination == $exam->id;
             })->count();
 
+            if ($count === 0) {
+                continue;
+            }
+
             $sheet->getRowDimension($currentRow)->setRowHeight(20);
             $sheet->setCellValue('A'.$currentRow, $exam->type?->name ?? 'N/A');
             $sheet->setCellValue('B'.$currentRow, $exam->name);

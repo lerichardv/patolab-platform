@@ -97,6 +97,7 @@ export default function PublicProgress({ specimen }: Props) {
         }
 
         const createdAt = new Date(specimen.created_at);
+
         return addWithoutWeekends(
             createdAt,
             specimen.category.quantity,

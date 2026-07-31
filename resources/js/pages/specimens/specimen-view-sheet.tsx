@@ -188,6 +188,7 @@ export default function SpecimenViewSheet({
         }
 
         const createdAt = new Date(specimen.created_at);
+
         return addWithoutWeekends(
             createdAt,
             specimen.category.intern_quantity,
@@ -206,6 +207,7 @@ export default function SpecimenViewSheet({
         }
 
         const createdAt = new Date(specimen.created_at);
+
         return addWithoutWeekends(
             createdAt,
             specimen.category.quantity,

@@ -6,9 +6,9 @@ class ReportPaginator
 {
     public static function paginate($specimen, $report, $customer, $referrer, $isMicroscopyVisible): array
     {
-        $pageContentHeight = 190.50; // mm
+        $pageContentHeight = 205.00; // mm
         $lineHeight = 3.97; // mm
-        $maxCharsPerLine = 140;
+        $maxCharsPerLine = 155;
         $pathologistsCount = max(1, $specimen->users ? $specimen->users->count() : 1);
         $rowsCount = (int) ceil($pathologistsCount / 2);
         $signatureHeight = $rowsCount * 25.0; // 25mm per row
@@ -48,6 +48,59 @@ class ReportPaginator
         usort($sectionsOrder, function ($a, $b) {
             return $a['order'] <=> $b['order'];
         });
+
+        $cuttingsBlock = null;
+        $hasPushedCuttings = false;
+        $cuttings = collect();
+        if (is_object($specimen) && isset($specimen->cuttings)) {
+            $cuttings = $specimen->cuttings;
+        }
+        if ($cuttings->count() > 0) {
+            $cuttingsList = $cuttings->values()->all();
+            $groups = [];
+            foreach ($cuttingsList as $idx => $cutting) {
+                $desc = $cutting->description ?? '';
+                $cuts = $cutting->number_of_cuttings ?? 0;
+
+                $lastGroupIdx = count($groups) - 1;
+                if ($lastGroupIdx >= 0 && $groups[$lastGroupIdx]['description'] === $desc) {
+                    $groups[$lastGroupIdx]['endIndex'] = $idx;
+                    $groups[$lastGroupIdx]['totalCuts'] += $cuts;
+                    $groups[$lastGroupIdx]['count'] += 1;
+                } else {
+                    $groups[] = [
+                        'startIndex' => $idx,
+                        'endIndex' => $idx,
+                        'description' => $desc,
+                        'totalCuts' => $cuts,
+                        'count' => 1,
+                    ];
+                }
+            }
+
+            $cutsList = [];
+            foreach ($groups as $g) {
+                $startLetter = self::indexToLetter($g['startIndex'] + 1);
+                $label = $g['startIndex'] === $g['endIndex']
+                    ? $startLetter
+                    : $startLetter.'-'.self::indexToLetter($g['endIndex'] + 1);
+
+                $formattedDesc = $g['description'] !== '' ? $g['description'].' ' : '';
+                $cutsList[] = "{$label}) {$formattedDesc}{$g['totalCuts']}x{$g['count']}";
+            }
+
+            $concatenatedCuts = 'Cortes: '.implode('; ', $cutsList).'.';
+
+            $charsCount = mb_strlen($concatenatedCuts);
+            $lines = max(1, (int) ceil($charsCount / $maxCharsPerLine));
+            $cutsHeight = $lines * $lineHeight + 2.0;
+
+            $cuttingsBlock = [
+                'type' => 'cuttings-summary',
+                'text' => $concatenatedCuts,
+                'height' => $cutsHeight,
+            ];
+        }
 
         foreach ($sectionsOrder as $sec) {
             $key = $sec['key'];
@@ -104,6 +157,11 @@ class ReportPaginator
                     foreach ($macroBlocks as $bHtml) {
                         $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
                     }
+                }
+
+                if ($cuttingsBlock && ! $hasPushedCuttings) {
+                    $blocks[] = $cuttingsBlock;
+                    $hasPushedCuttings = true;
                 }
             } elseif ($key === 'microscopy_html') {
                 if ($isMicroscopyVisible) {
@@ -170,56 +228,8 @@ class ReportPaginator
             }
         }
 
-        // Add Concatenated Cuts block if there are cuttings
-        $cuttings = collect();
-        if (is_object($specimen) && isset($specimen->cuttings)) {
-            $cuttings = $specimen->cuttings;
-        }
-        if ($cuttings->count() > 0) {
-            $cuttingsList = $cuttings->values()->all();
-            $groups = [];
-            foreach ($cuttingsList as $idx => $cutting) {
-                $desc = $cutting->description ?? '';
-                $cuts = $cutting->number_of_cuttings ?? 0;
-
-                $lastGroupIdx = count($groups) - 1;
-                if ($lastGroupIdx >= 0 && $groups[$lastGroupIdx]['description'] === $desc) {
-                    $groups[$lastGroupIdx]['endIndex'] = $idx;
-                    $groups[$lastGroupIdx]['totalCuts'] += $cuts;
-                    $groups[$lastGroupIdx]['count'] += 1;
-                } else {
-                    $groups[] = [
-                        'startIndex' => $idx,
-                        'endIndex' => $idx,
-                        'description' => $desc,
-                        'totalCuts' => $cuts,
-                        'count' => 1,
-                    ];
-                }
-            }
-
-            $cutsList = [];
-            foreach ($groups as $g) {
-                $startLetter = self::indexToLetter($g['startIndex'] + 1);
-                $label = $g['startIndex'] === $g['endIndex']
-                    ? $startLetter
-                    : $startLetter.'-'.self::indexToLetter($g['endIndex'] + 1);
-
-                $formattedDesc = $g['description'] !== '' ? $g['description'].' ' : '';
-                $cutsList[] = "{$label}) {$formattedDesc}{$g['totalCuts']}x{$g['count']}";
-            }
-
-            $concatenatedCuts = 'Cortes: '.implode('; ', $cutsList).'.';
-
-            $charsCount = mb_strlen($concatenatedCuts);
-            $lines = max(1, (int) ceil($charsCount / $maxCharsPerLine));
-            $cutsHeight = $lines * $lineHeight + 2.0;
-
-            $blocks[] = [
-                'type' => 'cuttings-summary',
-                'text' => $concatenatedCuts,
-                'height' => $cutsHeight,
-            ];
+        if ($cuttingsBlock && ! $hasPushedCuttings) {
+            $blocks[] = $cuttingsBlock;
         }
 
         // 3. Paginate the stream of blocks
@@ -343,7 +353,7 @@ class ReportPaginator
                     $totalRows = count($rowHeights);
                     $currentIndex = $totalRows - count($rowsRemaining);
 
-                    $minGridHeight = $rowHeights[$currentIndex] + 5.3;
+                    $minGridHeight = $rowHeights[$currentIndex] + 2.0;
 
                     if ($remaining < $minGridHeight && count($currentPage) > 0) {
                         $pages[] = $currentPage;
@@ -356,11 +366,11 @@ class ReportPaginator
                     // Find how many rows can fit in the remaining height
                     $r = 0;
                     for ($tempR = 1; $tempR <= count($rowsRemaining); $tempR++) {
-                        $cost = 5.3;
+                        $cost = 2.0;
                         for ($i = 0; $i < $tempR; $i++) {
                             $cost += $rowHeights[$currentIndex + $i];
                             if ($i > 0) {
-                                $cost += 3.18;
+                                $cost += 1.5;
                             }
                         }
                         if ($cost <= $remaining) {
@@ -403,11 +413,11 @@ class ReportPaginator
 
                     $sliceHtml = "<div data-type=\"image-grid\" data-columns=\"{$columns}\">".implode('', $sliceImages).'</div>';
 
-                    $cost = 5.3;
+                    $cost = 2.0;
                     for ($i = 0; $i < $r; $i++) {
                         $cost += $rowHeights[$currentIndex + $i];
                         if ($i > 0) {
-                            $cost += 3.18;
+                            $cost += 1.5;
                         }
                     }
 
@@ -811,7 +821,7 @@ class ReportPaginator
 
             $rowsOfImages = array_chunk($imgTags, $columns);
             $itemWidth = 185.9 / $columns;
-            $gridHeight = 5.3;
+            $gridHeight = 2.0;
             foreach ($rowsOfImages as $i => $rowImages) {
                 $maxRowAspectRatio = 0.0;
                 foreach ($rowImages as $imgTag) {
@@ -825,7 +835,7 @@ class ReportPaginator
                 }
                 $gridHeight += $itemWidth * $maxRowAspectRatio;
                 if ($i > 0) {
-                    $gridHeight += 3.18;
+                    $gridHeight += 1.5;
                 }
             }
 
@@ -917,7 +927,7 @@ class ReportPaginator
         return $html;
     }
 
-    public static function splitHtmlIntoLines(string $html, int $maxCharsPerLine = 140): array
+    public static function splitHtmlIntoLines(string $html, int $maxCharsPerLine = 155): array
     {
         if (empty($html)) {
             return [];
@@ -1064,7 +1074,7 @@ class ReportPaginator
 
         $heightMm = ($height * 25.4) / 96;
 
-        return $heightMm + 7.94;
+        return $heightMm + 1.0;
     }
 
     public static function getImageAspectRatio(string $imgTag): float
