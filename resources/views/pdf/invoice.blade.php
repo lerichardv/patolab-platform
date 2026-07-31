@@ -36,8 +36,9 @@
         }
 
         .logo-img {
-            max-width: 240px;
+            max-width: 280px;
             height: auto;
+			margin-bottom: 10px;
         }
 
         .info-section {
