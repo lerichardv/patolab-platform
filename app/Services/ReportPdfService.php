@@ -73,6 +73,8 @@ class ReportPdfService
         $report->comments_notes_html = $this->convertImagesToBase64($report->comments_notes_html);
         $report->protocols_html = $this->convertImagesToBase64($report->protocols_html);
         $report->legend_html = $this->convertImagesToBase64($report->legend_html);
+        $report->open_text_html = $this->convertImagesToBase64($report->open_text_html);
+        $report->addendum_html = $this->convertImagesToBase64($report->addendum_html);
 
         $isMicroscopyVisible = in_array($specimen->status, ['microscopic_review', 'finalized', 'delivered']);
 

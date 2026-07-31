@@ -263,7 +263,7 @@ const customWebhookExtension = {
 				const binaryState = Buffer.from(savedStateBase64, 'base64');
 				Y.applyUpdate(data.document, binaryState);
 
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order')) {
+				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
 					const text = data.document.getText('content').toString();
 
 					if (text && text.trim() !== '') {
@@ -301,7 +301,7 @@ const customWebhookExtension = {
 				if (htmlContent) {
 					console.log(`[webhook:onLoadDocument] Seeding document with initial content`);
 
-					if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order')) {
+					if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
 						// Seed with plain text
 						const ytext = data.document.getText('content');
 						ytext.insert(0, htmlContent);
@@ -334,7 +334,7 @@ const customWebhookExtension = {
 				// 2. Convert Ydoc to ProseMirror JSON, then to HTML (or extract plain text for date/status)
 				let htmlContent = '';
 
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order')) {
+				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
 					htmlContent = data.document.getText('content').toString();
 				} else {
 					try {
@@ -375,7 +375,7 @@ const customWebhookExtension = {
 		};
 
 		// Extract report ID to check if it's one of the report editors or the date
-		const match = data.documentName.match(/^report-(\d+)-(macroscopy|microscopy|diagnosis|report_date|clinical_details|comments_notes|protocols|legend|sections_order)$/);
+		const match = data.documentName.match(/^report-(\d+)-(macroscopy|microscopy|diagnosis|report_date|clinical_details|comments_notes|protocols|legend|sections_order|open_text|open_text_label|addendum|headings_toggles)$/);
 
 		if (match) {
 			const reportId = match[1];

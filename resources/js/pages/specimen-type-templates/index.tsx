@@ -71,7 +71,11 @@ interface Template {
     comments_notes_html: string | null;
     protocols_html: string | null;
     legend_html: string | null;
+    open_text_html: string | null;
+    open_text_label: string | null;
+    addendum_html: string | null;
     sections_order?: SectionsOrderElement[] | null;
+    headings_toggles?: Record<string, boolean> | null;
     created_at: string;
 }
 

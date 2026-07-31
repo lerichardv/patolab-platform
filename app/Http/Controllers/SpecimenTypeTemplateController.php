@@ -84,6 +84,9 @@ class SpecimenTypeTemplateController extends Controller
             'comments_notes_html' => 'nullable|string',
             'protocols_html' => 'nullable|string',
             'legend_html' => 'nullable|string',
+            'open_text_html' => 'nullable|string',
+            'open_text_label' => 'nullable|string',
+            'addendum_html' => 'nullable|string',
             'sections_order' => 'nullable|array',
             'sections_order.*.key' => 'required|string',
             'sections_order.*.order' => 'required|integer',
@@ -100,6 +103,7 @@ class SpecimenTypeTemplateController extends Controller
             ['key' => 'comments_notes_html', 'order' => 5, 'active' => true],
             ['key' => 'protocols_html', 'order' => 6, 'active' => true],
             ['key' => 'legend_html', 'order' => 7, 'active' => true],
+            ['key' => 'open_text_html', 'order' => 8, 'active' => true],
         ]);
 
         $examinations = SpecimenTypeExamination::whereIn('id', $validated['specimen_type_examination_ids'])
@@ -135,6 +139,9 @@ class SpecimenTypeTemplateController extends Controller
                 'comments_notes_html' => $validated['comments_notes_html'] ?? null,
                 'protocols_html' => $validated['protocols_html'] ?? null,
                 'legend_html' => $validated['legend_html'] ?? null,
+                'open_text_html' => $validated['open_text_html'] ?? null,
+                'open_text_label' => $validated['open_text_label'] ?? 'Texto Libre',
+                'addendum_html' => $validated['addendum_html'] ?? null,
                 'sections_order' => $sectionsOrder,
                 'headings_toggles' => $validated['headings_toggles'] ?? null,
             ]);
@@ -172,6 +179,9 @@ class SpecimenTypeTemplateController extends Controller
             'comments_notes_html' => 'nullable|string',
             'protocols_html' => 'nullable|string',
             'legend_html' => 'nullable|string',
+            'open_text_html' => 'nullable|string',
+            'open_text_label' => 'nullable|string',
+            'addendum_html' => 'nullable|string',
             'sections_order' => 'nullable|array',
             'sections_order.*.key' => 'required|string',
             'sections_order.*.order' => 'required|integer',

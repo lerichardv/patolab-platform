@@ -788,6 +788,9 @@ class SpecimenController extends Controller
                         'comments_notes_html' => $template->comments_notes_html ?? '',
                         'protocols_html' => $template->protocols_html ?? '',
                         'legend_html' => $template->legend_html ?? '',
+                        'open_text_html' => $template->open_text_html ?? '',
+                        'open_text_label' => $template->open_text_label ?? 'Texto Libre',
+                        'addendum_html' => $template->addendum_html ?? '',
                         'sections_order' => $template->sections_order ?? null,
                         'headings_toggles' => $template->headings_toggles ?? null,
                     ]);
@@ -801,6 +804,8 @@ class SpecimenController extends Controller
                         'yjs_comments_notes_state' => null,
                         'yjs_protocols_state' => null,
                         'yjs_legend_state' => null,
+                        'yjs_open_text_state' => null,
+                        'yjs_addendum_state' => null,
                     ]);
                 }
             }

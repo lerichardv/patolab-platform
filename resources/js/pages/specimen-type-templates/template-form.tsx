@@ -82,6 +82,9 @@ interface Template {
     comments_notes_html: string | null;
     protocols_html: string | null;
     legend_html: string | null;
+    open_text_html: string | null;
+    open_text_label: string | null;
+    addendum_html: string | null;
     sections_order?: SectionsOrderElement[] | null;
     headings_toggles?: Record<string, boolean> | null;
 }
@@ -274,6 +277,7 @@ export default function TemplateForm({
         { key: 'comments_notes_html', order: 5, active: true },
         { key: 'protocols_html', order: 6, active: true },
         { key: 'legend_html', order: 7, active: true },
+        { key: 'open_text_html', order: 8, active: true },
     ];
 
     const isEditMode = !!template;
@@ -295,6 +299,9 @@ export default function TemplateForm({
         comments_notes_html: template?.comments_notes_html || '',
         protocols_html: template?.protocols_html || '',
         legend_html: template?.legend_html || '',
+        open_text_html: template?.open_text_html || '',
+        open_text_label: template?.open_text_label || 'Texto Libre',
+        addendum_html: template?.addendum_html || '',
         sections_order: template?.sections_order || defaultSectionsOrder,
         headings_toggles: (template?.headings_toggles ?? {
             clinical_details_html: true,
@@ -304,6 +311,8 @@ export default function TemplateForm({
             comments_notes_html: true,
             protocols_html: true,
             legend_html: false,
+            open_text_html: true,
+            addendum_html: true,
         }) as Record<string, boolean>,
     });
 
@@ -341,6 +350,9 @@ export default function TemplateForm({
             comments_notes_html: template?.comments_notes_html || '',
             protocols_html: template?.protocols_html || '',
             legend_html: template?.legend_html || '',
+            open_text_html: template?.open_text_html || '',
+            open_text_label: template?.open_text_label || 'Texto Libre',
+            addendum_html: template?.addendum_html || '',
             sections_order: template?.sections_order || defaultSectionsOrder,
             headings_toggles: (template?.headings_toggles ?? {
                 clinical_details_html: true,
@@ -350,6 +362,8 @@ export default function TemplateForm({
                 comments_notes_html: true,
                 protocols_html: true,
                 legend_html: false,
+                open_text_html: true,
+                addendum_html: true,
             }) as Record<string, boolean>,
         });
 
@@ -639,6 +653,8 @@ export default function TemplateForm({
                                             section.key === 'protocols_html';
                                         const isLeg =
                                             section.key === 'legend_html';
+                                        const isOpenText =
+                                            section.key === 'open_text_html';
 
                                         return (
                                             <Draggable
@@ -659,9 +675,10 @@ export default function TemplateForm({
                                                                     .style
                                                             }
                                                             className={cn(
-                                                                'space-y-2 rounded-xl border border-transparent bg-card p-4 shadow-xs transition-all duration-200',
-                                                                snapshot.isDragging &&
-                                                                    'w-[720px] max-w-[90vw] rotate-1 border-primary/20 bg-card/85 shadow-lg ring-1 ring-primary/10 backdrop-blur-xs',
+                                                                'space-y-2 rounded-xl border bg-card p-4 shadow-xs transition-all duration-200',
+                                                                snapshot.isDragging
+                                                                    ? 'w-[720px] max-w-[90vw] rotate-1 border-primary/20 bg-card/85 shadow-lg ring-1 ring-primary/10 backdrop-blur-xs'
+                                                                    : 'border-slate-200 dark:border-slate-800',
                                                             )}
                                                         >
                                                             {/* Drag Handle Container (GripVertical + Label + Toggle) */}
@@ -683,71 +700,102 @@ export default function TemplateForm({
                                                                         'border-blue-600/85',
                                                                     isLeg &&
                                                                         'border-slate-500/85',
+                                                                    isOpenText &&
+                                                                        'border-amber-500/85',
                                                                 )}
                                                             >
-                                                                <div className="flex items-center gap-1.5">
+                                                                <div className="flex w-full items-center gap-1.5">
                                                                     <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                                                                    <h3 className="flex items-center gap-2 text-sm font-bold tracking-tight text-slate-800 dark:text-slate-200">
-                                                                        {isClin && (
-                                                                            <>
-                                                                                <FileText className="h-4 w-4 text-emerald-500" />
-                                                                                Plantilla
-                                                                                de
-                                                                                Datos
-                                                                                Clínicos
-                                                                            </>
-                                                                        )}
-                                                                        {isDiag && (
-                                                                            <>
-                                                                                <FileText className="h-4 w-4 text-blue-500" />
-                                                                                Plantilla
-                                                                                de
-                                                                                Diagnóstico
-                                                                            </>
-                                                                        )}
-                                                                        {isMacro && (
-                                                                            <>
-                                                                                <Microscope className="h-4 w-4 text-violet-500" />
-                                                                                Plantilla
-                                                                                de
-                                                                                Macroscopía
-                                                                            </>
-                                                                        )}
-                                                                        {isMicro && (
-                                                                            <>
-                                                                                <Microscope className="h-4 w-4 text-fuchsia-500" />
-                                                                                Plantilla
-                                                                                de
-                                                                                Microscopía
-                                                                            </>
-                                                                        )}
-                                                                        {isComm && (
-                                                                            <>
-                                                                                <FileText className="h-4 w-4 text-amber-500" />
-                                                                                Plantilla
-                                                                                de
-                                                                                Comentarios
-                                                                                /
-                                                                                Notas
-                                                                            </>
-                                                                        )}
-                                                                        {isProt && (
-                                                                            <>
-                                                                                <FileText className="h-4 w-4 text-blue-600" />
-                                                                                Plantilla
-                                                                                de
-                                                                                Protocolos
-                                                                            </>
-                                                                        )}
-                                                                        {isLeg && (
-                                                                            <>
-                                                                                <FileText className="h-4 w-4 text-slate-500" />
-                                                                                Plantilla
-                                                                                de
-                                                                                Leyenda
-                                                                            </>
-                                                                        )}
-                                                                    </h3>
+                                                                    {isOpenText ? (
+                                                                        <div
+                                                                            className="mr-4 flex w-full items-center gap-1.5"
+                                                                            onClick={(
+                                                                                e,
+                                                                            ) =>
+                                                                                e.stopPropagation()
+                                                                            }
+                                                                        >
+                                                                            <FileText className="h-4 w-4 shrink-0 text-amber-500" />
+                                                                            <input
+                                                                                type="text"
+                                                                                value={
+                                                                                    data.open_text_label
+                                                                                }
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    setData(
+                                                                                        'open_text_label',
+                                                                                        e.target.value,
+                                                                                    )
+                                                                                }
+                                                                                className="w-full border-b border-slate-300 bg-transparent px-1 py-0.5 text-sm font-bold tracking-tight text-slate-800 focus:border-primary focus:outline-hidden dark:text-slate-200"
+                                                                                placeholder="Texto Libre"
+                                                                            />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <h3 className="flex items-center gap-2 text-sm font-bold tracking-tight text-slate-800 dark:text-slate-200">
+                                                                            {isClin && (
+                                                                                <>
+                                                                                    <FileText className="h-4 w-4 text-emerald-500" />
+                                                                                    Plantilla
+                                                                                    de
+                                                                                    Datos
+                                                                                    Clínicos
+                                                                                </>
+                                                                            )}
+                                                                            {isDiag && (
+                                                                                <>
+                                                                                    <FileText className="h-4 w-4 text-blue-500" />
+                                                                                    Plantilla
+                                                                                    de
+                                                                                    Diagnóstico
+                                                                                </>
+                                                                            )}
+                                                                            {isMacro && (
+                                                                                <>
+                                                                                    <Microscope className="h-4 w-4 text-violet-500" />
+                                                                                    Plantilla
+                                                                                    de
+                                                                                    Macroscopía
+                                                                                </>
+                                                                            )}
+                                                                            {isMicro && (
+                                                                                <>
+                                                                                    <Microscope className="h-4 w-4 text-fuchsia-500" />
+                                                                                    Plantilla
+                                                                                    de
+                                                                                    Microscopía
+                                                                                </>
+                                                                            )}
+                                                                            {isComm && (
+                                                                                <>
+                                                                                    <FileText className="h-4 w-4 text-amber-500" />
+                                                                                    Plantilla
+                                                                                    de
+                                                                                    Comentarios
+                                                                                    /
+                                                                                    Notas
+                                                                                </>
+                                                                            )}
+                                                                            {isProt && (
+                                                                                <>
+                                                                                    <FileText className="h-4 w-4 text-blue-600" />
+                                                                                    Plantilla
+                                                                                    de
+                                                                                    Protocolos
+                                                                                </>
+                                                                            )}
+                                                                            {isLeg && (
+                                                                                <>
+                                                                                    <FileText className="h-4 w-4 text-slate-500" />
+                                                                                    Plantilla
+                                                                                    de
+                                                                                    Leyenda
+                                                                                </>
+                                                                            )}
+                                                                        </h3>
+                                                                    )}
                                                                 </div>
                                                                 {/* Heading visibility toggle */}
                                                                 <TooltipProvider>
@@ -979,6 +1027,31 @@ export default function TemplateForm({
                                                                     label=""
                                                                 />
                                                             )}
+                                                            {isOpenText && (
+                                                                <RichTextEditorArea
+                                                                    content={
+                                                                        data.open_text_html
+                                                                    }
+                                                                    onChange={(
+                                                                        html,
+                                                                    ) =>
+                                                                        setData(
+                                                                            'open_text_html',
+                                                                            html,
+                                                                        )
+                                                                    }
+                                                                    onFocus={(
+                                                                        editor,
+                                                                    ) =>
+                                                                        setActiveEditor(
+                                                                            editor,
+                                                                        )
+                                                                    }
+                                                                    onBlur={() => {}}
+                                                                    field="open_text"
+                                                                    label=""
+                                                                />
+                                                            )}
                                                         </div>
                                                     );
 
@@ -1003,6 +1076,86 @@ export default function TemplateForm({
                             )}
                         </Droppable>
                     </DragDropContext>
+
+                    <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                        <div className="flex items-center justify-between py-0.5 pr-2 transition-colors select-none">
+                            <div className="flex items-center gap-1.5">
+                                <FileText className="h-4 w-4 text-violet-500 shrink-0" />
+                                <h3 className="text-sm font-bold tracking-tight text-slate-800 dark:text-slate-200">
+                                    Plantilla de Addendum
+                                </h3>
+                            </div>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger
+                                        asChild
+                                    >
+                                        <div
+                                            className="flex items-center gap-1.5"
+                                            onClick={(
+                                                e,
+                                            ) =>
+                                                e.stopPropagation()
+                                            }
+                                        >
+                                            <Switch
+                                                id="toggle-addendum_html"
+                                                checked={
+                                                    data.headings_toggles?.[
+                                                        'addendum_html'
+                                                    ] ?? true
+                                                }
+                                                onCheckedChange={(
+                                                    v,
+                                                ) =>
+                                                    setData(
+                                                        'headings_toggles',
+                                                        {
+                                                            ...data.headings_toggles,
+                                                            addendum_html: v,
+                                                        },
+                                                    )
+                                                }
+                                                className="scale-75"
+                                            />
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                        {(data.headings_toggles?.[
+                                            'addendum_html'
+                                        ] ??
+                                        true)
+                                            ? 'Ocultar título en PDF'
+                                            : 'Mostrar título en PDF'}
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+
+                        <RichTextEditorArea
+                            content={
+                                data.addendum_html
+                            }
+                            onChange={(
+                                html,
+                            ) =>
+                                setData(
+                                    'addendum_html',
+                                    html,
+                                )
+                            }
+                            onFocus={(
+                                editor,
+                            ) =>
+                                setActiveEditor(
+                                    editor,
+                                )
+                            }
+                            onBlur={() => {}}
+                            field="addendum"
+                            label=""
+                        />
+                    </div>
                 </div>
 
                 {/* Footer submit action */}

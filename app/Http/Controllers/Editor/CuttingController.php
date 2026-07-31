@@ -35,6 +35,7 @@ class CuttingController extends Controller
                 'comments' => 'nullable|string|max:255',
                 'responsible_id' => 'required|exists:users,id',
                 'status' => 'nullable|string|in:processing,macroscopy,delivered',
+                'is_new_cut' => 'nullable|boolean',
             ], [
                 'code_ids.*.unique' => 'Uno de los códigos de casete seleccionados ya está registrado en esta muestra.',
             ]);
@@ -51,6 +52,7 @@ class CuttingController extends Controller
                     'comments' => $validated['comments'] ?? null,
                     'responsible_id' => $validated['responsible_id'],
                     'status' => $validated['status'] ?? 'macroscopy',
+                    'is_new_cut' => $validated['is_new_cut'] ?? false,
                 ]);
             }
 
@@ -72,6 +74,7 @@ class CuttingController extends Controller
             'comments' => 'nullable|string|max:255',
             'responsible_id' => 'required|exists:users,id',
             'status' => 'nullable|string|in:processing,macroscopy,delivered',
+            'is_new_cut' => 'nullable|boolean',
         ], [
             'code_id.unique' => 'Este código de casete ya está registrado en otro corte de esta muestra.',
         ]);
@@ -79,6 +82,7 @@ class CuttingController extends Controller
         $validated['specimen_id'] = $specimen->id;
         $validated['cuttings_description'] = $validated['cuttings_description'] ?? '';
         $validated['status'] = $validated['status'] ?? 'macroscopy';
+        $validated['is_new_cut'] = $validated['is_new_cut'] ?? false;
 
         Cutting::create($validated);
 
@@ -105,6 +109,7 @@ class CuttingController extends Controller
             'comments' => 'nullable|string|max:255',
             'responsible_id' => 'required|exists:users,id',
             'status' => 'nullable|string|in:processing,macroscopy,delivered',
+            'is_new_cut' => 'nullable|boolean',
         ], [
             'code_id.unique' => 'Este código de casete ya está registrado en otro corte de esta muestra.',
         ]);

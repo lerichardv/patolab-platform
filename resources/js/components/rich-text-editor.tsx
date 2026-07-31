@@ -1429,7 +1429,9 @@ interface RichTextEditorAreaProps {
         | 'clinical_details'
         | 'comments_notes'
         | 'protocols'
-        | 'legend';
+        | 'legend'
+        | 'open_text'
+        | 'addendum';
     label: string;
     editorRef?: React.MutableRefObject<Editor | null>;
 }

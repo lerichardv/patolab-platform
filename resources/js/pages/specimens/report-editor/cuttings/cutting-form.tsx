@@ -33,6 +33,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import WorkOrderTypeSheet from '@/pages/work-orders/work-order-type-sheet';
 import CuttingCodeSheet from './cutting-code-sheet';
@@ -49,6 +50,7 @@ interface Cutting {
     status: 'processing' | 'macroscopy' | 'delivered';
     comments: string | null;
     responsible_id: number;
+    is_new_cut: boolean;
 }
 
 interface CuttingCode {
@@ -326,6 +328,7 @@ export default function CuttingForm({
             comments: string;
             responsible_id: string;
             status: string;
+            is_new_cut: boolean;
         }>({
             code_id:
                 isEditMode && cutting?.code_id ? String(cutting.code_id) : '',
@@ -342,6 +345,7 @@ export default function CuttingForm({
                 ? String(cutting.responsible_id)
                 : '',
             status: isEditMode ? cutting?.status || 'macroscopy' : 'macroscopy',
+            is_new_cut: cutting?.is_new_cut ?? false,
         });
 
     const [isCreateCodeSheetOpen, setIsCreateCodeSheetOpen] = useState(false);
@@ -417,6 +421,7 @@ export default function CuttingForm({
         data.number_of_cuttings,
         data.number_of_slides,
         data.cutting_slide_types,
+        data.is_new_cut,
         transform,
     ]);
 
@@ -435,6 +440,7 @@ export default function CuttingForm({
                 comments: cutting.comments || '',
                 responsible_id: String(cutting.responsible_id),
                 status: isEditMode ? cutting.status : 'macroscopy',
+                is_new_cut: cutting.is_new_cut ?? false,
             });
         } else {
             reset();
@@ -772,6 +778,28 @@ export default function CuttingForm({
                         <InputError message={errors.status} />
                     </div>
                 )}
+
+                {/* is_new_cut Toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <div className="space-y-0.5">
+                        <Label
+                            htmlFor="is_new_cut"
+                            className="cursor-pointer text-sm font-semibold"
+                        >
+                            Nuevo Corte
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                            Marcar si este corte es un nuevo corte adicional al original.
+                        </p>
+                    </div>
+                    <Switch
+                        id="is_new_cut"
+                        checked={data.is_new_cut}
+                        onCheckedChange={(checked) =>
+                            setData('is_new_cut', checked)
+                        }
+                    />
+                </div>
 
                 {/* Form actions */}
                 <div className="flex justify-end pt-3">

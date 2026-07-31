@@ -61,6 +61,7 @@ interface Cutting {
     status: 'processing' | 'macroscopy' | 'delivered';
     comments: string | null;
     responsible_id: number;
+    is_new_cut: boolean;
     code?: {
         id: number;
         code: string;
@@ -544,6 +545,9 @@ export default function ManageCuttingsSheet({
                                             <TableHead className="w-[120px] min-w-[120px] font-semibold text-slate-800 dark:text-slate-200">
                                                 Estado
                                             </TableHead>
+                                            <TableHead className="w-[120px] min-w-[120px] font-semibold text-slate-800 dark:text-slate-200">
+                                                Nuevo Corte
+                                            </TableHead>
                                             <TableHead className="min-w-[180px] font-semibold text-slate-800 dark:text-slate-200">
                                                 Descripción
                                             </TableHead>
@@ -642,6 +646,19 @@ export default function ManageCuttingsSheet({
                                                                 </Badge>
                                                             )}
                                                         </div>
+                                                    </TableCell>
+
+                                                    {/* New Cut Badge */}
+                                                    <TableCell className="w-[120px] min-w-[120px] align-middle">
+                                                        {c.is_new_cut ? (
+                                                            <Badge className="border-emerald-200/40 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-400">
+                                                                Sí
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge className="border-red-200/40 bg-red-50 px-2 py-0.5 font-semibold text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
+                                                                No
+                                                            </Badge>
+                                                        )}
                                                     </TableCell>
 
                                                     {/* Description */}
@@ -857,7 +874,7 @@ export default function ManageCuttingsSheet({
                                         ) : (
                                             <TableRow>
                                                 <TableCell
-                                                    colSpan={11}
+                                                    colSpan={12}
                                                     className="h-32 text-center text-slate-400 dark:text-slate-500"
                                                 >
                                                     <Scissors className="mx-auto mb-2 h-8 w-8 stroke-1 text-slate-300 dark:text-slate-700" />

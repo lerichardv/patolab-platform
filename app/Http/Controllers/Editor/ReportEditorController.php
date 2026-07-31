@@ -120,6 +120,62 @@ class ReportEditorController extends Controller
             return response()->json(['status' => 'ignored']);
         }
 
+        if ($field === 'open_text_label') {
+            if ($event === 'onConnect') {
+                return response()->json([
+                    'document' => null,
+                ]);
+            }
+            if ($event === 'create') {
+                $report = DB::table('specimen_reports')->where('id', $reportId)->first();
+
+                return response()->json([
+                    'content' => $report ? $report->open_text_label : 'Texto Libre',
+                ]);
+            }
+            if ($event === 'onChange') {
+                $htmlValue = $payload['html'] ?? 'Texto Libre';
+                DB::table('specimen_reports')
+                    ->where('id', $reportId)
+                    ->update([
+                        'open_text_label' => $htmlValue,
+                        'updated_at' => now(),
+                    ]);
+
+                return response()->json(['status' => 'success']);
+            }
+
+            return response()->json(['status' => 'ignored']);
+        }
+
+        if ($field === 'headings_toggles') {
+            if ($event === 'onConnect') {
+                return response()->json([
+                    'document' => null,
+                ]);
+            }
+            if ($event === 'create') {
+                $report = DB::table('specimen_reports')->where('id', $reportId)->first();
+
+                return response()->json([
+                    'content' => $report ? $report->headings_toggles : '{}',
+                ]);
+            }
+            if ($event === 'onChange') {
+                $htmlValue = $payload['html'] ?? '{}';
+                DB::table('specimen_reports')
+                    ->where('id', $reportId)
+                    ->update([
+                        'headings_toggles' => $htmlValue,
+                        'updated_at' => now(),
+                    ]);
+
+                return response()->json(['status' => 'success']);
+            }
+
+            return response()->json(['status' => 'ignored']);
+        }
+
         // 3. Map the room string parameters to your exact database schema columns
         $columnMap = [
             'macroscopy' => ['state' => 'yjs_macroscopy_state', 'html' => 'macroscopy_html'],
@@ -130,6 +186,8 @@ class ReportEditorController extends Controller
             'comments_notes' => ['state' => 'yjs_comments_notes_state', 'html' => 'comments_notes_html'],
             'protocols' => ['state' => 'yjs_protocols_state', 'html' => 'protocols_html'],
             'legend' => ['state' => 'yjs_legend_state', 'html' => 'legend_html'],
+            'open_text' => ['state' => 'yjs_open_text_state', 'html' => 'open_text_html'],
+            'addendum' => ['state' => 'yjs_addendum_state', 'html' => 'addendum_html'],
         ];
 
         if (! array_key_exists($field, $columnMap)) {
@@ -425,8 +483,24 @@ class ReportEditorController extends Controller
             'comments_notes_html' => $template->comments_notes_html ?? '',
             'protocols_html' => $template->protocols_html ?? '',
             'legend_html' => $template->legend_html ?? '',
+            'open_text_html' => $template->open_text_html ?? '',
+            'open_text_label' => $template->open_text_label ?? 'Texto Libre',
+            'addendum_html' => $template->addendum_html ?? '',
             'sections_order' => $template->sections_order ?? null,
             'headings_toggles' => $template->headings_toggles ?? null,
+        ]);
+
+        DB::table('specimen_reports')->where('id', $specimen->report->id)->update([
+            'yjs_macroscopy_state' => null,
+            'yjs_microscopy_state' => null,
+            'yjs_diagnosis_state' => null,
+            'yjs_report_date_state' => null,
+            'yjs_clinical_details_state' => null,
+            'yjs_comments_notes_state' => null,
+            'yjs_protocols_state' => null,
+            'yjs_legend_state' => null,
+            'yjs_open_text_state' => null,
+            'yjs_addendum_state' => null,
         ]);
 
         return response()->json([
@@ -452,6 +526,9 @@ class ReportEditorController extends Controller
             'comments_notes_html' => 'nullable|string',
             'protocols_html' => 'nullable|string',
             'legend_html' => 'nullable|string',
+            'open_text_html' => 'nullable|string',
+            'open_text_label' => 'nullable|string',
+            'addendum_html' => 'nullable|string',
             'yjs_macroscopy_state' => 'nullable|string',
             'yjs_microscopy_state' => 'nullable|string',
             'yjs_diagnosis_state' => 'nullable|string',
@@ -460,6 +537,8 @@ class ReportEditorController extends Controller
             'yjs_comments_notes_state' => 'nullable|string',
             'yjs_protocols_state' => 'nullable|string',
             'yjs_legend_state' => 'nullable|string',
+            'yjs_open_text_state' => 'nullable|string',
+            'yjs_addendum_state' => 'nullable|string',
             'sections_order' => 'nullable|array',
             'sections_order.*.key' => 'required|string',
             'sections_order.*.order' => 'required|integer',
@@ -510,6 +589,15 @@ class ReportEditorController extends Controller
         if ($request->has('legend_html') && $hasGeneralAccess) {
             $updateData['legend_html'] = $request->input('legend_html') ?? '';
         }
+        if ($request->has('open_text_html') && $hasGeneralAccess) {
+            $updateData['open_text_html'] = $request->input('open_text_html') ?? '';
+        }
+        if ($request->has('open_text_label') && $hasGeneralAccess) {
+            $updateData['open_text_label'] = $request->input('open_text_label') ?? '';
+        }
+        if ($request->has('addendum_html') && $hasGeneralAccess) {
+            $updateData['addendum_html'] = $request->input('addendum_html') ?? '';
+        }
         if ($request->has('sections_order') && $hasGeneralAccess) {
             $updateData['sections_order'] = $request->input('sections_order');
         }
@@ -537,6 +625,12 @@ class ReportEditorController extends Controller
         }
         if ($request->filled('yjs_legend_state') && $hasGeneralAccess) {
             $updateData['yjs_legend_state'] = $request->input('yjs_legend_state');
+        }
+        if ($request->filled('yjs_open_text_state') && $hasGeneralAccess) {
+            $updateData['yjs_open_text_state'] = $request->input('yjs_open_text_state');
+        }
+        if ($request->filled('yjs_addendum_state') && $hasGeneralAccess) {
+            $updateData['yjs_addendum_state'] = $request->input('yjs_addendum_state');
         }
         if ($request->filled('yjs_report_date_state') && $hasGeneralAccess) {
             $updateData['yjs_report_date_state'] = $request->input('yjs_report_date_state');

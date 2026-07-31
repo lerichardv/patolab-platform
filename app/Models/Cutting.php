@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'status',
     'comments',
     'responsible_id',
+    'is_new_cut',
 ])]
 class Cutting extends Model
 {
@@ -28,6 +29,7 @@ class Cutting extends Model
             // NOTE: This JSON array stores IDs from App\Models\WorkOrderType,
             // as the table cutting_slide_types was deleted.
             'cutting_slide_types' => 'array',
+            'is_new_cut' => 'boolean',
         ];
     }
 

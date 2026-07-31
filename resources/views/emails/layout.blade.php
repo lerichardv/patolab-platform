@@ -135,5 +135,9 @@
             </table>
         </div>
     </div>
+
+    <div style="max-width: 600px; margin: 20px auto; padding: 0 20px; font-size: 12px; color: #64748b; line-height: 1.6; text-align: justify; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        <u>Aviso de confidencialidad:</u> La información contenida en este correo electrónico y sus archivos adjuntos puede incluir datos personales sensibles y resultados de estudios anatomopatológicos o de laboratorio, protegidos por la legislación aplicable. Este mensaje está dirigido únicamente a su destinatario. Cualquier revisión, uso, divulgación, distribución o reproducción no autorizada está estrictamente prohibida. Si ha recibido este correo por error, agradecemos informar de inmediato al remitente y eliminar el mensaje y sus anexos de todos sus dispositivos.
+    </div>
 </body>
 </html>

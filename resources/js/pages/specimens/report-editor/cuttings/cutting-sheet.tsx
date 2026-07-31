@@ -15,6 +15,7 @@ interface Cutting {
     status: 'processing' | 'macroscopy' | 'delivered';
     comments: string | null;
     responsible_id: number;
+    is_new_cut: boolean;
 }
 
 interface CuttingCode {

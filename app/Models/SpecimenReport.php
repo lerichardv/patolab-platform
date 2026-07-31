@@ -34,6 +34,9 @@ class SpecimenReport extends Model
         'comments_notes_html',
         'protocols_html',
         'legend_html',
+        'open_text_html',
+        'open_text_label',
+        'addendum_html',
         'report_finalization_datetime',
         'sections_order',
         'headings_toggles',
@@ -65,6 +68,8 @@ class SpecimenReport extends Model
         'yjs_comments_notes_state',
         'yjs_protocols_state',
         'yjs_legend_state',
+        'yjs_open_text_state',
+        'yjs_addendum_state',
     ];
 
     /**

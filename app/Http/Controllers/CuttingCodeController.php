@@ -45,7 +45,7 @@ class CuttingCodeController extends Controller
         if ($isBulk) {
             $validated = $request->validate([
                 'codes' => 'required|array|min:1',
-                'codes.*.code' => 'required|string|max:2|unique:cutting_codes,code',
+                'codes.*.code' => 'required|string|max:5|unique:cutting_codes,code',
                 'codes.*.color' => 'required|string|regex:/^#[a-fA-F0-9]{6}$/',
             ], [
                 'codes.*.code.required' => 'El código es requerido.',

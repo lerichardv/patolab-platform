@@ -40,6 +40,7 @@ class ReportPaginator
             ['key' => 'comments_notes_html', 'order' => 5, 'active' => true],
             ['key' => 'protocols_html', 'order' => 6, 'active' => true],
             ['key' => 'legend_html', 'order' => 7, 'active' => true],
+            ['key' => 'open_text_html', 'order' => 8, 'active' => true],
         ];
 
         $sectionsOrder = ! empty($report->sections_order) ? $report->sections_order : $defaultOrder;
@@ -50,13 +51,19 @@ class ReportPaginator
         });
 
         $cuttingsBlock = null;
+        $newCuttingsBlock = null;
         $hasPushedCuttings = false;
         $cuttings = collect();
         if (is_object($specimen) && isset($specimen->cuttings)) {
             $cuttings = $specimen->cuttings;
         }
-        if ($cuttings->count() > 0) {
-            $cuttingsList = $cuttings->values()->all();
+
+        // Helper to build a cuttings summary block from a list of cuttings
+        $buildCuttingsSummaryBlock = function (array $cuttingsList, string $blockType, string $prefix) use ($maxCharsPerLine, $lineHeight): ?array {
+            if (count($cuttingsList) === 0) {
+                return null;
+            }
+
             $groups = [];
             foreach ($cuttingsList as $idx => $cutting) {
                 $desc = $cutting->description ?? '';
@@ -89,17 +96,24 @@ class ReportPaginator
                 $cutsList[] = "{$label}) {$formattedDesc}{$g['totalCuts']}x{$g['count']}";
             }
 
-            $concatenatedCuts = 'Cortes: '.implode('; ', $cutsList).'.';
-
+            $concatenatedCuts = $prefix.' '.implode('; ', $cutsList).'.';
             $charsCount = mb_strlen($concatenatedCuts);
             $lines = max(1, (int) ceil($charsCount / $maxCharsPerLine));
             $cutsHeight = $lines * $lineHeight + 2.0;
 
-            $cuttingsBlock = [
-                'type' => 'cuttings-summary',
+            return [
+                'type' => $blockType,
                 'text' => $concatenatedCuts,
                 'height' => $cutsHeight,
             ];
+        };
+
+        if ($cuttings->count() > 0) {
+            $regularCuttings = $cuttings->filter(fn ($c) => ! $c->is_new_cut)->values()->all();
+            $newCuttings = $cuttings->filter(fn ($c) => $c->is_new_cut)->values()->all();
+
+            $cuttingsBlock = $buildCuttingsSummaryBlock($regularCuttings, 'cuttings-summary', 'Cortes:');
+            $newCuttingsBlock = $buildCuttingsSummaryBlock($newCuttings, 'new-cuttings-summary', 'Nuevos Cortes:');
         }
 
         foreach ($sectionsOrder as $sec) {
@@ -159,8 +173,13 @@ class ReportPaginator
                     }
                 }
 
-                if ($cuttingsBlock && ! $hasPushedCuttings) {
-                    $blocks[] = $cuttingsBlock;
+                if (! $hasPushedCuttings) {
+                    if ($cuttingsBlock) {
+                        $blocks[] = $cuttingsBlock;
+                    }
+                    if ($newCuttingsBlock) {
+                        $blocks[] = $newCuttingsBlock;
+                    }
                     $hasPushedCuttings = true;
                 }
             } elseif ($key === 'microscopy_html') {
@@ -225,473 +244,36 @@ class ReportPaginator
                         $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
                     }
                 }
+            } elseif ($key === 'open_text_html') {
+                $openHtml = ! empty($report->open_text_html) ? $report->open_text_html : '';
+                if (! self::isEmptyHtml($openHtml)) {
+                    if ($showHeading) {
+                        $openLabel = ! empty($report->open_text_label) ? $report->open_text_label : 'Texto Libre';
+                        $blocks[] = [
+                            'type' => 'section-header',
+                            'title' => mb_strtoupper($openLabel),
+                            'height' => 7.94,
+                        ];
+                    }
+                    $openBlocks = self::parseHtmlToBlocks($openHtml);
+                    foreach ($openBlocks as $bHtml) {
+                        $blocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
+                    }
+                }
             }
         }
 
-        if ($cuttingsBlock && ! $hasPushedCuttings) {
-            $blocks[] = $cuttingsBlock;
+        if (! $hasPushedCuttings) {
+            if ($cuttingsBlock) {
+                $blocks[] = $cuttingsBlock;
+            }
+            if ($newCuttingsBlock) {
+                $blocks[] = $newCuttingsBlock;
+            }
         }
 
         // 3. Paginate the stream of blocks
-        $pages = [];
-        $currentPage = [];
-        $currentHeight = 0.0;
-        $pageIndex = 0;
-
-        for ($bIndex = 0; $bIndex < count($blocks); $bIndex++) {
-            $block = $blocks[$bIndex];
-            $maxHeightForPage = $pageContentHeight;
-
-            if ($block['type'] === 'patient-card') {
-                $currentPage[] = $block;
-                $currentHeight += $block['height'];
-
-                continue;
-            }
-
-            if ($block['type'] === 'section-header') {
-                // If section header doesn't fit on this page, push to next
-                if ($currentHeight + $block['height'] > $maxHeightForPage) {
-                    $pages[] = $currentPage;
-                    $currentPage = [];
-                    $currentHeight = 0.0;
-                    $pageIndex++;
-                    $maxHeightForPage = $pageContentHeight;
-                }
-                $currentPage[] = $block;
-                $currentHeight += $block['height'];
-
-                continue;
-            }
-
-            if ($block['type'] === 'page-break') {
-                if (count($currentPage) > 0) {
-                    $pages[] = $currentPage;
-                    $currentPage = [];
-                    $currentHeight = 0.0;
-                    $pageIndex++;
-                }
-
-                continue;
-            }
-
-            if ($block['type'] === 'heading') {
-                $headingCost = $block['height'];
-                $nextBlockStartsNewPage = false;
-
-                // Keep with Next constraint
-                if ($bIndex + 1 < count($blocks)) {
-                    $nextBlock = $blocks[$bIndex + 1];
-                    $minNextHeight = 2.0 * $lineHeight;
-
-                    if ($nextBlock['type'] === 'image') {
-                        $minNextHeight = (float) $nextBlock['height'];
-                    } elseif ($nextBlock['type'] === 'heading') {
-                        $minNextHeight = (float) $nextBlock['height'];
-                    }
-
-                    if ($currentHeight + $headingCost + $minNextHeight > $maxHeightForPage) {
-                        $nextBlockStartsNewPage = true;
-                    }
-                }
-
-                if ($currentHeight + $headingCost > $maxHeightForPage || $nextBlockStartsNewPage) {
-                    if (count($currentPage) > 0) {
-                        $pages[] = $currentPage;
-                        $currentPage = [];
-                        $currentHeight = 0.0;
-                        $pageIndex++;
-                        $maxHeightForPage = $pageContentHeight;
-                    }
-                }
-
-                $currentPage[] = $block;
-                $currentHeight += $headingCost;
-
-                continue;
-            }
-
-            if ($block['type'] === 'image-grid') {
-                $columns = $block['columns'];
-                $images = $block['images'];
-
-                if (empty($images)) {
-                    $currentPage[] = [
-                        'type' => 'html',
-                        'html' => $block['html'],
-                        'height' => 5.3,
-                    ];
-                    $currentHeight += 5.3;
-
-                    continue;
-                }
-
-                $itemWidth = 185.9 / $columns;
-                $rowsRemaining = array_chunk($images, $columns);
-
-                // Pre-calculate height of each row using actual aspect ratios
-                $rowHeights = [];
-                foreach ($rowsRemaining as $rowIndex => $rowImages) {
-                    $maxRowAspectRatio = 0.0;
-                    foreach ($rowImages as $imgTag) {
-                        $aspectRatio = self::getImageAspectRatio($imgTag);
-                        if ($aspectRatio > $maxRowAspectRatio) {
-                            $maxRowAspectRatio = $aspectRatio;
-                        }
-                    }
-                    if ($maxRowAspectRatio <= 0.0) {
-                        $maxRowAspectRatio = 1.0;
-                    }
-                    $rowHeights[$rowIndex] = $itemWidth * $maxRowAspectRatio;
-                }
-
-                while (! empty($rowsRemaining)) {
-                    $maxHeightForPage = $pageContentHeight;
-                    $remaining = $maxHeightForPage - $currentHeight;
-
-                    // The index of the first row currently remaining
-                    $totalRows = count($rowHeights);
-                    $currentIndex = $totalRows - count($rowsRemaining);
-
-                    $minGridHeight = $rowHeights[$currentIndex] + 2.0;
-
-                    if ($remaining < $minGridHeight && count($currentPage) > 0) {
-                        $pages[] = $currentPage;
-                        $currentPage = [];
-                        $currentHeight = 0.0;
-
-                        continue;
-                    }
-
-                    // Find how many rows can fit in the remaining height
-                    $r = 0;
-                    for ($tempR = 1; $tempR <= count($rowsRemaining); $tempR++) {
-                        $cost = 2.0;
-                        for ($i = 0; $i < $tempR; $i++) {
-                            $cost += $rowHeights[$currentIndex + $i];
-                            if ($i > 0) {
-                                $cost += 1.5;
-                            }
-                        }
-                        if ($cost <= $remaining) {
-                            $r = $tempR;
-                        } else {
-                            break;
-                        }
-                    }
-
-                    // If we can't fit even one row
-                    if ($r === 0) {
-                        if (count($currentPage) > 0) {
-                            // Move to next page
-                            $pages[] = $currentPage;
-                            $currentPage = [];
-                            $currentHeight = 0.0;
-
-                            continue;
-                        } else {
-                            // Already on empty page, force 1 row to prevent infinite loop
-                            $r = 1;
-                        }
-                    }
-
-                    // Build the slice of rows
-                    $sliceImages = [];
-                    for ($i = 0; $i < $r; $i++) {
-                        foreach ($rowsRemaining[$i] as $imgTag) {
-                            $aspect = self::getImageAspectRatio($imgTag);
-                            if (preg_match('/style=["\']([^"\']*)["\']/i', $imgTag, $styleMatch)) {
-                                $existingStyle = rtrim($styleMatch[1], ';');
-                                $newStyle = "{$existingStyle}; aspect-ratio: 1 / {$aspect}; object-fit: cover;";
-                                $imgTag = preg_replace('/style=["\']([^"\']*)["\']/i', 'style="'.$newStyle.'"', $imgTag);
-                            } else {
-                                $imgTag = str_replace('<img', '<img style="aspect-ratio: 1 / '.$aspect.'; object-fit: cover;"', $imgTag);
-                            }
-                            $sliceImages[] = $imgTag;
-                        }
-                    }
-
-                    $sliceHtml = "<div data-type=\"image-grid\" data-columns=\"{$columns}\">".implode('', $sliceImages).'</div>';
-
-                    $cost = 2.0;
-                    for ($i = 0; $i < $r; $i++) {
-                        $cost += $rowHeights[$currentIndex + $i];
-                        if ($i > 0) {
-                            $cost += 1.5;
-                        }
-                    }
-
-                    $currentPage[] = [
-                        'type' => 'html',
-                        'html' => $sliceHtml,
-                        'height' => $cost,
-                    ];
-
-                    $currentHeight += $cost;
-                    $rowsRemaining = array_slice($rowsRemaining, $r);
-                }
-
-                continue;
-            }
-
-            if ($block['type'] === 'image') {
-                if ($currentHeight + $block['height'] > $maxHeightForPage) {
-                    $pages[] = $currentPage;
-                    $currentPage = [];
-                    $currentHeight = 0.0;
-                    $pageIndex++;
-                    $maxHeightForPage = $pageContentHeight;
-                }
-                $currentPage[] = $block;
-                $currentHeight += $block['height'];
-
-                continue;
-            }
-
-            if ($block['type'] === 'cuttings-summary') {
-                if ($currentHeight + $block['height'] > $maxHeightForPage) {
-                    $pages[] = $currentPage;
-                    $currentPage = [];
-                    $currentHeight = 0.0;
-                    $pageIndex++;
-                    $maxHeightForPage = $pageContentHeight;
-                }
-                $currentPage[] = $block;
-                $currentHeight += $block['height'];
-
-                continue;
-            }
-
-            if ($block['type'] === 'paragraph') {
-                $paraInnerHtml = self::getInnerHtml($block['html'], $block['tag']);
-                $lines = self::splitHtmlIntoLines($paraInnerHtml, $maxCharsPerLine);
-
-                $i = 0;
-                while ($i < count($lines)) {
-                    $maxHeightForPage = $pageContentHeight;
-                    $remaining = $maxHeightForPage - $currentHeight;
-
-                    if ($remaining <= 0.5 * $lineHeight) {
-                        $pages[] = $currentPage;
-                        $currentPage = [];
-                        $currentHeight = 0.0;
-                        $pageIndex++;
-
-                        continue;
-                    }
-
-                    $linesToFit = min((int) floor($remaining / $lineHeight), count($lines) - $i);
-                    if ($linesToFit <= 0) {
-                        $pages[] = $currentPage;
-                        $currentPage = [];
-                        $currentHeight = 0.0;
-                        $pageIndex++;
-
-                        continue;
-                    }
-
-                    $slice = array_slice($lines, $i, $linesToFit);
-
-                    // Is this the last slice of the paragraph?
-                    $isLastSlice = ($i + $linesToFit >= count($lines));
-                    $classAttr = ! empty($block['class']) ? $block['class'] : 'section-content';
-                    $style = $isLastSlice ? '' : 'style="margin-bottom: 0px;"';
-
-                    $sliceHtml = "<{$block['tag']} class=\"{$classAttr}\" {$style}>".implode('', $slice)."</{$block['tag']}>";
-                    $blockCost = ($linesToFit * $lineHeight) + ($isLastSlice ? 0.5 * $lineHeight : 0.0);
-
-                    $currentPage[] = [
-                        'type' => 'html',
-                        'html' => $sliceHtml,
-                        'height' => $blockCost,
-                    ];
-
-                    $currentHeight += $blockCost;
-                    $i += $linesToFit;
-                }
-
-                continue;
-            }
-
-            if ($block['type'] === 'list') {
-                $listData = self::paginateList($block['html']);
-                $listItems = $listData['items'];
-                $tag = $listData['tag'];
-
-                $i = 0;
-                $olStartIndex = 1;
-                while ($i < count($listItems)) {
-                    $maxHeightForPage = $pageContentHeight;
-                    $remaining = $maxHeightForPage - $currentHeight;
-
-                    if ($remaining <= 1.0 * $lineHeight) {
-                        $pages[] = $currentPage;
-                        $currentPage = [];
-                        $currentHeight = 0.0;
-                        $pageIndex++;
-
-                        continue;
-                    }
-
-                    // Estimate this item's lines
-                    $itemHtml = $listItems[$i];
-                    $itemPlainText = trim(strip_tags($itemHtml));
-                    $itemTextLines = max(1, (int) ceil(mb_strlen($itemPlainText) / ($maxCharsPerLine - 5)));
-                    $itemHeight = $itemTextLines * $lineHeight;
-
-                    if ($itemHeight > $remaining) {
-                        if ($currentHeight === 0.0) {
-                            $startAttr = ($tag === 'ol' && $olStartIndex > 1) ? " start=\"{$olStartIndex}\"" : '';
-                            $listStyleAttr = ! empty($listData['listStyleType']) ? " data-list-style-type=\"{$listData['listStyleType']}\"" : '';
-                            $styleAttr = ! empty($listData['styleAttr']) ? " style=\"{$listData['styleAttr']}\"" : '';
-                            $currentPage[] = [
-                                'type' => 'html',
-                                'html' => "<{$tag} class=\"section-content\"{$startAttr}{$listStyleAttr}{$styleAttr}>".$itemHtml."</{$tag}>",
-                                'height' => $itemHeight + 0.5 * $lineHeight,
-                            ];
-                            $currentHeight += $itemHeight + 0.5 * $lineHeight;
-                            $i++;
-                            $olStartIndex++;
-                        } else {
-                            $pages[] = $currentPage;
-                            $currentPage = [];
-                            $currentHeight = 0.0;
-                            $pageIndex++;
-                        }
-                    } else {
-                        $itemsToFit = [];
-                        $accumulatedHeight = 0.0;
-
-                        while ($i < count($listItems)) {
-                            $nextItemHtml = $listItems[$i];
-                            $nextItemPlainText = trim(strip_tags($nextItemHtml));
-                            $nextItemLines = max(1, (int) ceil(mb_strlen($nextItemPlainText) / ($maxCharsPerLine - 5)));
-                            $nextItemHeight = $nextItemLines * $lineHeight;
-
-                            $isLastOfAll = ($i === count($listItems) - 1);
-                            $spacingOverhead = $isLastOfAll ? 0.5 * $lineHeight : 0.0;
-
-                            if ($accumulatedHeight + $nextItemHeight + $spacingOverhead > $remaining) {
-                                break;
-                            }
-
-                            $itemsToFit[] = $nextItemHtml;
-                            $accumulatedHeight += $nextItemHeight;
-                            $i++;
-                        }
-
-                        if (count($itemsToFit) > 0) {
-                            $isLastOfAll = ($i >= count($listItems));
-                            $cost = $accumulatedHeight + ($isLastOfAll ? 0.5 * $lineHeight : 0.0);
-
-                            $startAttr = ($tag === 'ol' && $olStartIndex > 1) ? " start=\"{$olStartIndex}\"" : '';
-                            $listStyleAttr = ! empty($listData['listStyleType']) ? " data-list-style-type=\"{$listData['listStyleType']}\"" : '';
-                            $styleAttr = ! empty($listData['styleAttr']) ? " style=\"{$listData['styleAttr']}\"" : '';
-                            $currentPage[] = [
-                                'type' => 'html',
-                                'html' => "<{$tag} class=\"section-content\"{$startAttr}{$listStyleAttr}{$styleAttr}>".implode('', $itemsToFit)."</{$tag}>",
-                                'height' => $cost,
-                            ];
-                            $currentHeight += $cost;
-                            $olStartIndex += count($itemsToFit);
-                        } else {
-                            $pages[] = $currentPage;
-                            $currentPage = [];
-                            $currentHeight = 0.0;
-                            $pageIndex++;
-                        }
-                    }
-                }
-
-                continue;
-            }
-
-            if ($block['type'] === 'table') {
-                $tableData = self::paginateTable($block['html'], $maxCharsPerLine);
-                $headerHtml = $tableData['headerHtml'];
-                $rows = $tableData['rows'];
-                $colCount = $tableData['colCount'];
-
-                $i = 0;
-                while ($i < count($rows)) {
-                    $maxHeightForPage = $pageContentHeight;
-                    $remaining = $maxHeightForPage - $currentHeight;
-
-                    if ($remaining <= 5 * $lineHeight) {
-                        $pages[] = $currentPage;
-                        $currentPage = [];
-                        $currentHeight = 0.0;
-                        $pageIndex++;
-
-                        continue;
-                    }
-
-                    $headerHeight = empty($headerHtml) ? 0.0 : 2.0 * $lineHeight;
-                    $remainingForRows = $remaining - $headerHeight;
-
-                    $rowsToFit = [];
-                    $accumulatedHeight = 0.0;
-
-                    while ($i < count($rows)) {
-                        $row = $rows[$i];
-                        $charsPerCell = (int) floor($maxCharsPerLine / $colCount);
-                        $rowLines = max(1, (int) ceil($row['maxCellTextLen'] / $charsPerCell)) + 1;
-                        $rowHeight = $rowLines * $lineHeight;
-
-                        $isLastRow = ($i === count($rows) - 1);
-                        $tableSpacing = $isLastRow ? 1.0 * $lineHeight : 0.0;
-
-                        if ($accumulatedHeight + $rowHeight + $tableSpacing > $remainingForRows) {
-                            if (count($rowsToFit) === 0 && $currentHeight === 0.0) {
-                                $rowsToFit[] = $row['html'];
-                                $accumulatedHeight += $rowHeight;
-                                $i++;
-                            }
-                            break;
-                        }
-
-                        $rowsToFit[] = $row['html'];
-                        $accumulatedHeight += $rowHeight;
-                        $i++;
-                    }
-
-                    if (count($rowsToFit) > 0) {
-                        $isLastRow = ($i >= count($rows));
-                        $cost = $accumulatedHeight + $headerHeight + ($isLastRow ? 1.0 * $lineHeight : 0.0);
-
-                        $tableClass = 'section-content';
-                        if (preg_match('/<table[^>]+class=["\']([^"\']+)["\']/i', $block['html'], $classMatch)) {
-                            $tableClass = $classMatch[1];
-                        }
-
-                        $tableWrapperHtml = "<table class=\"{$tableClass}\">";
-                        if (! empty($headerHtml)) {
-                            $tableWrapperHtml .= '<thead>'.$headerHtml.'</thead>';
-                        }
-                        $tableWrapperHtml .= '<tbody>'.implode('', $rowsToFit).'</tbody></table>';
-
-                        $currentPage[] = [
-                            'type' => 'html',
-                            'html' => $tableWrapperHtml,
-                            'height' => $cost,
-                        ];
-                        $currentHeight += $cost;
-                    } else {
-                        $pages[] = $currentPage;
-                        $currentPage = [];
-                        $currentHeight = 0.0;
-                        $pageIndex++;
-                    }
-                }
-
-                continue;
-            }
-        }
-
-        // Add last page if not empty
-        if (count($currentPage) > 0) {
-            $pages[] = $currentPage;
-        }
+        $pages = self::paginateBlocks($blocks, $pageContentHeight, $lineHeight, $maxCharsPerLine);
 
         if (empty($pages)) {
             $pages[] = [
@@ -725,6 +307,29 @@ class ReportPaginator
                 'type' => 'signature',
                 'height' => $signatureHeight,
             ];
+        }
+
+        // 5. Paginate addendum onto new pages if it has content
+        $addendumHtml = ! empty($report->addendum_html) ? $report->addendum_html : '';
+        if (! self::isEmptyHtml($addendumHtml)) {
+            $addendumBlocks = [];
+            $showAddendumHeading = $headingsToggles['addendum_html'] ?? true;
+            if ($showAddendumHeading) {
+                $addendumBlocks[] = [
+                    'type' => 'section-header',
+                    'title' => 'ADDENDUM',
+                    'height' => 7.94,
+                ];
+            }
+            $rawAddendumBlocks = self::parseHtmlToBlocks($addendumHtml);
+            foreach ($rawAddendumBlocks as $bHtml) {
+                $addendumBlocks[] = self::classifyBlock($bHtml, $maxCharsPerLine);
+            }
+
+            $addendumPages = self::paginateBlocks($addendumBlocks, $pageContentHeight, $lineHeight, $maxCharsPerLine);
+            foreach ($addendumPages as $aPage) {
+                $pages[] = $aPage;
+            }
         }
 
         return $pages;
@@ -1241,5 +846,470 @@ class ReportPaginator
         }
 
         return $letter;
+    }
+
+    public static function paginateBlocks(array $blocks, float $pageContentHeight, float $lineHeight, int $maxCharsPerLine): array
+    {
+        $pages = [];
+        $currentPage = [];
+        $currentHeight = 0.0;
+        $pageIndex = 0;
+
+        for ($bIndex = 0; $bIndex < count($blocks); $bIndex++) {
+            $block = $blocks[$bIndex];
+            $maxHeightForPage = $pageContentHeight;
+
+            if ($block['type'] === 'patient-card') {
+                $currentPage[] = $block;
+                $currentHeight += $block['height'];
+
+                continue;
+            }
+
+            if ($block['type'] === 'section-header') {
+                // If section header doesn't fit on this page, push to next
+                if ($currentHeight + $block['height'] > $maxHeightForPage) {
+                    $pages[] = $currentPage;
+                    $currentPage = [];
+                    $currentHeight = 0.0;
+                    $pageIndex++;
+                    $maxHeightForPage = $pageContentHeight;
+                }
+                $currentPage[] = $block;
+                $currentHeight += $block['height'];
+
+                continue;
+            }
+
+            if ($block['type'] === 'page-break') {
+                if (count($currentPage) > 0) {
+                    $pages[] = $currentPage;
+                    $currentPage = [];
+                    $currentHeight = 0.0;
+                    $pageIndex++;
+                }
+
+                continue;
+            }
+
+            if ($block['type'] === 'heading') {
+                $headingCost = $block['height'];
+                $nextBlockStartsNewPage = false;
+
+                // Keep with Next constraint
+                if ($bIndex + 1 < count($blocks)) {
+                    $nextBlock = $blocks[$bIndex + 1];
+                    $minNextHeight = 2.0 * $lineHeight;
+
+                    if ($nextBlock['type'] === 'image') {
+                        $minNextHeight = (float) $nextBlock['height'];
+                    } elseif ($nextBlock['type'] === 'heading') {
+                        $minNextHeight = (float) $nextBlock['height'];
+                    }
+
+                    if ($currentHeight + $headingCost + $minNextHeight > $maxHeightForPage) {
+                        $nextBlockStartsNewPage = true;
+                    }
+                }
+
+                if ($currentHeight + $headingCost > $maxHeightForPage || $nextBlockStartsNewPage) {
+                    if (count($currentPage) > 0) {
+                        $pages[] = $currentPage;
+                        $currentPage = [];
+                        $currentHeight = 0.0;
+                        $pageIndex++;
+                        $maxHeightForPage = $pageContentHeight;
+                    }
+                }
+
+                $currentPage[] = $block;
+                $currentHeight += $headingCost;
+
+                continue;
+            }
+
+            if ($block['type'] === 'image-grid') {
+                $columns = $block['columns'];
+                $images = $block['images'];
+
+                if (empty($images)) {
+                    $currentPage[] = [
+                        'type' => 'html',
+                        'html' => $block['html'],
+                        'height' => 5.3,
+                    ];
+                    $currentHeight += 5.3;
+
+                    continue;
+                }
+
+                $itemWidth = 185.9 / $columns;
+                $rowsRemaining = array_chunk($images, $columns);
+
+                // Pre-calculate height of each row using actual aspect ratios
+                $rowHeights = [];
+                foreach ($rowsRemaining as $rowIndex => $rowImages) {
+                    $maxRowAspectRatio = 0.0;
+                    foreach ($rowImages as $imgTag) {
+                        $aspectRatio = self::getImageAspectRatio($imgTag);
+                        if ($aspectRatio > $maxRowAspectRatio) {
+                            $maxRowAspectRatio = $aspectRatio;
+                        }
+                    }
+                    if ($maxRowAspectRatio <= 0.0) {
+                        $maxRowAspectRatio = 1.0;
+                    }
+                    $rowHeights[$rowIndex] = $itemWidth * $maxRowAspectRatio;
+                }
+
+                while (! empty($rowsRemaining)) {
+                    $maxHeightForPage = $pageContentHeight;
+                    $remaining = $maxHeightForPage - $currentHeight;
+
+                    // The index of the first row currently remaining
+                    $totalRows = count($rowHeights);
+                    $currentIndex = $totalRows - count($rowsRemaining);
+
+                    $minGridHeight = $rowHeights[$currentIndex] + 2.0;
+
+                    if ($remaining < $minGridHeight && count($currentPage) > 0) {
+                        $pages[] = $currentPage;
+                        $currentPage = [];
+                        $currentHeight = 0.0;
+
+                        continue;
+                    }
+
+                    // Find how many rows can fit in the remaining height
+                    $r = 0;
+                    for ($tempR = 1; $tempR <= count($rowsRemaining); $tempR++) {
+                        $cost = 2.0;
+                        for ($i = 0; $i < $tempR; $i++) {
+                            $cost += $rowHeights[$currentIndex + $i];
+                            if ($i > 0) {
+                                $cost += 1.5;
+                            }
+                        }
+                        if ($cost <= $remaining) {
+                            $r = $tempR;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    // If we can't fit even one row
+                    if ($r === 0) {
+                        if (count($currentPage) > 0) {
+                            // Move to next page
+                            $pages[] = $currentPage;
+                            $currentPage = [];
+                            $currentHeight = 0.0;
+
+                            continue;
+                        } else {
+                            // Already on empty page, force 1 row to prevent infinite loop
+                            $r = 1;
+                        }
+                    }
+
+                    // Build the slice of rows
+                    $sliceImages = [];
+                    for ($i = 0; $i < $r; $i++) {
+                        foreach ($rowsRemaining[$i] as $imgTag) {
+                            $aspect = self::getImageAspectRatio($imgTag);
+                            if (preg_match('/style=["\']([^"\']*)["\']/i', $imgTag, $styleMatch)) {
+                                $existingStyle = rtrim($styleMatch[1], ';');
+                                $newStyle = "{$existingStyle}; aspect-ratio: 1 / {$aspect}; object-fit: cover;";
+                                $imgTag = preg_replace('/style=["\']([^"\']*)["\']/i', 'style="'.$newStyle.'"', $imgTag);
+                            } else {
+                                $imgTag = str_replace('<img', '<img style="aspect-ratio: 1 / '.$aspect.'; object-fit: cover;"', $imgTag);
+                            }
+                            $sliceImages[] = $imgTag;
+                        }
+                    }
+
+                    $sliceHtml = "<div data-type=\"image-grid\" data-columns=\"{$columns}\">".implode('', $sliceImages).'</div>';
+
+                    $cost = 2.0;
+                    for ($i = 0; $i < $r; $i++) {
+                        $cost += $rowHeights[$currentIndex + $i];
+                        if ($i > 0) {
+                            $cost += 1.5;
+                        }
+                    }
+
+                    $currentPage[] = [
+                        'type' => 'html',
+                        'html' => $sliceHtml,
+                        'height' => $cost,
+                    ];
+
+                    $currentHeight += $cost;
+                    $rowsRemaining = array_slice($rowsRemaining, $r);
+                }
+
+                continue;
+            }
+
+            if ($block['type'] === 'image') {
+                if ($currentHeight + $block['height'] > $maxHeightForPage) {
+                    $pages[] = $currentPage;
+                    $currentPage = [];
+                    $currentHeight = 0.0;
+                    $pageIndex++;
+                    $maxHeightForPage = $pageContentHeight;
+                }
+                $currentPage[] = $block;
+                $currentHeight += $block['height'];
+
+                continue;
+            }
+
+            if ($block['type'] === 'cuttings-summary' || $block['type'] === 'new-cuttings-summary') {
+                if ($currentHeight + $block['height'] > $maxHeightForPage) {
+                    $pages[] = $currentPage;
+                    $currentPage = [];
+                    $currentHeight = 0.0;
+                    $pageIndex++;
+                    $maxHeightForPage = $pageContentHeight;
+                }
+                $currentPage[] = $block;
+                $currentHeight += $block['height'];
+
+                continue;
+            }
+
+            if ($block['type'] === 'paragraph') {
+                $paraInnerHtml = self::getInnerHtml($block['html'], $block['tag']);
+                $lines = self::splitHtmlIntoLines($paraInnerHtml, $maxCharsPerLine);
+
+                $i = 0;
+                while ($i < count($lines)) {
+                    $maxHeightForPage = $pageContentHeight;
+                    $remaining = $maxHeightForPage - $currentHeight;
+
+                    if ($remaining <= 0.5 * $lineHeight) {
+                        $pages[] = $currentPage;
+                        $currentPage = [];
+                        $currentHeight = 0.0;
+                        $pageIndex++;
+
+                        continue;
+                    }
+
+                    $linesToFit = min((int) floor($remaining / $lineHeight), count($lines) - $i);
+                    if ($linesToFit <= 0) {
+                        $pages[] = $currentPage;
+                        $currentPage = [];
+                        $currentHeight = 0.0;
+                        $pageIndex++;
+
+                        continue;
+                    }
+
+                    $slice = array_slice($lines, $i, $linesToFit);
+
+                    // Is this the last slice of the paragraph?
+                    $isLastSlice = ($i + $linesToFit >= count($lines));
+                    $classAttr = ! empty($block['class']) ? $block['class'] : 'section-content';
+                    $style = $isLastSlice ? '' : 'style="margin-bottom: 0px;"';
+
+                    $sliceHtml = "<{$block['tag']} class=\"{$classAttr}\" {$style}>".implode('', $slice)."</{$block['tag']}>";
+                    $blockCost = ($linesToFit * $lineHeight) + ($isLastSlice ? 0.5 * $lineHeight : 0.0);
+
+                    $currentPage[] = [
+                        'type' => 'html',
+                        'html' => $sliceHtml,
+                        'height' => $blockCost,
+                    ];
+
+                    $currentHeight += $blockCost;
+                    $i += $linesToFit;
+                }
+
+                continue;
+            }
+
+            if ($block['type'] === 'list') {
+                $listData = self::paginateList($block['html']);
+                $listItems = $listData['items'];
+                $tag = $listData['tag'];
+
+                $i = 0;
+                $olStartIndex = 1;
+                while ($i < count($listItems)) {
+                    $maxHeightForPage = $pageContentHeight;
+                    $remaining = $maxHeightForPage - $currentHeight;
+
+                    if ($remaining <= 1.0 * $lineHeight) {
+                        $pages[] = $currentPage;
+                        $currentPage = [];
+                        $currentHeight = 0.0;
+                        $pageIndex++;
+
+                        continue;
+                    }
+
+                    // Estimate this item's lines
+                    $itemHtml = $listItems[$i];
+                    $itemPlainText = trim(strip_tags($itemHtml));
+                    $itemTextLines = max(1, (int) ceil(mb_strlen($itemPlainText) / ($maxCharsPerLine - 5)));
+                    $itemHeight = $itemTextLines * $lineHeight;
+
+                    if ($itemHeight > $remaining) {
+                        if ($currentHeight === 0.0) {
+                            $startAttr = ($tag === 'ol' && $olStartIndex > 1) ? " start=\"{$olStartIndex}\"" : '';
+                            $listStyleAttr = ! empty($listData['listStyleType']) ? " data-list-style-type=\"{$listData['listStyleType']}\"" : '';
+                            $styleAttr = ! empty($listData['styleAttr']) ? " style=\"{$listData['styleAttr']}\"" : '';
+                            $currentPage[] = [
+                                'type' => 'html',
+                                'html' => "<{$tag} class=\"section-content\"{$startAttr}{$listStyleAttr}{$styleAttr}>".$itemHtml."</{$tag}>",
+                                'height' => $itemHeight + 0.5 * $lineHeight,
+                            ];
+                            $currentHeight += $itemHeight + 0.5 * $lineHeight;
+                            $i++;
+                            $olStartIndex++;
+                        } else {
+                            $pages[] = $currentPage;
+                            $currentPage = [];
+                            $currentHeight = 0.0;
+                            $pageIndex++;
+                        }
+                    } else {
+                        $itemsToFit = [];
+                        $accumulatedHeight = 0.0;
+
+                        while ($i < count($listItems)) {
+                            $nextItemHtml = $listItems[$i];
+                            $nextItemPlainText = trim(strip_tags($nextItemHtml));
+                            $nextItemLines = max(1, (int) ceil(mb_strlen($nextItemPlainText) / ($maxCharsPerLine - 5)));
+                            $nextItemHeight = $nextItemLines * $lineHeight;
+
+                            $isLastOfAll = ($i === count($listItems) - 1);
+                            $spacingOverhead = $isLastOfAll ? 0.5 * $lineHeight : 0.0;
+
+                            if ($accumulatedHeight + $nextItemHeight + $spacingOverhead > $remaining) {
+                                break;
+                            }
+
+                            $itemsToFit[] = $nextItemHtml;
+                            $accumulatedHeight += $nextItemHeight;
+                            $i++;
+                        }
+
+                        if (count($itemsToFit) > 0) {
+                            $isLastOfAll = ($i >= count($listItems));
+                            $cost = $accumulatedHeight + ($isLastOfAll ? 0.5 * $lineHeight : 0.0);
+
+                            $startAttr = ($tag === 'ol' && $olStartIndex > 1) ? " start=\"{$olStartIndex}\"" : '';
+                            $listStyleAttr = ! empty($listData['listStyleType']) ? " data-list-style-type=\"{$listData['listStyleType']}\"" : '';
+                            $styleAttr = ! empty($listData['styleAttr']) ? " style=\"{$listData['styleAttr']}\"" : '';
+                            $currentPage[] = [
+                                'type' => 'html',
+                                'html' => "<{$tag} class=\"section-content\"{$startAttr}{$listStyleAttr}{$styleAttr}>".implode('', $itemsToFit)."</{$tag}>",
+                                'height' => $cost,
+                            ];
+                            $currentHeight += $cost;
+                            $olStartIndex += count($itemsToFit);
+                        } else {
+                            $pages[] = $currentPage;
+                            $currentPage = [];
+                            $currentHeight = 0.0;
+                            $pageIndex++;
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            if ($block['type'] === 'table') {
+                $tableData = self::paginateTable($block['html'], $maxCharsPerLine);
+                $headerHtml = $tableData['headerHtml'];
+                $rows = $tableData['rows'];
+                $colCount = $tableData['colCount'];
+
+                $i = 0;
+                while ($i < count($rows)) {
+                    $maxHeightForPage = $pageContentHeight;
+                    $remaining = $maxHeightForPage - $currentHeight;
+
+                    if ($remaining <= 5 * $lineHeight) {
+                        $pages[] = $currentPage;
+                        $currentPage = [];
+                        $currentHeight = 0.0;
+                        $pageIndex++;
+
+                        continue;
+                    }
+
+                    $headerHeight = empty($headerHtml) ? 0.0 : 2.0 * $lineHeight;
+                    $remainingForRows = $remaining - $headerHeight;
+
+                    $rowsToFit = [];
+                    $accumulatedHeight = 0.0;
+
+                    while ($i < count($rows)) {
+                        $row = $rows[$i];
+                        $charsPerCell = (int) floor($maxCharsPerLine / $colCount);
+                        $rowLines = max(1, (int) ceil($row['maxCellTextLen'] / $charsPerCell)) + 1;
+                        $rowHeight = $rowLines * $lineHeight;
+
+                        $isLastRow = ($i === count($rows) - 1);
+                        $tableSpacing = $isLastRow ? 1.0 * $lineHeight : 0.0;
+
+                        if ($accumulatedHeight + $rowHeight + $tableSpacing > $remainingForRows) {
+                            if (count($rowsToFit) === 0 && $currentHeight === 0.0) {
+                                $rowsToFit[] = $row['html'];
+                                $accumulatedHeight += $rowHeight;
+                                $i++;
+                            }
+                            break;
+                        }
+
+                        $rowsToFit[] = $row['html'];
+                        $accumulatedHeight += $rowHeight;
+                        $i++;
+                    }
+
+                    if (count($rowsToFit) > 0) {
+                        $isLastRow = ($i >= count($rows));
+                        $cost = $accumulatedHeight + $headerHeight + ($isLastRow ? 1.0 * $lineHeight : 0.0);
+
+                        $tableClass = 'section-content';
+                        if (preg_match('/<table[^>]+class=["\']([^"\']+)["\']/i', $block['html'], $classMatch)) {
+                            $tableClass = $classMatch[1];
+                        }
+
+                        $tableWrapperHtml = "<table class=\"{$tableClass}\">";
+                        if (! empty($headerHtml)) {
+                            $tableWrapperHtml .= '<thead>'.$headerHtml.'</thead>';
+                        }
+                        $tableWrapperHtml .= '<tbody>'.implode('', $rowsToFit).'</tbody></table>';
+
+                        $currentPage[] = [
+                            'type' => 'html',
+                            'html' => $tableWrapperHtml,
+                            'height' => $cost,
+                        ];
+                        $currentHeight += $cost;
+                    } else {
+                        $pages[] = $currentPage;
+                        $currentPage = [];
+                        $currentHeight = 0.0;
+                        $pageIndex++;
+                    }
+                }
+
+                continue;
+            }
+        }
+
+        // Add last page if not empty
+        if (count($currentPage) > 0) {
+            $pages[] = $currentPage;
+        }
+
+        return $pages;
     }
 }
