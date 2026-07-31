@@ -97,7 +97,7 @@
     <div class="email-container">
         <!-- Heading / Logo -->
         <div class="header">
-            <img src="https://pathos.support/images/patolab-logo-horizontal.png" alt="PatoLab Logo">
+            <img src="https://pathos.support/images/patolab-logo-horizontal-full.png" alt="PatoLab Logo">
         </div>
 
         <!-- Body Content -->

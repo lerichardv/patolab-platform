@@ -312,8 +312,8 @@
 
     <div class="header-container">
         <div class="logo-section">
-            @if(file_exists(public_path('images/patolab-logo-horizontal.png')))
-                <img class="logo-img" src="{{ public_path('images/patolab-logo-horizontal.png') }}" alt="Logo PatoLab">
+            @if(file_exists(public_path('images/patolab-logo-horizontal-full.png')))
+                <img class="logo-img" src="{{ public_path('images/patolab-logo-horizontal-full.png') }}" alt="Logo PatoLab">
             @else
                 <div style="font-size: 20px; font-weight: 800; color: #1e3a8a;">PatoLab</div>
             @endif

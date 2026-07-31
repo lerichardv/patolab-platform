@@ -1,5 +1,5 @@
 @php
-    $logoPath = public_path('images/patolab-logo-horizontal.png');
+    $logoPath = public_path('images/patolab-logo-horizontal-full.png');
     $logoBase64 = '';
     if (file_exists($logoPath)) {
         $logoData = base64_encode(file_get_contents($logoPath));

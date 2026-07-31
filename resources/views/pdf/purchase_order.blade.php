@@ -176,7 +176,7 @@
 <body>
     <div class="header-container">
         <div class="logo-section">
-            <img class="logo-img" src="{{ public_path('images/patolab-logo-horizontal.png') }}" alt="Logo PatoLab">
+            <img class="logo-img" src="{{ public_path('images/patolab-logo-horizontal-full.png') }}" alt="Logo PatoLab">
             <div class="company-details">
                 <p>Barrio. Los Andes, 7 calle NO, 12-13 Avenida</p>
                 <p>San Pedro Sula, Honduras C.A. TEL: 2510-6502 WHATSAPP: 9442-9419</p>
