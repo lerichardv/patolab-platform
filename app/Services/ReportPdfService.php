@@ -38,7 +38,7 @@ class ReportPdfService
      */
     public function generatePdfContent(Specimen $specimen, &$pages = null)
     {
-        $specimen->load(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'report', 'users.role']);
+        $specimen->load(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'report', 'users.role', 'cuttings.code', 'cuttings.responsible']);
         if (! $specimen->report) {
             abort(404, 'No hay reporte asociado a esta muestra.');
         }

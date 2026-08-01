@@ -16,11 +16,6 @@ import type { FormEventHandler } from 'react';
 import * as React from 'react';
 import { useEffect, useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import {
-    PaymentMethodSheet,
-    PaymentResume,
-    getPaymentTypeLabel,
-} from '../invoices/payment-method-sheet';
 import { pay as payRental } from '@/actions/App/Http/Controllers/RentalController';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import type { CustomerOption } from '@/components/async-customer-combobox';
@@ -55,6 +50,11 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import CustomerSheet from '../customers/customer-sheet';
+import {
+    PaymentMethodSheet,
+    PaymentResume,
+    getPaymentTypeLabel,
+} from '../invoices/payment-method-sheet';
 import RentalSheet from './rental-sheet';
 
 interface Customer {

@@ -22,11 +22,6 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import {
-    PaymentMethodSheet,
-    getPaymentTypeLabel,
-} from '../invoices/payment-method-sheet';
-import type { PaymentData } from '../invoices/payment-method-sheet';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
@@ -88,6 +83,11 @@ import { cn } from '@/lib/utils';
 
 // Reuse on-the-fly creators
 import CustomerForm from '../customers/customer-form';
+import type { PaymentData } from '../invoices/payment-method-sheet';
+import {
+    PaymentMethodSheet,
+    getPaymentTypeLabel,
+} from '../invoices/payment-method-sheet';
 import ReferrerForm from '../referrers/referrer-form';
 import SequenceForm from '../sequences/sequence-form';
 import CategorySheet from '../specimen-categories/category-sheet';

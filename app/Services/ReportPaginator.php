@@ -64,33 +64,100 @@ class ReportPaginator
                 return null;
             }
 
-            $groups = [];
+            // Sort alphabetically (by code length first, then natural comparison)
+            usort($cuttingsList, function ($a, $b) {
+                $codeA = (isset($a->code) && !empty($a->code->code)) ? $a->code->code : '';
+                $codeB = (isset($b->code) && !empty($b->code->code)) ? $b->code->code : '';
+                $lenA = strlen($codeA);
+                $lenB = strlen($codeB);
+                if ($lenA !== $lenB) {
+                    return $lenA <=> $lenB;
+                }
+                return strnatcasecmp($codeA, $codeB);
+            });
+
+            // Find runs of contiguous items with the same description
+            $tempRuns = [];
             foreach ($cuttingsList as $idx => $cutting) {
                 $desc = $cutting->description ?? '';
-                $cuts = $cutting->number_of_cuttings ?? 0;
-
-                $lastGroupIdx = count($groups) - 1;
-                if ($lastGroupIdx >= 0 && $groups[$lastGroupIdx]['description'] === $desc) {
-                    $groups[$lastGroupIdx]['endIndex'] = $idx;
-                    $groups[$lastGroupIdx]['totalCuts'] += $cuts;
-                    $groups[$lastGroupIdx]['count'] += 1;
+                $lastRunIdx = count($tempRuns) - 1;
+                if ($lastRunIdx >= 0 && $tempRuns[$lastRunIdx]['description'] === $desc) {
+                    $tempRuns[$lastRunIdx]['endIndex'] = $idx;
+                    $tempRuns[$lastRunIdx]['items'][] = $cutting;
                 } else {
-                    $groups[] = [
+                    $tempRuns[] = [
                         'startIndex' => $idx,
                         'endIndex' => $idx,
                         'description' => $desc,
-                        'totalCuts' => $cuts,
-                        'count' => 1,
+                        'items' => [$cutting],
                     ];
+                }
+            }
+
+            $groups = [];
+            foreach ($tempRuns as $run) {
+                $subGroups = [];
+                $currentSubGroup = [];
+
+                foreach ($run['items'] as $item) {
+                    $code = (isset($item->code) && !empty($item->code->code)) ? $item->code->code : '';
+
+                    if (empty($currentSubGroup)) {
+                        $currentSubGroup[] = $item;
+                    } else {
+                        $prevItem = end($currentSubGroup);
+                        $prevCode = (isset($prevItem->code) && !empty($prevItem->code->code)) ? $prevItem->code->code : '';
+                        
+                        if (self::areTwoCodesConsecutive($prevCode, $code)) {
+                            $currentSubGroup[] = $item;
+                        } else {
+                            $subGroups[] = $currentSubGroup;
+                            $currentSubGroup = [$item];
+                        }
+                    }
+                }
+                if (!empty($currentSubGroup)) {
+                    $subGroups[] = $currentSubGroup;
+                }
+
+                $startIdxInCuttingsList = $run['startIndex'];
+                foreach ($subGroups as $sub) {
+                    $subCount = count($sub);
+                    $totalCuts = 0;
+                    foreach ($sub as $item) {
+                        $totalCuts += $item->number_of_cuttings ?? 0;
+                    }
+
+                    $endIdxInCuttingsList = $startIdxInCuttingsList + $subCount - 1;
+
+                    $groups[] = [
+                        'startIndex' => $startIdxInCuttingsList,
+                        'endIndex' => $endIdxInCuttingsList,
+                        'description' => $run['description'],
+                        'totalCuts' => $totalCuts,
+                        'count' => $subCount,
+                    ];
+
+                    $startIdxInCuttingsList += $subCount;
                 }
             }
 
             $cutsList = [];
             foreach ($groups as $g) {
-                $startLetter = self::indexToLetter($g['startIndex'] + 1);
+                $startCutting = $cuttingsList[$g['startIndex']] ?? null;
+                $endCutting = $cuttingsList[$g['endIndex']] ?? null;
+
+                $startLetter = (isset($startCutting->code) && !empty($startCutting->code->code))
+                    ? $startCutting->code->code
+                    : self::indexToLetter($g['startIndex'] + 1);
+
+                $endLetter = (isset($endCutting->code) && !empty($endCutting->code->code))
+                    ? $endCutting->code->code
+                    : self::indexToLetter($g['endIndex'] + 1);
+
                 $label = $g['startIndex'] === $g['endIndex']
                     ? $startLetter
-                    : $startLetter.'-'.self::indexToLetter($g['endIndex'] + 1);
+                    : $startLetter.'-'.$endLetter;
 
                 $formattedDesc = $g['description'] !== '' ? $g['description'].' ' : '';
                 $cutsList[] = "{$label}) {$formattedDesc}{$g['totalCuts']}x{$g['count']}";
@@ -846,6 +913,28 @@ class ReportPaginator
         }
 
         return $letter;
+    }
+
+    public static function areTwoCodesConsecutive(string $code1, string $code2): bool
+    {
+        $len1 = strlen($code1);
+        $len2 = strlen($code2);
+        if ($len1 !== $len2 || $len1 === 0) {
+            return false;
+        }
+
+        if ($len1 > 1) {
+            $pref1 = substr($code1, 0, $len1 - 1);
+            $pref2 = substr($code2, 0, $len2 - 1);
+            if ($pref1 !== $pref2) {
+                return false;
+            }
+        }
+
+        $lastChar1 = ord(substr($code1, -1));
+        $lastChar2 = ord(substr($code2, -1));
+
+        return $lastChar2 === $lastChar1 + 1;
     }
 
     public static function paginateBlocks(array $blocks, float $pageContentHeight, float $lineHeight, int $maxCharsPerLine): array

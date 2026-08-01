@@ -32,8 +32,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import WorkOrderTypeSheet from '@/pages/work-orders/work-order-type-sheet';
 import CuttingCodeSheet from './cutting-code-sheet';

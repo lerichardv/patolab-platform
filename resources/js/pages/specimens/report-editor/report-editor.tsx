@@ -4089,6 +4089,7 @@ export default function ReportWorkspace({
                     loaded.push({ ...def, order: nextOrder + i });
                 }
             });
+
             return loaded;
         }
 
@@ -4127,6 +4128,7 @@ export default function ReportWorkspace({
 
     const handleOpenTextLabelChange = (val: string) => {
         setOpenTextLabel(val);
+
         if (openTextLabelDoc) {
             const ytext = openTextLabelDoc.getText('content');
             openTextLabelDoc.transact(() => {
@@ -4274,6 +4276,30 @@ export default function ReportWorkspace({
             return letter;
         };
 
+        const areTwoCodesConsecutive = (
+            code1: string,
+            code2: string,
+        ): boolean => {
+            const len1 = code1.length;
+            const len2 = code2.length;
+            if (len1 !== len2 || len1 === 0) {
+                return false;
+            }
+
+            if (len1 > 1) {
+                const pref1 = code1.substring(0, len1 - 1);
+                const pref2 = code2.substring(0, len2 - 1);
+                if (pref1 !== pref2) {
+                    return false;
+                }
+            }
+
+            const lastChar1 = code1.charCodeAt(len1 - 1);
+            const lastChar2 = code2.charCodeAt(len2 - 1);
+
+            return lastChar2 === lastChar1 + 1;
+        };
+
         const pageContentHeight = 205.0; // mm
         const lineHeight = 3.97; // mm
         const maxCharsPerLine = 155;
@@ -4301,7 +4327,52 @@ export default function ReportWorkspace({
             blockId: string,
             prefix: string,
         ): MeasuredBlock | null => {
-            if (cuttingsList.length === 0) return null;
+            if (cuttingsList.length === 0) {
+                return null;
+            }
+
+            // Sort alphabetically (by length first, then natural comparison)
+            cuttingsList.sort((a: any, b: any) => {
+                const codeA = a.code?.code || '';
+                const codeB = b.code?.code || '';
+                const lenA = codeA.length;
+                const lenB = codeB.length;
+                if (lenA !== lenB) {
+                    return lenA - lenB;
+                }
+                return codeA.localeCompare(codeB, undefined, {
+                    numeric: true,
+                    sensitivity: 'base',
+                });
+            });
+
+            interface TempRun {
+                startIndex: number;
+                endIndex: number;
+                description: string;
+                items: any[];
+            }
+
+            const tempRuns: TempRun[] = [];
+            cuttingsList.forEach((cutting: any, idx: number) => {
+                const desc = cutting.description || '';
+
+                if (
+                    tempRuns.length > 0 &&
+                    tempRuns[tempRuns.length - 1].description === desc
+                ) {
+                    const lastRun = tempRuns[tempRuns.length - 1];
+                    lastRun.endIndex = idx;
+                    lastRun.items.push(cutting);
+                } else {
+                    tempRuns.push({
+                        startIndex: idx,
+                        endIndex: idx,
+                        description: desc,
+                        items: [cutting],
+                    });
+                }
+            });
 
             const groups: {
                 startIndex: number;
@@ -4311,36 +4382,72 @@ export default function ReportWorkspace({
                 count: number;
             }[] = [];
 
-            cuttingsList.forEach((cutting: any, idx: number) => {
-                const desc = cutting.description || '';
-                const cuts = cutting.number_of_cuttings ?? 0;
+            tempRuns.forEach((run) => {
+                const subGroups: any[][] = [];
+                let currentSubGroup: any[] = [];
 
-                if (
-                    groups.length > 0 &&
-                    groups[groups.length - 1].description === desc
-                ) {
-                    const lastGroup = groups[groups.length - 1];
-                    lastGroup.endIndex = idx;
-                    lastGroup.totalCuts += cuts;
-                    lastGroup.count += 1;
-                } else {
-                    groups.push({
-                        startIndex: idx,
-                        endIndex: idx,
-                        description: desc,
-                        totalCuts: cuts,
-                        count: 1,
-                    });
+                run.items.forEach((item, idx) => {
+                    const realIdx = run.startIndex + idx;
+                    const code = item.code?.code || indexToLetter(realIdx + 1);
+
+                    if (currentSubGroup.length === 0) {
+                        currentSubGroup.push(item);
+                    } else {
+                        const prevItem =
+                            currentSubGroup[currentSubGroup.length - 1];
+                        const prevRealIdx = run.startIndex + idx - 1;
+                        const prevCode =
+                            prevItem.code?.code ||
+                            indexToLetter(prevRealIdx + 1);
+
+                        if (areTwoCodesConsecutive(prevCode, code)) {
+                            currentSubGroup.push(item);
+                        } else {
+                            subGroups.push(currentSubGroup);
+                            currentSubGroup = [item];
+                        }
+                    }
+                });
+
+                if (currentSubGroup.length > 0) {
+                    subGroups.push(currentSubGroup);
                 }
+
+                let startIdxInCuttingsList = run.startIndex;
+                subGroups.forEach((sub) => {
+                    const subCount = sub.length;
+                    let totalCuts = 0;
+                    sub.forEach((item) => {
+                        totalCuts += item.number_of_cuttings ?? 0;
+                    });
+
+                    const endIdxInCuttingsList =
+                        startIdxInCuttingsList + subCount - 1;
+
+                    groups.push({
+                        startIndex: startIdxInCuttingsList,
+                        endIndex: endIdxInCuttingsList,
+                        description: run.description,
+                        totalCuts,
+                        count: subCount,
+                    });
+
+                    startIdxInCuttingsList += subCount;
+                });
             });
 
             const cutsList: string[] = [];
             groups.forEach((g) => {
-                const startLetter = indexToLetter(g.startIndex + 1);
+                const startCutting = cuttingsList[g.startIndex];
+                const endCutting = cuttingsList[g.endIndex];
+                const startLetter =
+                    startCutting?.code?.code || indexToLetter(g.startIndex + 1);
+                const endLetter =
+                    endCutting?.code?.code || indexToLetter(g.endIndex + 1);
                 const label =
                     g.startIndex === g.endIndex
                         ? startLetter
-                        : `${startLetter}-${indexToLetter(g.endIndex + 1)}`;
+                        : `${startLetter}-${endLetter}`;
 
                 const formattedDesc = g.description ? `${g.description} ` : '';
                 cutsList.push(
@@ -4459,9 +4566,11 @@ export default function ReportWorkspace({
                     if (cuttingsBlock) {
                         blocks.push(cuttingsBlock);
                     }
+
                     if (newCuttingsBlock) {
                         blocks.push(newCuttingsBlock);
                     }
+
                     hasPushedCuttings = true;
                 }
             } else if (section.key === 'microscopy_html') {
@@ -4574,6 +4683,7 @@ export default function ReportWorkspace({
             if (cuttingsBlock) {
                 blocks.push(cuttingsBlock);
             }
+
             if (newCuttingsBlock) {
                 blocks.push(newCuttingsBlock);
             }
@@ -4674,6 +4784,7 @@ export default function ReportWorkspace({
 
                     const itemWidth = 185.9 / columns;
                     const rowsRemaining: string[][] = [];
+
                     for (let i = 0; i < images.length; i += columns) {
                         rowsRemaining.push(images.slice(i, i + columns));
                     }
@@ -4682,17 +4793,21 @@ export default function ReportWorkspace({
                         let maxRowAspectRatio = 0.0;
                         rowImages.forEach((imgTag: string) => {
                             const aspect = getImageAspectRatio(imgTag);
+
                             if (aspect > maxRowAspectRatio) {
                                 maxRowAspectRatio = aspect;
                             }
                         });
+
                         if (maxRowAspectRatio <= 0) {
                             maxRowAspectRatio = 1.0;
                         }
+
                         return itemWidth * maxRowAspectRatio;
                     });
 
                     let rowIndex = 0;
+
                     while (rowIndex < rowsRemaining.length) {
                         const remaining = maxHeightForPage - currentHeightList;
                         const minGridHeight = rowHeights[rowIndex] + 2.0;
@@ -4708,18 +4823,22 @@ export default function ReportWorkspace({
                         }
 
                         let r = 0;
+
                         for (
                             let tempR = 1;
                             tempR <= rowsRemaining.length - rowIndex;
                             tempR++
                         ) {
                             let cost = 2.0;
+
                             for (let i = 0; i < tempR; i++) {
                                 cost += rowHeights[rowIndex + i];
+
                                 if (i > 0) {
                                     cost += 1.5;
                                 }
                             }
+
                             if (cost <= remaining) {
                                 r = tempR;
                             } else {
@@ -4739,6 +4858,7 @@ export default function ReportWorkspace({
                         }
 
                         const sliceImages: string[] = [];
+
                         for (let i = 0; i < r; i++) {
                             rowsRemaining[rowIndex + i].forEach((imgTag) => {
                                 const aspect = getImageAspectRatio(imgTag);
@@ -4746,6 +4866,7 @@ export default function ReportWorkspace({
                                 const styleMatch = processedTag.match(
                                     /style=["\']([^"\']*)["\']/i,
                                 );
+
                                 if (styleMatch) {
                                     const existingStyle = styleMatch[1].replace(
                                         /;$/,
@@ -4762,6 +4883,7 @@ export default function ReportWorkspace({
                                         `<img style="aspect-ratio: 1 / ${aspect}; object-fit: cover;"`,
                                     );
                                 }
+
                                 sliceImages.push(processedTag);
                             });
                         }
@@ -4769,8 +4891,10 @@ export default function ReportWorkspace({
                         const sliceHtml = `<div data-type="image-grid" data-columns="${columns}">${sliceImages.join('')}</div>`;
 
                         let cost = 2.0;
+
                         for (let i = 0; i < r; i++) {
                             cost += rowHeights[rowIndex + i];
+
                             if (i > 0) {
                                 cost += 1.5;
                             }
@@ -4827,6 +4951,7 @@ export default function ReportWorkspace({
                     );
 
                     let i = 0;
+
                     while (i < lines.length) {
                         const fontLineHeight = lineHeight;
                         const remaining = maxHeightForPage - currentHeightList;
@@ -4883,6 +5008,7 @@ export default function ReportWorkspace({
 
                     let i = 0;
                     let olStartIndex = 1;
+
                     while (i < listItems.length) {
                         const fontLineHeight = lineHeight;
                         const remaining = maxHeightForPage - currentHeightList;
@@ -5015,6 +5141,7 @@ export default function ReportWorkspace({
                     const colCount = tableData.colCount;
 
                     let i = 0;
+
                     while (i < rows.length) {
                         const fontLineHeight = lineHeight;
                         const remaining = maxHeightForPage - currentHeightList;
@@ -5065,6 +5192,7 @@ export default function ReportWorkspace({
                                     accumulatedHeight += rowHeight;
                                     i++;
                                 }
+
                                 break;
                             }
 
@@ -5160,10 +5288,12 @@ export default function ReportWorkspace({
 
         // Addendum pagination
         const addendumHtmlValue = addendumHtml || '';
+
         if (!isEmptyHtml(addendumHtmlValue)) {
             const addendumBlocks: any[] = [];
             const showAddendumHeading =
                 headingsToggles['addendum_html'] ?? true;
+
             if (showAddendumHeading) {
                 addendumBlocks.push({
                     type: 'section-header',
@@ -5947,6 +6077,7 @@ export default function ReportWorkspace({
         const ytextLabel = labelDoc.getText('content');
         const handleLabelYjsChange = () => {
             const val = ytextLabel.toString().trim();
+
             if (val && val !== openTextLabelRef.current) {
                 setOpenTextLabel(val);
             }
@@ -5966,9 +6097,11 @@ export default function ReportWorkspace({
         const ytextToggles = togglesDoc.getText('content');
         const handleTogglesYjsChange = () => {
             const val = ytextToggles.toString().trim();
+
             if (val) {
                 try {
                     const parsed = JSON.parse(val);
+
                     if (parsed && typeof parsed === 'object') {
                         setHeadingsToggles((prev) => {
                             if (
@@ -5976,6 +6109,7 @@ export default function ReportWorkspace({
                             ) {
                                 return { ...defaultHeadingsToggles, ...parsed };
                             }
+
                             return prev;
                         });
                     }

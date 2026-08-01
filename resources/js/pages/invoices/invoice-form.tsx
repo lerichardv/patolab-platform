@@ -17,11 +17,6 @@ import {
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import {
-    PaymentMethodSheet,
-    PaymentResume,
-    getPaymentTypeLabel,
-} from './payment-method-sheet';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
@@ -65,6 +60,11 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import {
+    PaymentMethodSheet,
+    PaymentResume,
+    getPaymentTypeLabel,
+} from './payment-method-sheet';
 
 interface Props {
     invoice: any;

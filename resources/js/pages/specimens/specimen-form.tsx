@@ -20,11 +20,6 @@ import {
     Info,
 } from 'lucide-react';
 import React from 'react';
-import {
-    PaymentMethodSheet,
-    PaymentResume,
-    getPaymentTypeLabel,
-} from '../invoices/payment-method-sheet';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import {
@@ -80,6 +75,11 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import CustomerForm from '../customers/customer-form';
+import {
+    PaymentMethodSheet,
+    PaymentResume,
+    getPaymentTypeLabel,
+} from '../invoices/payment-method-sheet';
 import ReferrerForm from '../referrers/referrer-form';
 import SequenceForm from '../sequences/sequence-form';
 import CategorySheet from '../specimen-categories/category-sheet';
@@ -3533,6 +3533,7 @@ export default function SpecimenForm({
                         ) {
                             setShowBlockedPaymentAlert(true);
                             setIsPaymentSheetOpen(false);
+
                             return;
                         }
 
@@ -3543,6 +3544,7 @@ export default function SpecimenForm({
                         ) {
                             setShowBlockedPaymentAlert(true);
                             setIsPaymentSheetOpen(false);
+
                             return;
                         }
                     }

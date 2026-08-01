@@ -1,4 +1,5 @@
 import { useForm } from '@inertiajs/react';
+import { Info } from 'lucide-react';
 import type { FormEventHandler } from 'react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
@@ -7,6 +8,7 @@ import {
     update as updateSequence,
 } from '@/actions/App/Http/Controllers/SequenceController';
 import InputError from '@/components/input-error';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,8 +19,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info } from 'lucide-react';
 
 interface Location {
     id: number;

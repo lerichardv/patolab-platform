@@ -1,13 +1,11 @@
+import { Wallet, CreditCard, Landmark, Receipt } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import * as React from 'react';
 import { toast } from 'sonner';
-import { Wallet, CreditCard, Landmark, Receipt } from 'lucide-react';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
 import HeadingSheet from '@/components/heading-sheet';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -15,6 +13,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 export interface Bank {
@@ -321,6 +321,7 @@ export function PaymentMethodSheet({
             toast.error(
                 'Por favor complete los campos obligatorios del método de pago.',
             );
+
             return;
         }
 
@@ -1304,7 +1305,9 @@ interface PaymentResumeProps {
 }
 
 export function PaymentResume({ data, banks, className }: PaymentResumeProps) {
-    if (!data.payment_type) return null;
+    if (!data.payment_type) {
+        return null;
+    }
 
     const label = getPaymentTypeLabel(data.payment_type);
 
