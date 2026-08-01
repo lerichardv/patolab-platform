@@ -613,7 +613,7 @@ class CreditController extends Controller
         });
 
         return redirect()->back()->with([
-            'success' => $isSocialSecurity ? 'Factura para seguro social generada con éxito.' : 'Pago de crédito registrado con éxito.',
+            'success' => $isSocialSecurity ? 'Factura para seguro generada con éxito.' : 'Pago de crédito registrado con éxito.',
             'new_invoice_id' => $invoice->id,
             'new_invoice_url' => asset('storage/'.$invoice->invoice_file),
         ]);
