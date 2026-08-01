@@ -789,7 +789,8 @@ export default function CuttingForm({
                             Nuevo Corte
                         </Label>
                         <p className="text-xs text-muted-foreground">
-                            Marcar si este corte es un nuevo corte adicional al original.
+                            Marcar si este corte es un nuevo corte adicional al
+                            original.
                         </p>
                     </div>
                     <Switch

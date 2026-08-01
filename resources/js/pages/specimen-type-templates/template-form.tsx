@@ -726,7 +726,9 @@ export default function TemplateForm({
                                                                                 ) =>
                                                                                     setData(
                                                                                         'open_text_label',
-                                                                                        e.target.value,
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
                                                                                     )
                                                                                 }
                                                                                 className="w-full border-b border-slate-300 bg-transparent px-1 py-0.5 text-sm font-bold tracking-tight text-slate-800 focus:border-primary focus:outline-hidden dark:text-slate-200"
@@ -1077,26 +1079,20 @@ export default function TemplateForm({
                         </Droppable>
                     </DragDropContext>
 
-                    <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                    <div className="mt-8 space-y-3 border-t border-slate-200 pt-6 dark:border-slate-800">
                         <div className="flex items-center justify-between py-0.5 pr-2 transition-colors select-none">
                             <div className="flex items-center gap-1.5">
-                                <FileText className="h-4 w-4 text-violet-500 shrink-0" />
+                                <FileText className="h-4 w-4 shrink-0 text-violet-500" />
                                 <h3 className="text-sm font-bold tracking-tight text-slate-800 dark:text-slate-200">
                                     Plantilla de Addendum
                                 </h3>
                             </div>
                             <TooltipProvider>
                                 <Tooltip>
-                                    <TooltipTrigger
-                                        asChild
-                                    >
+                                    <TooltipTrigger asChild>
                                         <div
                                             className="flex items-center gap-1.5"
-                                            onClick={(
-                                                e,
-                                            ) =>
-                                                e.stopPropagation()
-                                            }
+                                            onClick={(e) => e.stopPropagation()}
                                         >
                                             <Switch
                                                 id="toggle-addendum_html"
@@ -1105,9 +1101,7 @@ export default function TemplateForm({
                                                         'addendum_html'
                                                     ] ?? true
                                                 }
-                                                onCheckedChange={(
-                                                    v,
-                                                ) =>
+                                                onCheckedChange={(v) =>
                                                     setData(
                                                         'headings_toggles',
                                                         {
@@ -1123,8 +1117,7 @@ export default function TemplateForm({
                                     <TooltipContent side="top">
                                         {(data.headings_toggles?.[
                                             'addendum_html'
-                                        ] ??
-                                        true)
+                                        ] ?? true)
                                             ? 'Ocultar título en PDF'
                                             : 'Mostrar título en PDF'}
                                     </TooltipContent>
@@ -1133,24 +1126,9 @@ export default function TemplateForm({
                         </div>
 
                         <RichTextEditorArea
-                            content={
-                                data.addendum_html
-                            }
-                            onChange={(
-                                html,
-                            ) =>
-                                setData(
-                                    'addendum_html',
-                                    html,
-                                )
-                            }
-                            onFocus={(
-                                editor,
-                            ) =>
-                                setActiveEditor(
-                                    editor,
-                                )
-                            }
+                            content={data.addendum_html}
+                            onChange={(html) => setData('addendum_html', html)}
+                            onFocus={(editor) => setActiveEditor(editor)}
                             onBlur={() => {}}
                             field="addendum"
                             label=""

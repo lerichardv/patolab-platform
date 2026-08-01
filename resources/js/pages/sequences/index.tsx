@@ -250,7 +250,10 @@ export default function SequencesIndex({
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-xs">
-                                                {String(new Date().getMonth() + 1).padStart(2, '0')} / {new Date().getFullYear()}
+                                                {String(
+                                                    new Date().getMonth() + 1,
+                                                ).padStart(2, '0')}{' '}
+                                                / {new Date().getFullYear()}
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right">

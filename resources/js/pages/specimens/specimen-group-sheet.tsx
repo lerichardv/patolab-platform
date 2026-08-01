@@ -22,6 +22,11 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
+import {
+    PaymentMethodSheet,
+    getPaymentTypeLabel,
+} from '../invoices/payment-method-sheet';
+import type { PaymentData } from '../invoices/payment-method-sheet';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
@@ -1262,149 +1267,6 @@ export default function SpecimenGroupSheet({
         isPaymentSheetOpen,
     ]);
 
-    const handleSavePaymentDetails = () => {
-        // Validate local payment inputs
-        if (!paymentType) {
-            toast.error('Seleccione el tipo de pago.');
-
-            return;
-        }
-
-        if (
-            paymentType === 'cash' &&
-            (!cashValue || parseFloat(cashValue) <= 0)
-        ) {
-            toast.error('Ingrese el monto en efectivo recibido.');
-
-            return;
-        }
-
-        if (paymentType === 'check') {
-            if (!checkNumber) {
-                toast.error('Ingrese el número de cheque.');
-
-                return;
-            }
-
-            if (!checkValue || parseFloat(checkValue) <= 0) {
-                toast.error('Ingrese el valor del cheque.');
-
-                return;
-            }
-        }
-
-        if (paymentType === 'credit card') {
-            if (!cardLast4 || cardLast4.length !== 4) {
-                toast.error('Ingrese los últimos 4 dígitos de la tarjeta.');
-
-                return;
-            }
-
-            if (
-                !cardExpiration ||
-                !/^(0[1-9]|1[0-2])\/\d{2}(\d{2})?$/.test(cardExpiration)
-            ) {
-                toast.error('Ingrese la fecha de vencimiento (MM/AA).');
-
-                return;
-            }
-
-            if (!cardAuthorizationCode) {
-                toast.error('Ingrese el código de autorización.');
-
-                return;
-            }
-
-            if (!cardValueCharged || parseFloat(cardValueCharged) <= 0) {
-                toast.error('Ingrese el valor cobrado.');
-
-                return;
-            }
-        }
-
-        if (paymentType === 'bank transfer') {
-            if (!transferBankId) {
-                toast.error('Seleccione el banco receptor.');
-
-                return;
-            }
-
-            if (!transferAuthorizationCode) {
-                toast.error('Ingrese el código de transferencia.');
-
-                return;
-            }
-
-            if (!transferValue || parseFloat(transferValue) <= 0) {
-                toast.error('Ingrese el valor transferido.');
-
-                return;
-            }
-        }
-
-        if (paymentType === 'credit' && hasInitialPayment) {
-            const initialAmt = parseFloat(initialPaymentAmount) || 0;
-
-            if (initialAmt <= 0) {
-                toast.error('Ingrese el monto de pago inicial.');
-
-                return;
-            }
-
-            if (initialAmt > finalSubtotalVal) {
-                toast.error('El pago inicial no puede superar el subtotal.');
-
-                return;
-            }
-
-            if (initialPaymentType === 'check' && !checkNumber) {
-                toast.error('Ingrese el número de cheque.');
-
-                return;
-            }
-
-            if (initialPaymentType === 'credit card') {
-                if (!cardLast4 || cardLast4.length !== 4) {
-                    toast.error('Ingrese los últimos 4 dígitos de la tarjeta.');
-
-                    return;
-                }
-
-                if (
-                    !cardExpiration ||
-                    !/^(0[1-9]|1[0-2])\/\d{2}(\d{2})?$/.test(cardExpiration)
-                ) {
-                    toast.error('Ingrese la fecha de vencimiento (MM/AA).');
-
-                    return;
-                }
-
-                if (!cardAuthorizationCode) {
-                    toast.error('Ingrese el código de autorización.');
-
-                    return;
-                }
-            }
-
-            if (initialPaymentType === 'bank transfer') {
-                if (!transferBankId) {
-                    toast.error('Seleccione el banco.');
-
-                    return;
-                }
-
-                if (!transferAuthorizationCode) {
-                    toast.error('Ingrese la referencia/código.');
-
-                    return;
-                }
-            }
-        }
-
-        setIsPaymentSheetOpen(false);
-        toast.success('Método de pago configurado.');
-    };
-
     // Form submit handler
     const handleSubmitGroup = (e: React.FormEvent) => {
         e.preventDefault();
@@ -1556,23 +1418,6 @@ export default function SpecimenGroupSheet({
                 );
             },
         });
-    };
-
-    const getPaymentTypeLabel = (type: string) => {
-        switch (type) {
-            case 'cash':
-                return 'Efectivo';
-            case 'credit card':
-                return 'Tarjeta de Crédito';
-            case 'bank transfer':
-                return 'Transferencia Bancaria';
-            case 'check':
-                return 'Cheque';
-            case 'credit':
-                return 'Al Crédito';
-            default:
-                return type || 'Sin seleccionar';
-        }
     };
 
     return (
@@ -3887,594 +3732,63 @@ export default function SpecimenGroupSheet({
                     </AlertDialog>
 
                     {/* Payment Details Configuration Sheet */}
-                    <Sheet
+                    <PaymentMethodSheet
                         open={isPaymentSheetOpen}
                         onOpenChange={setIsPaymentSheetOpen}
-                    >
-                        <SheetContent
-                            side="right"
-                            className="z-[95] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                            overlayClassName="z-[95]"
-                        >
-                            <HeadingSheet
-                                title="Método de Pago (Grupo)"
-                                description="Configure el método de pago e ingrese la información fiscal requerida para facturar."
-                            />
-                            <div className="mt-6 flex flex-col gap-6 px-5 pb-6">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="group_payment_type">
-                                        Tipo de Pago{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Select
-                                        value={paymentType}
-                                        onValueChange={(val) => {
-                                            setPaymentType(val);
-
-                                            if (val === 'credit') {
-                                                setHasInitialPayment(false);
-                                            }
-
-                                            resetDetailedPayments();
-                                        }}
-                                    >
-                                        <SelectTrigger
-                                            id="group_payment_type"
-                                            className="w-full"
-                                        >
-                                            <SelectValue placeholder="Seleccione el tipo de pago" />
-                                        </SelectTrigger>
-                                        <SelectContent className="z-[110]">
-                                            <SelectItem value="cash">
-                                                Efectivo
-                                            </SelectItem>
-                                            <SelectItem value="credit card">
-                                                Tarjeta de Crédito
-                                            </SelectItem>
-                                            <SelectItem value="bank transfer">
-                                                Transferencia Bancaria
-                                            </SelectItem>
-                                            <SelectItem value="check">
-                                                Cheque
-                                            </SelectItem>
-                                            <SelectItem value="credit">
-                                                Al Crédito
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {paymentType !== 'credit' &&
-                                    paymentType !== '' && (
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="group_payment_date">
-                                                Fecha de Pago
-                                            </Label>
-                                            <Input
-                                                id="group_payment_date"
-                                                type="date"
-                                                value={paymentMethodDate}
-                                                onChange={(e) =>
-                                                    setPaymentMethodDate(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                    )}
-
-                                {paymentType === 'cash' && (
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="group_cash_value">
-                                            Efectivo Recibido (L.){' '}
-                                            <span className="text-destructive">
-                                                *
-                                            </span>
-                                        </Label>
-                                        <Input
-                                            id="group_cash_value"
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="0.00"
-                                            value={cashValue}
-                                            onChange={(e) =>
-                                                setCashValue(e.target.value)
-                                            }
-                                        />
-                                    </div>
-                                )}
-
-                                {paymentType === 'check' && (
-                                    <div className="space-y-4">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="group_check_number">
-                                                Número de Cheque{' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Input
-                                                id="group_check_number"
-                                                type="text"
-                                                placeholder="Ej. 100234"
-                                                value={checkNumber}
-                                                onChange={(e) =>
-                                                    setCheckNumber(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="group_check_value">
-                                                Valor del Cheque (L.){' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Input
-                                                id="group_check_value"
-                                                type="number"
-                                                step="0.01"
-                                                placeholder="0.00"
-                                                value={checkValue}
-                                                onChange={(e) =>
-                                                    setCheckValue(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {paymentType === 'credit card' && (
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="group_card_last_4">
-                                                    Últimos 4 Dígitos{' '}
-                                                    <span className="text-destructive">
-                                                        *
-                                                    </span>
-                                                </Label>
-                                                <Input
-                                                    id="group_card_last_4"
-                                                    type="text"
-                                                    maxLength={4}
-                                                    placeholder="1234"
-                                                    value={cardLast4}
-                                                    onChange={(e) =>
-                                                        setCardLast4(
-                                                            e.target.value.replace(
-                                                                /\D/g,
-                                                                '',
-                                                            ),
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="group_card_expiration">
-                                                    Vencimiento (MM/AA){' '}
-                                                    <span className="text-destructive">
-                                                        *
-                                                    </span>
-                                                </Label>
-                                                <Input
-                                                    id="group_card_expiration"
-                                                    type="text"
-                                                    placeholder="12/26"
-                                                    value={cardExpiration}
-                                                    onChange={(e) => {
-                                                        const cleaned =
-                                                            e.target.value.replace(
-                                                                /\D/g,
-                                                                '',
-                                                            );
-                                                        let formatted = cleaned;
-
-                                                        if (
-                                                            cleaned.length > 2
-                                                        ) {
-                                                            formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}`;
-                                                        }
-
-                                                        setCardExpiration(
-                                                            formatted,
-                                                        );
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="group_card_auth">
-                                                Código de Autorización{' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Input
-                                                id="group_card_auth"
-                                                type="text"
-                                                placeholder="Ej. 900234"
-                                                value={cardAuthorizationCode}
-                                                onChange={(e) =>
-                                                    setCardAuthorizationCode(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="group_card_charged">
-                                                Monto a Cobrar (L.){' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Input
-                                                id="group_card_charged"
-                                                type="number"
-                                                step="0.01"
-                                                placeholder="0.00"
-                                                value={cardValueCharged}
-                                                onChange={(e) =>
-                                                    setCardValueCharged(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {paymentType === 'bank transfer' && (
-                                    <div className="space-y-4">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="group_transfer_bank">
-                                                Banco Receptor{' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Select
-                                                value={transferBankId}
-                                                onValueChange={
-                                                    setTransferBankId
-                                                }
-                                            >
-                                                <SelectTrigger
-                                                    id="group_transfer_bank"
-                                                    className="w-full"
-                                                >
-                                                    <SelectValue placeholder="Seleccione el banco" />
-                                                </SelectTrigger>
-                                                <SelectContent className="z-[110]">
-                                                    {banks.map((b) => (
-                                                        <SelectItem
-                                                            key={b.id}
-                                                            value={b.id.toString()}
-                                                        >
-                                                            {b.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="group_transfer_auth">
-                                                Código de Autorización /
-                                                Referencia{' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Input
-                                                id="group_transfer_auth"
-                                                type="text"
-                                                placeholder="Ej. TX-102934"
-                                                value={
-                                                    transferAuthorizationCode
-                                                }
-                                                onChange={(e) =>
-                                                    setTransferAuthorizationCode(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="group_transfer_value">
-                                                Monto Transferido (L.){' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Input
-                                                id="group_transfer_value"
-                                                type="number"
-                                                step="0.01"
-                                                placeholder="0.00"
-                                                value={transferValue}
-                                                onChange={(e) =>
-                                                    setTransferValue(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {paymentType === 'credit' && (
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-4">
-                                            <div className="flex flex-col gap-0.5">
-                                                <Label className="cursor-pointer text-xs font-semibold">
-                                                    Registrar pago inicial /
-                                                    prima
-                                                </Label>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    Si el cliente abona una
-                                                    parte del saldo hoy
-                                                </span>
-                                            </div>
-                                            <Switch
-                                                checked={hasInitialPayment}
-                                                onCheckedChange={(checked) => {
-                                                    setHasInitialPayment(
-                                                        checked,
-                                                    );
-
-                                                    if (!checked) {
-                                                        setInitialPaymentAmount(
-                                                            '',
-                                                        );
-                                                        resetDetailedPayments();
-                                                    }
-                                                }}
-                                            />
-                                        </div>
-
-                                        {hasInitialPayment && (
-                                            <div className="space-y-4 border-t pt-2">
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="group_initial_amount">
-                                                        Monto de Pago Inicial
-                                                        (L.){' '}
-                                                        <span className="text-destructive">
-                                                            *
-                                                        </span>
-                                                    </Label>
-                                                    <Input
-                                                        id="group_initial_amount"
-                                                        type="number"
-                                                        step="0.01"
-                                                        placeholder="0.00"
-                                                        value={
-                                                            initialPaymentAmount
-                                                        }
-                                                        onChange={(e) =>
-                                                            setInitialPaymentAmount(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="group_initial_type">
-                                                        Tipo de Pago Inicial{' '}
-                                                        <span className="text-destructive">
-                                                            *
-                                                        </span>
-                                                    </Label>
-                                                    <Select
-                                                        value={
-                                                            initialPaymentType
-                                                        }
-                                                        onValueChange={(
-                                                            val,
-                                                        ) => {
-                                                            setInitialPaymentType(
-                                                                val,
-                                                            );
-                                                            resetDetailedPayments();
-                                                        }}
-                                                    >
-                                                        <SelectTrigger
-                                                            id="group_initial_type"
-                                                            className="w-full"
-                                                        >
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent className="z-[110]">
-                                                            <SelectItem value="cash">
-                                                                Efectivo
-                                                            </SelectItem>
-                                                            <SelectItem value="credit card">
-                                                                Tarjeta de
-                                                                Crédito
-                                                            </SelectItem>
-                                                            <SelectItem value="bank transfer">
-                                                                Transferencia
-                                                                Bancaria
-                                                            </SelectItem>
-                                                            <SelectItem value="check">
-                                                                Cheque
-                                                            </SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-
-                                                {initialPaymentType ===
-                                                    'check' && (
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor="group_check_number">
-                                                            Número de Cheque{' '}
-                                                            <span className="text-destructive">
-                                                                *
-                                                            </span>
-                                                        </Label>
-                                                        <Input
-                                                            id="group_check_number"
-                                                            type="text"
-                                                            placeholder="Ej. 100234"
-                                                            value={checkNumber}
-                                                            onChange={(e) =>
-                                                                setCheckNumber(
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                        />
-                                                    </div>
-                                                )}
-
-                                                {initialPaymentType ===
-                                                    'credit card' && (
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="group_card_last_4">
-                                                                Últimos 4
-                                                                Dígitos{' '}
-                                                                <span className="text-destructive">
-                                                                    *
-                                                                </span>
-                                                            </Label>
-                                                            <Input
-                                                                id="group_card_last_4"
-                                                                type="text"
-                                                                maxLength={4}
-                                                                placeholder="1234"
-                                                                value={
-                                                                    cardLast4
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setCardLast4(
-                                                                        e.target.value.replace(
-                                                                            /\D/g,
-                                                                            '',
-                                                                        ),
-                                                                    )
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="group_card_auth">
-                                                                Autorización{' '}
-                                                                <span className="text-destructive">
-                                                                    *
-                                                                </span>
-                                                            </Label>
-                                                            <Input
-                                                                id="group_card_auth"
-                                                                type="text"
-                                                                placeholder="Ej. 900234"
-                                                                value={
-                                                                    cardAuthorizationCode
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setCardAuthorizationCode(
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {initialPaymentType ===
-                                                    'bank transfer' && (
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="group_transfer_bank">
-                                                                Banco{' '}
-                                                                <span className="text-destructive">
-                                                                    *
-                                                                </span>
-                                                            </Label>
-                                                            <Select
-                                                                value={
-                                                                    transferBankId
-                                                                }
-                                                                onValueChange={
-                                                                    setTransferBankId
-                                                                }
-                                                            >
-                                                                <SelectTrigger
-                                                                    id="group_transfer_bank"
-                                                                    className="w-full"
-                                                                >
-                                                                    <SelectValue />
-                                                                </SelectTrigger>
-                                                                <SelectContent className="z-[110]">
-                                                                    {banks.map(
-                                                                        (b) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    b.id
-                                                                                }
-                                                                                value={b.id.toString()}
-                                                                            >
-                                                                                {
-                                                                                    b.name
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="group_transfer_auth">
-                                                                Referencia{' '}
-                                                                <span className="text-destructive">
-                                                                    *
-                                                                </span>
-                                                            </Label>
-                                                            <Input
-                                                                id="group_transfer_auth"
-                                                                type="text"
-                                                                placeholder="TX-1029"
-                                                                value={
-                                                                    transferAuthorizationCode
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setTransferAuthorizationCode(
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                <div className="mt-4 flex justify-end gap-3 border-t pt-6">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() =>
-                                            setIsPaymentSheetOpen(false)
-                                        }
-                                    >
-                                        Cancelar
-                                    </Button>
-                                    <Button onClick={handleSavePaymentDetails}>
-                                        Guardar
-                                    </Button>
-                                </div>
-                            </div>
-                        </SheetContent>
-                    </Sheet>
+                        banks={banks}
+                        totalAmount={finalSubtotalVal}
+                        paymentData={{
+                            payment_type: paymentType,
+                            payment_method_date: paymentMethodDate,
+                            cash_value: cashValue,
+                            check_number: checkNumber,
+                            check_value: checkValue,
+                            card_last_4: cardLast4,
+                            card_value_charged: cardValueCharged,
+                            card_expiration: cardExpiration,
+                            card_authorization_code: cardAuthorizationCode,
+                            transfer_bank_id: transferBankId,
+                            transfer_value: transferValue,
+                            transfer_authorization_code:
+                                transferAuthorizationCode,
+                            has_initial_payment: hasInitialPayment,
+                            initial_payment_amount: initialPaymentAmount,
+                            initial_payment_type: initialPaymentType,
+                        }}
+                        onSave={(paymentData: PaymentData) => {
+                            setPaymentType(paymentData.payment_type);
+                            setPaymentMethodDate(
+                                paymentData.payment_method_date,
+                            );
+                            setCashValue(paymentData.cash_value);
+                            setCheckNumber(paymentData.check_number);
+                            setCheckValue(paymentData.check_value);
+                            setCardLast4(paymentData.card_last_4);
+                            setCardValueCharged(paymentData.card_value_charged);
+                            setCardExpiration(paymentData.card_expiration);
+                            setCardAuthorizationCode(
+                                paymentData.card_authorization_code,
+                            );
+                            setTransferBankId(paymentData.transfer_bank_id);
+                            setTransferValue(paymentData.transfer_value);
+                            setTransferAuthorizationCode(
+                                paymentData.transfer_authorization_code,
+                            );
+                            setHasInitialPayment(
+                                paymentData.has_initial_payment,
+                            );
+                            setInitialPaymentAmount(
+                                paymentData.initial_payment_amount,
+                            );
+                            setInitialPaymentType(
+                                paymentData.initial_payment_type,
+                            );
+                            setIsPaymentSheetOpen(false);
+                            toast.success('Método de pago configurado.');
+                        }}
+                        className="z-[95]"
+                        overlayClassName="z-[95]"
+                    />
 
                     {/* On-the-fly sheets for nested creation */}
                     <Sheet

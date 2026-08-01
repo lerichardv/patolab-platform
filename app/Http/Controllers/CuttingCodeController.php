@@ -23,7 +23,8 @@ class CuttingCodeController extends Controller
             $query->where('code', 'like', "%{$search}%");
         }
 
-        $cuttingCodes = $query->orderBy('code', 'asc')
+        $cuttingCodes = $query->orderByRaw('LENGTH(code) asc')
+            ->orderBy('code', 'asc')
             ->paginate(10)
             ->withQueryString();
 

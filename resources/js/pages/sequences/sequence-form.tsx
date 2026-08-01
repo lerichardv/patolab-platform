@@ -262,9 +262,13 @@ export default function SequenceForm({
 
             <Alert className="border-blue-200 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-950/20">
                 <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <AlertTitle className="text-blue-800 dark:text-blue-300 font-semibold">Información</AlertTitle>
+                <AlertTitle className="font-semibold text-blue-800 dark:text-blue-300">
+                    Información
+                </AlertTitle>
                 <AlertDescription className="text-blue-700 dark:text-blue-400">
-                    El mes y el año se asignarán automáticamente utilizando el mes y año actuales al momento de generar el número de secuencia para la muestra.
+                    El mes y el año se asignarán automáticamente utilizando el
+                    mes y año actuales al momento de generar el número de
+                    secuencia para la muestra.
                 </AlertDescription>
             </Alert>
 

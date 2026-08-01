@@ -314,7 +314,7 @@ class ReportEditorController extends Controller
             ],
             'pathologists' => $pathologists,
             'products' => $products,
-            'cutting_codes' => CuttingCode::all(),
+            'cutting_codes' => CuttingCode::orderByRaw('LENGTH(code) asc')->orderBy('code', 'asc')->get(),
             'cutting_slide_types' => WorkOrderType::all(),
             'users' => User::where('active', true)->select('id', 'name')->get(),
         ]);
