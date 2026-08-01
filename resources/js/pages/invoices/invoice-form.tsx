@@ -736,29 +736,7 @@ export default function InvoiceForm({
         }, 0);
     }, [isGroupInvoice, data.group_specimens]);
 
-    const totalSpecimenDiscount = React.useMemo(() => {
-        if (!isGroupInvoice || !data.group_specimens) {
-            return 0;
-        }
-
-        return data.group_specimens.reduce((sum: number, gs: any) => {
-            const priceVal =
-                gs.selected_price === 'custom'
-                    ? parseFloat(gs.custom_specimen_price) || 0
-                    : parseFloat(gs.selected_price) || 0;
-            const basePrice = Math.max(gs.max_price || 0, priceVal);
-            const diff = Math.max(0, basePrice - priceVal);
-            const ageDisc = parseFloat(gs.age_discount_amount) || 0;
-            const addDisc = gs.additional_discount_enabled
-                ? parseFloat(gs.additional_discount) || 0
-                : 0;
-            const qty = gs.quantity || 1;
-
-            return sum + (diff + ageDisc + addDisc) * qty;
-        }, 0);
-    }, [isGroupInvoice, data.group_specimens]);
-
-    // Auto-calculate specimen discount
+    // Auto-calculate specimen discount (Rate / Category discount)
     const specimenDiscountVal = React.useMemo(() => {
         if (hasSpecimen) {
             return (
@@ -766,7 +744,21 @@ export default function InvoiceForm({
                 quantityVal
             );
         } else if (isGroupInvoice) {
-            return totalSpecimenDiscount;
+            if (!data.group_specimens) {
+                return 0;
+            }
+
+            return data.group_specimens.reduce((sum: number, gs: any) => {
+                const priceVal =
+                    gs.selected_price === 'custom'
+                        ? parseFloat(gs.custom_specimen_price) || 0
+                        : parseFloat(gs.selected_price) || 0;
+                const basePrice = Math.max(gs.max_price || 0, priceVal);
+                const diff = Math.max(0, basePrice - priceVal);
+                const qty = gs.quantity || 1;
+
+                return sum + diff * qty;
+            }, 0);
         }
 
         return 0;
@@ -776,22 +768,29 @@ export default function InvoiceForm({
         baseSpecimenPriceVal,
         selectedPriceVal,
         quantityVal,
-        totalSpecimenDiscount,
+        data.group_specimens,
     ]);
 
     // Auto-calculate age discount
     const ageDiscountVal = React.useMemo(() => {
+        if (isGroupInvoice) {
+            if (!data.group_specimens) {
+                return 0;
+            }
+
+            return data.group_specimens.reduce((sum: number, gs: any) => {
+                const ageDisc = parseFloat(gs.age_discount_amount) || 0;
+                const qty = gs.quantity || 1;
+
+                return sum + ageDisc * qty;
+            }, 0);
+        }
+
         const basePrice = hasSpecimen
             ? selectedPriceVal
-            : isGroupInvoice
-              ? totalSpecimenAmount
-              : parseFloat(data.amount) || 0;
+            : parseFloat(data.amount) || 0;
 
-        const qty = hasSpecimen
-            ? quantityVal
-            : isGroupInvoice
-              ? 1
-              : quantityVal;
+        const qty = quantityVal;
 
         if (data.age_discount_type === 'third') {
             return ((basePrice * thirdAgePercent) / 100) * qty;
@@ -804,12 +803,12 @@ export default function InvoiceForm({
         hasSpecimen,
         isGroupInvoice,
         selectedPriceVal,
-        totalSpecimenAmount,
         data.amount,
         data.age_discount_type,
         thirdAgePercent,
         fourthAgePercent,
         quantityVal,
+        data.group_specimens,
     ]);
 
     const autoDiscountTotal = specimenDiscountVal + ageDiscountVal;
@@ -853,10 +852,33 @@ export default function InvoiceForm({
         setData,
     ]);
 
-    // Reactively update total discount in form data
-    const additionalDiscountVal = data.additional_discount_enabled
-        ? parseFloat(data.additional_discount) || 0
-        : 0;
+    // Auto-calculate additional discount
+    const additionalDiscountVal = React.useMemo(() => {
+        if (isGroupInvoice) {
+            if (!data.group_specimens) {
+                return 0;
+            }
+
+            return data.group_specimens.reduce((sum: number, gs: any) => {
+                const addDisc = gs.additional_discount_enabled
+                    ? parseFloat(gs.additional_discount) || 0
+                    : 0;
+                const qty = gs.quantity || 1;
+
+                return sum + addDisc * qty;
+            }, 0);
+        }
+
+        return data.additional_discount_enabled
+            ? parseFloat(data.additional_discount) || 0
+            : 0;
+    }, [
+        isGroupInvoice,
+        data.group_specimens,
+        data.additional_discount_enabled,
+        data.additional_discount,
+    ]);
+
     const totalDiscountVal = autoDiscountTotal + additionalDiscountVal;
 
     useEffect(() => {
