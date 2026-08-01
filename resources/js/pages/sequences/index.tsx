@@ -149,8 +149,8 @@ export default function SequencesIndex({
     const formatPreview = (sequence: any) => {
         const fill = sequence.fill || 4;
         const seq = String(sequence.current_sequence).padStart(fill, '0');
-        const month = String(sequence.month).padStart(2, '0');
-        const year = String(sequence.year); // Full 4-digit year
+        const month = String(new Date().getMonth() + 1).padStart(2, '0');
+        const year = String(new Date().getFullYear());
 
         return `${sequence.prefix}${sequence.separator}${seq}${sequence.separator}${month}${sequence.separator}${year}`;
     };
@@ -250,10 +250,7 @@ export default function SequencesIndex({
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-xs">
-                                                {String(
-                                                    sequence.month,
-                                                ).padStart(2, '0')}{' '}
-                                                / {sequence.year}
+                                                {String(new Date().getMonth() + 1).padStart(2, '0')} / {new Date().getFullYear()}
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right">

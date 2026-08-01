@@ -203,10 +203,12 @@ class InvoiceController extends Controller
         $activeLocationId = $activeCai ? $activeCai->location_id : null;
         $sequences = Sequence::where('active', true)->get()->map(function ($sequence) {
             $tempSequence = clone $sequence;
+            $currentMonth = now()->format('m');
+            $currentYear = now()->format('Y');
             do {
                 $paddedSeq = str_pad($tempSequence->current_sequence, $tempSequence->fill ?? 4, '0', STR_PAD_LEFT);
-                $paddedMonth = str_pad($tempSequence->month, 2, '0', STR_PAD_LEFT);
-                $sequenceCode = $tempSequence->prefix.$tempSequence->separator.$paddedSeq.$tempSequence->separator.$paddedMonth.$tempSequence->separator.$tempSequence->year;
+                $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
+                $sequenceCode = $tempSequence->prefix.$tempSequence->separator.$paddedSeq.$tempSequence->separator.$paddedMonth.$tempSequence->separator.$currentYear;
 
                 $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
                 if ($exists) {

@@ -17,6 +17,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
 
 interface Location {
     id: number;
@@ -142,8 +144,8 @@ export default function SequenceForm({
     const formatPreview = () => {
         const fill = data.fill || 4;
         const seq = String(data.current_sequence).padStart(fill, '0');
-        const month = String(data.month).padStart(2, '0');
-        const year = String(data.year);
+        const month = String(new Date().getMonth() + 1).padStart(2, '0');
+        const year = String(new Date().getFullYear());
         const prefix = data.prefix || '...';
         const separator = data.separator || '';
 
@@ -258,13 +260,13 @@ export default function SequenceForm({
                 <InputError message={errors.fill} />
             </div>
 
-            <div className="rounded-lg border border-accent bg-accent/50 p-3 text-sm text-muted-foreground">
-                <p>
-                    <strong>Nota:</strong> El mes y el año se asignarán
-                    automáticamente según la fecha actual al momento de generar
-                    el número de secuencia para la muestra.
-                </p>
-            </div>
+            <Alert className="border-blue-200 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-950/20">
+                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <AlertTitle className="text-blue-800 dark:text-blue-300 font-semibold">Información</AlertTitle>
+                <AlertDescription className="text-blue-700 dark:text-blue-400">
+                    El mes y el año se asignarán automáticamente utilizando el mes y año actuales al momento de generar el número de secuencia para la muestra.
+                </AlertDescription>
+            </Alert>
 
             <div className="space-y-2">
                 <Label htmlFor="current_sequence">Secuencia Actual *</Label>

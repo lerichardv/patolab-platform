@@ -20,12 +20,14 @@ use App\Models\User;
 use App\Services\InvoicePdfService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 uses(RefreshDatabase::class);
 
 test('specimen sequence code and current sequence update when specimen type is changed', function () {
+    Carbon::setTestNow('2026-07-15');
     // 1. Setup role and permissions
     $editRole = Role::create(['slug' => 'admin', 'name' => 'Admin']);
     // Give all permissions (or bypass with Gate/auth)
@@ -159,6 +161,8 @@ test('specimen sequence code and current sequence update when specimen type is c
     // Verify Sequence 2's current_sequence was incremented
     $sequence2->refresh();
     expect($sequence2->current_sequence)->toBe(6);
+
+    Carbon::setTestNow();
 });
 
 test('specimen payment type change from credit to cash is successful when credit has no payments', function () {
