@@ -256,9 +256,7 @@ const getDueDateInfo = (wo: WorkOrder) => {
 
     const isExpired = isPast(dueDate);
     const isWithinOneDay =
-        dueDateFormatted.includes('1 día') ||
-        dueDateFormatted.includes('hora') ||
-        dueDateFormatted.includes('minuto');
+        !isExpired && (dueDate.getTime() - Date.now()) <= 24 * 60 * 60 * 1000;
 
     let colorClass =
         'bg-secondary text-secondary-foreground border-transparent';
