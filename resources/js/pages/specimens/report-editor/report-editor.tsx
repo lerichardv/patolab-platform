@@ -3536,18 +3536,16 @@ function PatientMetadataCard({ specimen }: { specimen: Specimen }) {
 						{specimen.referrer_relation.notes || 'HDV'}
 						<br />
 						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
-							Fecha de la Toma:
+							Fecha de Recibo:
 						</strong>{' '}
 						{new Date(specimen.created_at).toLocaleDateString(
 							'es-HN',
 						)}
 						<br />
 						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
-							Fecha de Recibo:
+							Sitio Anatómico:
 						</strong>{' '}
-						{new Date(specimen.created_at).toLocaleDateString(
-							'es-HN',
-						)}
+						{specimen.anatomic_site || 'N/A'}
 					</td>
 				</tr>
 			</tbody>
