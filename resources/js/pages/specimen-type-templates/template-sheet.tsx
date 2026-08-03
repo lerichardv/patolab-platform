@@ -1,48 +1,14 @@
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import TemplateForm from './template-form';
-
-interface User {
-    id: number;
-    name: string;
-    email: string;
-}
-
-interface SpecimenTypeExamination {
-    id: number;
-    name: string;
-}
-
-interface SpecimenType {
-    id: number;
-    name: string;
-    examinations: SpecimenTypeExamination[];
-}
-
-interface SectionsOrderElement {
-    key: string;
-    order: number;
-    active: boolean;
-}
-
-interface Template {
-    id: number;
-    user_id: number;
-    specimen_type_id: number;
-    specimen_type_examination_id: number;
-    clinical_details_html: string | null;
-    diagnosis_html: string | null;
-    macroscopy_html: string | null;
-    microscopy_html: string | null;
-    comments_notes_html: string | null;
-    protocols_html: string | null;
-    legend_html: string | null;
-    open_text_html: string | null;
-    open_text_label: string | null;
-    addendum_html: string | null;
-    sections_order?: SectionsOrderElement[] | null;
-    headings_toggles?: Record<string, boolean> | null;
-}
+import TemplateForm, {
+    Template,
+    SpecimenType,
+    User,
+} from '@/components/template-form';
+import {
+    store as storeTemplate,
+    update as updateTemplate,
+} from '@/actions/App/Http/Controllers/SpecimenTypeTemplateController';
 
 interface Props {
     template: Template | null;
@@ -76,6 +42,8 @@ export default function TemplateSheet({
                         specimenTypes={specimenTypes}
                         users={users}
                         onSuccess={() => onOpenChange(false)}
+                        storeAction={storeTemplate}
+                        updateAction={updateTemplate}
                     />
                 </div>
             </SheetContent>
