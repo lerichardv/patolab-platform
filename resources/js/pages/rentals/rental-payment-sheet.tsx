@@ -4,13 +4,6 @@ import {
     Upload,
     X,
     Plus,
-    ChevronsUpDown,
-    Check,
-    Calendar,
-    Wallet,
-    CreditCard,
-    Landmark,
-    Receipt,
 } from 'lucide-react';
 import type { FormEventHandler } from 'react';
 import * as React from 'react';
@@ -22,22 +15,9 @@ import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberPicker } from '@/components/ui/number-picker';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
 import {
     Select,
     SelectContent,
@@ -57,16 +37,6 @@ import {
 } from '../invoices/payment-method-sheet';
 import RentalSheet from './rental-sheet';
 
-interface Customer {
-    id: number;
-    name: string;
-    id_number: string;
-    type?: 'cliente' | 'empresa';
-    email?: string | null;
-    phone?: string | null;
-    age?: number | string | null;
-}
-
 interface Bank {
     id: number;
     name: string;
@@ -84,79 +54,6 @@ interface Props {
     onOpenChange: (open: boolean) => void;
     banks: Bank[];
     rentals: Rental[];
-}
-
-function FormCombobox({
-    options,
-    value,
-    onChange,
-    placeholder,
-    emptyMessage = 'No se encontraron resultados.',
-    disabled = false,
-}: {
-    options: { label: string; value: string }[];
-    value: string;
-    onChange: (value: string) => void;
-    placeholder: string;
-    emptyMessage?: string;
-    disabled?: boolean;
-}) {
-    const [open, setOpen] = React.useState(false);
-    const selectedOption = options.find((opt) => opt.value === value);
-
-    return (
-        <Popover open={open} onOpenChange={setOpen} modal={true}>
-            <PopoverTrigger asChild className="w-full">
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-full justify-between text-left font-normal"
-                    disabled={disabled}
-                >
-                    <span className="truncate">
-                        {selectedOption ? selectedOption.label : placeholder}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                className="z-[110] w-[--radix-popover-trigger-width] p-0"
-                align="start"
-            >
-                <Command>
-                    <CommandInput placeholder="Buscar..." />
-                    <CommandList>
-                        <CommandEmpty>{emptyMessage}</CommandEmpty>
-                        <CommandGroup>
-                            {options.map((option) => (
-                                <CommandItem
-                                    key={option.value}
-                                    value={option.label}
-                                    onSelect={() => {
-                                        onChange(option.value);
-                                        setOpen(false);
-                                    }}
-                                >
-                                    <Check
-                                        className={cn(
-                                            'mr-2 h-4 w-4 shrink-0',
-                                            value === option.value
-                                                ? 'opacity-100'
-                                                : 'opacity-0',
-                                        )}
-                                    />
-                                    <span className="truncate">
-                                        {option.label}
-                                    </span>
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
-    );
 }
 
 export default function RentalPaymentSheet({
@@ -184,6 +81,7 @@ export default function RentalPaymentSheet({
         amount: '0.00',
         discount: '0.00',
         payment_type: '',
+        pay_isv: true,
         has_initial_payment: false,
         initial_payment_amount: '',
         initial_payment_type: 'cash',
@@ -224,6 +122,7 @@ export default function RentalPaymentSheet({
                 setData('rental_id', '');
             }
 
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setBaseAmount('0.00');
         }
     }, [open, rental]);
@@ -310,8 +209,8 @@ export default function RentalPaymentSheet({
     // Calculate 15% ISV on the rental subtotal.
     // Business Rule: This 15% ISV is stored in the database's `isv_15` column.
     const isv15Val = useMemo(() => {
-        return rentalSubtotalVal * 0.15;
-    }, [rentalSubtotalVal]);
+        return data.pay_isv ? rentalSubtotalVal * 0.15 : 0;
+    }, [rentalSubtotalVal, data.pay_isv]);
 
     // Subtotal includes the rental subtotal and the custom amount.
     const subtotalVal = useMemo(() => {
@@ -772,6 +671,31 @@ export default function RentalPaymentSheet({
                                 />
                             </div>
                         </div>
+
+                        {/* ISV Switch */}
+                        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex flex-col">
+                                    <Label
+                                        className="cursor-pointer text-xs font-semibold"
+                                        htmlFor="pay_isv"
+                                    >
+                                        Calcular ISV (15%)
+                                    </Label>
+                                    <span className="text-[10px] text-muted-foreground">
+                                        Activar o desactivar el cálculo de
+                                        impuesto sobre ventas
+                                    </span>
+                                </div>
+                                <Switch
+                                    id="pay_isv"
+                                    checked={data.pay_isv}
+                                    onCheckedChange={(checked) => {
+                                        setData('pay_isv', checked);
+                                    }}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     {/* SECTION 3: PAYMENT METHOD */}
@@ -951,7 +875,9 @@ export default function RentalPaymentSheet({
                         )}
                         <div className="flex justify-between border-t pt-1 text-xs">
                             <span className="text-muted-foreground">
-                                Subtotal Gravado (15%):
+                                {data.pay_isv
+                                    ? 'Subtotal Gravado (15%):'
+                                    : 'Subtotal Exento:'}
                             </span>
                             <span>L. {rentalSubtotalVal.toFixed(2)}</span>
                         </div>

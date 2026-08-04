@@ -1,3 +1,6 @@
+/**
+ * This tsx manages Otros Cobros actions, at the begining was called Rentals, but was renamed to be Otros Cobros to suppor other use cases
+ */
 import { Head, router, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';

@@ -57,6 +57,7 @@ class Invoice extends Model
         'invoice_type',
         'rental_id',
         'description',
+        'pay_isv',
     ];
 
     protected $casts = [
@@ -80,6 +81,7 @@ class Invoice extends Model
         'transfer_value' => 'decimal:2',
         'is_group' => 'boolean',
         'quantity' => 'integer',
+        'pay_isv' => 'boolean',
     ];
 
     public function caiRange(): BelongsTo

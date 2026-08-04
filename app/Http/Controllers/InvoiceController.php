@@ -510,6 +510,7 @@ class InvoiceController extends Controller
             'group_specimens.*.age_discount_amount' => 'nullable|numeric|min:0',
             'group_specimens.*.additional_discount_enabled' => 'nullable|boolean',
             'group_specimens.*.additional_discount' => 'nullable|numeric|min:0',
+            'pay_isv' => 'nullable|boolean',
         ]);
 
         if ($request->hasFile('proof_of_payment')) {
@@ -528,10 +529,13 @@ class InvoiceController extends Controller
 
         // Calculate tax/exempt fields based on invoice type
         if ($invoice->invoice_type === 'rental' || $invoice->rental_id) {
+            $payIsv = filter_var($request->input('pay_isv', $invoice->pay_isv ?? true), FILTER_VALIDATE_BOOLEAN);
+            $validated['pay_isv'] = $payIsv;
             $validated['tax_exempt_amount'] = (float) ($validated['custom_amount'] ?? 0.00);
-            $validated['taxable_amount_15'] = (float) $validated['subtotal'];
+            $validated['taxable_amount_15'] = $payIsv ? (float) $validated['subtotal'] : 0.00;
             $validated['taxable_amount_18'] = 0.00;
-            $validated['isv_15'] = round((float) $validated['subtotal'] * 0.15, 2);
+            $validated['exempt_amount'] = $payIsv ? 0.00 : (float) $validated['subtotal'];
+            $validated['isv_15'] = $payIsv ? round((float) $validated['subtotal'] * 0.15, 2) : 0.00;
             $validated['isv_18'] = 0.00;
             $validated['total'] = (float) $validated['subtotal'] + $validated['isv_15'] + $validated['tax_exempt_amount'];
         } else {

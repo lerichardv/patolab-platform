@@ -21,6 +21,9 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Spatie\Browsershot\Browsershot;
 
+/**
+ * This class manages Otros Cobros actions, at the begining was called Rentals, but was renamed to be Otros Cobros to suppor other use cases
+ */
 class RentalController extends Controller
 {
     /**
@@ -182,6 +185,7 @@ class RentalController extends Controller
             'amount' => 'required|numeric|min:0.01',
             'discount' => 'required|numeric|min:0',
             'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
+            'pay_isv' => 'nullable|boolean',
             'has_initial_payment' => 'nullable|boolean',
             'initial_payment_amount' => 'required_if:has_initial_payment,true|nullable|numeric|min:0.01',
             'initial_payment_type' => 'required_if:has_initial_payment,true|nullable|in:cash,credit card,bank transfer,check',
@@ -275,13 +279,14 @@ class RentalController extends Controller
                 $qty = 1;
             }
 
-            // Business Rule: A 15% ISV rate is applied only to the rental subtotal
+            // Business Rule: A 15% ISV rate is optionally applied to the rental subtotal
             // (rental base amount minus discount, excluding the custom extra charge).
-            // This 15% tax is stored in the database's `isv_15` column.
+            // This tax is stored in the database's `isv_15` column.
+            $payIsv = $request->boolean('pay_isv', true);
             $rentalBaseAmount = $amount - $customAmountVal;
             $unitPrice = $rentalBaseAmount / $qty;
             $rentalSubtotal = max(0.00, $rentalBaseAmount - $discount);
-            $isv15 = $rentalSubtotal * 0.15;
+            $isv15 = $payIsv ? ($rentalSubtotal * 0.15) : 0.00;
 
             // Invoice subtotal is rental subtotal plus custom amount (net amount before tax)
             $subtotal = $rentalSubtotal + $customAmountVal;
@@ -325,11 +330,11 @@ class RentalController extends Controller
                 'amount' => $unitPrice,
                 'discount' => $discount,
                 'subtotal' => $subtotal,
-                'exempt_amount' => 0.00,
+                'exempt_amount' => $payIsv ? 0.00 : $rentalSubtotal,
                 'tax_exempt_amount' => $customAmountVal, // custom amount is exempt from ISV
-                'taxable_amount_15' => $rentalSubtotal, // rental subtotal subject to ISV
+                'taxable_amount_15' => $payIsv ? $rentalSubtotal : 0.00, // rental subtotal subject to ISV
                 'taxable_amount_18' => 0.00,
-                'isv_15' => $isv15, // store the calculated 30% ISV here
+                'isv_15' => $isv15, // store the calculated 15% ISV here
                 'isv_18' => 0.00,
                 'total' => $total,
                 'total_paid' => $totalPaid,
@@ -353,6 +358,7 @@ class RentalController extends Controller
                 'invoice_type' => 'rental',
                 'rental_id' => $rentalId,
                 'description' => $validated['description'] ?? null,
+                'pay_isv' => $payIsv,
             ]);
 
             // Increment CAI Range last used number
