@@ -234,7 +234,11 @@ interface Props {
             id: number;
             name: string;
             cursor_color?: string;
+            role?: {
+                slug: string;
+            };
         };
+        permissions?: string[];
     };
     pathologists?: any[];
     products?: any[];
@@ -3852,6 +3856,10 @@ export default function ReportWorkspace({
     const isAssigned =
         !!currentUserSpecimenRelation || !!currentUserCollaboratorRelation;
 
+    const hasCuttingsPermission =
+        auth.user.role?.slug === 'admin' ||
+        auth.permissions?.includes('cuttings.manage');
+
     let accessBadgeLabel = 'Solo Lectura';
     let accessBadgeStyle = {
         backgroundColor: 'rgba(100, 116, 139, 0.15)',
@@ -7288,18 +7296,22 @@ export default function ReportWorkspace({
                                                     ? 'Microscopía'
                                                     : 'Finalizado'}
                                         </span>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7 cursor-pointer text-violet-600 hover:bg-violet-100 hover:text-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/30"
-                                            onClick={() =>
-                                                setIsManageCuttingsOpen(true)
-                                            }
-                                            title="Gestionar Cortes"
-                                        >
-                                            <Scissors className="h-4 w-4" />
-                                        </Button>
+                                        {hasCuttingsPermission && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7 cursor-pointer text-violet-600 hover:bg-violet-100 hover:text-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/30"
+                                                onClick={() =>
+                                                    setIsManageCuttingsOpen(
+                                                        true,
+                                                    )
+                                                }
+                                                title="Gestionar Cortes"
+                                            >
+                                                <Scissors className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-[10px] tracking-tight text-muted-foreground uppercase">
@@ -8179,23 +8191,25 @@ export default function ReportWorkspace({
                                                                                             </TooltipContent>
                                                                                         </Tooltip>
                                                                                     </TooltipProvider>
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="outline"
-                                                                                        size="sm"
-                                                                                        className="h-8 cursor-pointer gap-1.5 border-violet-500/30 text-violet-600 hover:bg-violet-50 hover:text-violet-700 dark:border-violet-500/20 dark:text-violet-400 dark:hover:bg-violet-500/10"
-                                                                                        onClick={() =>
-                                                                                            setIsManageCuttingsOpen(
-                                                                                                true,
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        <Scissors className="h-3.5 w-3.5" />
-                                                                                        <span>
-                                                                                            Gestionar
-                                                                                            Cortes
-                                                                                        </span>
-                                                                                    </Button>
+                                                                                    {hasCuttingsPermission && (
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            variant="outline"
+                                                                                            size="sm"
+                                                                                            className="h-8 cursor-pointer gap-1.5 border-violet-500/30 text-violet-600 hover:bg-violet-50 hover:text-violet-700 dark:border-violet-500/20 dark:text-violet-400 dark:hover:bg-violet-500/10"
+                                                                                            onClick={() =>
+                                                                                                setIsManageCuttingsOpen(
+                                                                                                    true,
+                                                                                                )
+                                                                                            }
+                                                                                        >
+                                                                                            <Scissors className="h-3.5 w-3.5" />
+                                                                                            <span>
+                                                                                                Gestionar
+                                                                                                Cortes
+                                                                                            </span>
+                                                                                        </Button>
+                                                                                    )}
                                                                                 </div>
                                                                             </div>
 

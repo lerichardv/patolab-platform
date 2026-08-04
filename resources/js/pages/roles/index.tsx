@@ -162,6 +162,24 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Editor de Reportes',
+        description:
+            'Permite acceder y utilizar el editor colaborativo de reportes diagnósticos.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            view: 'report_editor.view',
+        },
+    },
+    {
+        label: 'Gestionar Cortes',
+        description:
+            'Permite gestionar los bloques de casetes, cortes generados y láminas de las muestras.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            manage: 'cuttings.manage',
+        },
+    },
+    {
         label: 'Reportes y Estadísticas',
         description: 'Consulta y exportación de reportes operativos.',
         module: 'Operaciones del Laboratorio',
@@ -337,6 +355,18 @@ const permissionRows: PermissionRow[] = [
             create: 'sequences.create',
             edit: 'sequences.edit',
             delete: 'sequences.delete',
+        },
+    },
+    {
+        label: 'Códigos de Casete',
+        description:
+            'Configuración de códigos identificadores y colores de casetes.',
+        module: 'Administración de Muestras',
+        slugs: {
+            view: 'cutting_codes.view',
+            create: 'cutting_codes.create',
+            edit: 'cutting_codes.edit',
+            delete: 'cutting_codes.delete',
         },
     },
     {

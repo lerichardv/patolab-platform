@@ -1,4 +1,4 @@
-import { useForm } from '@inertiajs/react';
+import { useForm, usePage } from '@inertiajs/react';
 import { Palette, Plus, Trash2 } from 'lucide-react';
 import React, { useEffect } from 'react';
 import rc from 'react-color';
@@ -44,6 +44,15 @@ interface Props {
 }
 
 export default function CuttingCodeForm({ cuttingCode, onSuccess }: Props) {
+    const { props } = usePage() as any;
+    const hasCuttingsPermission =
+        props.auth?.user?.role?.slug === 'admin' ||
+        props.auth?.permissions?.includes('cuttings.manage');
+
+    if (!hasCuttingsPermission) {
+        return null;
+    }
+
     const { data, setData, post, put, processing, errors, reset } = useForm<{
         code: string;
         color: string;

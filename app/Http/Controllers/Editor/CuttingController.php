@@ -186,4 +186,19 @@ class CuttingController extends Controller
 
         return redirect()->back()->with('error', 'No se proporcionaron datos para actualizar.');
     }
+
+    /**
+     * Bulk destroy cuttings.
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:cuttings,id',
+        ]);
+
+        Cutting::whereIn('id', $validated['ids'])->delete();
+
+        return redirect()->back()->with('success', 'Cortes seleccionados eliminados correctamente.');
+    }
 }

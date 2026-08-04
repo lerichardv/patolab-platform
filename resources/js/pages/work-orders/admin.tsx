@@ -499,7 +499,14 @@ export default function WorkOrdersAdminIndex({
                                                     )}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className={cn("text-xs whitespace-nowrap", order.deleted_at ? "text-destructive font-semibold" : "text-muted-foreground")}>
+                                            <TableCell
+                                                className={cn(
+                                                    'text-xs whitespace-nowrap',
+                                                    order.deleted_at
+                                                        ? 'font-semibold text-destructive'
+                                                        : 'text-muted-foreground',
+                                                )}
+                                            >
                                                 {order.deleted_at
                                                     ? format(
                                                           new Date(
@@ -517,45 +524,79 @@ export default function WorkOrdersAdminIndex({
                                                         variant="ghost"
                                                         size="icon"
                                                         title="Ver detalles de la orden"
-                                                        onClick={() => handleViewWorkOrder(order)}
+                                                        onClick={() =>
+                                                            handleViewWorkOrder(
+                                                                order,
+                                                            )
+                                                        }
                                                     >
                                                         <Eye className="h-4 w-4" />
                                                     </Button>
                                                     <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
+                                                        <DropdownMenuTrigger
+                                                            asChild
+                                                        >
                                                             <Button
                                                                 variant="ghost"
                                                                 className="h-8 w-8 p-0"
                                                             >
-                                                                <span className="sr-only">Abrir menú</span>
+                                                                <span className="sr-only">
+                                                                    Abrir menú
+                                                                </span>
                                                                 <MoreHorizontal className="h-4 w-4" />
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end">
-                                                            {!order.deleted_at && (auth?.user?.role?.slug === 'admin' || order.created_by_id === auth?.user?.id) && (
-                                                                <DropdownMenuItem
-                                                                    onClick={() => {
-                                                                        setEditingWorkOrder(order);
-                                                                        setIsEditWorkOrderSheetOpen(true);
-                                                                    }}
-                                                                >
-                                                                    <Edit className="mr-2 h-4 w-4" />
-                                                                    Editar orden
-                                                                </DropdownMenuItem>
-                                                            )}
+                                                            {!order.deleted_at &&
+                                                                (auth?.user
+                                                                    ?.role
+                                                                    ?.slug ===
+                                                                    'admin' ||
+                                                                    order.created_by_id ===
+                                                                        auth
+                                                                            ?.user
+                                                                            ?.id) && (
+                                                                    <DropdownMenuItem
+                                                                        onClick={() => {
+                                                                            setEditingWorkOrder(
+                                                                                order,
+                                                                            );
+                                                                            setIsEditWorkOrderSheetOpen(
+                                                                                true,
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <Edit className="mr-2 h-4 w-4" />
+                                                                        Editar
+                                                                        orden
+                                                                    </DropdownMenuItem>
+                                                                )}
 
-                                                            {!order.deleted_at && (auth?.user?.role?.slug === 'admin' || order.created_by_id === auth?.user?.id) && (
-                                                                <DropdownMenuItem
-                                                                    className="text-destructive focus:text-destructive"
-                                                                    onClick={() => {
-                                                                        setWorkOrderToDelete(order);
-                                                                        setIsDeleteDialogOpen(true);
-                                                                    }}
-                                                                >
-                                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                                    Eliminar orden
-                                                                </DropdownMenuItem>
-                                                            )}
+                                                            {!order.deleted_at &&
+                                                                (auth?.user
+                                                                    ?.role
+                                                                    ?.slug ===
+                                                                    'admin' ||
+                                                                    order.created_by_id ===
+                                                                        auth
+                                                                            ?.user
+                                                                            ?.id) && (
+                                                                    <DropdownMenuItem
+                                                                        className="text-destructive focus:text-destructive"
+                                                                        onClick={() => {
+                                                                            setWorkOrderToDelete(
+                                                                                order,
+                                                                            );
+                                                                            setIsDeleteDialogOpen(
+                                                                                true,
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                                        Eliminar
+                                                                        orden
+                                                                    </DropdownMenuItem>
+                                                                )}
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </div>

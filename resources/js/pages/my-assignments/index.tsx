@@ -84,6 +84,8 @@ import SpecimenBulkCollaboratorSheet from '../specimens/specimen-bulk-collaborat
 import SpecimenCollaboratorSheet from '../specimens/specimen-collaborator-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 import SpecimenWorkOrdersSheet from './specimen-work-orders-sheet';
+import ManageCuttingsSheet from '../specimens/report-editor/cuttings/manage-cuttings-sheet';
+import { Scissors } from 'lucide-react';
 
 interface Specimen {
     id: number;
@@ -142,6 +144,8 @@ interface Props {
     workOrderTypes: any[];
     workOrderTasks: any[];
     usersList: any[];
+    cuttingCodes: any[];
+    cuttingSlideTypes: any[];
     filters: {
         status?: string[];
         specimen_type_id?: string;
@@ -279,6 +283,8 @@ export default function MyAssignmentsIndex({
     workOrderTypes,
     workOrderTasks,
     usersList,
+    cuttingCodes,
+    cuttingSlideTypes,
     filters,
 }: Props) {
     const { props } = usePage() as any;
@@ -303,11 +309,33 @@ export default function MyAssignmentsIndex({
     const [isBulkCollaboratorSheetOpen, setIsBulkCollaboratorSheetOpen] =
         useState(false);
 
+    const [specimenForCuttings, setSpecimenForCuttings] = useState<any | null>(
+        null,
+    );
+    const [isManageCuttingsOpen, setIsManageCuttingsOpen] = useState(false);
+
+    const hasReportEditorPermission =
+        props.auth?.user?.role?.slug === 'admin' ||
+        props.auth?.permissions?.includes('report_editor.view');
+    const hasCuttingsPermission =
+        props.auth?.user?.role?.slug === 'admin' ||
+        props.auth?.permissions?.includes('cuttings.manage');
+
     useEffect(() => {
         if (selectedSpecimenForWorkOrdersList) {
-            const updated = specimens.find((s) => s.id === selectedSpecimenForWorkOrdersList.id);
+            const updated = specimens.find(
+                (s) => s.id === selectedSpecimenForWorkOrdersList.id,
+            );
             if (updated) {
                 setSelectedSpecimenForWorkOrdersList(updated);
+            }
+        }
+        if (specimenForCuttings) {
+            const updated = specimens.find(
+                (s) => s.id === specimenForCuttings.id,
+            );
+            if (updated) {
+                setSpecimenForCuttings(updated);
             }
         }
     }, [specimens]);
@@ -1328,7 +1356,9 @@ export default function MyAssignmentsIndex({
                                                                         toggleSelectSpecimen(
                                                                             specimen.id,
                                                                         );
-                                                                    } else {
+                                                                    } else if (
+                                                                        hasReportEditorPermission
+                                                                    ) {
                                                                         router.get(
                                                                             `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
                                                                         );
@@ -1626,21 +1656,42 @@ export default function MyAssignmentsIndex({
                                                                             align="end"
                                                                             className="w-52"
                                                                         >
-                                                                            <DropdownMenuItem
-                                                                                onClick={() => {
-                                                                                    router.get(
-                                                                                        `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
-                                                                                    );
-                                                                                }}
-                                                                                className="group cursor-pointer"
-                                                                            >
-                                                                                <FileText className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
-                                                                                <span>
-                                                                                    Editor
-                                                                                    de
-                                                                                    Reporte
-                                                                                </span>
-                                                                            </DropdownMenuItem>
+                                                                            {hasReportEditorPermission && (
+                                                                                <DropdownMenuItem
+                                                                                    onClick={() => {
+                                                                                        router.get(
+                                                                                            `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
+                                                                                        );
+                                                                                    }}
+                                                                                    className="group cursor-pointer"
+                                                                                >
+                                                                                    <FileText className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                                                                    <span>
+                                                                                        Editor
+                                                                                        de
+                                                                                        Reporte
+                                                                                    </span>
+                                                                                </DropdownMenuItem>
+                                                                            )}
+                                                                            {hasCuttingsPermission && (
+                                                                                <DropdownMenuItem
+                                                                                    onClick={() => {
+                                                                                        setSpecimenForCuttings(
+                                                                                            specimen,
+                                                                                        );
+                                                                                        setIsManageCuttingsOpen(
+                                                                                            true,
+                                                                                        );
+                                                                                    }}
+                                                                                    className="group cursor-pointer"
+                                                                                >
+                                                                                    <Scissors className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                                                                    <span>
+                                                                                        Gestionar
+                                                                                        Cortes
+                                                                                    </span>
+                                                                                </DropdownMenuItem>
+                                                                            )}
                                                                             <DropdownMenuItem
                                                                                 onClick={() => {
                                                                                     setSelectedSpecimenForWorkOrder(
@@ -1771,6 +1822,26 @@ export default function MyAssignmentsIndex({
                 workOrderTypes={workOrderTypes}
                 workOrderTasks={workOrderTasks}
                 usersList={usersList}
+            />
+
+            <ManageCuttingsSheet
+                specimen={
+                    specimenForCuttings || {
+                        id: 0,
+                        sequence_code: '',
+                        cuttings: [],
+                    }
+                }
+                cuttingCodes={cuttingCodes}
+                cuttingSlideTypes={cuttingSlideTypes}
+                users={usersList}
+                open={isManageCuttingsOpen}
+                onOpenChange={(open) => {
+                    setIsManageCuttingsOpen(open);
+                    if (!open) {
+                        setSpecimenForCuttings(null);
+                    }
+                }}
             />
         </>
     );

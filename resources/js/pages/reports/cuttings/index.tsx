@@ -51,7 +51,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import { cn, getContrastColor } from '@/lib/utils';
 import SpecimenViewSheet from '../../specimens/specimen-view-sheet';
 
 interface CuttingReportItem {
@@ -875,11 +875,15 @@ export default function CuttingsReportIndex({
                                             {/* Range of Cassettes */}
                                             <TableCell className="min-w-[150px] font-mono">
                                                 <span
-                                                    className="inline-flex items-center justify-center rounded border border-slate-300/30 px-2.5 py-1 text-xs font-bold text-slate-900 shadow-sm"
+                                                    className="inline-flex items-center justify-center rounded border border-slate-300/30 px-2.5 py-1 text-xs font-bold shadow-sm"
                                                     style={{
                                                         backgroundColor:
                                                             cutting.cassette_color ||
                                                             '#e2e8f0',
+                                                        color: getContrastColor(
+                                                            cutting.cassette_color ||
+                                                                '#e2e8f0',
+                                                        ),
                                                     }}
                                                 >
                                                     {cutting.cassettes_range}

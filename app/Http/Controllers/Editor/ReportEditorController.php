@@ -7,6 +7,7 @@ use App\Models\CuttingCode;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\InvoiceGroupSpecimen;
+use App\Models\Permission;
 use App\Models\Product;
 use App\Models\Role;
 use App\Models\Setting;
@@ -310,7 +311,12 @@ class ReportEditorController extends Controller
                     'id' => auth()->user()->id,
                     'name' => auth()->user()->name ?? 'Dr. Specialist',
                     'cursor_color' => '#'.substr(md5(rand()), 0, 6),
+                    'role' => auth()->user()->role ? [
+                        'slug' => auth()->user()->role->slug,
+                        'name' => auth()->user()->role->name,
+                    ] : null,
                 ],
+                'permissions' => auth()->user()->role ? (auth()->user()->role->slug === 'admin' ? Permission::pluck('slug')->toArray() : auth()->user()->role->permissions->pluck('slug')->toArray()) : [],
             ],
             'pathologists' => $pathologists,
             'products' => $products,

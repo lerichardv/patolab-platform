@@ -1,4 +1,4 @@
-import { useForm } from '@inertiajs/react';
+import { useForm, usePage } from '@inertiajs/react';
 import { Check, ChevronsUpDown, X, Plus, Info } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 import type { FormEventHandler } from 'react';
@@ -300,6 +300,15 @@ export default function CuttingForm({
     isDuplicate = false,
     onSuccess,
 }: Props) {
+    const { props } = usePage() as any;
+    const hasCuttingsPermission =
+        props.auth?.user?.role?.slug === 'admin' ||
+        props.auth?.permissions?.includes('cuttings.manage');
+
+    if (!hasCuttingsPermission) {
+        return null;
+    }
+
     const isEditMode = !!cutting?.id && !isDuplicate;
 
     const usedCodeIds = (specimen.cuttings || [])

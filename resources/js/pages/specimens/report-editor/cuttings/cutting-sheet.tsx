@@ -1,5 +1,6 @@
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { usePage } from '@inertiajs/react';
 import { cn } from '@/lib/utils';
 import CuttingForm from './cutting-form';
 
@@ -63,6 +64,15 @@ export default function CuttingSheet({
     className,
     overlayClassName,
 }: Props) {
+    const { props } = usePage() as any;
+    const hasCuttingsPermission =
+        props.auth?.user?.role?.slug === 'admin' ||
+        props.auth?.permissions?.includes('cuttings.manage');
+
+    if (!hasCuttingsPermission) {
+        return null;
+    }
+
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent

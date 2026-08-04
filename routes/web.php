@@ -157,6 +157,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Specimen Cutting routes
     Route::put('cuttings/bulk-update', [CuttingController::class, 'bulkUpdate'])->name('cuttings.bulk-update');
+    Route::delete('cuttings/bulk-delete', [CuttingController::class, 'bulkDestroy'])->name('cuttings.bulk-delete');
     Route::post('specimens/{specimen:sequence_code}/cuttings', [CuttingController::class, 'store'])->name('cuttings.store');
     Route::put('cuttings/{cutting}', [CuttingController::class, 'update'])->name('cuttings.update');
     Route::put('cuttings/{cutting}/status', [CuttingController::class, 'updateStatus'])->name('cuttings.update-status');

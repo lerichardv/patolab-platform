@@ -15,18 +15,7 @@ class RolesSeeder extends Seeder
     {
         $this->call([
             PermissionsSeeder::class,
-            MorePermissionsSeeder::class,
         ]);
-
-        // 1. Create Admin Role
-        $admin = Role::updateOrCreate(
-            ['slug' => 'admin'],
-            ['name' => 'Administrador']
-        );
-
-        // Admin gets all permissions
-        $allPermissions = Permission::all();
-        $admin->permissions()->sync($allPermissions->pluck('id'));
 
         // 2. Create Patólogo Role
         $pathologist = Role::updateOrCreate(

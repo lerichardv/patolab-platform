@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CuttingCode;
 use App\Models\Priority;
 use App\Models\Specimen;
 use App\Models\SpecimenType;
@@ -115,7 +116,7 @@ class MyAssignmentController extends Controller
             ->select('specimen.*')
             ->orderBy('priorities.order', 'asc')
             ->orderBy('specimen.created_at', 'desc')
-            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'workOrders.task', 'workOrders.users'])
+            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'workOrders.task', 'workOrders.users', 'cuttings.code', 'cuttings.responsible'])
             ->get();
 
         $priorities = Priority::orderBy('order', 'asc')->get();
@@ -124,6 +125,8 @@ class MyAssignmentController extends Controller
         $workOrderTypes = WorkOrderType::orderBy('name')->get();
         $workOrderTasks = WorkOrderTask::orderBy('name')->get();
         $usersList = User::where('active', true)->orderBy('name')->get();
+        $cuttingCodes = CuttingCode::orderByRaw('LENGTH(code) asc')->orderBy('code', 'asc')->get();
+        $cuttingSlideTypes = WorkOrderType::all();
 
         return Inertia::render('my-assignments/index', [
             'specimens' => $specimens,
@@ -133,6 +136,8 @@ class MyAssignmentController extends Controller
             'workOrderTypes' => $workOrderTypes,
             'workOrderTasks' => $workOrderTasks,
             'usersList' => $usersList,
+            'cuttingCodes' => $cuttingCodes,
+            'cuttingSlideTypes' => $cuttingSlideTypes,
             'filters' => [
                 'status' => $statuses,
                 'specimen_type_id' => $specimenTypeId,

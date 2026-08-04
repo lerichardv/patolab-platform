@@ -1,6 +1,7 @@
 import React from 'react';
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { usePage } from '@inertiajs/react';
 import CuttingCodeForm from './cutting-code-form';
 
 interface CuttingCode {
@@ -20,6 +21,15 @@ export default function CuttingCodeSheet({
     open,
     onOpenChange,
 }: Props) {
+    const { props } = usePage() as any;
+    const hasCuttingsPermission =
+        props.auth?.user?.role?.slug === 'admin' ||
+        props.auth?.permissions?.includes('cuttings.manage');
+
+    if (!hasCuttingsPermission) {
+        return null;
+    }
+
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
