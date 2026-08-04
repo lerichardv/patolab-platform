@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderTask;
 use App\Models\WorkOrderType;
@@ -17,7 +18,7 @@ class WorkOrderController extends Controller
      */
     public function index(Request $request)
     {
-        $query = WorkOrder::with(['specimen.customerRelation', 'task', 'users']);
+        $query = WorkOrder::withTrashed()->with(['specimen.customerRelation', 'task', 'users']);
 
         // Filter status
         if ($request->has('status') && $request->status !== 'all' && $request->status !== '') {
@@ -99,10 +100,14 @@ class WorkOrderController extends Controller
         $workOrders = $query->paginate(15)->withQueryString();
 
         $workOrderTypes = WorkOrderType::orderBy('name')->get();
+        $workOrderTasks = WorkOrderTask::orderBy('name')->get();
+        $usersList = User::where('active', true)->orderBy('name')->get();
 
         return Inertia::render('work-orders/admin', [
             'workOrders' => $workOrders,
             'workOrderTypes' => $workOrderTypes,
+            'workOrderTasks' => $workOrderTasks,
+            'usersList' => $usersList,
             'filters' => array_merge(
                 $request->only(['search', 'status', 'priority', 'work_order_type_id', 'sort_field', 'sort_direction']),
                 [
@@ -185,6 +190,96 @@ class WorkOrderController extends Controller
             // Sincronizar todos los usuarios/patólogos en la relación N:M
             $workOrder->users()->sync($userIds);
         }
+
+        return redirect()->back();
+    }
+
+    /**
+     * Actualiza la orden de trabajo en la base de datos.
+     */
+    public function update(Request $request, WorkOrder $workOrder)
+    {
+        $user = auth()->user();
+        if ($workOrder->created_by_id !== $user->id && $user->role?->slug !== 'admin') {
+            abort(403, 'No autorizado para editar esta orden de trabajo.');
+        }
+
+        $validated = $request->validate([
+            'work_order_type_id' => 'required|array|min:1',
+            'work_order_type_id.*' => 'exists:work_order_types,id',
+            'work_order_task_id' => 'required|exists:work_order_tasks,id',
+            'quantity' => 'nullable|integer|min:0',
+            'user_ids' => 'nullable|array',
+            'user_ids.*' => 'exists:users,id',
+            'status' => 'required|in:Enviada,En Proceso,Finalizada',
+            'priority' => 'required|integer|in:1,2,3',
+            'comments' => 'nullable|string',
+        ]);
+
+        $userIds = $validated['user_ids'] ?? [];
+        $primaryUserId = ! empty($userIds) ? $userIds[0] : null;
+
+        // Si la tarea cambió, recalculamos due_date, de lo contrario dejamos la actual
+        $dueDate = $workOrder->due_date;
+        if ($workOrder->work_order_task_id !== (int) $validated['work_order_task_id']) {
+            $task = WorkOrderTask::find($validated['work_order_task_id']);
+            if ($task) {
+                $now = Carbon::now();
+                $isSameDay = false;
+
+                if ($task->same_day_rule_enabled && $task->same_day_cutoff_start && $task->same_day_cutoff_end) {
+                    $currentTime = $now->format('H:i:s');
+                    if ($currentTime >= $task->same_day_cutoff_start && $currentTime <= $task->same_day_cutoff_end) {
+                        $isSameDay = true;
+                    }
+                }
+
+                if ($isSameDay) {
+                    $dueDate = Carbon::today()->endOfDay();
+                } else {
+                    if ($task->duration_unit === 'hours') {
+                        $dueDate = $now->copy();
+                        for ($i = 0; $i < $task->duration_value; $i++) {
+                            $dueDate->addHour();
+                            while ($dueDate->isWeekend()) {
+                                $dueDate->addDay();
+                            }
+                        }
+                    } else {
+                        $dueDate = $now->copy()->addWeekdays($task->duration_value);
+                    }
+                }
+            }
+        }
+
+        $workOrder->update([
+            'work_order_type_id' => array_map('intval', $validated['work_order_type_id']),
+            'work_order_task_id' => $validated['work_order_task_id'],
+            'quantity' => $validated['quantity'] ?? 1,
+            'user_id' => $primaryUserId,
+            'status' => $validated['status'],
+            'priority' => $validated['priority'],
+            'comments' => $validated['comments'] ?? null,
+            'due_date' => $dueDate,
+        ]);
+
+        // Sincronizar todos los usuarios en la relación N:M
+        $workOrder->users()->sync($userIds);
+
+        return redirect()->back();
+    }
+
+    /**
+     * Elimina una orden de trabajo (soft delete).
+     */
+    public function destroy(WorkOrder $workOrder)
+    {
+        $user = auth()->user();
+        if ($workOrder->created_by_id !== $user->id && $user->role?->slug !== 'admin') {
+            abort(403, 'No autorizado para eliminar esta orden de trabajo.');
+        }
+
+        $workOrder->delete();
 
         return redirect()->back();
     }

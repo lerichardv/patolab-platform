@@ -2,7 +2,10 @@ import { useForm, usePage } from '@inertiajs/react';
 import { Check, ChevronsUpDown, X, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { toast } from 'sonner';
-import { store as storeWorkOrder } from '@/actions/App/Http/Controllers/WorkOrderController';
+import {
+    store as storeWorkOrder,
+    update as updateWorkOrder,
+} from '@/actions/App/Http/Controllers/WorkOrderController';
 import HeadingSheet from '@/components/heading-sheet';
 
 import { Button } from '@/components/ui/button';
@@ -67,6 +70,7 @@ interface Props {
     workOrderTasks: WorkOrderTask[];
     usersList: User[];
     onSuccess: () => void;
+    workOrder?: any | null;
 }
 
 function FormCombobox({
@@ -271,21 +275,29 @@ export default function WorkOrderForm({
     workOrderTasks,
     usersList,
     onSuccess,
+    workOrder = null,
 }: Props) {
     const { auth } = usePage<any>().props;
     const canCreateType = auth.permissions?.includes('work_orders.create');
     const canCreateTask = auth.permissions?.includes('work_order_tasks.create');
+    const isEdit = !!workOrder;
 
-    const { data, setData, post, processing, errors } = useForm({
-        specimen_id: specimenId || null,
+    const { data, setData, post, put, processing, errors } = useForm({
+        specimen_id: workOrder?.specimen_id || specimenId || null,
         specimen_ids: specimenIds || [],
-        work_order_type_id: [] as string[],
-        work_order_task_id: '',
-        quantity: 1,
-        user_ids: [] as string[],
-        status: 'Enviada',
-        priority: '3', // 3 = Baja (default)
-        comments: '',
+        work_order_type_id: workOrder
+            ? Array.isArray(workOrder.work_order_type_id)
+                ? workOrder.work_order_type_id.map((id: any) => id.toString())
+                : [workOrder.work_order_type_id.toString()]
+            : ([] as string[]),
+        work_order_task_id: workOrder?.work_order_task_id?.toString() || '',
+        quantity: workOrder?.quantity ?? 1,
+        user_ids: workOrder?.users
+            ? workOrder.users.map((u: any) => u.id.toString())
+            : ([] as string[]),
+        status: workOrder?.status || 'Enviada',
+        priority: workOrder?.priority?.toString() || '3', // 3 = Baja (default)
+        comments: workOrder?.comments || '',
     });
 
     const [isTypeSheetOpen, setIsTypeSheetOpen] = React.useState(false);
@@ -293,6 +305,8 @@ export default function WorkOrderForm({
 
     const prevTasksRef = React.useRef(workOrderTasks);
     React.useEffect(() => {
+        if (isEdit) return; // Do not auto-set task in edit mode
+
         if (workOrderTasks.length > prevTasksRef.current.length) {
             const newTasks = workOrderTasks.filter(
                 (t) => !prevTasksRef.current.some((pt) => pt.id === t.id),
@@ -304,7 +318,7 @@ export default function WorkOrderForm({
         }
 
         prevTasksRef.current = workOrderTasks;
-    }, [workOrderTasks, setData]);
+    }, [workOrderTasks, setData, isEdit]);
 
     const PRIORITY_OPTIONS = [
         { label: 'Alta', value: '1', color: 'orange' },
@@ -329,19 +343,30 @@ export default function WorkOrderForm({
             return;
         }
 
-        post(storeWorkOrder().url, {
-            onSuccess: () => {
-                if (data.specimen_ids && data.specimen_ids.length > 0) {
+        if (isEdit) {
+            put(updateWorkOrder({ work_order: workOrder.id }).url, {
+                onSuccess: () => {
                     toast.success(
-                        `Se crearon ${data.specimen_ids.length} órdenes de trabajo correctamente.`,
+                        'Orden de trabajo actualizada correctamente.',
                     );
-                } else {
-                    toast.success('Orden de trabajo creada correctamente.');
-                }
+                    onSuccess();
+                },
+            });
+        } else {
+            post(storeWorkOrder().url, {
+                onSuccess: () => {
+                    if (data.specimen_ids && data.specimen_ids.length > 0) {
+                        toast.success(
+                            `Se crearon ${data.specimen_ids.length} órdenes de trabajo correctamente.`,
+                        );
+                    } else {
+                        toast.success('Orden de trabajo creada correctamente.');
+                    }
 
-                onSuccess();
-            },
-        });
+                    onSuccess();
+                },
+            });
+        }
     };
 
     return (
@@ -486,10 +511,10 @@ export default function WorkOrderForm({
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="Enviada">Enviada</SelectItem>
-                            <SelectItem value="En Proceso" disabled>
+                            <SelectItem value="En Proceso" disabled={!isEdit}>
                                 En Proceso
                             </SelectItem>
-                            <SelectItem value="Finalizada" disabled>
+                            <SelectItem value="Finalizada" disabled={!isEdit}>
                                 Finalizada
                             </SelectItem>
                         </SelectContent>
@@ -545,9 +570,11 @@ export default function WorkOrderForm({
                     {processing && (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    {data.specimen_ids.length > 1
-                        ? 'Crear Órdenes'
-                        : 'Crear Orden'}
+                    {isEdit
+                        ? 'Guardar Cambios'
+                        : data.specimen_ids.length > 1
+                          ? 'Crear Órdenes'
+                          : 'Crear Orden'}
                 </Button>
             </div>
 

@@ -35,6 +35,7 @@ interface Props {
     usersList: User[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    workOrder?: any | null;
 }
 
 export default function WorkOrderSheet({
@@ -45,25 +46,31 @@ export default function WorkOrderSheet({
     usersList,
     open,
     onOpenChange,
+    workOrder = null,
 }: Props) {
     const isBulk = specimenIds && specimenIds.length > 0;
+    const isEdit = !!workOrder;
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="w-full overflow-y-auto sm:max-w-[90vw] md:max-w-[650px] lg:max-w-[750px]">
                 <HeadingSheet
                     title={
-                        isBulk
-                            ? 'Crear Órdenes de Trabajo en Lote'
-                            : 'Crear Orden de Trabajo'
+                        isEdit
+                            ? 'Editar Orden de Trabajo'
+                            : isBulk
+                              ? 'Crear Órdenes de Trabajo en Lote'
+                              : 'Crear Orden de Trabajo'
                     }
                     description={
-                        isBulk
-                            ? `Complete el formulario para crear una orden de trabajo para cada una de las ${specimenIds.length} muestras seleccionadas.`
-                            : 'Complete el formulario para crear una nueva orden de trabajo para esta muestra.'
+                        isEdit
+                            ? 'Complete el formulario para editar la configuración de esta orden de trabajo.'
+                            : isBulk
+                              ? `Complete el formulario para crear una orden de trabajo para cada una de las ${specimenIds.length} muestras seleccionadas.`
+                              : 'Complete el formulario para crear una nueva orden de trabajo para esta muestra.'
                     }
                 />
-                {open && (specimenId !== null || isBulk) && (
+                {open && (specimenId !== null || isBulk || isEdit) && (
                     <WorkOrderForm
                         specimenId={specimenId}
                         specimenIds={specimenIds}
@@ -71,6 +78,7 @@ export default function WorkOrderSheet({
                         workOrderTasks={workOrderTasks}
                         usersList={usersList}
                         onSuccess={() => onOpenChange(false)}
+                        workOrder={workOrder}
                     />
                 )}
             </SheetContent>

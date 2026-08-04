@@ -17,9 +17,13 @@ import {
     Layers,
     Calendar,
     Users,
+    Edit,
+    Trash2,
+    MoreHorizontal,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import * as React from 'react';
+import { toast } from 'sonner';
 import { index as adminWorkOrdersIndex } from '@/actions/App/Http/Controllers/WorkOrderController';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Pagination } from '@/components/pagination';
@@ -44,6 +48,23 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import WorkOrderViewSheet from '../my-work-orders/work-order-view-sheet';
+import WorkOrderSheet from '../my-work-orders/work-order-sheet';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface WorkOrder {
     id: number;
@@ -58,6 +79,8 @@ interface WorkOrder {
     due_date: string | null;
     created_at: string;
     users: any[];
+    deleted_at?: string | null;
+    created_by_id: number;
 }
 
 interface Props {
@@ -75,6 +98,8 @@ interface Props {
         to: number;
     };
     workOrderTypes: { id: number; name: string }[];
+    workOrderTasks: any[];
+    usersList: any[];
     filters: {
         search?: string;
         status?: string;
@@ -90,6 +115,8 @@ interface Props {
 export default function WorkOrdersAdminIndex({
     workOrders,
     workOrderTypes,
+    workOrderTasks,
+    usersList,
     filters,
 }: Props) {
     const { auth } = usePage<any>().props;
@@ -97,6 +124,13 @@ export default function WorkOrdersAdminIndex({
         null,
     );
     const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
+    const [editingWorkOrder, setEditingWorkOrder] = useState<any | null>(null);
+    const [isEditWorkOrderSheetOpen, setIsEditWorkOrderSheetOpen] =
+        useState(false);
+    const [workOrderToDelete, setWorkOrderToDelete] = useState<any | null>(
+        null,
+    );
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [search, setSearch] = useState(filters.search || '');
 
     const handleFilterChange = useCallback(
@@ -363,6 +397,7 @@ export default function WorkOrdersAdminIndex({
                                     )}
                                 </TableHead>
                                 <TableHead>Técnicos Asignados</TableHead>
+                                <TableHead>Eliminada</TableHead>
                                 <TableHead className="text-right">
                                     Acciones
                                 </TableHead>
@@ -464,20 +499,66 @@ export default function WorkOrdersAdminIndex({
                                                     )}
                                                 </div>
                                             </TableCell>
+                                            <TableCell className={cn("text-xs whitespace-nowrap", order.deleted_at ? "text-destructive font-semibold" : "text-muted-foreground")}>
+                                                {order.deleted_at
+                                                    ? format(
+                                                          new Date(
+                                                              order.deleted_at,
+                                                          ),
+                                                          'dd/MM/yyyy HH:mm',
+                                                          { locale: es },
+                                                      )
+                                                    : '-'}
+                                            </TableCell>
                                             <TableCell className="text-right">
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    title="Ver detalles de la orden"
-                                                    onClick={() =>
-                                                        handleViewWorkOrder(
-                                                            order,
-                                                        )
-                                                    }
-                                                >
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        title="Ver detalles de la orden"
+                                                        onClick={() => handleViewWorkOrder(order)}
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button
+                                                                variant="ghost"
+                                                                className="h-8 w-8 p-0"
+                                                            >
+                                                                <span className="sr-only">Abrir menú</span>
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            {!order.deleted_at && (auth?.user?.role?.slug === 'admin' || order.created_by_id === auth?.user?.id) && (
+                                                                <DropdownMenuItem
+                                                                    onClick={() => {
+                                                                        setEditingWorkOrder(order);
+                                                                        setIsEditWorkOrderSheetOpen(true);
+                                                                    }}
+                                                                >
+                                                                    <Edit className="mr-2 h-4 w-4" />
+                                                                    Editar orden
+                                                                </DropdownMenuItem>
+                                                            )}
+
+                                                            {!order.deleted_at && (auth?.user?.role?.slug === 'admin' || order.created_by_id === auth?.user?.id) && (
+                                                                <DropdownMenuItem
+                                                                    className="text-destructive focus:text-destructive"
+                                                                    onClick={() => {
+                                                                        setWorkOrderToDelete(order);
+                                                                        setIsDeleteDialogOpen(true);
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                                    Eliminar orden
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -485,7 +566,7 @@ export default function WorkOrdersAdminIndex({
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={9}
+                                        colSpan={10}
                                         className="h-24 text-center text-sm text-muted-foreground"
                                     >
                                         No se encontraron órdenes de trabajo.
@@ -514,6 +595,75 @@ export default function WorkOrdersAdminIndex({
                 open={isViewSheetOpen}
                 onOpenChange={setIsViewSheetOpen}
             />
+
+            {/* Stacked Sheet to edit Work Order */}
+            <WorkOrderSheet
+                specimenId={null}
+                workOrder={editingWorkOrder}
+                workOrderTypes={workOrderTypes}
+                workOrderTasks={workOrderTasks}
+                usersList={usersList}
+                open={isEditWorkOrderSheetOpen}
+                onOpenChange={(open) => {
+                    setIsEditWorkOrderSheetOpen(open);
+                    if (!open) {
+                        setEditingWorkOrder(null);
+                    }
+                }}
+            />
+
+            {/* Alert Dialog to Confirm Deletion */}
+            <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            ¿Está absolutamente seguro?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción eliminará la orden de trabajo #
+                            {workOrderToDelete?.id}. Esta orden de trabajo ya no
+                            aparecerá en el control, mis asignaciones u otros
+                            listados.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            onClick={() => setWorkOrderToDelete(null)}
+                        >
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (workOrderToDelete) {
+                                    router.delete(
+                                        `/work-order-records/${workOrderToDelete.id}`,
+                                        {
+                                            onSuccess: () => {
+                                                toast.success(
+                                                    'Orden de trabajo eliminada correctamente.',
+                                                );
+                                                setIsDeleteDialogOpen(false);
+                                                setWorkOrderToDelete(null);
+                                            },
+                                            onError: () => {
+                                                toast.error(
+                                                    'Ocurrió un error al eliminar la orden de trabajo.',
+                                                );
+                                            },
+                                        },
+                                    );
+                                }
+                            }}
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                        >
+                            Eliminar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }

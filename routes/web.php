@@ -202,6 +202,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     ]);
     Route::resource('work-order-tasks', WorkOrderTaskController::class);
     Route::post('work-order-records', [WorkOrderController::class, 'store'])->name('work-order-records.store');
+    Route::put('work-order-records/{work_order}', [WorkOrderController::class, 'update'])->name('work-order-records.update');
+    Route::delete('work-order-records/{work_order}', [WorkOrderController::class, 'destroy'])->name('work-order-records.destroy');
     Route::get('admin-work-orders', [WorkOrderController::class, 'index'])->name('admin-work-orders.index');
     Route::get('my-work-orders', [MyWorkOrderController::class, 'index'])->name('my-work-orders.index');
     Route::put('my-work-orders/{work_order}/status', [MyWorkOrderController::class, 'updateStatus'])->name('my-work-orders.update-status');

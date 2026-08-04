@@ -83,6 +83,7 @@ import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import SpecimenBulkCollaboratorSheet from '../specimens/specimen-bulk-collaborator-sheet';
 import SpecimenCollaboratorSheet from '../specimens/specimen-collaborator-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
+import SpecimenWorkOrdersSheet from './specimen-work-orders-sheet';
 
 interface Specimen {
     id: number;
@@ -301,6 +302,15 @@ export default function MyAssignmentsIndex({
         useState(false);
     const [isBulkCollaboratorSheetOpen, setIsBulkCollaboratorSheetOpen] =
         useState(false);
+
+    useEffect(() => {
+        if (selectedSpecimenForWorkOrdersList) {
+            const updated = specimens.find((s) => s.id === selectedSpecimenForWorkOrdersList.id);
+            if (updated) {
+                setSelectedSpecimenForWorkOrdersList(updated);
+            }
+        }
+    }, [specimens]);
 
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -1750,184 +1760,18 @@ export default function MyAssignmentsIndex({
                 usersList={usersList}
             />
 
-            <Dialog
+            <SpecimenWorkOrdersSheet
+                specimen={selectedSpecimenForWorkOrdersList}
                 open={selectedSpecimenForWorkOrdersList !== null}
                 onOpenChange={(open) => {
                     if (!open) {
                         setSelectedSpecimenForWorkOrdersList(null);
                     }
                 }}
-            >
-                <DialogContent className="max-h-[85vh] w-full overflow-y-auto sm:max-w-[750px]">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-lg font-bold text-primary">
-                            <ClipboardList className="h-5 w-5 text-primary" />
-                            Órdenes de Trabajo
-                        </DialogTitle>
-                        <p className="text-xs text-muted-foreground">
-                            Detalles de las órdenes generadas para la muestra{' '}
-                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono font-semibold text-foreground">
-                                {selectedSpecimenForWorkOrdersList?.sequence_code ||
-                                    `#${selectedSpecimenForWorkOrdersList?.id}`}
-                            </span>
-                        </p>
-                    </DialogHeader>
-                    <Separator className="my-2" />
-                    <div className="flex flex-col gap-4 py-2 select-none">
-                        {selectedSpecimenForWorkOrdersList?.work_orders &&
-                        selectedSpecimenForWorkOrdersList.work_orders.length >
-                            0 ? (
-                            selectedSpecimenForWorkOrdersList.work_orders.map(
-                                (order: any) => {
-                                    const priorityLabel =
-                                        order.priority === 1
-                                            ? 'Alta'
-                                            : order.priority === 2
-                                              ? 'Media'
-                                              : 'Baja';
-
-                                    const priorityColor =
-                                        order.priority === 1
-                                            ? 'bg-orange-500 text-white animate-pulse'
-                                            : order.priority === 2
-                                              ? 'bg-yellow-500 text-black'
-                                              : 'bg-green-500 text-white';
-
-                                    const statusColor =
-                                        order.status === 'Finalizada'
-                                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'
-                                            : order.status === 'En Proceso'
-                                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300'
-                                              : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300';
-
-                                    return (
-                                        <div
-                                            key={order.id}
-                                            className="flex flex-col gap-3 rounded-lg border border-border/80 bg-card p-4 transition-colors hover:bg-muted/10"
-                                        >
-                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                                <div className="space-y-2">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="text-xs font-semibold text-primary">
-                                                            #{order.id}
-                                                        </span>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            |
-                                                        </span>
-                                                        <span className="text-sm font-semibold text-foreground">
-                                                            {order.type?.name ||
-                                                                'Tipo Desconocido'}
-                                                        </span>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            |
-                                                        </span>
-                                                        <span className="text-xs font-medium text-foreground">
-                                                            Cantidad:{' '}
-                                                            {order.quantity}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className="space-y-1 rounded-md bg-muted/40 p-2.5">
-                                                        <p className="text-xs font-semibold text-foreground">
-                                                            Tarea:{' '}
-                                                            {order.task?.name ||
-                                                                'N/A'}
-                                                        </p>
-                                                        {order.task
-                                                            ?.description && (
-                                                            <p className="text-[11px] text-muted-foreground">
-                                                                {
-                                                                    order.task
-                                                                        .description
-                                                                }
-                                                            </p>
-                                                        )}
-                                                    </div>
-
-                                                    {order.due_date && (
-                                                        <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
-                                                            <Clock className="h-3 w-3" />
-                                                            Vence:{' '}
-                                                            {format(
-                                                                new Date(
-                                                                    order.due_date,
-                                                                ),
-                                                                'dd/MM/yyyy h:mm a',
-                                                                { locale: es },
-                                                            )}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div className="flex shrink-0 flex-row items-center gap-1.5 sm:flex-col sm:items-end">
-                                                    <span
-                                                        className={cn(
-                                                            'inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase',
-                                                            statusColor,
-                                                        )}
-                                                    >
-                                                        {order.status}
-                                                    </span>
-                                                    <span
-                                                        className={cn(
-                                                            'inline-block rounded-full px-1.5 py-0.5 text-[8px] font-semibold uppercase',
-                                                            priorityColor,
-                                                        )}
-                                                    >
-                                                        {priorityLabel}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {order.comments && (
-                                                <p className="rounded bg-muted/40 p-2.5 text-xs text-muted-foreground italic">
-                                                    "{order.comments}"
-                                                </p>
-                                            )}
-
-                                            {order.users &&
-                                            order.users.length > 0 ? (
-                                                <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
-                                                    <span className="text-[10px] font-medium text-muted-foreground">
-                                                        Técnicos Asignados:
-                                                    </span>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {order.users.map(
-                                                            (u: any) => (
-                                                                <span
-                                                                    key={u.id}
-                                                                    className="inline-flex items-center gap-1 rounded bg-secondary px-2 py-0.5 text-[9px] font-medium text-secondary-foreground"
-                                                                >
-                                                                    {u.name}
-                                                                </span>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
-                                                    <span className="text-[10px] font-medium text-muted-foreground">
-                                                        Técnicos Asignados:
-                                                    </span>
-                                                    <div>
-                                                        <span className="inline-flex items-center rounded bg-destructive/10 px-2 py-0.5 text-[9px] font-medium text-destructive">
-                                                            Sin asignar
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                },
-                            )
-                        ) : (
-                            <p className="py-4 text-center text-sm text-muted-foreground">
-                                No hay órdenes de trabajo asignadas a esta
-                                muestra.
-                            </p>
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog>
+                workOrderTypes={workOrderTypes}
+                workOrderTasks={workOrderTasks}
+                usersList={usersList}
+            />
         </>
     );
 }
