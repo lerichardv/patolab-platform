@@ -66,13 +66,14 @@ class ReportPaginator
 
             // Sort alphabetically (by code length first, then natural comparison)
             usort($cuttingsList, function ($a, $b) {
-                $codeA = (isset($a->code) && !empty($a->code->code)) ? $a->code->code : '';
-                $codeB = (isset($b->code) && !empty($b->code->code)) ? $b->code->code : '';
+                $codeA = (isset($a->code) && ! empty($a->code->code)) ? $a->code->code : '';
+                $codeB = (isset($b->code) && ! empty($b->code->code)) ? $b->code->code : '';
                 $lenA = strlen($codeA);
                 $lenB = strlen($codeB);
                 if ($lenA !== $lenB) {
                     return $lenA <=> $lenB;
                 }
+
                 return strnatcasecmp($codeA, $codeB);
             });
 
@@ -100,14 +101,14 @@ class ReportPaginator
                 $currentSubGroup = [];
 
                 foreach ($run['items'] as $item) {
-                    $code = (isset($item->code) && !empty($item->code->code)) ? $item->code->code : '';
+                    $code = (isset($item->code) && ! empty($item->code->code)) ? $item->code->code : '';
 
                     if (empty($currentSubGroup)) {
                         $currentSubGroup[] = $item;
                     } else {
                         $prevItem = end($currentSubGroup);
-                        $prevCode = (isset($prevItem->code) && !empty($prevItem->code->code)) ? $prevItem->code->code : '';
-                        
+                        $prevCode = (isset($prevItem->code) && ! empty($prevItem->code->code)) ? $prevItem->code->code : '';
+
                         if (self::areTwoCodesConsecutive($prevCode, $code)) {
                             $currentSubGroup[] = $item;
                         } else {
@@ -116,7 +117,7 @@ class ReportPaginator
                         }
                     }
                 }
-                if (!empty($currentSubGroup)) {
+                if (! empty($currentSubGroup)) {
                     $subGroups[] = $currentSubGroup;
                 }
 
@@ -147,11 +148,11 @@ class ReportPaginator
                 $startCutting = $cuttingsList[$g['startIndex']] ?? null;
                 $endCutting = $cuttingsList[$g['endIndex']] ?? null;
 
-                $startLetter = (isset($startCutting->code) && !empty($startCutting->code->code))
+                $startLetter = (isset($startCutting->code) && ! empty($startCutting->code->code))
                     ? $startCutting->code->code
                     : self::indexToLetter($g['startIndex'] + 1);
 
-                $endLetter = (isset($endCutting->code) && !empty($endCutting->code->code))
+                $endLetter = (isset($endCutting->code) && ! empty($endCutting->code->code))
                     ? $endCutting->code->code
                     : self::indexToLetter($g['endIndex'] + 1);
 

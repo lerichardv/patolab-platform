@@ -325,7 +325,7 @@ class SpecimenController extends Controller
         $paymentInvoice = null;
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($request, $validated, &$specimen, &$invoice, &$paymentInvoice) {
-            $caiRange = CaiRange::where('status', 'active')->first();
+            $caiRange = CaiRange::where('status', 'active')->lockForUpdate()->first();
             if (! $caiRange) {
                 throw new \Exception('No hay un rango CAI activo configurado en el sistema.');
             }
@@ -445,9 +445,20 @@ class SpecimenController extends Controller
                 'order' => $maxOrder + 1,
             ]);
 
-            $nextNumber = $caiRange->last_used_number + 1;
-            $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
-            $fullInvoiceNumber = $caiRange->full_prefix.$invoiceNumber;
+            do {
+                $nextNumber = $caiRange->last_used_number + 1;
+                $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+                $fullInvoiceNumber = $caiRange->full_prefix.$invoiceNumber;
+
+                $exists = Invoice::where('full_invoice_number', $fullInvoiceNumber)->exists();
+                if ($exists) {
+                    $caiRange->increment('last_used_number');
+                    if ($caiRange->last_used_number >= $caiRange->end_number) {
+                        $caiRange->update(['status' => 'exhausted']);
+                        throw new \Exception('El rango CAI activo se ha agotado al buscar un número de factura disponible.');
+                    }
+                }
+            } while ($exists);
 
             $proofOfPaymentPath = null;
             if ($validated['payment_type'] === 'credit') {
