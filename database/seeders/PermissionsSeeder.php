@@ -74,6 +74,10 @@ class PermissionsSeeder extends Seeder
             */
             ['name' => 'Ver Reportes', 'slug' => 'reports.view'],
             ['name' => 'Exportar Reportes', 'slug' => 'reports.export'],
+            ['name' => 'Ver Resumen de Facturación', 'slug' => 'reports.billing_summary.view'],
+            ['name' => 'Ver Agrupación de Créditos', 'slug' => 'reports.credit_group.view'],
+            ['name' => 'Ver Relación de Biopsias (Cortes)', 'slug' => 'reports.cuttings.view'],
+            ['name' => 'Ver Reporte de Entrega', 'slug' => 'reports.delivery.view'],
 
             /*
             |--------------------------------------------------------------------------

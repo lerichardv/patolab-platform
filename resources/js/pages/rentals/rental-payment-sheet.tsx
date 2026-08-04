@@ -1,10 +1,5 @@
 import { useForm, usePage } from '@inertiajs/react';
-import {
-    FileText,
-    Upload,
-    X,
-    Plus,
-} from 'lucide-react';
+import { FileText, Upload, X, Plus } from 'lucide-react';
 import type { FormEventHandler } from 'react';
 import * as React from 'react';
 import { useEffect, useState, useMemo } from 'react';

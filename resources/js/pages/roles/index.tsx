@@ -189,6 +189,41 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Reporte: Resumen de Facturación',
+        description: 'Permite consultar y exportar el resumen de facturación.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            view: 'reports.billing_summary.view',
+        },
+    },
+    {
+        label: 'Reporte: Agrupación de Créditos',
+        description:
+            'Permite consultar y exportar el reporte de créditos grupales.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            view: 'reports.credit_group.view',
+        },
+    },
+    {
+        label: 'Reporte: Relación de Biopsias (Cortes)',
+        description:
+            'Permite consultar y exportar el reporte de cortes/láminas.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            view: 'reports.cuttings.view',
+        },
+    },
+    {
+        label: 'Reporte: Reporte de Entrega',
+        description:
+            'Permite consultar y exportar el reporte de entrega de muestras.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            view: 'reports.delivery.view',
+        },
+    },
+    {
         label: 'Otros Cobros',
         description: 'Gestión de cobros de equipos, espacios o servicios.',
         module: 'Otros Cobros',

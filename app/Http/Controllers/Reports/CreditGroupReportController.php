@@ -27,7 +27,7 @@ class CreditGroupReportController extends Controller
      */
     public function index(Request $request)
     {
-        Gate::authorize('invoices.view');
+        Gate::authorize('reports.credit_group.view');
 
         $query = $this->buildQuery($request);
 
@@ -123,7 +123,7 @@ class CreditGroupReportController extends Controller
      */
     public function export(Request $request)
     {
-        Gate::authorize('invoices.view');
+        Gate::authorize('reports.credit_group.view');
 
         $query = $this->buildQuery($request);
 

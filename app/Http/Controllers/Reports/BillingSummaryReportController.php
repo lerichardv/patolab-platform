@@ -26,7 +26,7 @@ class BillingSummaryReportController extends Controller
      */
     public function index(Request $request)
     {
-        Gate::authorize('invoices.view');
+        Gate::authorize('reports.billing_summary.view');
 
         // Build base queries
         $activeQuery = $this->buildQuery($request, false);
@@ -166,7 +166,7 @@ class BillingSummaryReportController extends Controller
      */
     public function export(Request $request)
     {
-        Gate::authorize('invoices.view');
+        Gate::authorize('reports.billing_summary.view');
 
         // Fetch active and cancelled items
         $allActiveInvoices = $this->buildQuery($request, false)->get();
