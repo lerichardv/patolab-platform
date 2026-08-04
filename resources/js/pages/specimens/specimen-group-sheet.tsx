@@ -443,6 +443,7 @@ export default function SpecimenGroupSheet({
                                 name: p.name,
                             })),
                             isExisting: true,
+                            sequence_code: s.sequence_code,
 
                             selected_price:
                                 breakdown.selected_price?.toString() || '0',
@@ -816,6 +817,11 @@ export default function SpecimenGroupSheet({
             : null;
 
         const specObject = {
+            id: existingSpec ? existingSpec.id : undefined,
+            isExisting: existingSpec ? existingSpec.isExisting : undefined,
+            sequence_code: existingSpec
+                ? existingSpec.sequence_code
+                : undefined,
             client_id:
                 nestedSpecimenToEditId ||
                 Math.random().toString(36).substring(2, 9),
@@ -1091,6 +1097,11 @@ export default function SpecimenGroupSheet({
         const map: Record<string, string> = {};
 
         specimens.forEach((spec) => {
+            if (spec.isExisting && spec.sequence_code) {
+                map[spec.client_id] = spec.sequence_code;
+                return;
+            }
+
             const typeId = parseInt(spec.specimen_type);
 
             if (isNaN(typeId)) {
@@ -1120,11 +1131,10 @@ export default function SpecimenGroupSheet({
             const currentSeqNum = seq.current_sequence + typeOffsets[typeId];
             const fillWidth = seq.fill ?? 4;
             const paddedSeq = String(currentSeqNum).padStart(fillWidth, '0');
-            const paddedMonth = String(
-                seq.month ?? new Date().getMonth() + 1,
-            ).padStart(2, '0');
+            const now = new Date();
+            const paddedMonth = String(now.getMonth() + 1).padStart(2, '0');
             const separator = seq.separator ?? '-';
-            const year = seq.year ?? new Date().getFullYear();
+            const year = now.getFullYear();
 
             map[spec.client_id] =
                 `${seq.prefix}${separator}${paddedSeq}${separator}${paddedMonth}${separator}${year}`;
@@ -1685,7 +1695,8 @@ export default function SpecimenGroupSheet({
                                                                         .client_id
                                                                 ] && (
                                                                     <span className="inline-flex items-center rounded-md border border-sky-100 bg-sky-50 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-400">
-                                                                        *
+                                                                        {!spec.isExisting &&
+                                                                            '*'}
                                                                         {
                                                                             estimatedCodes[
                                                                                 spec
