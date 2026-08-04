@@ -161,21 +161,31 @@ class SpecimenGroupController extends Controller
                 ]);
             }
 
-            // CAI generation
-            do {
-                $nextNumber = $caiRange->last_used_number + 1;
-                $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
-                $fullInvoiceNumber = $caiRange->full_prefix.$invoiceNumber;
+            $nextNumber = $caiRange->last_used_number;
+            if ($nextNumber < $caiRange->start_number) {
+                $nextNumber = $caiRange->start_number;
+            }
 
-                $exists = Invoice::where('full_invoice_number', $fullInvoiceNumber)->exists();
-                if ($exists) {
-                    $caiRange->increment('last_used_number');
-                    if ($caiRange->last_used_number >= $caiRange->end_number) {
-                        $caiRange->update(['status' => 'exhausted']);
-                        throw new \Exception('El rango CAI activo se ha agotado al buscar un número de factura disponible.');
+            $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+            $fullInvoiceNumber = $caiRange->full_prefix.$invoiceNumber;
+
+            $exists = Invoice::where('full_invoice_number', $fullInvoiceNumber)->exists();
+            if ($exists) {
+                do {
+                    $nextNumber = $caiRange->last_used_number + 1;
+                    $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+                    $fullInvoiceNumber = $caiRange->full_prefix.$invoiceNumber;
+
+                    $exists = Invoice::where('full_invoice_number', $fullInvoiceNumber)->exists();
+                    if ($exists) {
+                        $caiRange->increment('last_used_number');
+                        if ($caiRange->last_used_number >= $caiRange->end_number) {
+                            $caiRange->update(['status' => 'exhausted']);
+                            throw new \Exception('El rango CAI activo se ha agotado al buscar un número de factura disponible.');
+                        }
                     }
-                }
-            } while ($exists);
+                } while ($exists);
+            }
 
             // Save proof of payment file
             $proofOfPaymentPath = null;
