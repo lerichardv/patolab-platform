@@ -287,11 +287,13 @@ export default function SpecimenGroupSheet({
 
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
     const [customerSheetSource, setCustomerSheetSource] = useState<
-        'global' | 'nested'
+        'global' | 'nested' | 'table_row'
     >('global');
     const [customerToEdit, setCustomerToEdit] = useState<CustomerOption | null>(
         null,
     );
+    const [editingCustomerRowClientId, setEditingCustomerRowClientId] =
+        useState<string | null>(null);
     // Track selected customer data for display (async combobox)
     const [selectedGlobalCustomerData, setSelectedGlobalCustomerData] =
         useState<CustomerOption | null>(null);
@@ -427,6 +429,27 @@ export default function SpecimenGroupSheet({
                             customer: s.customer,
                             customer_name:
                                 s.customer_relation?.name || 'Desconocido',
+                            customer_data: s.customer_relation
+                                ? {
+                                      id: s.customer_relation.id,
+                                      name: s.customer_relation.name,
+                                      id_number:
+                                          s.customer_relation.id_number || '',
+                                      phone: s.customer_relation.phone || '',
+                                      secondary_phone:
+                                          s.customer_relation.secondary_phone ||
+                                          '',
+                                      email: s.customer_relation.email || '',
+                                      gender: s.customer_relation.gender || '',
+                                      type:
+                                          s.customer_relation.type || 'cliente',
+                                      age: s.customer_relation.age || '',
+                                      state: s.customer_relation.state || '',
+                                      city: s.customer_relation.city || '',
+                                      address:
+                                          s.customer_relation.address || '',
+                                  }
+                                : null,
                             specimen_type: s.specimen_type,
                             specimen_type_name: s.type?.name || '',
                             specimen_type_examination:
@@ -864,6 +887,7 @@ export default function SpecimenGroupSheet({
                 Math.random().toString(36).substring(2, 9),
             customer: parseInt(nestedCustomer),
             customer_name: selectedNestedCustomerData?.name || 'Desconocido',
+            customer_data: selectedNestedCustomerData,
             specimen_type: parseInt(nestedSpecimenType),
             specimen_type_name:
                 specimenTypes.find(
@@ -1405,7 +1429,7 @@ export default function SpecimenGroupSheet({
                 id: s.id,
                 customer: s.customer,
                 specimen_type: s.specimen_type,
-                reserved_code: s.id ? null : (s.sequence_code || null),
+                reserved_code: s.id ? null : s.sequence_code || null,
                 specimen_type_examination: s.specimen_type_examination,
                 specimen_category: s.specimen_category,
                 referrer: s.referrer,
@@ -1746,28 +1770,57 @@ export default function SpecimenGroupSheet({
                                                             {idx + 1}
                                                         </TableCell>
                                                         <TableCell>
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                                <span className="text-sm font-semibold">
-                                                                    {
-                                                                        spec.customer_name
-                                                                    }
-                                                                </span>
-                                                                {estimatedCodes[
-                                                                    spec
-                                                                        .client_id
-                                                                ] && (
-                                                                    <span className="inline-flex items-center rounded-md border border-sky-100 bg-sky-50 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-400">
-                                                                        {!spec.isExisting &&
-                                                                            !spec.sequence_code &&
-                                                                            '*'}
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <span className="text-sm font-semibold">
                                                                         {
-                                                                            estimatedCodes[
-                                                                                spec
-                                                                                    .client_id
-                                                                            ]
+                                                                            spec.customer_name
                                                                         }
                                                                     </span>
-                                                                )}
+                                                                    {estimatedCodes[
+                                                                        spec
+                                                                            .client_id
+                                                                    ] && (
+                                                                        <span className="inline-flex items-center rounded-md border border-sky-100 bg-sky-50 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-400">
+                                                                            {!spec.isExisting &&
+                                                                                !spec.sequence_code &&
+                                                                                '*'}
+                                                                            {
+                                                                                estimatedCodes[
+                                                                                    spec
+                                                                                        .client_id
+                                                                                ]
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {pageProps.auth?.permissions?.includes(
+                                                                    'patients.edit',
+                                                                ) &&
+                                                                    spec.customer_data && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                setCustomerToEdit(
+                                                                                    spec.customer_data,
+                                                                                );
+                                                                                setCustomerSheetSource(
+                                                                                    'table_row',
+                                                                                );
+                                                                                setEditingCustomerRowClientId(
+                                                                                    spec.client_id,
+                                                                                );
+                                                                                setIsCustomerSheetOpen(
+                                                                                    true,
+                                                                                );
+                                                                            }}
+                                                                            className="flex items-center gap-1 self-start text-[10px] font-medium text-primary hover:underline"
+                                                                        >
+                                                                            <Edit2 className="h-3 w-3" />{' '}
+                                                                            Editar
+                                                                            paciente
+                                                                        </button>
+                                                                    )}
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>
@@ -1854,11 +1907,12 @@ export default function SpecimenGroupSheet({
                                         <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
                                         <span>
                                             <strong>
-                                                * Código de la muestra:
+                                                Códigos de muestra reservados:
                                             </strong>{' '}
-                                            El código real de la muestra se
-                                            generará en la base de datos hasta
-                                            que el grupo sea creado.
+                                            Los códigos de secuencia para cada
+                                            muestra agregada han sido reservados
+                                            y se asignarán definitivamente al
+                                            crear el grupo.
                                         </span>
                                     </div>
                                 </div>
@@ -3905,10 +3959,31 @@ export default function SpecimenGroupSheet({
                                     setSelectedGlobalCustomerData(
                                         updatedCustomer,
                                     );
-                                } else {
+                                } else if (customerSheetSource === 'nested') {
                                     setSelectedNestedCustomerData(
                                         updatedCustomer,
                                     );
+                                } else if (
+                                    customerSheetSource === 'table_row'
+                                ) {
+                                    setSpecimens((prev) =>
+                                        prev.map((s) => {
+                                            if (
+                                                s.client_id ===
+                                                editingCustomerRowClientId
+                                            ) {
+                                                return {
+                                                    ...s,
+                                                    customer_name:
+                                                        updatedCustomer.name,
+                                                    customer_data:
+                                                        updatedCustomer,
+                                                };
+                                            }
+                                            return s;
+                                        }),
+                                    );
+                                    setEditingCustomerRowClientId(null);
                                 }
                             }
                         }}

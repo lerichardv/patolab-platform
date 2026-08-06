@@ -491,6 +491,10 @@ export default function SpecimensIndex({
                     selectedGroupId === 'all' ||
                     specimen.group_id?.toString() === selectedGroupId;
 
+                const invoice = specimen.group?.invoice
+                    ? specimen.group.invoice
+                    : specimen.invoice_relation;
+
                 const matchesSearch =
                     !searchLower ||
                     (specimen.sequence_code &&
@@ -504,6 +508,14 @@ export default function SpecimensIndex({
                             .includes(searchLower)) ||
                     (specimen.customer_relation?.id_number &&
                         specimen.customer_relation.id_number
+                            .toLowerCase()
+                            .includes(searchLower)) ||
+                    (invoice?.full_invoice_number &&
+                        invoice.full_invoice_number
+                            .toLowerCase()
+                            .includes(searchLower)) ||
+                    (invoice?.invoice_number &&
+                        invoice.invoice_number
                             .toLowerCase()
                             .includes(searchLower));
 
