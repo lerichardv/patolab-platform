@@ -530,6 +530,7 @@
                         <div class="{!! $block['class'] ?? 'section-content' !!}">
                             {!! $block['html'] !!}
                         </div>
+                    {{--
                     @elseif($block['type'] === 'cuttings-summary')
                         <div class="cuttings-summary" style="margin-top: 2.0mm; margin-bottom: 2.0mm; font-size: 2.51mm; line-height: 3.97mm; text-align: justify; font-family: inherit; font-weight: normal;">
                             <u>Cortes</u>: {{ str_replace('Cortes: ', '', $block['text']) }}
@@ -538,6 +539,7 @@
                         <div class="cuttings-summary" style="margin-top: 2.0mm; margin-bottom: 2.0mm; font-size: 2.51mm; line-height: 3.97mm; text-align: justify; font-family: inherit; font-weight: normal;">
                             <u>Nuevos Cortes</u>: {{ str_replace('Nuevos Cortes: ', '', $block['text']) }}
                         </div>
+                    --}}
                     @elseif($block['type'] === 'signature')
                         <div class="signatures-container" style="display: flex; flex-direction: column; gap: 4mm; margin-top: 4mm; align-items: center; width: 100%;">
                             @php

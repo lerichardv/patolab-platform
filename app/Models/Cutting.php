@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'code_id',
     'specimen_id',
+    'prefix_id',
     'description',
     'number_of_cuttings',
     'cuttings_description',
@@ -46,5 +47,10 @@ class Cutting extends Model
     public function responsible(): BelongsTo
     {
         return $this->belongsTo(User::class, 'responsible_id');
+    }
+
+    public function prefix(): BelongsTo
+    {
+        return $this->belongsTo(CuttingPrefix::class, 'prefix_id');
     }
 }

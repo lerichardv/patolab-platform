@@ -305,7 +305,9 @@ export default function WorkOrderForm({
 
     const prevTasksRef = React.useRef(workOrderTasks);
     React.useEffect(() => {
-        if (isEdit) return; // Do not auto-set task in edit mode
+        if (isEdit) {
+            return;
+        } // Do not auto-set task in edit mode
 
         if (workOrderTasks.length > prevTasksRef.current.length) {
             const newTasks = workOrderTasks.filter(

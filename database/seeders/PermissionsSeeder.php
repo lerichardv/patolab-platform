@@ -131,6 +131,10 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Crear Códigos de Casete', 'slug' => 'cutting_codes.create'],
             ['name' => 'Editar Códigos de Casete', 'slug' => 'cutting_codes.edit'],
             ['name' => 'Eliminar Códigos de Casete', 'slug' => 'cutting_codes.delete'],
+            ['name' => 'Ver Prefijos de Cortes', 'slug' => 'cutting_prefixes.view'],
+            ['name' => 'Crear Prefijos de Cortes', 'slug' => 'cutting_prefixes.create'],
+            ['name' => 'Editar Prefijos de Cortes', 'slug' => 'cutting_prefixes.edit'],
+            ['name' => 'Eliminar Prefijos de Cortes', 'slug' => 'cutting_prefixes.delete'],
 
             /*
             |--------------------------------------------------------------------------

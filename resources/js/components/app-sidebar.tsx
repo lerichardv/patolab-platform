@@ -29,6 +29,7 @@ import { index as caiRangesIndex } from '@/actions/App/Http/Controllers/CaiRange
 import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
 import { index as customersIndex } from '@/actions/App/Http/Controllers/CustomerController';
 import { index as cuttingCodesIndex } from '@/actions/App/Http/Controllers/CuttingCodeController';
+import { index as cuttingPrefixesIndex } from '@/actions/App/Http/Controllers/CuttingPrefixController';
 import { index as histotechnologistWorkOrdersIndex } from '@/actions/App/Http/Controllers/HistotechnologistWorkOrderController';
 import { index as inventoriesIndex } from '@/actions/App/Http/Controllers/InventoryController';
 import { index as inventoryMovementsIndex } from '@/actions/App/Http/Controllers/InventoryMovementController';
@@ -214,6 +215,11 @@ const adminNavItems: NavItem[] = [
                         title: 'Códigos de Casete',
                         href: cuttingCodesIndex(),
                         permission: 'cutting_codes.view',
+                    },
+                    {
+                        title: 'Prefijos de Cortes',
+                        href: cuttingPrefixesIndex(),
+                        permission: 'cutting_prefixes.view',
                     },
                 ],
             },

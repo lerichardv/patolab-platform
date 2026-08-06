@@ -1,7 +1,16 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import debounce from 'lodash/debounce';
-import { Eye, Search, Download, FileSpreadsheet, Coins } from 'lucide-react';
+import {
+    Eye,
+    Search,
+    Download,
+    FileSpreadsheet,
+    Coins,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
+} from 'lucide-react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
 import { index as billingSummaryReportIndex } from '@/actions/App/Http/Controllers/Reports/BillingSummaryReportController';
@@ -98,6 +107,7 @@ interface Props {
         examination_id?: string;
         date_from?: string;
         date_to?: string;
+        sort_order?: string;
     };
     selectedCustomer?: {
         id: number;
@@ -517,7 +527,7 @@ export default function BillingSummaryReportIndex({
                 </div>
 
                 {/* Tabs Layout */}
-                <Tabs defaultValue="emitidas" className="w-full">
+                <Tabs defaultValue="emitidas" className="mb-24 w-full">
                     <TabsList className="grid w-full max-w-md grid-cols-3">
                         <TabsTrigger value="emitidas">
                             Facturas Emitidas
@@ -539,8 +549,33 @@ export default function BillingSummaryReportIndex({
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="w-[100px] text-center">
-                                            Fecha
+                                        <TableHead className="min-w-[145px] text-center whitespace-nowrap">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const nextOrder =
+                                                        (filters.sort_order ||
+                                                            'desc') === 'desc'
+                                                            ? 'asc'
+                                                            : 'desc';
+                                                    handleFilterChange(
+                                                        'sort_order',
+                                                        nextOrder,
+                                                    );
+                                                }}
+                                                className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground focus:outline-none"
+                                            >
+                                                <span>Fecha</span>
+                                                {filters.sort_order ===
+                                                'asc' ? (
+                                                    <ArrowUp className="h-3.5 w-3.5" />
+                                                ) : filters.sort_order ===
+                                                  'desc' ? (
+                                                    <ArrowDown className="h-3.5 w-3.5" />
+                                                ) : (
+                                                    <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
+                                                )}
+                                            </button>
                                         </TableHead>
                                         <TableHead className="min-w-[120px]">
                                             ID/RTN
@@ -594,13 +629,13 @@ export default function BillingSummaryReportIndex({
                                     ) : (
                                         activeInvoices.data.map((row) => (
                                             <TableRow key={row.id}>
-                                                <TableCell className="text-center">
+                                                <TableCell className="text-center whitespace-nowrap">
                                                     {row.date
                                                         ? format(
                                                               new Date(
                                                                   row.date,
                                                               ),
-                                                              'd/M/yy',
+                                                              'd/M/yy h:mm a',
                                                           )
                                                         : 'N/A'}
                                                 </TableCell>
@@ -772,8 +807,33 @@ export default function BillingSummaryReportIndex({
                             <Table>
                                 <TableHeader>
                                     <TableRow className="bg-yellow-500/5 hover:bg-yellow-500/5">
-                                        <TableHead className="w-[100px] text-center">
-                                            Fecha
+                                        <TableHead className="min-w-[145px] text-center whitespace-nowrap">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const nextOrder =
+                                                        (filters.sort_order ||
+                                                            'desc') === 'desc'
+                                                            ? 'asc'
+                                                            : 'desc';
+                                                    handleFilterChange(
+                                                        'sort_order',
+                                                        nextOrder,
+                                                    );
+                                                }}
+                                                className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground focus:outline-none"
+                                            >
+                                                <span>Fecha</span>
+                                                {filters.sort_order ===
+                                                'asc' ? (
+                                                    <ArrowUp className="h-3.5 w-3.5" />
+                                                ) : filters.sort_order ===
+                                                  'desc' ? (
+                                                    <ArrowDown className="h-3.5 w-3.5" />
+                                                ) : (
+                                                    <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
+                                                )}
+                                            </button>
                                         </TableHead>
                                         <TableHead className="min-w-[120px]">
                                             ID/RTN
@@ -830,13 +890,13 @@ export default function BillingSummaryReportIndex({
                                                 key={row.id}
                                                 className="bg-yellow-500/[0.01] hover:bg-yellow-500/[0.04]"
                                             >
-                                                <TableCell className="text-center">
+                                                <TableCell className="text-center whitespace-nowrap">
                                                     {row.date
                                                         ? format(
                                                               new Date(
                                                                   row.date,
                                                               ),
-                                                              'd/M/yy',
+                                                              'd/M/yy h:mm a',
                                                           )
                                                         : 'N/A'}
                                                 </TableCell>

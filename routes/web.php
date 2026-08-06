@@ -6,6 +6,7 @@ use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerSearchController;
 use App\Http\Controllers\CuttingCodeController;
+use App\Http\Controllers\CuttingPrefixController;
 use App\Http\Controllers\Editor\CuttingController;
 use App\Http\Controllers\Editor\ReportEditorController;
 use App\Http\Controllers\HistotechnologistWorkOrderController;
@@ -165,6 +166,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('cuttings/{cutting}/status', [CuttingController::class, 'updateStatus'])->name('cuttings.update-status');
     Route::delete('cuttings/{cutting}', [CuttingController::class, 'destroy'])->name('cuttings.destroy');
     Route::resource('cutting-codes', CuttingCodeController::class);
+    Route::resource('cutting-prefixes', CuttingPrefixController::class);
     Route::post('specimens/{specimen:sequence_code}/generate-report', [SpecimenController::class, 'generateReport'])->name('specimens.generate-report');
     Route::resource('specimens', SpecimenController::class);
     Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');

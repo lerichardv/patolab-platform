@@ -405,6 +405,18 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Prefijos de Cortes',
+        description:
+            'Configuración de prefijos identificadores para los cortes.',
+        module: 'Administración de Muestras',
+        slugs: {
+            view: 'cutting_prefixes.view',
+            create: 'cutting_prefixes.create',
+            edit: 'cutting_prefixes.edit',
+            delete: 'cutting_prefixes.delete',
+        },
+    },
+    {
         label: 'Remitentes (Médicos/Clínicas)',
         description: 'Médicos referentes y orígenes de muestras.',
         module: 'Directorio y Ubicaciones',

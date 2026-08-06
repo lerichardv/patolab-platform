@@ -2,31 +2,31 @@ import { usePage } from '@inertiajs/react';
 import React from 'react';
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import CuttingCodeForm from './cutting-code-form';
+import CuttingPrefixForm from './cutting-prefix-form';
 
-interface CuttingCode {
+interface CuttingPrefix {
     id: number;
-    code: string;
-    color: string;
+    prefix: string;
 }
 
 interface Props {
-    cuttingCode?: CuttingCode | null;
+    cuttingPrefix?: CuttingPrefix | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
-export default function CuttingCodeSheet({
-    cuttingCode,
+export default function CuttingPrefixSheet({
+    cuttingPrefix,
     open,
     onOpenChange,
 }: Props) {
     const { props } = usePage() as any;
-    const hasCuttingsPermission =
+    const hasPrefixesPermission =
         props.auth?.user?.role?.slug === 'admin' ||
-        props.auth?.permissions?.includes('cuttings.manage');
+        props.auth?.permissions?.includes('cutting_prefixes.create') ||
+        props.auth?.permissions?.includes('cutting_prefixes.edit');
 
-    if (!hasCuttingsPermission) {
+    if (!hasPrefixesPermission) {
         return null;
     }
 
@@ -38,19 +38,19 @@ export default function CuttingCodeSheet({
             >
                 <HeadingSheet
                     title={
-                        cuttingCode
-                            ? 'Editar Código de Casete'
-                            : 'Nuevo Código de Casete'
+                        cuttingPrefix
+                            ? 'Editar Prefijo de Corte'
+                            : 'Nuevo Prefijo de Corte'
                     }
                     description={
-                        cuttingCode
-                            ? 'Actualice la información del código de casete aquí.'
-                            : 'Complete los campos para registrar uno o más códigos identificadores de casete.'
+                        cuttingPrefix
+                            ? 'Actualice la información del prefijo de corte aquí.'
+                            : 'Complete los campos para registrar uno o más prefijos de cortes.'
                     }
                 />
                 <div className="mt-6">
-                    <CuttingCodeForm
-                        cuttingCode={cuttingCode}
+                    <CuttingPrefixForm
+                        cuttingPrefix={cuttingPrefix}
                         onSuccess={() => onOpenChange(false)}
                     />
                 </div>

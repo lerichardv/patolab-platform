@@ -10,6 +10,9 @@ import {
     Trash2,
     ChevronDown,
     ChevronRight,
+    Layers,
+    Tag,
+    UserPlus,
 } from 'lucide-react';
 import { useState, Fragment } from 'react';
 import { toast } from 'sonner';
@@ -32,6 +35,17 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuSubContent,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -65,11 +79,16 @@ interface Cutting {
     comments: string | null;
     responsible_id: number;
     is_new_cut: boolean;
+    prefix_id?: number | null;
     code?: {
         id: number;
         code: string;
         color: string;
     };
+    prefix?: {
+        id: number;
+        prefix: string;
+    } | null;
     responsible?: {
         id: number;
         name: string;
@@ -87,6 +106,11 @@ interface CuttingSlideType {
     name: string;
 }
 
+interface CuttingPrefix {
+    id: number;
+    prefix: string;
+}
+
 interface User {
     id: number;
     name: string;
@@ -99,38 +123,47 @@ interface Props {
         cuttings?: Cutting[];
     };
     cuttingCodes: CuttingCode[];
+    cuttingPrefixes: CuttingPrefix[];
     cuttingSlideTypes: CuttingSlideType[];
     users: User[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
     canEdit?: boolean;
+    onInsertConcatenatedString?: (text: string) => void;
 }
 const indexToLetter = (index: number): string => {
     let letter = '';
     let idx = index;
+
     while (idx > 0) {
         const temp = (idx - 1) % 26;
         letter = String.fromCharCode(65 + temp) + letter;
         idx = Math.floor((idx - temp - 1) / 26);
     }
+
     return letter;
 };
 
 const areTwoCodesConsecutive = (code1: string, code2: string): boolean => {
     const len1 = code1.length;
     const len2 = code2.length;
+
     if (len1 !== len2 || len1 === 0) {
         return false;
     }
+
     if (len1 > 1) {
         const pref1 = code1.substring(0, len1 - 1);
         const pref2 = code2.substring(0, len2 - 1);
+
         if (pref1 !== pref2) {
             return false;
         }
     }
+
     const lastChar1 = code1.charCodeAt(len1 - 1);
     const lastChar2 = code2.charCodeAt(len2 - 1);
+
     return lastChar2 === lastChar1 + 1;
 };
 
@@ -138,6 +171,7 @@ interface CuttingGroup {
     key: string;
     label: string;
     description: string;
+    prefix: string;
     totalCuts: number;
     count: number;
     items: Cutting[];
@@ -155,9 +189,11 @@ const groupCuttings = (cuttingsList: Cutting[]): CuttingGroup[] => {
         const codeB = b.code?.code || '';
         const lenA = codeA.length;
         const lenB = codeB.length;
+
         if (lenA !== lenB) {
             return lenA - lenB;
         }
+
         return codeA.localeCompare(codeB, undefined, {
             numeric: true,
             sensitivity: 'base',
@@ -166,6 +202,7 @@ const groupCuttings = (cuttingsList: Cutting[]): CuttingGroup[] => {
 
     interface TempRun {
         description: string;
+        prefix: string;
         isNewCut: boolean;
         items: Cutting[];
     }
@@ -173,17 +210,20 @@ const groupCuttings = (cuttingsList: Cutting[]): CuttingGroup[] => {
     const tempRuns: TempRun[] = [];
     sorted.forEach((cutting) => {
         const desc = cutting.description || '';
+        const prefix = cutting.prefix?.prefix || '';
         const isNew = !!cutting.is_new_cut;
 
         if (
             tempRuns.length > 0 &&
             tempRuns[tempRuns.length - 1].description === desc &&
+            tempRuns[tempRuns.length - 1].prefix === prefix &&
             tempRuns[tempRuns.length - 1].isNewCut === isNew
         ) {
             tempRuns[tempRuns.length - 1].items.push(cutting);
         } else {
             tempRuns.push({
                 description: desc,
+                prefix,
                 isNewCut: isNew,
                 items: [cutting],
             });
@@ -240,12 +280,13 @@ const groupCuttings = (cuttingsList: Cutting[]): CuttingGroup[] => {
 
             const label =
                 subCount === 1 ? startLetter : `${startLetter}-${endLetter}`;
-            const key = `${run.isNewCut ? 'new-' : 'reg-'}${run.description}-${startLetter}-${endLetter}`;
+            const key = `${run.isNewCut ? 'new-' : 'reg-'}${run.description}-${run.prefix || ''}-${startLetter}-${endLetter}`;
 
             groups.push({
                 key,
                 label,
                 description: run.description,
+                prefix: run.prefix,
                 totalCuts,
                 count: subCount,
                 items: sub,
@@ -260,11 +301,13 @@ const groupCuttings = (cuttingsList: Cutting[]): CuttingGroup[] => {
 export default function ManageCuttingsSheet({
     specimen,
     cuttingCodes,
+    cuttingPrefixes,
     cuttingSlideTypes,
     users,
     open,
     onOpenChange,
     canEdit = true,
+    onInsertConcatenatedString,
 }: Props) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -290,6 +333,10 @@ export default function ManageCuttingsSheet({
         setPrevOpen(open);
         setSelectedIds([]);
     }
+
+    const [expandedGroups, setExpandedGroups] = useState<
+        Record<string, boolean>
+    >({});
 
     const { props } = usePage() as any;
     const hasCuttingsPermission =
@@ -317,10 +364,6 @@ export default function ManageCuttingsSheet({
         );
     }
 
-    const [expandedGroups, setExpandedGroups] = useState<
-        Record<string, boolean>
-    >({});
-
     const cuttings = specimen.cuttings || [];
 
     // Filter cuttings locally
@@ -339,7 +382,8 @@ export default function ManageCuttingsSheet({
     const groups = groupCuttings(filteredCuttings);
     const suffixMap: Record<number, string> = {};
     groups.forEach((g) => {
-        const suffix = `${g.totalCuts}x${g.count}`;
+        const cutsVal = g.totalCuts === 0 && g.prefix ? g.prefix : g.totalCuts;
+        const suffix = `${cutsVal}x${g.count}`;
         g.items.forEach((item) => {
             suffixMap[item.id] = suffix;
         });
@@ -446,6 +490,37 @@ export default function ManageCuttingsSheet({
         );
     };
 
+    const handleBulkPrefixChange = (nextPrefixId: string) => {
+        if (!canEdit) {
+            return;
+        }
+
+        if (selectedIds.length === 0) {
+            return;
+        }
+
+        setIsBulkUpdating(true);
+        router.put(
+            bulkUpdateCutting().url,
+            {
+                ids: selectedIds,
+                prefix_id:
+                    nextPrefixId === 'none' ? null : parseInt(nextPrefixId, 10),
+            },
+            {
+                onSuccess: () => {
+                    toast.success(
+                        'Prefijo actualizado para los cortes seleccionados',
+                    );
+                    setSelectedIds([]);
+                },
+                onFinish: () => {
+                    setIsBulkUpdating(false);
+                },
+            },
+        );
+    };
+
     const confirmBulkDelete = () => {
         if (!canEdit) {
             return;
@@ -467,6 +542,195 @@ export default function ManageCuttingsSheet({
                 setIsBulkUpdating(false);
             },
         });
+    };
+
+    const buildCuttingsSummary = (
+        cuttingsList: Cutting[],
+        prefix: string,
+    ): string | null => {
+        if (cuttingsList.length === 0) {
+            return null;
+        }
+
+        // Sort alphabetically (by length first, then natural comparison)
+        const sortedList = [...cuttingsList].sort((a: Cutting, b: Cutting) => {
+            const codeA = a.code?.code || '';
+            const codeB = b.code?.code || '';
+            const lenA = codeA.length;
+            const lenB = codeB.length;
+
+            if (lenA !== lenB) {
+                return lenA - lenB;
+            }
+
+            return codeA.localeCompare(codeB, undefined, {
+                numeric: true,
+                sensitivity: 'base',
+            });
+        });
+
+        interface TempRun {
+            startIndex: number;
+            endIndex: number;
+            description: string;
+            prefix: string;
+            items: Cutting[];
+        }
+
+        const tempRuns: TempRun[] = [];
+        sortedList.forEach((cutting, idx) => {
+            const desc = cutting.description || '';
+            const pref = cutting.prefix?.prefix || '';
+
+            if (
+                tempRuns.length > 0 &&
+                tempRuns[tempRuns.length - 1].description === desc &&
+                tempRuns[tempRuns.length - 1].prefix === pref
+            ) {
+                const lastRun = tempRuns[tempRuns.length - 1];
+                lastRun.endIndex = idx;
+                lastRun.items.push(cutting);
+            } else {
+                tempRuns.push({
+                    startIndex: idx,
+                    endIndex: idx,
+                    description: desc,
+                    prefix: pref,
+                    items: [cutting],
+                });
+            }
+        });
+
+        const groupsList: {
+            startIndex: number;
+            endIndex: number;
+            description: string;
+            prefix: string;
+            totalCuts: number;
+            count: number;
+        }[] = [];
+
+        tempRuns.forEach((run) => {
+            const subGroups: Cutting[][] = [];
+            let currentSubGroup: Cutting[] = [];
+
+            run.items.forEach((item, idx) => {
+                const realIdx = run.startIndex + idx;
+                const code = item.code?.code || indexToLetter(realIdx + 1);
+
+                if (currentSubGroup.length === 0) {
+                    currentSubGroup.push(item);
+                } else {
+                    const prevItem =
+                        currentSubGroup[currentSubGroup.length - 1];
+                    const prevRealIdx = run.startIndex + idx - 1;
+                    const prevCode =
+                        prevItem.code?.code || indexToLetter(prevRealIdx + 1);
+
+                    if (areTwoCodesConsecutive(prevCode, code)) {
+                        currentSubGroup.push(item);
+                    } else {
+                        subGroups.push(currentSubGroup);
+                        currentSubGroup = [item];
+                    }
+                }
+            });
+
+            if (currentSubGroup.length > 0) {
+                subGroups.push(currentSubGroup);
+            }
+
+            let startIdxInCuttingsList = run.startIndex;
+            subGroups.forEach((sub) => {
+                const subCount = sub.length;
+                let totalCuts = 0;
+                sub.forEach((item) => {
+                    totalCuts += item.number_of_cuttings ?? 0;
+                });
+
+                const endIdxInCuttingsList =
+                    startIdxInCuttingsList + subCount - 1;
+
+                groupsList.push({
+                    startIndex: startIdxInCuttingsList,
+                    endIndex: endIdxInCuttingsList,
+                    description: run.description,
+                    prefix: run.prefix,
+                    totalCuts,
+                    count: subCount,
+                });
+
+                startIdxInCuttingsList += subCount;
+            });
+        });
+
+        const cutsList: string[] = [];
+        groupsList.forEach((g) => {
+            const startCutting = sortedList[g.startIndex];
+            const endCutting = sortedList[g.endIndex];
+            const startLetter =
+                startCutting?.code?.code || indexToLetter(g.startIndex + 1);
+            const endLetter =
+                endCutting?.code?.code || indexToLetter(g.endIndex + 1);
+            const label =
+                g.startIndex === g.endIndex
+                    ? startLetter
+                    : `${startLetter}-${endLetter}`;
+
+            const formattedDesc = g.description ? `${g.description} ` : '';
+            const cutsVal =
+                g.totalCuts === 0 && g.prefix
+                    ? g.prefix
+                    : g.prefix
+                      ? `${g.prefix} ${g.totalCuts}`
+                      : g.totalCuts;
+            cutsList.push(`${label}) ${formattedDesc}${cutsVal}x${g.count}`);
+        });
+
+        return `${prefix} ${cutsList.join('; ')}.`;
+    };
+
+    const handleCopyAndInsertSummary = () => {
+        if (selectedIds.length === 0) {
+            return;
+        }
+
+        const selectedCuttings = cuttings.filter((c) =>
+            selectedIds.includes(c.id),
+        );
+        const selectedRegularCuttings = selectedCuttings.filter(
+            (c) => !c.is_new_cut,
+        );
+        const selectedNewCuttings = selectedCuttings.filter(
+            (c) => c.is_new_cut,
+        );
+
+        const summaries: string[] = [];
+        const regularSummary = buildCuttingsSummary(
+            selectedRegularCuttings,
+            'Cortes:',
+        );
+
+        if (regularSummary) {
+            summaries.push(regularSummary);
+        }
+
+        const newSummary = buildCuttingsSummary(
+            selectedNewCuttings,
+            'Nuevos Cortes:',
+        );
+
+        if (newSummary) {
+            summaries.push(newSummary);
+        }
+
+        const concatenatedString = summaries.join(' ');
+
+        if (concatenatedString) {
+            onInsertConcatenatedString?.(concatenatedString);
+            onOpenChange(false);
+            setSelectedIds([]);
+        }
     };
 
     const handleCreate = () => {
@@ -590,107 +854,193 @@ export default function ManageCuttingsSheet({
 
                             {/* Bulk Actions Bar */}
                             {selectedIds.length > 0 && (
-                                <div className="mb-3 flex animate-in flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-sm duration-200 fade-in sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-900/50">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-semibold text-slate-700 dark:text-slate-300">
-                                            {selectedIds.length}{' '}
-                                            {selectedIds.length === 1
-                                                ? 'corte seleccionado'
-                                                : 'cortes seleccionados'}
+                                <div className="mb-3 flex w-full animate-in flex-col justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2 px-3 select-none sm:flex-row sm:items-center sm:p-0 sm:py-1 sm:pr-1 sm:pl-3 dark:border-border/60 dark:bg-muted/10">
+                                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:flex-nowrap sm:text-sm">
+                                        <span>
+                                            <span className="font-semibold text-primary">
+                                                {selectedIds.length}
+                                            </span>{' '}
+                                            <span className="sm:hidden">
+                                                {selectedIds.length === 1
+                                                    ? 'seleccionado'
+                                                    : 'seleccionados'}
+                                            </span>
+                                            <span className="hidden sm:inline">
+                                                {selectedIds.length === 1
+                                                    ? 'corte seleccionado'
+                                                    : 'cortes seleccionados'}
+                                            </span>
+                                        </span>
+                                        <span className="text-muted-foreground/30">
+                                            |
                                         </span>
                                         <Button
-                                            variant="ghost"
-                                            size="sm"
+                                            type="button"
+                                            variant="link"
                                             disabled={isBulkUpdating}
                                             onClick={() => setSelectedIds([])}
-                                            className="h-8 cursor-pointer text-xs text-muted-foreground hover:text-foreground"
+                                            className="h-auto p-0 text-xs font-semibold text-primary transition-colors hover:text-primary/80 sm:text-sm"
                                         >
                                             Limpiar selección
                                         </Button>
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-3">
-                                        {/* Bulk Edit Status */}
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-xs text-muted-foreground">
-                                                Estado:
-                                            </span>
-                                            <Select
-                                                disabled={isBulkUpdating}
-                                                onValueChange={(val: any) =>
-                                                    handleBulkStatusChange(val)
-                                                }
-                                                value=""
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    disabled={
+                                                        selectedIds.length ===
+                                                            0 ||
+                                                        isBulkUpdating ||
+                                                        !canEdit
+                                                    }
+                                                    className="flex h-8 w-full items-center gap-2 px-3 text-xs sm:w-auto sm:px-4"
+                                                >
+                                                    <Layers className="h-4 w-4" />{' '}
+                                                    Acciones en Lote{' '}
+                                                    <ChevronDown className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent
+                                                align="end"
+                                                className="w-56"
                                             >
-                                                <SelectTrigger className="h-8 w-[140px] text-xs">
-                                                    <SelectValue placeholder="Cambiar estado..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem
-                                                        value="macroscopy"
-                                                        className="text-xs"
-                                                    >
-                                                        Macroscopía
-                                                    </SelectItem>
-                                                    <SelectItem
-                                                        value="processing"
-                                                        className="text-xs"
-                                                    >
-                                                        Procesamiento
-                                                    </SelectItem>
-                                                    <SelectItem
-                                                        value="delivered"
-                                                        className="text-xs"
-                                                    >
-                                                        Entregado
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                                <DropdownMenuLabel>
+                                                    Acciones en Lote
+                                                </DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
 
-                                        {/* Bulk Edit Responsible */}
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-xs text-muted-foreground">
-                                                Responsable:
-                                            </span>
-                                            <Select
-                                                disabled={isBulkUpdating}
-                                                onValueChange={(val: any) =>
-                                                    handleBulkResponsibleChange(
-                                                        val,
-                                                    )
-                                                }
-                                                value=""
-                                            >
-                                                <SelectTrigger className="h-8 w-[180px] text-xs">
-                                                    <SelectValue placeholder="Asignar responsable..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {users.map((u) => (
-                                                        <SelectItem
-                                                            key={u.id}
-                                                            value={u.id.toString()}
-                                                            className="text-xs"
+                                                {/* Cambiar Estado Submenu */}
+                                                <DropdownMenuSub>
+                                                    <DropdownMenuSubTrigger>
+                                                        <Tag className="mr-2 h-4 w-4" />
+                                                        <span>
+                                                            Cambiar Estado
+                                                        </span>
+                                                    </DropdownMenuSubTrigger>
+                                                    <DropdownMenuSubContent>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkStatusChange(
+                                                                    'macroscopy',
+                                                                )
+                                                            }
                                                         >
-                                                            {u.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                                            Macroscopía
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkStatusChange(
+                                                                    'processing',
+                                                                )
+                                                            }
+                                                        >
+                                                            Procesamiento
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkStatusChange(
+                                                                    'delivered',
+                                                                )
+                                                            }
+                                                        >
+                                                            Entregado
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuSubContent>
+                                                </DropdownMenuSub>
 
-                                        {/* Bulk Delete */}
-                                        <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            disabled={isBulkUpdating}
-                                            onClick={() =>
-                                                setIsBulkDeleteDialogOpen(true)
-                                            }
-                                            className="h-8 cursor-pointer gap-1.5 text-xs"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                            Eliminar seleccionados
-                                        </Button>
+                                                {/* Asignar Responsable Submenu */}
+                                                <DropdownMenuSub>
+                                                    <DropdownMenuSubTrigger>
+                                                        <UserPlus className="mr-2 h-4 w-4" />
+                                                        <span>
+                                                            Asignar Responsable
+                                                        </span>
+                                                    </DropdownMenuSubTrigger>
+                                                    <DropdownMenuSubContent className="max-h-60 overflow-y-auto">
+                                                        {users.map((u) => (
+                                                            <DropdownMenuItem
+                                                                key={u.id}
+                                                                onClick={() =>
+                                                                    handleBulkResponsibleChange(
+                                                                        u.id.toString(),
+                                                                    )
+                                                                }
+                                                            >
+                                                                {u.name}
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                    </DropdownMenuSubContent>
+                                                </DropdownMenuSub>
+
+                                                {/* Asignar Prefijo Submenu */}
+                                                <DropdownMenuSub>
+                                                    <DropdownMenuSubTrigger>
+                                                        <Tag className="mr-2 h-4 w-4" />
+                                                        <span>
+                                                            Asignar Prefijo
+                                                        </span>
+                                                    </DropdownMenuSubTrigger>
+                                                    <DropdownMenuSubContent className="max-h-60 overflow-y-auto">
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                handleBulkPrefixChange(
+                                                                    'none',
+                                                                )
+                                                            }
+                                                        >
+                                                            Ninguno
+                                                        </DropdownMenuItem>
+                                                        {cuttingPrefixes.map(
+                                                            (p) => (
+                                                                <DropdownMenuItem
+                                                                    key={p.id}
+                                                                    onClick={() =>
+                                                                        handleBulkPrefixChange(
+                                                                            p.id.toString(),
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    {p.prefix}
+                                                                </DropdownMenuItem>
+                                                            ),
+                                                        )}
+                                                    </DropdownMenuSubContent>
+                                                </DropdownMenuSub>
+
+                                                {onInsertConcatenatedString && (
+                                                    <DropdownMenuItem
+                                                        onClick={
+                                                            handleCopyAndInsertSummary
+                                                        }
+                                                        className="cursor-pointer"
+                                                    >
+                                                        <Copy className="mr-2 h-4 w-4" />
+                                                        <span>
+                                                            Concatenar y Copiar
+                                                            a Macroscopía
+                                                        </span>
+                                                    </DropdownMenuItem>
+                                                )}
+
+                                                <DropdownMenuSeparator />
+
+                                                {/* Eliminar Seleccionados */}
+                                                <DropdownMenuItem
+                                                    className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                                    onClick={() =>
+                                                        setIsBulkDeleteDialogOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                >
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    <span>
+                                                        Eliminar seleccionados
+                                                    </span>
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
                                 </div>
                             )}
@@ -815,8 +1165,10 @@ export default function ManageCuttingsSheet({
                                                                     onClick={() => {
                                                                         if (
                                                                             !canEdit
-                                                                        )
+                                                                        ) {
                                                                             return;
+                                                                        }
+
                                                                         const groupItemIds =
                                                                             group.items.map(
                                                                                 (
@@ -824,6 +1176,7 @@ export default function ManageCuttingsSheet({
                                                                                 ) =>
                                                                                     item.id,
                                                                             );
+
                                                                         if (
                                                                             allGroupItemsSelected
                                                                         ) {
@@ -857,12 +1210,14 @@ export default function ManageCuttingsSheet({
                                                                                                 !next.includes(
                                                                                                     id,
                                                                                                 )
-                                                                                            )
+                                                                                            ) {
                                                                                                 next.push(
                                                                                                     id,
                                                                                                 );
+                                                                                            }
                                                                                         },
                                                                                     );
+
                                                                                     return next;
                                                                                 },
                                                                             );
@@ -908,6 +1263,7 @@ export default function ManageCuttingsSheet({
                                                                                         ] ||
                                                                                             0) +
                                                                                         1;
+
                                                                                     return acc;
                                                                                 },
                                                                                 {} as Record<
@@ -937,6 +1293,7 @@ export default function ManageCuttingsSheet({
                                                                                     1
                                                                                         ? ` x${count}`
                                                                                         : '';
+
                                                                                 if (
                                                                                     status ===
                                                                                     'processing'
@@ -955,6 +1312,7 @@ export default function ManageCuttingsSheet({
                                                                                         </Badge>
                                                                                     );
                                                                                 }
+
                                                                                 if (
                                                                                     status ===
                                                                                     'macroscopy'
@@ -973,6 +1331,7 @@ export default function ManageCuttingsSheet({
                                                                                         </Badge>
                                                                                     );
                                                                                 }
+
                                                                                 if (
                                                                                     status ===
                                                                                     'delivered'
@@ -991,6 +1350,7 @@ export default function ManageCuttingsSheet({
                                                                                         </Badge>
                                                                                     );
                                                                                 }
+
                                                                                 return null;
                                                                             },
                                                                         );
@@ -1024,9 +1384,11 @@ export default function ManageCuttingsSheet({
                                                                         variant="secondary"
                                                                         className="px-1.5 py-0 font-mono text-[10px] font-semibold text-primary"
                                                                     >
-                                                                        {
-                                                                            group.totalCuts
-                                                                        }
+                                                                        {group.totalCuts ===
+                                                                            0 &&
+                                                                        group.prefix
+                                                                            ? group.prefix
+                                                                            : group.totalCuts}
                                                                         x
                                                                         {
                                                                             group.count
@@ -1037,9 +1399,26 @@ export default function ManageCuttingsSheet({
 
                                                             {/* Total number of cuts */}
                                                             <TableCell className="w-[100px] min-w-[100px] text-center align-middle font-bold text-slate-700 dark:text-slate-300">
-                                                                {
-                                                                    group.totalCuts
-                                                                }
+                                                                {group.totalCuts ===
+                                                                    0 &&
+                                                                group.prefix ? (
+                                                                    group.prefix
+                                                                ) : (
+                                                                    <>
+                                                                        {group.totalCuts >
+                                                                            0 &&
+                                                                        group.prefix
+                                                                            ? `${group.prefix} `
+                                                                            : ''}
+                                                                        {group.totalCuts && (
+                                                                            <span className="ml-1 rounded-sm border border-gray-200 bg-gray-100 px-1 text-gray-600">
+                                                                                {
+                                                                                    group.totalCuts
+                                                                                }
+                                                                            </span>
+                                                                        )}
+                                                                    </>
+                                                                )}
                                                             </TableCell>
 
                                                             {/* Cuts Description (unique combination) */}
@@ -1090,6 +1469,7 @@ export default function ManageCuttingsSheet({
                                                                                 ),
                                                                             ),
                                                                         );
+
                                                                     if (
                                                                         allTypes.length >
                                                                         0
@@ -1120,6 +1500,7 @@ export default function ManageCuttingsSheet({
                                                                                                 )
                                                                                                     ?.name ||
                                                                                                 `ID: ${stId}`;
+
                                                                                             return (
                                                                                                 <Badge
                                                                                                     key={
@@ -1146,6 +1527,7 @@ export default function ManageCuttingsSheet({
                                                                             </div>
                                                                         );
                                                                     }
+
                                                                     return '-';
                                                                 })()}
                                                             </TableCell>
@@ -1204,16 +1586,21 @@ export default function ManageCuttingsSheet({
                                                                                     ),
                                                                             ),
                                                                         );
+
                                                                     if (
                                                                         responsibles.length ===
                                                                         1
-                                                                    )
+                                                                    ) {
                                                                         return responsibles[0];
+                                                                    }
+
                                                                     if (
                                                                         responsibles.length >
                                                                         1
-                                                                    )
+                                                                    ) {
                                                                         return 'Varios';
+                                                                    }
+
                                                                     return 'No asignado';
                                                                 })()}
                                                             </TableCell>
@@ -1365,9 +1752,28 @@ export default function ManageCuttingsSheet({
 
                                                                         {/* Number of Cuttings */}
                                                                         <TableCell className="w-[100px] min-w-[100px] text-center align-middle font-bold text-slate-600 dark:text-slate-400">
-                                                                            {
-                                                                                c.number_of_cuttings
-                                                                            }
+                                                                            {c
+                                                                                .prefix
+                                                                                ?.prefix
+                                                                                ? `${c.prefix.prefix} `
+                                                                                : ''}
+                                                                            {c.number_of_cuttings >
+                                                                                0 && (
+                                                                                <>
+                                                                                    <span className="ml-1 rounded-sm border border-gray-200 bg-gray-100 px-1 text-gray-600">
+                                                                                        {
+                                                                                            c.number_of_cuttings
+                                                                                        }
+                                                                                    </span>
+                                                                                </>
+                                                                            )}
+                                                                            {!c
+                                                                                .prefix
+                                                                                ?.prefix &&
+                                                                            c.number_of_cuttings ===
+                                                                                0
+                                                                                ? '-'
+                                                                                : ''}
                                                                         </TableCell>
 
                                                                         {/* Cuttings Description */}
@@ -1588,6 +1994,7 @@ export default function ManageCuttingsSheet({
                 cutting={selectedCutting}
                 specimen={specimen}
                 cuttingCodes={cuttingCodes}
+                cuttingPrefixes={cuttingPrefixes}
                 cuttingSlideTypes={cuttingSlideTypes}
                 users={users}
                 isDuplicate={isDuplicateMode}

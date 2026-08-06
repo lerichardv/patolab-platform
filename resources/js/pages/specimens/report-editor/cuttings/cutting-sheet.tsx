@@ -1,6 +1,6 @@
+import { usePage } from '@inertiajs/react';
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { usePage } from '@inertiajs/react';
 import { cn } from '@/lib/utils';
 import CuttingForm from './cutting-form';
 
@@ -30,6 +30,11 @@ interface CuttingSlideType {
     name: string;
 }
 
+interface CuttingPrefix {
+    id: number;
+    prefix: string;
+}
+
 interface User {
     id: number;
     name: string;
@@ -43,6 +48,7 @@ interface Props {
         cuttings?: Cutting[];
     };
     cuttingCodes: CuttingCode[];
+    cuttingPrefixes: CuttingPrefix[];
     cuttingSlideTypes: CuttingSlideType[];
     users: User[];
     isDuplicate?: boolean;
@@ -56,6 +62,7 @@ export default function CuttingSheet({
     cutting,
     specimen,
     cuttingCodes,
+    cuttingPrefixes,
     cuttingSlideTypes,
     users,
     isDuplicate = false,
@@ -102,6 +109,7 @@ export default function CuttingSheet({
                     cutting={cutting}
                     specimen={specimen}
                     cuttingCodes={cuttingCodes}
+                    cuttingPrefixes={cuttingPrefixes}
                     cuttingSlideTypes={cuttingSlideTypes}
                     users={users}
                     isDuplicate={isDuplicate}

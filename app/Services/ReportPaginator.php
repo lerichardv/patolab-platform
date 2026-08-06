@@ -77,12 +77,13 @@ class ReportPaginator
                 return strnatcasecmp($codeA, $codeB);
             });
 
-            // Find runs of contiguous items with the same description
+            // Find runs of contiguous items with the same description and prefix
             $tempRuns = [];
             foreach ($cuttingsList as $idx => $cutting) {
                 $desc = $cutting->description ?? '';
+                $cuttingPrefix = (isset($cutting->prefix) && ! empty($cutting->prefix->prefix)) ? $cutting->prefix->prefix : '';
                 $lastRunIdx = count($tempRuns) - 1;
-                if ($lastRunIdx >= 0 && $tempRuns[$lastRunIdx]['description'] === $desc) {
+                if ($lastRunIdx >= 0 && $tempRuns[$lastRunIdx]['description'] === $desc && $tempRuns[$lastRunIdx]['prefix'] === $cuttingPrefix) {
                     $tempRuns[$lastRunIdx]['endIndex'] = $idx;
                     $tempRuns[$lastRunIdx]['items'][] = $cutting;
                 } else {
@@ -90,6 +91,7 @@ class ReportPaginator
                         'startIndex' => $idx,
                         'endIndex' => $idx,
                         'description' => $desc,
+                        'prefix' => $cuttingPrefix,
                         'items' => [$cutting],
                     ];
                 }
@@ -135,6 +137,7 @@ class ReportPaginator
                         'startIndex' => $startIdxInCuttingsList,
                         'endIndex' => $endIdxInCuttingsList,
                         'description' => $run['description'],
+                        'prefix' => $run['prefix'],
                         'totalCuts' => $totalCuts,
                         'count' => $subCount,
                     ];
@@ -161,7 +164,8 @@ class ReportPaginator
                     : $startLetter.'-'.$endLetter;
 
                 $formattedDesc = $g['description'] !== '' ? $g['description'].' ' : '';
-                $cutsList[] = "{$label}) {$formattedDesc}{$g['totalCuts']}x{$g['count']}";
+                $cutsVal = ($g['totalCuts'] === 0 && ! empty($g['prefix'])) ? $g['prefix'] : (! empty($g['prefix']) ? $g['prefix'].' '.$g['totalCuts'] : $g['totalCuts']);
+                $cutsList[] = "{$label}) {$formattedDesc}{$cutsVal}x{$g['count']}";
             }
 
             $concatenatedCuts = $prefix.' '.implode('; ', $cutsList).'.';
@@ -241,6 +245,7 @@ class ReportPaginator
                     }
                 }
 
+                /*
                 if (! $hasPushedCuttings) {
                     if ($cuttingsBlock) {
                         $blocks[] = $cuttingsBlock;
@@ -250,6 +255,7 @@ class ReportPaginator
                     }
                     $hasPushedCuttings = true;
                 }
+                */
             } elseif ($key === 'microscopy_html') {
                 if ($isMicroscopyVisible) {
                     $microHtml = ! empty($report->microscopy_html) ? $report->microscopy_html : '';
@@ -331,6 +337,7 @@ class ReportPaginator
             }
         }
 
+        /*
         if (! $hasPushedCuttings) {
             if ($cuttingsBlock) {
                 $blocks[] = $cuttingsBlock;
@@ -339,6 +346,7 @@ class ReportPaginator
                 $blocks[] = $newCuttingsBlock;
             }
         }
+        */
 
         // 3. Paginate the stream of blocks
         $pages = self::paginateBlocks($blocks, $pageContentHeight, $lineHeight, $maxCharsPerLine);

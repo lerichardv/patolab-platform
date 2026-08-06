@@ -3,6 +3,7 @@
 use App\Models\Customer;
 use App\Models\Cutting;
 use App\Models\CuttingCode;
+use App\Models\CuttingPrefix;
 use App\Models\Permission;
 use App\Models\Priority;
 use App\Models\Referrer;
@@ -187,4 +188,76 @@ test('user can store a new cutting code', function () {
         'code' => 'B',
         'color' => '#ff0000',
     ]);
+});
+
+test('user can bulk update cuttings status, responsible, and prefix', function () {
+    $cutting1 = Cutting::create([
+        'specimen_id' => $this->specimen->id,
+        'code_id' => $this->code->id,
+        'description' => 'C1',
+        'number_of_cuttings' => 1,
+        'cuttings_description' => '',
+        'responsible_id' => $this->user->id,
+        'status' => 'processing',
+    ]);
+
+    $code2 = CuttingCode::create(['code' => 'B', 'color' => '#ffffff']);
+    $cutting2 = Cutting::create([
+        'specimen_id' => $this->specimen->id,
+        'code_id' => $code2->id,
+        'description' => 'C2',
+        'number_of_cuttings' => 1,
+        'cuttings_description' => '',
+        'responsible_id' => $this->user->id,
+        'status' => 'processing',
+    ]);
+
+    $prefix = CuttingPrefix::create(['prefix' => 'P1']);
+    $newUser = User::factory()->create();
+
+    $response = $this->actingAs($this->user)
+        ->put(route('cuttings.bulk-update'), [
+            'ids' => [$cutting1->id, $cutting2->id],
+            'status' => 'delivered',
+            'responsible_id' => $newUser->id,
+            'prefix_id' => $prefix->id,
+        ]);
+
+    $response->assertRedirect();
+
+    $cutting1->refresh();
+    $cutting2->refresh();
+
+    expect($cutting1->status)->toBe('delivered');
+    expect($cutting1->responsible_id)->toBe($newUser->id);
+    expect($cutting1->prefix_id)->toBe($prefix->id);
+
+    expect($cutting2->status)->toBe('delivered');
+    expect($cutting2->responsible_id)->toBe($newUser->id);
+    expect($cutting2->prefix_id)->toBe($prefix->id);
+});
+
+test('user can clear prefix in bulk update', function () {
+    $prefix = CuttingPrefix::create(['prefix' => 'P1']);
+    $cutting = Cutting::create([
+        'specimen_id' => $this->specimen->id,
+        'code_id' => $this->code->id,
+        'description' => 'C1',
+        'number_of_cuttings' => 1,
+        'cuttings_description' => '',
+        'responsible_id' => $this->user->id,
+        'status' => 'processing',
+        'prefix_id' => $prefix->id,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->put(route('cuttings.bulk-update'), [
+            'ids' => [$cutting->id],
+            'prefix_id' => null,
+        ]);
+
+    $response->assertRedirect();
+
+    $cutting->refresh();
+    expect($cutting->prefix_id)->toBeNull();
 });

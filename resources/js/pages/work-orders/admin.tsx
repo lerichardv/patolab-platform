@@ -27,8 +27,24 @@ import { toast } from 'sonner';
 import { index as adminWorkOrdersIndex } from '@/actions/App/Http/Controllers/WorkOrderController';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Pagination } from '@/components/pagination';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -47,24 +63,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import WorkOrderViewSheet from '../my-work-orders/work-order-view-sheet';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import WorkOrderViewSheet from '../my-work-orders/work-order-view-sheet';
 
 interface WorkOrder {
     id: number;
@@ -647,6 +647,7 @@ export default function WorkOrdersAdminIndex({
                 open={isEditWorkOrderSheetOpen}
                 onOpenChange={(open) => {
                     setIsEditWorkOrderSheetOpen(open);
+
                     if (!open) {
                         setEditingWorkOrder(null);
                     }

@@ -28,6 +28,7 @@ import {
     Layers,
     UserPlus,
 } from 'lucide-react';
+import { Scissors } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
@@ -80,12 +81,11 @@ import {
 } from '@/components/ui/table';
 import { cn, addWithoutWeekends } from '@/lib/utils';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
+import ManageCuttingsSheet from '../specimens/report-editor/cuttings/manage-cuttings-sheet';
 import SpecimenBulkCollaboratorSheet from '../specimens/specimen-bulk-collaborator-sheet';
 import SpecimenCollaboratorSheet from '../specimens/specimen-collaborator-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 import SpecimenWorkOrdersSheet from './specimen-work-orders-sheet';
-import ManageCuttingsSheet from '../specimens/report-editor/cuttings/manage-cuttings-sheet';
-import { Scissors } from 'lucide-react';
 
 interface Specimen {
     id: number;
@@ -146,6 +146,7 @@ interface Props {
     workOrderTasks: any[];
     usersList: any[];
     cuttingCodes: any[];
+    cuttingPrefixes: any[];
     cuttingSlideTypes: any[];
     filters: {
         status?: string[];
@@ -285,6 +286,7 @@ export default function MyAssignmentsIndex({
     workOrderTasks,
     usersList,
     cuttingCodes,
+    cuttingPrefixes,
     cuttingSlideTypes,
     filters,
 }: Props) {
@@ -327,14 +329,17 @@ export default function MyAssignmentsIndex({
             const updated = specimens.find(
                 (s) => s.id === selectedSpecimenForWorkOrdersList.id,
             );
+
             if (updated) {
                 setSelectedSpecimenForWorkOrdersList(updated);
             }
         }
+
         if (specimenForCuttings) {
             const updated = specimens.find(
                 (s) => s.id === specimenForCuttings.id,
             );
+
             if (updated) {
                 setSpecimenForCuttings(updated);
             }
@@ -1844,11 +1849,13 @@ export default function MyAssignmentsIndex({
                     }
                 }
                 cuttingCodes={cuttingCodes}
+                cuttingPrefixes={cuttingPrefixes}
                 cuttingSlideTypes={cuttingSlideTypes}
                 users={usersList}
                 open={isManageCuttingsOpen}
                 onOpenChange={(open) => {
                     setIsManageCuttingsOpen(open);
+
                     if (!open) {
                         setSpecimenForCuttings(null);
                     }

@@ -243,6 +243,7 @@ interface Props {
     pathologists?: any[];
     products?: any[];
     cutting_codes: any[];
+    cutting_prefixes: any[];
     cutting_slide_types: any[];
     users: any[];
     templates?: any[];
@@ -1015,6 +1016,7 @@ const CustomImage = Image.extend({
             if (pos !== undefined) {
                 try {
                     const $pos = editor.state.doc.resolve(pos);
+
                     if ($pos.parent && $pos.parent.type.name === 'imageGrid') {
                         isInsideGrid = true;
                     }
@@ -1052,9 +1054,11 @@ const CustomImage = Image.extend({
                         if (updatedNode.type !== node.type) {
                             return false;
                         }
+
                         if (updatedNode.attrs.src) {
                             el.src = updatedNode.attrs.src;
                         }
+
                         return true;
                     },
                 };
@@ -1284,11 +1288,16 @@ export const ImageGrid = TiptapNode.create<ImageGridOptions>({
             width: {
                 default: null,
                 parseHTML: (element: HTMLElement) => {
-                    const w = element.getAttribute('width') || element.style.width;
+                    const w =
+                        element.getAttribute('width') || element.style.width;
+
                     return w ? parseInt(w, 10) : null;
                 },
                 renderHTML: (attributes: Record<string, any>) => {
-                    if (!attributes.width) return {};
+                    if (!attributes.width) {
+                        return {};
+                    }
+
                     return {
                         width: attributes.width,
                     };
@@ -2065,10 +2074,14 @@ function EditorToolbar({
                             }}
                             active={
                                 editor?.isActive('imageGrid')
-                                    ? editor?.isActive('imageGrid', { alignment: 'left' })
+                                    ? editor?.isActive('imageGrid', {
+                                          alignment: 'left',
+                                      })
                                     : editor?.isActive('image')
-                                        ? editor?.isActive('image', { alignment: 'left' })
-                                        : editor?.isActive({ textAlign: 'left' })
+                                      ? editor?.isActive('image', {
+                                            alignment: 'left',
+                                        })
+                                      : editor?.isActive({ textAlign: 'left' })
                             }
                             title="Alinear a la izquierda"
                         >
@@ -2102,10 +2115,16 @@ function EditorToolbar({
                             }}
                             active={
                                 editor?.isActive('imageGrid')
-                                    ? editor?.isActive('imageGrid', { alignment: 'center' })
+                                    ? editor?.isActive('imageGrid', {
+                                          alignment: 'center',
+                                      })
                                     : editor?.isActive('image')
-                                        ? editor?.isActive('image', { alignment: 'center' })
-                                        : editor?.isActive({ textAlign: 'center' })
+                                      ? editor?.isActive('image', {
+                                            alignment: 'center',
+                                        })
+                                      : editor?.isActive({
+                                            textAlign: 'center',
+                                        })
                             }
                             title="Centrar"
                         >
@@ -2139,10 +2158,14 @@ function EditorToolbar({
                             }}
                             active={
                                 editor?.isActive('imageGrid')
-                                    ? editor?.isActive('imageGrid', { alignment: 'right' })
+                                    ? editor?.isActive('imageGrid', {
+                                          alignment: 'right',
+                                      })
                                     : editor?.isActive('image')
-                                        ? editor?.isActive('image', { alignment: 'right' })
-                                        : editor?.isActive({ textAlign: 'right' })
+                                      ? editor?.isActive('image', {
+                                            alignment: 'right',
+                                        })
+                                      : editor?.isActive({ textAlign: 'right' })
                             }
                             title="Alinear a la derecha"
                         >
@@ -2176,10 +2199,16 @@ function EditorToolbar({
                             }}
                             active={
                                 editor?.isActive('imageGrid')
-                                    ? editor?.isActive('imageGrid', { alignment: 'justify' })
+                                    ? editor?.isActive('imageGrid', {
+                                          alignment: 'justify',
+                                      })
                                     : editor?.isActive('image')
-                                        ? editor?.isActive('image', { alignment: 'justify' })
-                                        : editor?.isActive({ textAlign: 'justify' })
+                                      ? editor?.isActive('image', {
+                                            alignment: 'justify',
+                                        })
+                                      : editor?.isActive({
+                                            textAlign: 'justify',
+                                        })
                             }
                             title="Justificar"
                         >
@@ -2918,6 +2947,7 @@ function CollaborativeEditorInner({
                 Editor de texto enriquecido
             </span>
             <div
+                id={`editor-container-${field}`}
                 className={cn(
                     'relative rounded-lg border bg-card text-card-foreground shadow-xs transition-all duration-200',
                     isFocused ? focusColorClass : 'border-border',
@@ -3260,16 +3290,25 @@ function getImageHeight(blockHtml: string): number {
 
     if ((!attrWidth || !attrHeight) && typeof document !== 'undefined') {
         const srcMatch = blockHtml.match(/src=["\']([^"\']+)["\']/i);
+
         if (srcMatch && srcMatch[1]) {
             const src = srcMatch[1];
             const imgs = document.getElementsByTagName('img');
+
             for (let i = 0; i < imgs.length; i++) {
                 const imgEl = imgs[i];
+
                 if (imgEl.src === src || imgEl.getAttribute('src') === src) {
                     if (imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
-                        if (!attrWidth) attrWidth = imgEl.naturalWidth;
-                        if (!attrHeight) attrHeight = imgEl.naturalHeight;
+                        if (!attrWidth) {
+                            attrWidth = imgEl.naturalWidth;
+                        }
+
+                        if (!attrHeight) {
+                            attrHeight = imgEl.naturalHeight;
+                        }
                     }
+
                     break;
                 }
             }
@@ -3295,7 +3334,7 @@ function getImageHeight(blockHtml: string): number {
 function getImageAspectRatio(imgTag: string): number {
     const wAttrMatch = imgTag.match(/width=["\'](\d+)["\']/i);
     const swMatch = imgTag.match(/width:\s*(\d+)px/i);
-    let attrWidth = wAttrMatch
+    const attrWidth = wAttrMatch
         ? parseInt(wAttrMatch[1], 10)
         : swMatch
           ? parseInt(swMatch[1], 10)
@@ -3303,7 +3342,7 @@ function getImageAspectRatio(imgTag: string): number {
 
     const hAttrMatch = imgTag.match(/height=["\'](\d+)["\']/i);
     const shMatch = imgTag.match(/height:\s*(\d+)px/i);
-    let attrHeight = hAttrMatch
+    const attrHeight = hAttrMatch
         ? parseInt(hAttrMatch[1], 10)
         : shMatch
           ? parseInt(shMatch[1], 10)
@@ -3315,15 +3354,19 @@ function getImageAspectRatio(imgTag: string): number {
 
     if (typeof document !== 'undefined') {
         const srcMatch = imgTag.match(/src=["\']([^"\']+)["\']/i);
+
         if (srcMatch && srcMatch[1]) {
             const src = srcMatch[1];
             const imgs = document.getElementsByTagName('img');
+
             for (let i = 0; i < imgs.length; i++) {
                 const imgEl = imgs[i];
+
                 if (imgEl.src === src || imgEl.getAttribute('src') === src) {
                     if (imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
                         return imgEl.naturalHeight / imgEl.naturalWidth;
                     }
+
                     break;
                 }
             }
@@ -3358,12 +3401,16 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
 
         let align = 'center';
         const alignMatch = blockHtml.match(/data-align=["\']([^"\']+)["\']/i);
+
         if (alignMatch) {
             align = alignMatch[1];
         }
 
         let width: number | null = null;
-        const widthMatch = blockHtml.match(/(?:width|data-width)=["\'](\d+)["\']/i);
+        const widthMatch = blockHtml.match(
+            /(?:width|data-width)=["\'](\d+)["\']/i,
+        );
+
         if (widthMatch) {
             width = parseInt(widthMatch[1], 10);
         }
@@ -3376,8 +3423,8 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             imgTags.push(match[0]);
         }
 
-        const usableWidth = width ? (185.9 * (width / 704)) : 185.9;
-        const gap = 1.50; // mm
+        const usableWidth = width ? 185.9 * (width / 704) : 185.9;
+        const gap = 1.5; // mm
 
         // Group images into a single row of up to 4 images
         const slicedTags = imgTags.slice(0, 4);
@@ -3388,6 +3435,7 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             let aspectSum = 0.0;
             rowImages.forEach((imgTag) => {
                 const aspect = getImageAspectRatio(imgTag);
+
                 if (aspect > 0.0) {
                     aspectSum += 1.0 / aspect;
                 } else {
@@ -3400,12 +3448,16 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             }
 
             const N = rowImages.length;
-            const maxRowHeight = N === 1 ? Math.min(120.0, usableWidth) : (usableWidth * 1.5);
+            const maxRowHeight =
+                N === 1 ? Math.min(120.0, usableWidth) : usableWidth * 1.5;
             let rowHeight = 0.0;
+
             if (N > 0) {
-                const calculatedHeight = (usableWidth - (N - 1) * gap) / aspectSum;
+                const calculatedHeight =
+                    (usableWidth - (N - 1) * gap) / aspectSum;
                 rowHeight = Math.min(calculatedHeight, maxRowHeight);
             }
+
             gridHeight += rowHeight;
 
             if (i > 0) {
@@ -3946,6 +3998,7 @@ export default function ReportWorkspace({
     pathologists = [],
     products = [],
     cutting_codes = [],
+    cutting_prefixes = [],
     cutting_slide_types = [],
     users = [],
     templates = [],
@@ -3959,6 +4012,38 @@ export default function ReportWorkspace({
 
     const registerEditor = (field: string, editor: any) => {
         editorRefs.current[field] = editor;
+    };
+
+    const handleInsertConcatenatedString = (text: string) => {
+        const editor = editorRefs.current['macroscopy'];
+
+        if (editor) {
+            setTimeout(() => {
+                const container = document.getElementById(
+                    'editor-container-macroscopy',
+                );
+
+                if (container) {
+                    container.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center',
+                    });
+                }
+
+                editor.commands.focus();
+                const from = editor.state.selection.from;
+
+                editor.chain().insertContent(`<p>${text}</p>`).run();
+
+                const startPos = from;
+                const endPos = startPos + text.length;
+
+                editor
+                    .chain()
+                    .setTextSelection({ from: startPos, to: endPos })
+                    .run();
+            }, 200);
+        }
     };
 
     useEffect(() => {
@@ -4418,6 +4503,7 @@ export default function ReportWorkspace({
         ): boolean => {
             const len1 = code1.length;
             const len2 = code2.length;
+
             if (len1 !== len2 || len1 === 0) {
                 return false;
             }
@@ -4425,6 +4511,7 @@ export default function ReportWorkspace({
             if (len1 > 1) {
                 const pref1 = code1.substring(0, len1 - 1);
                 const pref2 = code2.substring(0, len2 - 1);
+
                 if (pref1 !== pref2) {
                     return false;
                 }
@@ -4473,9 +4560,11 @@ export default function ReportWorkspace({
                 const codeB = b.code?.code || '';
                 const lenA = codeA.length;
                 const lenB = codeB.length;
+
                 if (lenA !== lenB) {
                     return lenA - lenB;
                 }
+
                 return codeA.localeCompare(codeB, undefined, {
                     numeric: true,
                     sensitivity: 'base',
@@ -4486,16 +4575,19 @@ export default function ReportWorkspace({
                 startIndex: number;
                 endIndex: number;
                 description: string;
+                prefix: string;
                 items: any[];
             }
 
             const tempRuns: TempRun[] = [];
             cuttingsList.forEach((cutting: any, idx: number) => {
                 const desc = cutting.description || '';
+                const prefix = cutting.prefix?.prefix || '';
 
                 if (
                     tempRuns.length > 0 &&
-                    tempRuns[tempRuns.length - 1].description === desc
+                    tempRuns[tempRuns.length - 1].description === desc &&
+                    tempRuns[tempRuns.length - 1].prefix === prefix
                 ) {
                     const lastRun = tempRuns[tempRuns.length - 1];
                     lastRun.endIndex = idx;
@@ -4505,6 +4597,7 @@ export default function ReportWorkspace({
                         startIndex: idx,
                         endIndex: idx,
                         description: desc,
+                        prefix: prefix,
                         items: [cutting],
                     });
                 }
@@ -4514,6 +4607,7 @@ export default function ReportWorkspace({
                 startIndex: number;
                 endIndex: number;
                 description: string;
+                prefix: string;
                 totalCuts: number;
                 count: number;
             }[] = [];
@@ -4564,6 +4658,7 @@ export default function ReportWorkspace({
                         startIndex: startIdxInCuttingsList,
                         endIndex: endIdxInCuttingsList,
                         description: run.description,
+                        prefix: run.prefix,
                         totalCuts,
                         count: subCount,
                     });
@@ -4586,8 +4681,14 @@ export default function ReportWorkspace({
                         : `${startLetter}-${endLetter}`;
 
                 const formattedDesc = g.description ? `${g.description} ` : '';
+                const cutsVal =
+                    g.totalCuts === 0 && g.prefix
+                        ? g.prefix
+                        : g.prefix
+                          ? `${g.prefix} ${g.totalCuts}`
+                          : g.totalCuts;
                 cutsList.push(
-                    `${label}) ${formattedDesc}${g.totalCuts}x${g.count}`,
+                    `${label}) ${formattedDesc}${cutsVal}x${g.count}`,
                 );
             });
 
@@ -4697,6 +4798,7 @@ export default function ReportWorkspace({
                     });
                 }
 
+                /*
                 // Cuttings summary block always goes after the macroscopy editor/blocks
                 if (!hasPushedCuttings) {
                     if (cuttingsBlock) {
@@ -4709,6 +4811,7 @@ export default function ReportWorkspace({
 
                     hasPushedCuttings = true;
                 }
+                */
             } else if (section.key === 'microscopy_html') {
                 if (isMicroscopyVisible) {
                     const microHtml = microscopyHtml || '';
@@ -4814,6 +4917,7 @@ export default function ReportWorkspace({
             }
         });
 
+        /*
         // Fallback: If for some reason cuttings summary wasn't pushed (e.g. macroscopy section was inactive or missing)
         if (!hasPushedCuttings) {
             if (cuttingsBlock) {
@@ -4824,6 +4928,7 @@ export default function ReportWorkspace({
                 blocks.push(newCuttingsBlock);
             }
         }
+        */
 
         const paginateBlocksJS = (blocksList: any[]): MeasuredBlock[][] => {
             const pagesList: MeasuredBlock[][] = [];
@@ -4919,8 +5024,8 @@ export default function ReportWorkspace({
                     }
 
                     const width = block.width || null;
-                    const usableWidth = width ? (185.9 * (width / 704)) : 185.9;
-                    const gap = 1.50; // mm
+                    const usableWidth = width ? 185.9 * (width / 704) : 185.9;
+                    const gap = 1.5; // mm
                     const slicedImages = images.slice(0, 4);
                     const rowsRemaining: string[][] = [slicedImages];
 
@@ -4928,6 +5033,7 @@ export default function ReportWorkspace({
                         let aspectSum = 0.0;
                         rowImages.forEach((imgTag: string) => {
                             const aspect = getImageAspectRatio(imgTag);
+
                             if (aspect > 0.0) {
                                 aspectSum += 1.0 / aspect;
                             } else {
@@ -4940,8 +5046,13 @@ export default function ReportWorkspace({
                         }
 
                         const N = rowImages.length;
-                        const maxRowHeight = N === 1 ? Math.min(120.0, usableWidth) : (usableWidth * 1.5);
-                        const calculatedHeight = (usableWidth - (N - 1) * gap) / aspectSum;
+                        const maxRowHeight =
+                            N === 1
+                                ? Math.min(120.0, usableWidth)
+                                : usableWidth * 1.5;
+                        const calculatedHeight =
+                            (usableWidth - (N - 1) * gap) / aspectSum;
+
                         return Math.min(calculatedHeight, maxRowHeight);
                     });
 
@@ -5005,7 +5116,8 @@ export default function ReportWorkspace({
 
                             rowImages.forEach((imgTag) => {
                                 const aspect = getImageAspectRatio(imgTag);
-                                const widthMm = aspect > 0.0 ? (H_j / aspect) : H_j;
+                                const widthMm =
+                                    aspect > 0.0 ? H_j / aspect : H_j;
                                 const styleRule = `height: ${H_j}mm; width: ${widthMm}mm; object-fit: cover;`;
 
                                 let processedTag = imgTag;
@@ -5046,9 +5158,11 @@ export default function ReportWorkspace({
                             `margin-left: ${marginLeft}`,
                             `margin-right: ${marginRight}`,
                         ];
+
                         if (width) {
                             styles.push(`width: ${width}px`);
                         }
+
                         const styleStr = styles.join('; ') + ';';
 
                         const sliceHtml = `<div data-type="image-grid" class="align-${align}" data-columns="${columns}" data-align="${align}"${width ? ` width="${width}"` : ''} style="${styleStr}">${sliceImages.join('')}</div>`;
@@ -9599,11 +9713,13 @@ export default function ReportWorkspace({
                 <ManageCuttingsSheet
                     specimen={specimen}
                     cuttingCodes={cutting_codes}
+                    cuttingPrefixes={cutting_prefixes}
                     cuttingSlideTypes={cutting_slide_types}
                     users={users}
                     open={isManageCuttingsOpen}
                     onOpenChange={setIsManageCuttingsOpen}
                     canEdit={isAssigned}
+                    onInsertConcatenatedString={handleInsertConcatenatedString}
                 />
 
                 <AlertDialog

@@ -63,7 +63,7 @@ export default function ImageGridComponent({
         }
     });
 
-    const imagesSrcString = currentImages.map(img => img.src).join(',');
+    const imagesSrcString = currentImages.map((img) => img.src).join(',');
 
     const [isOpen, setIsOpen] = useState(false);
     const [croppingImage, setCroppingImage] = useState<{
@@ -78,43 +78,70 @@ export default function ImageGridComponent({
     const lastWidthRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (!containerRef.current) return;
+        if (!containerRef.current) {
+            return;
+        }
 
-        const contentEl = (containerRef.current.querySelector('[data-node-view-content]') || containerRef.current.querySelector('.w-full')) as HTMLElement;
-        if (!contentEl) return;
+        const contentEl = (containerRef.current.querySelector(
+            '[data-node-view-content]',
+        ) || containerRef.current.querySelector('.w-full')) as HTMLElement;
+
+        if (!contentEl) {
+            return;
+        }
 
         // In TipTap React Node Views, NodeViewContent creates an inner container
         // with data-node-view-content-react that holds the child image elements.
-        const targetContainer = (contentEl.querySelector('[data-node-view-content-react]') || contentEl) as HTMLElement;
-
-        // Apply flex layout to content container
-        targetContainer.style.display = 'flex';
-        targetContainer.style.flexWrap = 'nowrap';
-        targetContainer.style.gap = '12px';
-        targetContainer.style.justifyContent = 'flex-start';
-        targetContainer.style.width = '100%';
-
-        if (targetContainer !== contentEl) {
-            contentEl.style.display = 'flex';
-            contentEl.style.width = '100%';
-        }
+        const targetContainer = (contentEl.querySelector(
+            '[data-node-view-content-react]',
+        ) || contentEl) as HTMLElement;
 
         const updateLayout = () => {
-            const containerWidth = targetContainer.getBoundingClientRect().width || contentEl.getBoundingClientRect().width || width || 600;
-            const children = Array.from(targetContainer.children) as HTMLElement[];
-            if (children.length === 0) return;
+            // Apply flex layout to content container
+            targetContainer.style.display = 'flex';
+            targetContainer.style.flexWrap = 'nowrap';
+            targetContainer.style.gap = '12px';
+            targetContainer.style.justifyContent = 'flex-start';
+            targetContainer.style.width = '100%';
+
+            if (targetContainer !== contentEl) {
+                contentEl.style.display = 'flex';
+                contentEl.style.width = '100%';
+            }
+
+            const containerWidth =
+                targetContainer.getBoundingClientRect().width ||
+                contentEl.getBoundingClientRect().width ||
+                width ||
+                600;
+
+            if (containerWidth < 100) {
+                return;
+            }
+
+            const children = Array.from(
+                targetContainer.children,
+            ) as HTMLElement[];
+
+            if (children.length === 0) {
+                return;
+            }
 
             // Get image details (element and aspect ratio)
             const imgItems = children.map((child) => {
                 let img: HTMLImageElement | null = null;
+
                 if (child.tagName.toLowerCase() === 'img') {
                     img = child as HTMLImageElement;
                 } else {
                     img = child.querySelector('img');
                 }
-                const aspect = (img && img.naturalWidth > 0 && img.naturalHeight > 0)
-                    ? img.naturalHeight / img.naturalWidth
-                    : 1.0;
+
+                const aspect =
+                    img && img.naturalWidth > 0 && img.naturalHeight > 0
+                        ? img.naturalHeight / img.naturalWidth
+                        : 1.0;
+
                 return { child, img, aspect };
             });
 
@@ -136,11 +163,18 @@ export default function ImageGridComponent({
                 row.forEach((item) => {
                     aspectSum += 1.0 / item.aspect;
                 });
-                if (aspectSum <= 0) aspectSum = 1.0;
+
+                if (aspectSum <= 0) {
+                    aspectSum = 1.0;
+                }
 
                 const N = row.length;
-                const targetRowHeight = Math.max(350, Math.round(containerWidth * 0.55));
-                const calculatedHeight = (containerWidth - (N - 1) * gapPx) / aspectSum;
+                const targetRowHeight = Math.max(
+                    350,
+                    Math.round(containerWidth * 0.55),
+                );
+                const calculatedHeight =
+                    (containerWidth - (N - 1) * gapPx) / aspectSum;
                 const rowHeight = Math.min(calculatedHeight, targetRowHeight);
 
                 row.forEach((item) => {
@@ -192,7 +226,10 @@ export default function ImageGridComponent({
         const mutationObserver = new MutationObserver(() => {
             setupImageListeners();
         });
-        mutationObserver.observe(targetContainer, { childList: true, subtree: true });
+        mutationObserver.observe(targetContainer, {
+            childList: true,
+            subtree: true,
+        });
 
         // ResizeObserver to handle container resizing dynamically
         const resizeObserver = new ResizeObserver(() => {
@@ -207,23 +244,31 @@ export default function ImageGridComponent({
         };
     }, [columns, width, currentImages.length, imagesSrcString]);
 
-    const startResize = (e: React.MouseEvent | React.TouchEvent, direction: 'left' | 'right') => {
+    const startResize = (
+        e: React.MouseEvent | React.TouchEvent,
+        direction: 'left' | 'right',
+    ) => {
         e.preventDefault();
         e.stopPropagation();
 
         const isTouch = 'touches' in e;
         const startX = isTouch ? e.touches[0].clientX : e.clientX;
-        const initialWidth = containerRef.current?.getBoundingClientRect().width || 600;
+        const initialWidth =
+            containerRef.current?.getBoundingClientRect().width || 600;
 
         setIsResizing(true);
         setResizeWidth(initialWidth);
         lastWidthRef.current = initialWidth;
 
         const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
-            const currentX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
+            const currentX =
+                'touches' in moveEvent
+                    ? moveEvent.touches[0].clientX
+                    : moveEvent.clientX;
             const deltaX = currentX - startX;
-            
+
             let newWidth = initialWidth;
+
             if (direction === 'right') {
                 if (align === 'center') {
                     newWidth = initialWidth + deltaX * 2;
@@ -232,7 +277,8 @@ export default function ImageGridComponent({
                 } else if (align === 'right') {
                     newWidth = initialWidth - deltaX;
                 }
-            } else { // left
+            } else {
+                // left
                 if (align === 'center') {
                     newWidth = initialWidth - deltaX * 2;
                 } else if (align === 'left') {
@@ -244,7 +290,9 @@ export default function ImageGridComponent({
 
             // Min and max limits
             const minWidth = 200;
-            const maxWidth = containerRef.current?.parentElement?.getBoundingClientRect().width || 1200;
+            const maxWidth =
+                containerRef.current?.parentElement?.getBoundingClientRect()
+                    .width || 1200;
             newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
 
             const finalW = Math.round(newWidth);
@@ -254,7 +302,7 @@ export default function ImageGridComponent({
 
         const handleEnd = () => {
             setIsResizing(false);
-            
+
             document.removeEventListener('mousemove', handleMove);
             document.removeEventListener('mouseup', handleEnd);
             document.removeEventListener('touchmove', handleMove);
@@ -263,6 +311,7 @@ export default function ImageGridComponent({
             if (lastWidthRef.current !== null) {
                 updateAttributes({ width: lastWidthRef.current });
             }
+
             setResizeWidth(null);
             lastWidthRef.current = null;
         };
@@ -275,11 +324,19 @@ export default function ImageGridComponent({
 
     const handleSelectGrid = (e: React.MouseEvent) => {
         const pos = getPos();
+
         if (pos !== undefined) {
             const target = e.target as HTMLElement;
-            if (target.closest('button') || target.closest('[role="dialog"]') || target.closest('input') || target.closest('[data-type="dialog"]')) {
+
+            if (
+                target.closest('button') ||
+                target.closest('[role="dialog"]') ||
+                target.closest('input') ||
+                target.closest('[data-type="dialog"]')
+            ) {
                 return;
             }
+
             e.preventDefault();
             e.stopPropagation();
             editor.commands.setNodeSelection(pos);
@@ -489,24 +546,28 @@ export default function ImageGridComponent({
                 <>
                     <div
                         className={cn(
-                            "absolute top-2 bottom-2 left-0 w-2 cursor-ew-resize bg-indigo-500/20 hover:bg-indigo-500/40 rounded-l transition-all z-20 flex items-center justify-center",
-                            isResizing ? "opacity-100" : "opacity-0 group-hover:opacity-100 hover:opacity-100"
+                            'absolute top-2 bottom-2 left-0 z-20 flex w-2 cursor-ew-resize items-center justify-center rounded-l bg-indigo-500/20 transition-all hover:bg-indigo-500/40',
+                            isResizing
+                                ? 'opacity-100'
+                                : 'opacity-0 group-hover:opacity-100 hover:opacity-100',
                         )}
                         onMouseDown={(e) => startResize(e, 'left')}
                         onTouchStart={(e) => startResize(e, 'left')}
                     >
-                        <div className="w-[2px] h-4 bg-indigo-600 rounded" />
+                        <div className="h-4 w-[2px] rounded bg-indigo-600" />
                     </div>
 
                     <div
                         className={cn(
-                            "absolute top-2 bottom-2 right-0 w-2 cursor-ew-resize bg-indigo-500/20 hover:bg-indigo-500/40 rounded-r transition-all z-20 flex items-center justify-center",
-                            isResizing ? "opacity-100" : "opacity-0 group-hover:opacity-100 hover:opacity-100"
+                            'absolute top-2 right-0 bottom-2 z-20 flex w-2 cursor-ew-resize items-center justify-center rounded-r bg-indigo-500/20 transition-all hover:bg-indigo-500/40',
+                            isResizing
+                                ? 'opacity-100'
+                                : 'opacity-0 group-hover:opacity-100 hover:opacity-100',
                         )}
                         onMouseDown={(e) => startResize(e, 'right')}
                         onTouchStart={(e) => startResize(e, 'right')}
                     >
-                        <div className="w-[2px] h-4 bg-indigo-600 rounded" />
+                        <div className="h-4 w-[2px] rounded bg-indigo-600" />
                     </div>
 
                     {isResizing && currentWidth && (

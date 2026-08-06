@@ -51,13 +51,18 @@ class BillingSummaryReportController extends Controller
             ));
         }
 
+        $sortOrder = $request->get('sort_order', 'desc');
+        if (! in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+
         // Run queries with pagination
         $activeInvoicesPaginated = $activeQuery->paginate(15, ['*'], 'active_page')->withQueryString();
         $cancelledInvoicesPaginated = $cancelledQuery->paginate(10, ['*'], 'cancelled_page')->withQueryString();
 
         // Transform collection to flat-mapped specimen/item rows
-        $activeRows = $this->transformInvoicesToRows($activeInvoicesPaginated->items());
-        $cancelledRows = $this->transformInvoicesToRows($cancelledInvoicesPaginated->items());
+        $activeRows = $this->transformInvoicesToRows($activeInvoicesPaginated->items(), $dateFrom, $dateTo, $sortOrder);
+        $cancelledRows = $this->transformInvoicesToRows($cancelledInvoicesPaginated->items(), $dateFrom, $dateTo, $sortOrder);
 
         // Replace the raw paginated items with our processed rows
         $activeInvoicesData = $activeInvoicesPaginated->toArray();
@@ -68,7 +73,7 @@ class BillingSummaryReportController extends Controller
 
         // Calculate totals and payment details for the entire filtered set (unpaginated)
         $allActiveInvoices = $this->buildQuery($request, false)->get();
-        $activeRowsAll = $this->transformInvoicesToRows($allActiveInvoices);
+        $activeRowsAll = $this->transformInvoicesToRows($allActiveInvoices, $dateFrom, $dateTo, $sortOrder);
 
         $paymentDetails = [
             'cash' => 0.0,
@@ -112,7 +117,7 @@ class BillingSummaryReportController extends Controller
 
         // Calculate cancelled totals
         $allCancelledInvoices = $this->buildQuery($request, true)->get();
-        $cancelledRowsAll = $this->transformInvoicesToRows($allCancelledInvoices);
+        $cancelledRowsAll = $this->transformInvoicesToRows($allCancelledInvoices, $dateFrom, $dateTo, $sortOrder);
 
         $cancelledTotals = [
             'gross' => 0.0,
@@ -148,7 +153,7 @@ class BillingSummaryReportController extends Controller
             'cancelledTotals' => $cancelledTotals,
             'filters' => array_merge(
                 $request->only([
-                    'search', 'payment_type', 'customer_id', 'specimen_type_id', 'examination_id',
+                    'search', 'payment_type', 'customer_id', 'specimen_type_id', 'examination_id', 'sort_order',
                 ]),
                 [
                     'date_from' => $dateFrom,
@@ -168,21 +173,6 @@ class BillingSummaryReportController extends Controller
     {
         Gate::authorize('reports.billing_summary.view');
 
-        // Fetch active and cancelled items
-        $allActiveInvoices = $this->buildQuery($request, false)->get();
-        $activeRows = $this->transformInvoicesToRows($allActiveInvoices);
-
-        $allCancelledInvoices = $this->buildQuery($request, true)->get();
-        $cancelledRows = $this->transformInvoicesToRows($allCancelledInvoices);
-
-        // Build Excel Sheet
-        $spreadsheet = new Spreadsheet;
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Reporte de Facturación');
-
-        // Paint background white
-        $sheet->getStyle('A1:Z1000')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF');
-
         // Resolve date range text
         $userId = auth()->id();
         $resolvedDates = DateFilterService::resolveFilter(
@@ -192,6 +182,26 @@ class BillingSummaryReportController extends Controller
         );
         $dateFrom = $resolvedDates['from'];
         $dateTo = $resolvedDates['to'];
+
+        $sortOrder = $request->get('sort_order', 'desc');
+        if (! in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+
+        // Fetch active and cancelled items
+        $allActiveInvoices = $this->buildQuery($request, false)->get();
+        $activeRows = $this->transformInvoicesToRows($allActiveInvoices, $dateFrom, $dateTo, $sortOrder);
+
+        $allCancelledInvoices = $this->buildQuery($request, true)->get();
+        $cancelledRows = $this->transformInvoicesToRows($allCancelledInvoices, $dateFrom, $dateTo, $sortOrder);
+
+        // Build Excel Sheet
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Reporte de Facturación');
+
+        // Paint background white
+        $sheet->getStyle('A1:Z1000')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF');
 
         $dateFromText = $this->formatDateSpanish($dateFrom);
         $dateToText = $this->formatDateSpanish($dateTo);
@@ -645,12 +655,47 @@ class BillingSummaryReportController extends Controller
         $dateFrom = $resolvedDates['from'];
         $dateTo = $resolvedDates['to'];
 
-        if (! empty($dateFrom)) {
-            $query->whereDate('invoices.created_at', '>=', $dateFrom);
-        }
-        if (! empty($dateTo)) {
-            $dateToEnd = Carbon::parse($dateTo)->addDays(1)->toDateString();
-            $query->whereDate('invoices.created_at', '<=', $dateToEnd);
+        if (! empty($dateFrom) || ! empty($dateTo)) {
+            $query->where(function ($q) use ($dateFrom, $dateTo) {
+                // Scenario A: Non-grouped invoices within date range
+                $q->where(function ($sub) use ($dateFrom, $dateTo) {
+                    $sub->where('is_group', false);
+                    if (! empty($dateFrom)) {
+                        $sub->whereDate('invoices.created_at', '>=', $dateFrom);
+                    }
+                    if (! empty($dateTo)) {
+                        $sub->whereDate('invoices.created_at', '<=', $dateTo);
+                    }
+                });
+
+                // Scenario B: Grouped credit invoices with specimens added within date range
+                $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
+                    $sub->where('is_group', true)
+                        ->where('payment_type', 'credit')
+                        ->whereHas('creditInvoiceSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                            if (! empty($dateFrom)) {
+                                $subQ->whereDate('created_at', '>=', $dateFrom);
+                            }
+                            if (! empty($dateTo)) {
+                                $subQ->whereDate('created_at', '<=', $dateTo);
+                            }
+                        });
+                });
+
+                // Scenario C: Grouped non-credit invoices with specimens added within date range
+                $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
+                    $sub->where('is_group', true)
+                        ->where('payment_type', '!=', 'credit')
+                        ->whereHas('groupSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                            if (! empty($dateFrom)) {
+                                $subQ->whereDate('created_at', '>=', $dateFrom);
+                            }
+                            if (! empty($dateTo)) {
+                                $subQ->whereDate('created_at', '<=', $dateTo);
+                            }
+                        });
+                });
+            });
         }
 
         // Payment Method
@@ -688,7 +733,11 @@ class BillingSummaryReportController extends Controller
         }
 
         // Order by Date Created
-        $query->orderBy('invoices.created_at', 'desc');
+        $sortOrder = $request->get('sort_order', 'desc');
+        if (! in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+        $query->orderBy('invoices.created_at', $sortOrder);
 
         return $query;
     }
@@ -696,20 +745,28 @@ class BillingSummaryReportController extends Controller
     /**
      * Map raw invoices list into detailed specimen/item rows.
      */
-    private function transformInvoicesToRows($invoices)
+    private function transformInvoicesToRows($invoices, $dateFrom = null, $dateTo = null, $sortOrder = 'desc')
     {
         $rows = [];
         foreach ($invoices as $invoice) {
             if ($invoice->is_group) {
                 if ($invoice->payment_type === 'credit') {
-                    if ($invoice->creditInvoiceSpecimens->count() > 0) {
-                        foreach ($invoice->creditInvoiceSpecimens as $cis) {
+                    $cisItems = $invoice->creditInvoiceSpecimens;
+                    if (! empty($dateFrom)) {
+                        $cisItems = $cisItems->filter(fn ($cis) => $cis->created_at && $cis->created_at->toDateString() >= $dateFrom);
+                    }
+                    if (! empty($dateTo)) {
+                        $cisItems = $cisItems->filter(fn ($cis) => $cis->created_at && $cis->created_at->toDateString() <= $dateTo);
+                    }
+
+                    if ($cisItems->count() > 0) {
+                        foreach ($cisItems as $cis) {
                             $quantity = $cis->quantity ?? 1;
                             $rows[] = [
                                 'id' => 'cis-'.$cis->id,
                                 'invoice_id' => $invoice->id,
                                 'invoice' => $invoice,
-                                'date' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
+                                'date' => $cis->created_at ? $cis->created_at->toIso8601String() : null,
                                 'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
                                 'customer_name' => $invoice->customer?->name ?? 'N/A',
                                 'invoice_number' => $invoice->full_invoice_number,
@@ -727,14 +784,22 @@ class BillingSummaryReportController extends Controller
                         }
                     }
                 } else {
-                    if ($invoice->groupSpecimens->count() > 0) {
-                        foreach ($invoice->groupSpecimens as $igs) {
+                    $igsItems = $invoice->groupSpecimens;
+                    if (! empty($dateFrom)) {
+                        $igsItems = $igsItems->filter(fn ($igs) => $igs->created_at && $igs->created_at->toDateString() >= $dateFrom);
+                    }
+                    if (! empty($dateTo)) {
+                        $igsItems = $igsItems->filter(fn ($igs) => $igs->created_at && $igs->created_at->toDateString() <= $dateTo);
+                    }
+
+                    if ($igsItems->count() > 0) {
+                        foreach ($igsItems as $igs) {
                             $quantity = $igs->quantity ?? 1;
                             $rows[] = [
                                 'id' => 'igs-'.$igs->id,
                                 'invoice_id' => $invoice->id,
                                 'invoice' => $invoice,
-                                'date' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
+                                'date' => $igs->created_at ? $igs->created_at->toIso8601String() : null,
                                 'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
                                 'customer_name' => $invoice->customer?->name ?? 'N/A',
                                 'invoice_number' => $invoice->full_invoice_number,
@@ -784,6 +849,19 @@ class BillingSummaryReportController extends Controller
                 ];
             }
         }
+
+        usort($rows, function ($a, $b) use ($sortOrder) {
+            $dateA = $a['date'] ? strtotime($a['date']) : 0;
+            $dateB = $b['date'] ? strtotime($b['date']) : 0;
+            if ($dateA == $dateB) {
+                return 0;
+            }
+            if ($sortOrder === 'asc') {
+                return $dateA < $dateB ? -1 : 1;
+            } else {
+                return $dateA > $dateB ? -1 : 1;
+            }
+        });
 
         return $rows;
     }

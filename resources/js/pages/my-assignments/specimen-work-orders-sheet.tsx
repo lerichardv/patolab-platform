@@ -284,6 +284,7 @@ export default function SpecimenWorkOrdersSheet({
                 open={isEditWorkOrderSheetOpen}
                 onOpenChange={(open) => {
                     setIsEditWorkOrderSheetOpen(open);
+
                     if (!open) {
                         setEditingWorkOrder(null);
                     }

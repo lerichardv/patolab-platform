@@ -36,6 +36,7 @@ class CuttingController extends Controller
                 'responsible_id' => 'required|exists:users,id',
                 'status' => 'nullable|string|in:processing,macroscopy,delivered',
                 'is_new_cut' => 'nullable|boolean',
+                'prefix_id' => 'nullable|integer|exists:cutting_prefixes,id',
             ], [
                 'code_ids.*.unique' => 'Uno de los códigos de casete seleccionados ya está registrado en esta muestra.',
             ]);
@@ -53,6 +54,7 @@ class CuttingController extends Controller
                     'responsible_id' => $validated['responsible_id'],
                     'status' => $validated['status'] ?? 'macroscopy',
                     'is_new_cut' => $validated['is_new_cut'] ?? false,
+                    'prefix_id' => $validated['prefix_id'] ?? null,
                 ]);
             }
 
@@ -75,6 +77,7 @@ class CuttingController extends Controller
             'responsible_id' => 'required|exists:users,id',
             'status' => 'nullable|string|in:processing,macroscopy,delivered',
             'is_new_cut' => 'nullable|boolean',
+            'prefix_id' => 'nullable|integer|exists:cutting_prefixes,id',
         ], [
             'code_id.unique' => 'Este código de casete ya está registrado en otro corte de esta muestra.',
         ]);
@@ -110,6 +113,7 @@ class CuttingController extends Controller
             'responsible_id' => 'required|exists:users,id',
             'status' => 'nullable|string|in:processing,macroscopy,delivered',
             'is_new_cut' => 'nullable|boolean',
+            'prefix_id' => 'nullable|integer|exists:cutting_prefixes,id',
         ], [
             'code_id.unique' => 'Este código de casete ya está registrado en otro corte de esta muestra.',
         ]);
@@ -171,12 +175,22 @@ class CuttingController extends Controller
             'ids.*' => 'integer|exists:cuttings,id',
             'status' => 'nullable|string|in:processing,macroscopy,delivered',
             'responsible_id' => 'nullable|integer|exists:users,id',
+            'prefix_id' => 'nullable|integer|exists:cutting_prefixes,id',
         ]);
 
-        $updateData = array_filter([
-            'status' => $validated['status'] ?? null,
-            'responsible_id' => $validated['responsible_id'] ?? null,
-        ]);
+        $updateData = [];
+
+        if ($request->has('status')) {
+            $updateData['status'] = $validated['status'];
+        }
+
+        if ($request->has('responsible_id')) {
+            $updateData['responsible_id'] = $validated['responsible_id'];
+        }
+
+        if ($request->has('prefix_id')) {
+            $updateData['prefix_id'] = $validated['prefix_id'];
+        }
 
         if (! empty($updateData)) {
             Cutting::whereIn('id', $validated['ids'])->update($updateData);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CuttingCode;
+use App\Models\CuttingPrefix;
 use App\Models\Priority;
 use App\Models\Specimen;
 use App\Models\SpecimenType;
@@ -116,7 +117,7 @@ class MyAssignmentController extends Controller
             ->select('specimen.*')
             ->orderBy('priorities.order', 'asc')
             ->orderBy('specimen.created_at', 'desc')
-            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'workOrders.task', 'workOrders.users', 'cuttings.code', 'cuttings.responsible'])
+            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'workOrders.task', 'workOrders.users', 'cuttings.code', 'cuttings.prefix', 'cuttings.responsible'])
             ->get();
 
         $priorities = Priority::orderBy('order', 'asc')->get();
@@ -126,6 +127,7 @@ class MyAssignmentController extends Controller
         $workOrderTasks = WorkOrderTask::orderBy('name')->get();
         $usersList = User::where('active', true)->orderBy('name')->get();
         $cuttingCodes = CuttingCode::orderByRaw('LENGTH(code) asc')->orderBy('code', 'asc')->get();
+        $cuttingPrefixes = CuttingPrefix::orderByRaw('LENGTH(prefix) asc')->orderBy('prefix', 'asc')->get();
         $cuttingSlideTypes = WorkOrderType::all();
 
         return Inertia::render('my-assignments/index', [
@@ -137,6 +139,7 @@ class MyAssignmentController extends Controller
             'workOrderTasks' => $workOrderTasks,
             'usersList' => $usersList,
             'cuttingCodes' => $cuttingCodes,
+            'cuttingPrefixes' => $cuttingPrefixes,
             'cuttingSlideTypes' => $cuttingSlideTypes,
             'filters' => [
                 'status' => $statuses,

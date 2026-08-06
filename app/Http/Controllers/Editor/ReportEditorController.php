@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Editor;
 
 use App\Http\Controllers\Controller;
 use App\Models\CuttingCode;
+use App\Models\CuttingPrefix;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\InvoiceGroupSpecimen;
@@ -267,6 +268,7 @@ class ReportEditorController extends Controller
             'invoiceRelation.transferBank',
             'products.prices',
             'cuttings.code',
+            'cuttings.prefix',
             'cuttings.responsible',
         ]);
 
@@ -321,6 +323,7 @@ class ReportEditorController extends Controller
             'pathologists' => $pathologists,
             'products' => $products,
             'cutting_codes' => CuttingCode::orderByRaw('LENGTH(code) asc')->orderBy('code', 'asc')->get(),
+            'cutting_prefixes' => CuttingPrefix::orderByRaw('LENGTH(prefix) asc')->orderBy('prefix', 'asc')->get(),
             'cutting_slide_types' => WorkOrderType::all(),
             'users' => User::where('active', true)->select('id', 'name')->get(),
         ]);

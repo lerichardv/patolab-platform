@@ -51,6 +51,7 @@ interface Cutting {
     comments: string | null;
     responsible_id: number;
     is_new_cut: boolean;
+    prefix_id?: number | null;
 }
 
 interface CuttingCode {
@@ -62,6 +63,11 @@ interface CuttingCode {
 interface CuttingSlideType {
     id: number;
     name: string;
+}
+
+interface CuttingPrefix {
+    id: number;
+    prefix: string;
 }
 
 interface User {
@@ -77,6 +83,7 @@ interface Props {
         cuttings?: Cutting[];
     };
     cuttingCodes: CuttingCode[];
+    cuttingPrefixes: CuttingPrefix[];
     cuttingSlideTypes: CuttingSlideType[];
     users: User[];
     isDuplicate?: boolean;
@@ -295,6 +302,7 @@ export default function CuttingForm({
     cutting,
     specimen,
     cuttingCodes,
+    cuttingPrefixes,
     cuttingSlideTypes,
     users,
     isDuplicate = false,
@@ -338,6 +346,7 @@ export default function CuttingForm({
             responsible_id: string;
             status: string;
             is_new_cut: boolean;
+            prefix_id: string | null;
         }>({
             code_id:
                 isEditMode && cutting?.code_id ? String(cutting.code_id) : '',
@@ -355,6 +364,7 @@ export default function CuttingForm({
                 : '',
             status: isEditMode ? cutting?.status || 'macroscopy' : 'macroscopy',
             is_new_cut: cutting?.is_new_cut ?? false,
+            prefix_id: cutting?.prefix_id ? String(cutting.prefix_id) : null,
         });
 
     const [isCreateCodeSheetOpen, setIsCreateCodeSheetOpen] = useState(false);
@@ -422,6 +432,7 @@ export default function CuttingForm({
                 ? Number(data.number_of_slides)
                 : null,
             cutting_slide_types: data.cutting_slide_types.map(Number),
+            prefix_id: data.prefix_id ? Number(data.prefix_id) : null,
         }));
     }, [
         data.code_id,
@@ -431,6 +442,7 @@ export default function CuttingForm({
         data.number_of_slides,
         data.cutting_slide_types,
         data.is_new_cut,
+        data.prefix_id,
         transform,
     ]);
 
@@ -450,6 +462,7 @@ export default function CuttingForm({
                 responsible_id: String(cutting.responsible_id),
                 status: isEditMode ? cutting.status : 'macroscopy',
                 is_new_cut: cutting.is_new_cut ?? false,
+                prefix_id: cutting.prefix_id ? String(cutting.prefix_id) : null,
             });
         } else {
             reset();
@@ -672,7 +685,34 @@ export default function CuttingForm({
                     <InputError message={errors.description} />
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex items-center justify-start gap-5">
+                    {/* Prefix */}
+                    <div className="space-y-2">
+                        <Label htmlFor="prefix_id">Prefijo</Label>
+                        <Select
+                            value={data.prefix_id ?? 'none'}
+                            onValueChange={(val) =>
+                                setData(
+                                    'prefix_id',
+                                    val === 'none' ? null : val,
+                                )
+                            }
+                        >
+                            <SelectTrigger id="prefix_id" className="mb-0">
+                                <SelectValue placeholder="Ninguno" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">Ninguno</SelectItem>
+                                {cuttingPrefixes.map((p) => (
+                                    <SelectItem key={p.id} value={String(p.id)}>
+                                        {p.prefix}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <InputError message={errors.prefix_id} />
+                    </div>
+
                     {/* Number of Cuttings */}
                     <div className="space-y-2">
                         <Label htmlFor="number_of_cuttings">

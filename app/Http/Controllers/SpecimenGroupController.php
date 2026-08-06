@@ -654,6 +654,19 @@ class SpecimenGroupController extends Controller
             throw new \Exception('No se encontró la factura de este grupo de muestras.');
         }
 
+        if ($invoice->payment_type !== 'credit') {
+            throw ValidationException::withMessages([
+                'payment_type' => ['No se pueden agregar muestras a un grupo cuya factura no sea al crédito.'],
+            ]);
+        }
+
+        $invoice->load('creditRelation');
+        if (! $invoice->creditRelation || $invoice->creditRelation->amount_remaining <= 0) {
+            throw ValidationException::withMessages([
+                'payment_type' => ['No se pueden agregar muestras a un grupo cuyo crédito ya esté completamente pagado.'],
+            ]);
+        }
+
         DB::transaction(function () use ($request, $validated, $group, $invoice) {
             $caiRange = $invoice->caiRange;
             if (! $caiRange) {
@@ -1388,7 +1401,12 @@ class SpecimenGroupController extends Controller
                 $q->select('id', 'group_id', 'sequence_code');
             },
         ])
-            ->whereHas('invoice')
+            ->whereHas('invoice', function ($iq) {
+                $iq->where('payment_type', 'credit')
+                    ->whereHas('creditRelation', function ($cq) {
+                        $cq->where('amount_remaining', '>', 0);
+                    });
+            })
             ->when($term, function ($query, $term) {
                 $query->where(function ($q) use ($term) {
                     $q->where('name', 'like', "%{$term}%")

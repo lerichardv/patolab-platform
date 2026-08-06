@@ -181,11 +181,8 @@ export function PaymentMethodSheet({
         if (localPayment.payment_type === 'cash') {
             const val = parseFloat(localPayment.cash_value);
             const minAllowed = totalAmount === 0 ? 0 : 0.01;
-            if (
-                !localPayment.cash_value ||
-                isNaN(val) ||
-                val < minAllowed
-            ) {
+
+            if (!localPayment.cash_value || isNaN(val) || val < minAllowed) {
                 errorsMap.cash_value =
                     totalAmount === 0
                         ? 'El valor recibido es requerido y debe ser mayor o igual que 0.'
@@ -200,11 +197,8 @@ export function PaymentMethodSheet({
 
             const val = parseFloat(localPayment.check_value);
             const minAllowed = totalAmount === 0 ? 0 : 0.01;
-            if (
-                !localPayment.check_value ||
-                isNaN(val) ||
-                val < minAllowed
-            ) {
+
+            if (!localPayment.check_value || isNaN(val) || val < minAllowed) {
                 errorsMap.check_value =
                     totalAmount === 0
                         ? 'El valor del cheque es requerido y debe ser mayor o igual que 0.'
@@ -232,6 +226,7 @@ export function PaymentMethodSheet({
 
             const val = parseFloat(localPayment.card_value_charged);
             const minAllowed = totalAmount === 0 ? 0 : 0.01;
+
             if (
                 !localPayment.card_value_charged ||
                 isNaN(val) ||
@@ -259,6 +254,7 @@ export function PaymentMethodSheet({
 
             const val = parseFloat(localPayment.transfer_value);
             const minAllowed = totalAmount === 0 ? 0 : 0.01;
+
             if (
                 !localPayment.transfer_value ||
                 isNaN(val) ||
@@ -277,6 +273,7 @@ export function PaymentMethodSheet({
         ) {
             const val = parseFloat(localPayment.initial_payment_amount);
             const minAllowed = totalAmount === 0 ? 0 : 0.01;
+
             if (
                 !localPayment.initial_payment_amount ||
                 isNaN(val) ||
@@ -286,9 +283,7 @@ export function PaymentMethodSheet({
                     totalAmount === 0
                         ? 'El monto de pago inicial es requerido y debe ser mayor o igual que 0.'
                         : 'El monto de pago inicial es requerido y debe ser mayor que 0.';
-            } else if (
-                val > totalAmount
-            ) {
+            } else if (val > totalAmount) {
                 errorsMap.initial_payment_amount = `El pago inicial no puede superar el total (L. ${totalAmount.toFixed(
                     2,
                 )}).`;
@@ -854,7 +849,11 @@ export function PaymentMethodSheet({
                                                 id="sheet_initial_payment_amount"
                                                 type="number"
                                                 step="0.01"
-                                                min={totalAmount === 0 ? "0" : "0.01"}
+                                                min={
+                                                    totalAmount === 0
+                                                        ? '0'
+                                                        : '0.01'
+                                                }
                                                 max={totalAmount}
                                                 value={
                                                     localPayment.initial_payment_amount

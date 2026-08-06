@@ -67,6 +67,10 @@ class RolesSeeder extends Seeder
             'cutting_codes.create',
             'cutting_codes.edit',
             'cutting_codes.delete',
+            'cutting_prefixes.view',
+            'cutting_prefixes.create',
+            'cutting_prefixes.edit',
+            'cutting_prefixes.delete',
 
             // My templates management
             'my_specimen_type_templates.view',
