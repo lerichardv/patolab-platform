@@ -67,6 +67,9 @@ class InvoiceController extends Controller
             'groupSpecimens.specimen.customerRelation',
             'groupSpecimens.specimen.products',
             'groupSpecimens.specimen.cancelledBy',
+            'creditInvoiceSpecimens.specimen.type',
+            'creditInvoiceSpecimens.specimen.examination.prices',
+            'creditInvoiceSpecimens.specimen.customerRelation',
         ]);
 
         // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
@@ -129,12 +132,47 @@ class InvoiceController extends Controller
             $query->where('invoice_type', $request->get('invoice_type'));
         }
 
-        if (! empty($dateFrom)) {
-            $query->whereDate('invoices.created_at', '>=', $dateFrom);
-        }
-        if (! empty($dateTo)) {
-            $dateToEnd = Carbon::parse($dateTo)->addDays(1)->toDateString();
-            $query->whereDate('invoices.created_at', '<=', $dateToEnd);
+        if (! empty($dateFrom) || ! empty($dateTo)) {
+            $query->where(function ($q) use ($dateFrom, $dateTo) {
+                // Scenario A: Non-grouped invoices within date range
+                $q->where(function ($sub) use ($dateFrom, $dateTo) {
+                    $sub->where('is_group', false);
+                    if (! empty($dateFrom)) {
+                        $sub->whereDate('invoices.created_at', '>=', $dateFrom);
+                    }
+                    if (! empty($dateTo)) {
+                        $sub->whereDate('invoices.created_at', '<=', $dateTo);
+                    }
+                });
+
+                // Scenario B: Grouped credit invoices with specimens added within date range
+                $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
+                    $sub->where('is_group', true)
+                        ->where('payment_type', 'credit')
+                        ->whereHas('creditInvoiceSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                            if (! empty($dateFrom)) {
+                                $subQ->whereDate('created_at', '>=', $dateFrom);
+                            }
+                            if (! empty($dateTo)) {
+                                $subQ->whereDate('created_at', '<=', $dateTo);
+                            }
+                        });
+                });
+
+                // Scenario C: Grouped non-credit invoices with specimens added within date range
+                $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
+                    $sub->where('is_group', true)
+                        ->where('payment_type', '!=', 'credit')
+                        ->whereHas('groupSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                            if (! empty($dateFrom)) {
+                                $subQ->whereDate('created_at', '>=', $dateFrom);
+                            }
+                            if (! empty($dateTo)) {
+                                $subQ->whereDate('created_at', '<=', $dateTo);
+                            }
+                        });
+                });
+            });
         }
 
         // Filter by specimen group

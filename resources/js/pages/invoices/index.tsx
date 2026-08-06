@@ -299,6 +299,157 @@ const ALL_STATUSES = [
     { value: 'cancelled', label: 'Cancelada' },
 ];
 
+function getInvoiceDisplayValues(
+    invoice: any,
+    filters: { date_from?: string; date_to?: string },
+) {
+    const isGroup = Boolean(invoice.is_group || invoice.group);
+    if (!isGroup) {
+        return {
+            amount: parseFloat(String(invoice.amount || 0)),
+            quantity: invoice.quantity ?? 1,
+            subtotal: parseFloat(String(invoice.subtotal || 0)),
+            discount: parseFloat(String(invoice.discount || 0)),
+            isv_15: parseFloat(String(invoice.isv_15 || 0)),
+            total: parseFloat(String(invoice.total || 0)),
+            total_paid: parseFloat(String(invoice.total_paid || 0)),
+            age_discount_amount: parseFloat(
+                String(invoice.age_discount_amount || 0),
+            ),
+            age_discount_type: invoice.age_discount_type,
+            groupText: null,
+            isGroupFiltered: false,
+            specimensInRangeMap: null as Record<number, boolean> | null,
+            inRangeCount: 0,
+            totalGroupCount: 0,
+        };
+    }
+
+    const allGroupSpecimens = invoice.group?.specimens || [];
+    const totalGroupCount = allGroupSpecimens.length;
+    const dateFrom = filters.date_from || '';
+    const dateTo = filters.date_to || '';
+    const hasDateFilter = Boolean(dateFrom || dateTo);
+
+    const isCredit = invoice.payment_type === 'credit';
+    const breakdownRecords = isCredit
+        ? invoice.credit_invoice_specimens ||
+          invoice.creditInvoiceSpecimens ||
+          []
+        : invoice.group_specimens || invoice.groupSpecimens || [];
+
+    const breakdownBySpecimenId: Record<number, any> = {};
+    breakdownRecords.forEach((b: any) => {
+        if (b.specimen_id) {
+            breakdownBySpecimenId[b.specimen_id] = b;
+        }
+    });
+
+    const specimensInRangeMap: Record<number, boolean> = {};
+    let inRangeCount = 0;
+
+    allGroupSpecimens.forEach((specimen: any) => {
+        const breakdown = breakdownBySpecimenId[specimen.id];
+        const rawDate = breakdown?.created_at || specimen.created_at;
+        const dateStr = rawDate ? String(rawDate).substring(0, 10) : '';
+
+        let inRange = true;
+        if (hasDateFilter) {
+            if (dateFrom && dateStr < dateFrom) {
+                inRange = false;
+            }
+            if (dateTo && dateStr > dateTo) {
+                inRange = false;
+            }
+        }
+
+        specimensInRangeMap[specimen.id] = inRange;
+        if (inRange) {
+            inRangeCount++;
+        }
+    });
+
+    let amount = 0;
+    let quantity = 0;
+    let subtotal = 0;
+    let discount = 0;
+    let isv_15 = 0;
+    let total = 0;
+    let total_paid = 0;
+    let age_discount_amount = 0;
+
+    if (hasDateFilter && breakdownRecords.length > 0) {
+        breakdownRecords.forEach((b: any) => {
+            const rawDate = b.created_at;
+            const dateStr = rawDate ? String(rawDate).substring(0, 10) : '';
+            let inRange = true;
+            if (dateFrom && dateStr < dateFrom) {
+                inRange = false;
+            }
+            if (dateTo && dateStr > dateTo) {
+                inRange = false;
+            }
+
+            if (inRange) {
+                const qty = b.quantity ?? 1;
+                const itemAmount = parseFloat(String(b.amount || 0)) * qty;
+                const itemSubtotal = parseFloat(String(b.subtotal || 0));
+                const itemDiscount = parseFloat(String(b.discount || 0)) * qty;
+                const itemIsv = parseFloat(String(b.isv_15 || 0));
+                const itemTotal = parseFloat(String(b.total || 0));
+                const itemPaid = isCredit
+                    ? b.is_paid
+                        ? itemTotal
+                        : 0
+                    : itemTotal;
+                const itemAgeDisc =
+                    parseFloat(String(b.age_discount_amount || 0)) * qty;
+
+                amount += itemAmount;
+                quantity += qty;
+                subtotal += itemSubtotal;
+                discount += itemDiscount;
+                isv_15 += itemIsv;
+                total += itemTotal;
+                total_paid += itemPaid;
+                age_discount_amount += itemAgeDisc;
+            }
+        });
+    } else {
+        amount = parseFloat(String(invoice.amount || 0));
+        quantity = invoice.quantity ?? totalGroupCount;
+        subtotal = parseFloat(String(invoice.subtotal || 0));
+        discount = parseFloat(String(invoice.discount || 0));
+        isv_15 = parseFloat(String(invoice.isv_15 || 0));
+        total = parseFloat(String(invoice.total || 0));
+        total_paid = parseFloat(String(invoice.total_paid || 0));
+        age_discount_amount = parseFloat(
+            String(invoice.age_discount_amount || 0),
+        );
+    }
+
+    const groupText = hasDateFilter
+        ? `Grupo de Muestras (${inRangeCount} de ${totalGroupCount} muestras)`
+        : `Grupo de Muestras (${totalGroupCount} muestras)`;
+
+    return {
+        amount,
+        quantity,
+        subtotal,
+        discount,
+        isv_15,
+        total,
+        total_paid,
+        age_discount_amount,
+        age_discount_type: invoice.age_discount_type,
+        groupText,
+        isGroupFiltered: hasDateFilter,
+        specimensInRangeMap,
+        inRangeCount,
+        totalGroupCount,
+    };
+}
+
 export default function InvoicesIndex({
     invoices,
     filters,
@@ -1289,75 +1440,81 @@ export default function InvoicesIndex({
                         </TableHeader>
                         <TableBody>
                             {invoices.data.length > 0 ? (
-                                invoices.data.map((invoice) => (
-                                    <TableRow
-                                        key={invoice.id}
-                                        className="group"
-                                    >
-                                        <TableCell
-                                            className={`pointer-events-none z-10 w-[150px] min-w-[150px] border-r border-border bg-card transition-colors group-hover:bg-muted after:top-0 after:right-[-8px] after:bottom-0 after:hidden after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent after:transition-opacity after:duration-200 md:sticky md:left-0 md:after:absolute dark:after:from-black/[0.2] ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}
+                                invoices.data.map((invoice) => {
+                                    const displayValues =
+                                        getInvoiceDisplayValues(
+                                            invoice,
+                                            filters,
+                                        );
+                                    return (
+                                        <TableRow
+                                            key={invoice.id}
+                                            className="group"
                                         >
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="font-mono text-sm font-semibold text-foreground">
-                                                    {
-                                                        invoice.full_invoice_number
-                                                    }
-                                                </span>
-                                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                                    <span>
-                                                        {invoice.created_at
-                                                            ? format(
-                                                                  new Date(
-                                                                      invoice.created_at,
-                                                                  ),
-                                                                  'dd/MM/yyyy',
-                                                                  {
-                                                                      locale: es,
-                                                                  },
-                                                              )
-                                                            : 'N/A'}
-                                                    </span>
-                                                    <span className="font-mono text-[9px] text-muted-foreground/80 before:mr-1 before:content-['•']">
-                                                        {invoice.created_at
-                                                            ? format(
-                                                                  new Date(
-                                                                      invoice.created_at,
-                                                                  ),
-                                                                  'h:mm a',
-                                                                  {
-                                                                      locale: es,
-                                                                  },
-                                                              )
-                                                            : 'N/A'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="min-w-[200px] pl-5">
-                                            <div className="flex flex-col">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="font-medium text-foreground">
-                                                        {invoice.customer
-                                                            ?.name || 'N/A'}
-                                                    </span>
-                                                </div>
-                                                {invoice.customer
-                                                    ?.id_number && (
-                                                    <span className="font-mono text-xs text-muted-foreground">
+                                            <TableCell
+                                                className={`pointer-events-none z-10 w-[150px] min-w-[150px] border-r border-border bg-card transition-colors group-hover:bg-muted after:top-0 after:right-[-8px] after:bottom-0 after:hidden after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent after:transition-opacity after:duration-200 md:sticky md:left-0 md:after:absolute dark:after:from-black/[0.2] ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}
+                                            >
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-mono text-sm font-semibold text-foreground">
                                                         {
-                                                            invoice.customer
-                                                                .id_number
+                                                            invoice.full_invoice_number
                                                         }
                                                     </span>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="min-w-[150px]">
-                                            <div className="flex items-center gap-1.5">
-                                                {getPaymentBadge(
-                                                    invoice.payment_type,
-                                                )}
-                                                {/* {invoice.payment_type ===
+                                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                        <span>
+                                                            {invoice.created_at
+                                                                ? format(
+                                                                      new Date(
+                                                                          invoice.created_at,
+                                                                      ),
+                                                                      'dd/MM/yyyy',
+                                                                      {
+                                                                          locale: es,
+                                                                      },
+                                                                  )
+                                                                : 'N/A'}
+                                                        </span>
+                                                        <span className="font-mono text-[9px] text-muted-foreground/80 before:mr-1 before:content-['•']">
+                                                            {invoice.created_at
+                                                                ? format(
+                                                                      new Date(
+                                                                          invoice.created_at,
+                                                                      ),
+                                                                      'h:mm a',
+                                                                      {
+                                                                          locale: es,
+                                                                      },
+                                                                  )
+                                                                : 'N/A'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="min-w-[200px] pl-5">
+                                                <div className="flex flex-col">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="font-medium text-foreground">
+                                                            {invoice.customer
+                                                                ?.name || 'N/A'}
+                                                        </span>
+                                                    </div>
+                                                    {invoice.customer
+                                                        ?.id_number && (
+                                                        <span className="font-mono text-xs text-muted-foreground">
+                                                            {
+                                                                invoice.customer
+                                                                    .id_number
+                                                            }
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="min-w-[150px]">
+                                                <div className="flex items-center gap-1.5">
+                                                    {getPaymentBadge(
+                                                        invoice.payment_type,
+                                                    )}
+                                                    {/* {invoice.payment_type ===
 													'credit' &&
 													invoice.credit_payment_id && (
 														<Button
@@ -1380,33 +1537,33 @@ export default function InvoicesIndex({
 															<Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
 														</Button>
 													)} */}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="min-w-[200px] pl-5">
-                                            <div className="flex items-center gap-1.5">
-                                                {getInvoiceTypeBadge(
-                                                    invoice.invoice_type,
-                                                )}
-                                                {invoice.invoice_type ===
-                                                    'cancelled' && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-5 w-5 hover:bg-muted"
-                                                        onClick={() => {
-                                                            setSelectedInvoiceForCancellationReason(
-                                                                invoice,
-                                                            );
-                                                            setIsCancellationReasonSheetOpen(
-                                                                true,
-                                                            );
-                                                        }}
-                                                        title="Ver Motivo de Cancelación"
-                                                    >
-                                                        <MessageSquare className="h-3.5 w-3.5 text-red-500 hover:text-red-700" />
-                                                    </Button>
-                                                )}
-                                                {/* {invoice.invoice_type ===
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="min-w-[200px] pl-5">
+                                                <div className="flex items-center gap-1.5">
+                                                    {getInvoiceTypeBadge(
+                                                        invoice.invoice_type,
+                                                    )}
+                                                    {invoice.invoice_type ===
+                                                        'cancelled' && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-5 w-5 hover:bg-muted"
+                                                            onClick={() => {
+                                                                setSelectedInvoiceForCancellationReason(
+                                                                    invoice,
+                                                                );
+                                                                setIsCancellationReasonSheetOpen(
+                                                                    true,
+                                                                );
+                                                            }}
+                                                            title="Ver Motivo de Cancelación"
+                                                        >
+                                                            <MessageSquare className="h-3.5 w-3.5 text-red-500 hover:text-red-700" />
+                                                        </Button>
+                                                    )}
+                                                    {/* {invoice.invoice_type ===
 													'credit payment' &&
 													invoice.credit_payment_id && (
 														<Button
@@ -1429,276 +1586,19 @@ export default function InvoicesIndex({
 															<Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
 														</Button>
 													)} */}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="min-w-[220px]">
-                                            <div className="flex max-w-[220px] flex-col gap-1.5 text-xs">
-                                                {/* Detalle principal (Grupo, Otro Cobro o Muestra) */}
-                                                {invoice.group ? (
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="w-max rounded border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-purple-600 dark:bg-purple-500/20 dark:text-purple-300">
-                                                                {
-                                                                    invoice
-                                                                        .group
-                                                                        .name
-                                                                }
-                                                            </span>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-5 w-5 hover:bg-muted"
-                                                                onClick={() => {
-                                                                    setSelectedGroupForView(
-                                                                        {
-                                                                            ...invoice.group,
-                                                                            invoice:
-                                                                                invoice,
-                                                                        },
-                                                                    );
-                                                                    setIsGroupViewSheetOpen(
-                                                                        true,
-                                                                    );
-                                                                }}
-                                                                title="Ver Grupo de Muestras"
-                                                            >
-                                                                <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                                            </Button>
-                                                            <DropdownMenu
-                                                                onOpenChange={(
-                                                                    open,
-                                                                ) => {
-                                                                    if (!open) {
-                                                                        setSpecimenSearchQuery(
-                                                                            '',
-                                                                        );
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <DropdownMenuTrigger
-                                                                    asChild
-                                                                >
-                                                                    <button
-                                                                        data-slot="button"
-                                                                        className="inline-flex h-5 w-8 items-center justify-center gap-0.5 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-                                                                        title="Editar Muestra"
-                                                                    >
-                                                                        <Edit2 className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                                                                        <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
-                                                                    </button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent
-                                                                    align="start"
-                                                                    className="w-64 p-0"
-                                                                >
-                                                                    {(() => {
-                                                                        const filteredSpecimens =
-                                                                            (
-                                                                                invoice
-                                                                                    .group
-                                                                                    .specimens ||
-                                                                                []
-                                                                            ).filter(
-                                                                                (
-                                                                                    s: any,
-                                                                                ) =>
-                                                                                    (
-                                                                                        s.sequence_code ||
-                                                                                        ''
-                                                                                    )
-                                                                                        .toLowerCase()
-                                                                                        .includes(
-                                                                                            specimenSearchQuery.toLowerCase(),
-                                                                                        ),
-                                                                            );
-
-                                                                        return (
-                                                                            <>
-                                                                                <div className="border-b border-border/50 p-2">
-                                                                                    <div className="relative">
-                                                                                        <Search className="absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                                                                                        <Input
-                                                                                            placeholder="Buscar código..."
-                                                                                            value={
-                                                                                                specimenSearchQuery
-                                                                                            }
-                                                                                            onChange={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                setSpecimenSearchQuery(
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                                )
-                                                                                            }
-                                                                                            className="h-8 pl-8 text-xs focus-visible:ring-1 focus-visible:ring-ring"
-                                                                                            onClick={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                e.stopPropagation()
-                                                                                            }
-                                                                                            onKeyDown={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                e.stopPropagation()
-                                                                                            }
-                                                                                        />
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="max-h-[250px] overflow-y-auto p-1">
-                                                                                    {filteredSpecimens.length ===
-                                                                                    0 ? (
-                                                                                        <div className="p-4 text-center text-xs text-muted-foreground">
-                                                                                            No
-                                                                                            se
-                                                                                            encontraron
-                                                                                            muestras
-                                                                                        </div>
-                                                                                    ) : (
-                                                                                        filteredSpecimens.map(
-                                                                                            (
-                                                                                                specimen: any,
-                                                                                            ) => (
-                                                                                                <DropdownMenuItem
-                                                                                                    key={
-                                                                                                        specimen.id
-                                                                                                    }
-                                                                                                    onClick={() => {
-                                                                                                        const specimenWithInvoice =
-                                                                                                            {
-                                                                                                                ...specimen,
-                                                                                                                customerRelation:
-                                                                                                                    specimen.customer_relation ||
-                                                                                                                    specimen.customerRelation ||
-                                                                                                                    invoice.customer,
-                                                                                                                customer_relation:
-                                                                                                                    specimen.customer_relation ||
-                                                                                                                    specimen.customerRelation ||
-                                                                                                                    invoice.customer,
-                                                                                                                invoice_relation:
-                                                                                                                    {
-                                                                                                                        ...invoice,
-                                                                                                                        specimen:
-                                                                                                                            undefined,
-                                                                                                                    },
-                                                                                                            };
-                                                                                                        setSelectedSpecimen(
-                                                                                                            specimenWithInvoice,
-                                                                                                        );
-                                                                                                        setIsSpecimenSheetOpen(
-                                                                                                            true,
-                                                                                                        );
-                                                                                                    }}
-                                                                                                    className="group cursor-pointer"
-                                                                                                >
-                                                                                                    <div className="flex w-full flex-col gap-0.5">
-                                                                                                        <span className="font-mono text-xs font-semibold text-primary transition-colors group-hover:text-white group-focus:text-white">
-                                                                                                            {specimen.sequence_code ||
-                                                                                                                'Sin código'}
-                                                                                                        </span>
-                                                                                                        <span className="truncate text-[10px] text-muted-foreground transition-colors group-hover:text-white/90 group-focus:text-white/90">
-                                                                                                            {specimen
-                                                                                                                .customer_relation
-                                                                                                                ?.name ||
-                                                                                                                invoice
-                                                                                                                    .customer
-                                                                                                                    ?.name ||
-                                                                                                                'Sin cliente'}
-                                                                                                        </span>
-                                                                                                    </div>
-                                                                                                </DropdownMenuItem>
-                                                                                            ),
-                                                                                        )
-                                                                                    )}
-                                                                                </div>
-                                                                            </>
-                                                                        );
-                                                                    })()}
-                                                                    {invoice
-                                                                        .group
-                                                                        .specimens
-                                                                        ?.length >
-                                                                        0 && (
-                                                                        <>
-                                                                            <DropdownMenuSeparator />
-                                                                            <div className="p-1">
-                                                                                <DropdownMenuItem
-                                                                                    onClick={() => {
-                                                                                        setSelectedGroup(
-                                                                                            {
-                                                                                                ...invoice.group,
-                                                                                                invoice:
-                                                                                                    invoice,
-                                                                                            },
-                                                                                        );
-                                                                                        setIsGroupSheetOpen(
-                                                                                            true,
-                                                                                        );
-                                                                                    }}
-                                                                                    className="group flex cursor-pointer items-center justify-center gap-1.5 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-white"
-                                                                                >
-                                                                                    <Plus className="h-3.5 w-3.5" />
-                                                                                    <span>
-                                                                                        Agregar
-                                                                                        más
-                                                                                        muestras
-                                                                                    </span>
-                                                                                </DropdownMenuItem>
-                                                                            </div>
-                                                                        </>
-                                                                    )}
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        </div>
-                                                        <span className="text-[10px] text-muted-foreground">
-                                                            Grupo de Muestras (
-                                                            {invoice.group
-                                                                .specimens
-                                                                ?.length ||
-                                                                0}{' '}
-                                                            muestras)
-                                                        </span>
-                                                    </div>
-                                                ) : invoice.invoice_type ===
-                                                      'rental' &&
-                                                  invoice.rental ? (
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="w-max rounded border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
-                                                                {
-                                                                    invoice
-                                                                        .rental
-                                                                        .name
-                                                                }
-                                                            </span>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-5 w-5 hover:bg-muted"
-                                                                onClick={() =>
-                                                                    router.visit(
-                                                                        `${rentalsIndex().url}?search=${encodeURIComponent(invoice.rental!.name)}`,
-                                                                    )
-                                                                }
-                                                                title="Ver en Otros Cobros"
-                                                            >
-                                                                <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                                            </Button>
-                                                        </div>
-                                                        <span className="text-[10px] text-muted-foreground">
-                                                            Otro Cobro
-                                                        </span>
-                                                    </div>
-                                                ) : invoice.specimen ? (
-                                                    <div className="flex flex-col gap-1">
-                                                        {invoice.specimen
-                                                            .sequence_code && (
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="min-w-[220px]">
+                                                <div className="flex max-w-[220px] flex-col gap-1.5 text-xs">
+                                                    {/* Detalle principal (Grupo, Otro Cobro o Muestra) */}
+                                                    {invoice.group ? (
+                                                        <div className="flex flex-col gap-1">
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="w-max rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary dark:bg-primary/10">
+                                                                <span className="w-max rounded border border-purple-500/20 bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-purple-600 dark:bg-purple-500/20 dark:text-purple-300">
                                                                     {
                                                                         invoice
-                                                                            .specimen
-                                                                            .sequence_code
+                                                                            .group
+                                                                            .name
                                                                     }
                                                                 </span>
                                                                 <Button
@@ -1706,310 +1606,808 @@ export default function InvoicesIndex({
                                                                     size="icon"
                                                                     className="h-5 w-5 hover:bg-muted"
                                                                     onClick={() => {
-                                                                        setSelectedSpecimenIdForView(
-                                                                            invoice.specimen_id ||
-                                                                                invoice
-                                                                                    .specimen
-                                                                                    ?.id,
+                                                                        setSelectedGroupForView(
+                                                                            {
+                                                                                ...invoice.group,
+                                                                                invoice:
+                                                                                    invoice,
+                                                                            },
                                                                         );
-                                                                        setSelectedSpecimenForView(
-                                                                            invoice.specimen,
-                                                                        );
-                                                                        setIsSpecimenViewSheetOpen(
+                                                                        setIsGroupViewSheetOpen(
                                                                             true,
                                                                         );
                                                                     }}
-                                                                    title="Ver Muestra"
+                                                                    title="Ver Grupo de Muestras"
                                                                 >
                                                                     <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                                                 </Button>
+                                                                <DropdownMenu
+                                                                    onOpenChange={(
+                                                                        open,
+                                                                    ) => {
+                                                                        if (
+                                                                            !open
+                                                                        ) {
+                                                                            setSpecimenSearchQuery(
+                                                                                '',
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <DropdownMenuTrigger
+                                                                        asChild
+                                                                    >
+                                                                        <button
+                                                                            data-slot="button"
+                                                                            className="inline-flex h-5 w-8 items-center justify-center gap-0.5 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] outline-none hover:bg-muted hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+                                                                            title="Editar Muestra"
+                                                                        >
+                                                                            <Edit2 className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                                                                            <ChevronDown className="h-2.5 w-2.5 text-muted-foreground" />
+                                                                        </button>
+                                                                    </DropdownMenuTrigger>
+                                                                    <DropdownMenuContent
+                                                                        align="start"
+                                                                        className="w-64 p-0"
+                                                                    >
+                                                                        {(() => {
+                                                                            const filteredSpecimens =
+                                                                                (
+                                                                                    invoice
+                                                                                        .group
+                                                                                        .specimens ||
+                                                                                    []
+                                                                                ).filter(
+                                                                                    (
+                                                                                        s: any,
+                                                                                    ) =>
+                                                                                        (
+                                                                                            s.sequence_code ||
+                                                                                            ''
+                                                                                        )
+                                                                                            .toLowerCase()
+                                                                                            .includes(
+                                                                                                specimenSearchQuery.toLowerCase(),
+                                                                                            ),
+                                                                                );
+
+                                                                            return (
+                                                                                <>
+                                                                                    <div className="border-b border-border/50 p-2">
+                                                                                        <div className="relative">
+                                                                                            <Search className="absolute top-2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                                                                            <Input
+                                                                                                placeholder="Buscar código..."
+                                                                                                value={
+                                                                                                    specimenSearchQuery
+                                                                                                }
+                                                                                                onChange={(
+                                                                                                    e,
+                                                                                                ) =>
+                                                                                                    setSpecimenSearchQuery(
+                                                                                                        e
+                                                                                                            .target
+                                                                                                            .value,
+                                                                                                    )
+                                                                                                }
+                                                                                                className="h-8 pl-8 text-xs focus-visible:ring-1 focus-visible:ring-ring"
+                                                                                                onClick={(
+                                                                                                    e,
+                                                                                                ) =>
+                                                                                                    e.stopPropagation()
+                                                                                                }
+                                                                                                onKeyDown={(
+                                                                                                    e,
+                                                                                                ) =>
+                                                                                                    e.stopPropagation()
+                                                                                                }
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="max-h-[250px] overflow-y-auto p-1">
+                                                                                        {filteredSpecimens.length ===
+                                                                                        0 ? (
+                                                                                            <div className="p-4 text-center text-xs text-muted-foreground">
+                                                                                                No
+                                                                                                se
+                                                                                                encontraron
+                                                                                                muestras
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            filteredSpecimens.map(
+                                                                                                (
+                                                                                                    specimen: any,
+                                                                                                ) => {
+                                                                                                    const isInRange =
+                                                                                                        displayValues.isGroupFiltered &&
+                                                                                                        displayValues.specimensInRangeMap
+                                                                                                            ? displayValues
+                                                                                                                  .specimensInRangeMap[
+                                                                                                                  specimen
+                                                                                                                      .id
+                                                                                                              ] !==
+                                                                                                              false
+                                                                                                            : true;
+
+                                                                                                    return (
+                                                                                                        <DropdownMenuItem
+                                                                                                            key={
+                                                                                                                specimen.id
+                                                                                                            }
+                                                                                                            onClick={() => {
+                                                                                                                const specimenWithInvoice =
+                                                                                                                    {
+                                                                                                                        ...specimen,
+                                                                                                                        customerRelation:
+                                                                                                                            specimen.customer_relation ||
+                                                                                                                            specimen.customerRelation ||
+                                                                                                                            invoice.customer,
+                                                                                                                        customer_relation:
+                                                                                                                            specimen.customer_relation ||
+                                                                                                                            specimen.customerRelation ||
+                                                                                                                            invoice.customer,
+                                                                                                                        invoice_relation:
+                                                                                                                            {
+                                                                                                                                ...invoice,
+                                                                                                                                specimen:
+                                                                                                                                    undefined,
+                                                                                                                            },
+                                                                                                                    };
+                                                                                                                setSelectedSpecimen(
+                                                                                                                    specimenWithInvoice,
+                                                                                                                );
+                                                                                                                setIsSpecimenSheetOpen(
+                                                                                                                    true,
+                                                                                                                );
+                                                                                                            }}
+                                                                                                            className={`group cursor-pointer ${!isInRange ? 'bg-muted/40 text-muted-foreground opacity-55' : ''}`}
+                                                                                                        >
+                                                                                                            <div className="flex w-full flex-col gap-0.5">
+                                                                                                                <div className="flex items-center justify-between gap-1">
+                                                                                                                    <span
+                                                                                                                        className={`font-mono text-xs font-semibold ${!isInRange ? 'text-muted-foreground' : 'text-primary transition-colors group-hover:text-white group-focus:text-white'}`}
+                                                                                                                    >
+                                                                                                                        {specimen.sequence_code ||
+                                                                                                                            'Sin código'}
+                                                                                                                    </span>
+                                                                                                                    {!isInRange && (
+                                                                                                                        <span className="py-0.2 rounded border border-border/50 bg-muted/80 px-1 text-[9px] font-normal text-muted-foreground italic">
+                                                                                                                            Fuera
+                                                                                                                            de
+                                                                                                                            rango
+                                                                                                                        </span>
+                                                                                                                    )}
+                                                                                                                </div>
+                                                                                                                <span
+                                                                                                                    className={`truncate text-[10px] ${!isInRange ? 'text-muted-foreground/80' : 'text-muted-foreground transition-colors group-hover:text-white/90 group-focus:text-white/90'}`}
+                                                                                                                >
+                                                                                                                    {specimen
+                                                                                                                        .customer_relation
+                                                                                                                        ?.name ||
+                                                                                                                        invoice
+                                                                                                                            .customer
+                                                                                                                            ?.name ||
+                                                                                                                        'Sin cliente'}
+                                                                                                                </span>
+                                                                                                            </div>
+                                                                                                        </DropdownMenuItem>
+                                                                                                    );
+                                                                                                },
+                                                                                            )
+                                                                                        )}
+                                                                                    </div>
+                                                                                </>
+                                                                            );
+                                                                        })()}
+                                                                        {invoice
+                                                                            .group
+                                                                            .specimens
+                                                                            ?.length >
+                                                                            0 && (
+                                                                            <>
+                                                                                <DropdownMenuSeparator />
+                                                                                <div className="p-1">
+                                                                                    <DropdownMenuItem
+                                                                                        onClick={() => {
+                                                                                            setSelectedGroup(
+                                                                                                {
+                                                                                                    ...invoice.group,
+                                                                                                    invoice:
+                                                                                                        invoice,
+                                                                                                },
+                                                                                            );
+                                                                                            setIsGroupSheetOpen(
+                                                                                                true,
+                                                                                            );
+                                                                                        }}
+                                                                                        className="group flex cursor-pointer items-center justify-center gap-1.5 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-white"
+                                                                                    >
+                                                                                        <Plus className="h-3.5 w-3.5" />
+                                                                                        <span>
+                                                                                            Agregar
+                                                                                            más
+                                                                                            muestras
+                                                                                        </span>
+                                                                                    </DropdownMenuItem>
+                                                                                </div>
+                                                                            </>
+                                                                        )}
+                                                                    </DropdownMenuContent>
+                                                                </DropdownMenu>
+                                                            </div>
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                                {displayValues.groupText ||
+                                                                    `Grupo de Muestras (${invoice.group.specimens?.length || 0} muestras)`}
+                                                            </span>
+                                                        </div>
+                                                    ) : invoice.invoice_type ===
+                                                          'rental' &&
+                                                      invoice.rental ? (
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="w-max rounded border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                                                                    {
+                                                                        invoice
+                                                                            .rental
+                                                                            .name
+                                                                    }
+                                                                </span>
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     className="h-5 w-5 hover:bg-muted"
-                                                                    onClick={() => {
-                                                                        const specimenWithInvoice =
-                                                                            {
-                                                                                ...invoice.specimen,
-                                                                                invoice_relation:
-                                                                                    {
-                                                                                        ...invoice,
-                                                                                        specimen:
-                                                                                            undefined,
-                                                                                    },
-                                                                            };
-                                                                        setSelectedSpecimen(
-                                                                            specimenWithInvoice,
-                                                                        );
-                                                                        setIsSpecimenSheetOpen(
-                                                                            true,
-                                                                        );
-                                                                    }}
-                                                                    title="Editar Muestra"
+                                                                    onClick={() =>
+                                                                        router.visit(
+                                                                            `${rentalsIndex().url}?search=${encodeURIComponent(invoice.rental!.name)}`,
+                                                                        )
+                                                                    }
+                                                                    title="Ver en Otros Cobros"
                                                                 >
-                                                                    <Edit2 className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                                                                    <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                                                 </Button>
                                                             </div>
-                                                        )}
-                                                        <span
-                                                            className="text-[10px] text-muted-foreground"
-                                                            title={
-                                                                invoice.specimen
-                                                                    .type?.name
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                                Otro Cobro
+                                                            </span>
+                                                        </div>
+                                                    ) : invoice.specimen ? (
+                                                        <div className="flex flex-col gap-1">
+                                                            {invoice.specimen
+                                                                .sequence_code && (
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="w-max rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary dark:bg-primary/10">
+                                                                        {
+                                                                            invoice
+                                                                                .specimen
+                                                                                .sequence_code
+                                                                        }
+                                                                    </span>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-5 w-5 hover:bg-muted"
+                                                                        onClick={() => {
+                                                                            setSelectedSpecimenIdForView(
+                                                                                invoice.specimen_id ||
+                                                                                    invoice
+                                                                                        .specimen
+                                                                                        ?.id,
+                                                                            );
+                                                                            setSelectedSpecimenForView(
+                                                                                invoice.specimen,
+                                                                            );
+                                                                            setIsSpecimenViewSheetOpen(
+                                                                                true,
+                                                                            );
+                                                                        }}
+                                                                        title="Ver Muestra"
+                                                                    >
+                                                                        <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-5 w-5 hover:bg-muted"
+                                                                        onClick={() => {
+                                                                            const specimenWithInvoice =
+                                                                                {
+                                                                                    ...invoice.specimen,
+                                                                                    invoice_relation:
+                                                                                        {
+                                                                                            ...invoice,
+                                                                                            specimen:
+                                                                                                undefined,
+                                                                                        },
+                                                                                };
+                                                                            setSelectedSpecimen(
+                                                                                specimenWithInvoice,
+                                                                            );
+                                                                            setIsSpecimenSheetOpen(
+                                                                                true,
+                                                                            );
+                                                                        }}
+                                                                        title="Editar Muestra"
+                                                                    >
+                                                                        <Edit2 className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                            <span
+                                                                className="text-[10px] text-muted-foreground"
+                                                                title={
+                                                                    invoice
+                                                                        .specimen
+                                                                        .type
+                                                                        ?.name
+                                                                }
+                                                            >
+                                                                {
+                                                                    invoice
+                                                                        .specimen
+                                                                        .type
+                                                                        ?.name
+                                                                }{' '}
+                                                                -{' '}
+                                                                {
+                                                                    invoice
+                                                                        .specimen
+                                                                        .examination
+                                                                        ?.name
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        invoice.invoice_type !==
+                                                            'credit payment' && (
+                                                            <span className="text-xs text-muted-foreground italic">
+                                                                N/A
+                                                            </span>
+                                                        )
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {/* Información del Crédito (si aplica) */}
+                                                {(invoice.invoice_type ===
+                                                    'credit payment' ||
+                                                    invoice.payment_type ===
+                                                        'credit') && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="w-max rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                                            Crédito #
+                                                            {
+                                                                invoice.credit_payment_id
                                                             }
+                                                        </span>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-5 w-5 hover:bg-muted"
+                                                            onClick={() =>
+                                                                router.get(
+                                                                    '/credits',
+                                                                    {
+                                                                        search: String(
+                                                                            invoice.credit_payment_id ||
+                                                                                '',
+                                                                        ),
+                                                                    },
+                                                                )
+                                                            }
+                                                            title="Ver Crédito"
                                                         >
-                                                            {
-                                                                invoice.specimen
-                                                                    .type?.name
-                                                            }{' '}
-                                                            -{' '}
-                                                            {
-                                                                invoice.specimen
-                                                                    .examination
-                                                                    ?.name
-                                                            }
-                                                        </span>
+                                                            <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                        </Button>
                                                     </div>
-                                                ) : (
-                                                    invoice.invoice_type !==
-                                                        'credit payment' && (
-                                                        <span className="text-xs text-muted-foreground italic">
-                                                            N/A
-                                                        </span>
-                                                    )
                                                 )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            {/* Información del Crédito (si aplica) */}
-                                            {(invoice.invoice_type ===
-                                                'credit payment' ||
-                                                invoice.payment_type ===
-                                                    'credit') && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="w-max rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
-                                                        Crédito #
-                                                        {
-                                                            invoice.credit_payment_id
-                                                        }
+                                            </TableCell>
+                                            <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
+                                                L.{' '}
+                                                {displayValues.amount.toFixed(
+                                                    2,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="min-w-[100px] text-right font-medium text-muted-foreground">
+                                                {displayValues.quantity}
+                                            </TableCell>
+                                            <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
+                                                L.{' '}
+                                                {displayValues.subtotal.toFixed(
+                                                    2,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="min-w-[150px] text-right">
+                                                <div className="flex flex-col items-end">
+                                                    <span className="font-medium text-muted-foreground">
+                                                        L.{' '}
+                                                        {displayValues.discount.toFixed(
+                                                            2,
+                                                        )}
                                                     </span>
+                                                    {displayValues.age_discount_type && (
+                                                        <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                            {displayValues.age_discount_type ===
+                                                            'third'
+                                                                ? 'Tercera Edad'
+                                                                : 'Cuarta Edad'}
+                                                            {displayValues.age_discount_amount >
+                                                                0 &&
+                                                                ` (-L. ${displayValues.age_discount_amount.toFixed(2)})`}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
+                                                L.{' '}
+                                                {displayValues.isv_15.toFixed(
+                                                    2,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="min-w-[120px] pr-6 text-right font-bold text-primary">
+                                                L.{' '}
+                                                {displayValues.total.toFixed(2)}
+                                            </TableCell>
+                                            <TableCell
+                                                className={`pointer-events-none z-10 w-[100px] min-w-[100px] border-l border-border bg-card text-right font-bold text-emerald-600 transition-colors group-hover:bg-muted before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:sticky md:right-[80px] md:before:absolute dark:text-emerald-400 dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
+                                            >
+                                                L.{' '}
+                                                {displayValues.total_paid.toFixed(
+                                                    2,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="z-10 w-[80px] min-w-[80px] bg-card text-right transition-colors group-hover:bg-muted md:sticky md:right-0">
+                                                <div className="flex justify-end gap-2">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-5 w-5 hover:bg-muted"
                                                         onClick={() =>
-                                                            router.get(
-                                                                '/credits',
-                                                                {
-                                                                    search: String(
-                                                                        invoice.credit_payment_id ||
-                                                                            '',
-                                                                    ),
-                                                                },
+                                                            handleViewDetails(
+                                                                invoice,
                                                             )
                                                         }
-                                                        title="Ver Crédito"
+                                                        title="Ver Detalle de Factura"
                                                     >
-                                                        <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                        <Eye className="h-4 w-4" />
                                                     </Button>
-                                                </div>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
-                                            L.{' '}
-                                            {parseFloat(
-                                                String(invoice.amount || 0),
-                                            ).toFixed(2)}
-                                        </TableCell>
-                                        <TableCell className="min-w-[100px] text-right font-medium text-muted-foreground">
-                                            {invoice.quantity ?? 1}
-                                        </TableCell>
-                                        <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
-                                            L.{' '}
-                                            {parseFloat(
-                                                String(invoice.subtotal || 0),
-                                            ).toFixed(2)}
-                                        </TableCell>
-                                        <TableCell className="min-w-[150px] text-right">
-                                            <div className="flex flex-col items-end">
-                                                <span className="font-medium text-muted-foreground">
-                                                    L.{' '}
-                                                    {parseFloat(
-                                                        String(
-                                                            invoice.discount ||
-                                                                0,
-                                                        ),
-                                                    ).toFixed(2)}
-                                                </span>
-                                                {invoice.age_discount_type && (
-                                                    <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                                                        {invoice.age_discount_type ===
-                                                        'third'
-                                                            ? 'Tercera Edad'
-                                                            : 'Cuarta Edad'}
-                                                        {parseFloat(
-                                                            String(
-                                                                invoice.age_discount_amount ||
-                                                                    0,
-                                                            ),
-                                                        ) > 0 &&
-                                                            ` (-L. ${parseFloat(String(invoice.age_discount_amount)).toFixed(2)})`}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">
-                                            L.{' '}
-                                            {parseFloat(
-                                                String(invoice.isv_15 || 0),
-                                            ).toFixed(2)}
-                                        </TableCell>
-                                        <TableCell className="min-w-[120px] pr-6 text-right font-bold text-primary">
-                                            L.{' '}
-                                            {parseFloat(
-                                                String(invoice.total),
-                                            ).toFixed(2)}
-                                        </TableCell>
-                                        <TableCell
-                                            className={`pointer-events-none z-10 w-[100px] min-w-[100px] border-l border-border bg-card text-right font-bold text-emerald-600 transition-colors group-hover:bg-muted before:top-0 before:bottom-0 before:left-[-8px] before:hidden before:w-[8px] before:bg-gradient-to-r before:from-transparent before:to-black/[0.06] before:transition-opacity before:duration-200 md:sticky md:right-[80px] md:before:absolute dark:text-emerald-400 dark:before:to-black/[0.2] ${showRightShadow ? 'before:opacity-100' : 'before:opacity-0'}`}
-                                        >
-                                            L.{' '}
-                                            {parseFloat(
-                                                String(invoice.total_paid || 0),
-                                            ).toFixed(2)}
-                                        </TableCell>
-                                        <TableCell className="z-10 w-[80px] min-w-[80px] bg-card text-right transition-colors group-hover:bg-muted md:sticky md:right-0">
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() =>
-                                                        handleViewDetails(
-                                                            invoice,
-                                                        )
-                                                    }
-                                                    title="Ver Detalle de Factura"
-                                                >
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
-                                                {(canManageInvoices ||
-                                                    canCreateWorkOrders) && (
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger
-                                                            asChild
-                                                        >
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                                title="Acciones"
+                                                    {(canManageInvoices ||
+                                                        canCreateWorkOrders) && (
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger
+                                                                asChild
                                                             >
-                                                                <MoreVertical className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent
-                                                            align="end"
-                                                            className="w-52"
-                                                        >
-                                                            {canManageInvoices && (
-                                                                <DropdownMenuItem
-                                                                    onClick={() =>
-                                                                        handleEditDetails(
-                                                                            invoice,
-                                                                        )
-                                                                    }
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                                    title="Acciones"
                                                                 >
-                                                                    <Edit2 className="mr-2 h-4 w-4 text-muted-foreground" />
-                                                                    <span>
-                                                                        Editar
-                                                                        factura
-                                                                    </span>
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            {canEditSpecimen &&
-                                                                invoice.invoice_type !==
-                                                                    'cancelled' &&
-                                                                ((invoice.specimen &&
-                                                                    ![
-                                                                        'cancelled',
-                                                                        'finalized',
-                                                                        'delivered',
-                                                                    ].includes(
-                                                                        invoice
-                                                                            .specimen
-                                                                            .status,
-                                                                    )) ||
-                                                                    invoice.group?.specimens?.some(
-                                                                        (
-                                                                            s: any,
-                                                                        ) =>
-                                                                            ![
-                                                                                'cancelled',
-                                                                                'finalized',
-                                                                                'delivered',
-                                                                            ].includes(
-                                                                                s.status,
-                                                                            ),
-                                                                    )) && (
+                                                                    <MoreVertical className="h-4 w-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent
+                                                                align="end"
+                                                                className="w-52"
+                                                            >
+                                                                {canManageInvoices && (
                                                                     <DropdownMenuItem
-                                                                        variant="destructive"
-                                                                        onClick={(
-                                                                            e,
-                                                                        ) => {
-                                                                            e.stopPropagation();
-                                                                            const specimen =
-                                                                                invoice.specimen ||
-                                                                                invoice.group?.specimens?.find(
-                                                                                    (
-                                                                                        s: any,
-                                                                                    ) =>
-                                                                                        ![
-                                                                                            'cancelled',
-                                                                                            'finalized',
-                                                                                            'delivered',
-                                                                                        ].includes(
-                                                                                            s.status,
-                                                                                        ),
-                                                                                );
-
-                                                                            if (
-                                                                                specimen
-                                                                            ) {
-                                                                                handleCancelClick(
-                                                                                    specimen,
-                                                                                );
-                                                                            }
-                                                                        }}
+                                                                        onClick={() =>
+                                                                            handleEditDetails(
+                                                                                invoice,
+                                                                            )
+                                                                        }
                                                                     >
-                                                                        <Ban className="mr-2 h-4 w-4" />
+                                                                        <Edit2 className="mr-2 h-4 w-4 text-muted-foreground" />
                                                                         <span>
-                                                                            Cancelar
-                                                                            muestra
+                                                                            Editar
+                                                                            factura
                                                                         </span>
                                                                     </DropdownMenuItem>
                                                                 )}
-                                                            {(canCreateWorkOrders ||
-                                                                canManageInvoices) &&
-                                                                (() => {
-                                                                    const specimens =
-                                                                        getInvoiceSpecimens(
-                                                                            invoice,
-                                                                        );
+                                                                {canEditSpecimen &&
+                                                                    invoice.invoice_type !==
+                                                                        'cancelled' &&
+                                                                    ((invoice.specimen &&
+                                                                        ![
+                                                                            'cancelled',
+                                                                            'finalized',
+                                                                            'delivered',
+                                                                        ].includes(
+                                                                            invoice
+                                                                                .specimen
+                                                                                .status,
+                                                                        )) ||
+                                                                        invoice.group?.specimens?.some(
+                                                                            (
+                                                                                s: any,
+                                                                            ) =>
+                                                                                ![
+                                                                                    'cancelled',
+                                                                                    'finalized',
+                                                                                    'delivered',
+                                                                                ].includes(
+                                                                                    s.status,
+                                                                                ),
+                                                                        )) && (
+                                                                        <DropdownMenuItem
+                                                                            variant="destructive"
+                                                                            onClick={(
+                                                                                e,
+                                                                            ) => {
+                                                                                e.stopPropagation();
+                                                                                const specimen =
+                                                                                    invoice.specimen ||
+                                                                                    invoice.group?.specimens?.find(
+                                                                                        (
+                                                                                            s: any,
+                                                                                        ) =>
+                                                                                            ![
+                                                                                                'cancelled',
+                                                                                                'finalized',
+                                                                                                'delivered',
+                                                                                            ].includes(
+                                                                                                s.status,
+                                                                                            ),
+                                                                                    );
 
-                                                                    if (
-                                                                        specimens.length ===
-                                                                            1 &&
-                                                                        specimens[0]
-                                                                            .id
-                                                                    ) {
+                                                                                if (
+                                                                                    specimen
+                                                                                ) {
+                                                                                    handleCancelClick(
+                                                                                        specimen,
+                                                                                    );
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <Ban className="mr-2 h-4 w-4" />
+                                                                            <span>
+                                                                                Cancelar
+                                                                                muestra
+                                                                            </span>
+                                                                        </DropdownMenuItem>
+                                                                    )}
+                                                                {(canCreateWorkOrders ||
+                                                                    canManageInvoices) &&
+                                                                    (() => {
+                                                                        const specimens =
+                                                                            getInvoiceSpecimens(
+                                                                                invoice,
+                                                                            );
+
+                                                                        if (
+                                                                            specimens.length ===
+                                                                                1 &&
+                                                                            specimens[0]
+                                                                                .id
+                                                                        ) {
+                                                                            return (
+                                                                                <DropdownMenuItem
+                                                                                    onClick={() =>
+                                                                                        handleCreateWorkOrder(
+                                                                                            specimens[0]
+                                                                                                .id,
+                                                                                        )
+                                                                                    }
+                                                                                >
+                                                                                    <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                                    <span>
+                                                                                        Crear
+                                                                                        orden
+                                                                                        de
+                                                                                        trabajo
+                                                                                    </span>
+                                                                                </DropdownMenuItem>
+                                                                            );
+                                                                        }
+
+                                                                        if (
+                                                                            specimens.length >
+                                                                            1
+                                                                        ) {
+                                                                            const allIds =
+                                                                                specimens
+                                                                                    .map(
+                                                                                        (
+                                                                                            s: any,
+                                                                                        ) =>
+                                                                                            s.id,
+                                                                                    )
+                                                                                    .filter(
+                                                                                        Boolean,
+                                                                                    );
+                                                                            const selectedIds =
+                                                                                getSelectedSpecimensForInvoice(
+                                                                                    invoice,
+                                                                                );
+                                                                            const isAllSelected =
+                                                                                selectedIds.length ===
+                                                                                    allIds.length &&
+                                                                                allIds.length >
+                                                                                    0;
+
+                                                                            return (
+                                                                                <DropdownMenuSub>
+                                                                                    <DropdownMenuSubTrigger>
+                                                                                        <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                                        <span>
+                                                                                            Crear
+                                                                                            orden
+                                                                                            de
+                                                                                            trabajo
+                                                                                        </span>
+                                                                                    </DropdownMenuSubTrigger>
+                                                                                    <DropdownMenuSubContent
+                                                                                        alignOffset={
+                                                                                            -4
+                                                                                        }
+                                                                                        className="w-64 p-0 shadow-lg"
+                                                                                        onClick={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            e.stopPropagation()
+                                                                                        }
+                                                                                    >
+                                                                                        <div className="flex items-center justify-between border-b border-border/60 bg-muted/40 px-3 py-2 text-xs">
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                onClick={(
+                                                                                                    e,
+                                                                                                ) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setGroupSpecimenSelections(
+                                                                                                        (
+                                                                                                            prev,
+                                                                                                        ) => ({
+                                                                                                            ...prev,
+                                                                                                            [invoice.id]:
+                                                                                                                allIds,
+                                                                                                        }),
+                                                                                                    );
+                                                                                                }}
+                                                                                                className="cursor-pointer font-medium text-primary transition-all hover:underline"
+                                                                                            >
+                                                                                                Seleccionar
+                                                                                                todos
+                                                                                            </button>
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                onClick={(
+                                                                                                    e,
+                                                                                                ) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setGroupSpecimenSelections(
+                                                                                                        (
+                                                                                                            prev,
+                                                                                                        ) => ({
+                                                                                                            ...prev,
+                                                                                                            [invoice.id]:
+                                                                                                                [],
+                                                                                                        }),
+                                                                                                    );
+                                                                                                }}
+                                                                                                className="cursor-pointer font-medium text-muted-foreground transition-all hover:text-destructive hover:underline"
+                                                                                            >
+                                                                                                Deseleccionar
+                                                                                                todos
+                                                                                            </button>
+                                                                                        </div>
+
+                                                                                        <div className="max-h-56 space-y-0.5 overflow-y-auto p-1">
+                                                                                            {specimens.map(
+                                                                                                (
+                                                                                                    specimen: any,
+                                                                                                ) => {
+                                                                                                    const isChecked =
+                                                                                                        selectedIds.includes(
+                                                                                                            specimen.id,
+                                                                                                        );
+                                                                                                    const codeOrId =
+                                                                                                        specimen.sequence_code ||
+                                                                                                        specimen.id;
+                                                                                                    const name =
+                                                                                                        specimen
+                                                                                                            .examination
+                                                                                                            ?.name ||
+                                                                                                        specimen
+                                                                                                            .type
+                                                                                                            ?.name ||
+                                                                                                        'Muestra';
+
+                                                                                                    return (
+                                                                                                        <DropdownMenuItem
+                                                                                                            key={
+                                                                                                                specimen.id
+                                                                                                            }
+                                                                                                            onSelect={(
+                                                                                                                e,
+                                                                                                            ) => {
+                                                                                                                e.preventDefault();
+                                                                                                                toggleSpecimenForInvoice(
+                                                                                                                    invoice.id,
+                                                                                                                    specimen.id,
+                                                                                                                    allIds,
+                                                                                                                );
+                                                                                                            }}
+                                                                                                            className="flex cursor-pointer items-center text-xs"
+                                                                                                        >
+                                                                                                            <div
+                                                                                                                className={cn(
+                                                                                                                    'group mr-2 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-all',
+                                                                                                                    isChecked
+                                                                                                                        ? 'border-primary bg-primary text-white'
+                                                                                                                        : 'border-muted-foreground/40 bg-transparent text-muted-foreground/20',
+                                                                                                                )}
+                                                                                                            >
+                                                                                                                <Check
+                                                                                                                    className={cn(
+                                                                                                                        'h-2 w-2 stroke-[3]',
+                                                                                                                        isChecked
+                                                                                                                            ? 'stroke-white/80'
+                                                                                                                            : 'text-muted-foreground/50',
+                                                                                                                    )}
+                                                                                                                />
+                                                                                                            </div>
+                                                                                                            <span className="truncate">
+                                                                                                                [
+                                                                                                                {
+                                                                                                                    codeOrId
+                                                                                                                }
+
+                                                                                                                ]{' '}
+                                                                                                                {
+                                                                                                                    name
+                                                                                                                }
+                                                                                                            </span>
+                                                                                                        </DropdownMenuItem>
+                                                                                                    );
+                                                                                                },
+                                                                                            )}
+                                                                                        </div>
+
+                                                                                        <div className="border-t border-border/60 p-1">
+                                                                                            <DropdownMenuItem
+                                                                                                disabled={
+                                                                                                    selectedIds.length ===
+                                                                                                    0
+                                                                                                }
+                                                                                                onClick={() => {
+                                                                                                    if (
+                                                                                                        selectedIds.length ===
+                                                                                                        1
+                                                                                                    ) {
+                                                                                                        handleCreateWorkOrder(
+                                                                                                            selectedIds[0],
+                                                                                                        );
+                                                                                                    } else if (
+                                                                                                        selectedIds.length >
+                                                                                                        1
+                                                                                                    ) {
+                                                                                                        handleCreateBulkWorkOrders(
+                                                                                                            selectedIds,
+                                                                                                        );
+                                                                                                    }
+                                                                                                }}
+                                                                                                className="justify-center text-xs font-semibold text-primary focus:bg-primary/10 focus:text-primary"
+                                                                                            >
+                                                                                                <ClipboardList className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                                                                                                <span>
+                                                                                                    {selectedIds.length ===
+                                                                                                    0
+                                                                                                        ? 'Sin seleccionadas'
+                                                                                                        : selectedIds.length ===
+                                                                                                            1
+                                                                                                          ? 'Crear 1 orden'
+                                                                                                          : `Crear ${selectedIds.length} órdenes`}
+                                                                                                </span>
+                                                                                            </DropdownMenuItem>
+                                                                                        </div>
+                                                                                    </DropdownMenuSubContent>
+                                                                                </DropdownMenuSub>
+                                                                            );
+                                                                        }
+
                                                                         return (
                                                                             <DropdownMenuItem
-                                                                                onClick={() =>
-                                                                                    handleCreateWorkOrder(
-                                                                                        specimens[0]
-                                                                                            .id,
-                                                                                    )
-                                                                                }
+                                                                                disabled
                                                                             >
                                                                                 <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
                                                                                 <span>
@@ -2020,235 +2418,15 @@ export default function InvoicesIndex({
                                                                                 </span>
                                                                             </DropdownMenuItem>
                                                                         );
-                                                                    }
-
-                                                                    if (
-                                                                        specimens.length >
-                                                                        1
-                                                                    ) {
-                                                                        const allIds =
-                                                                            specimens
-                                                                                .map(
-                                                                                    (
-                                                                                        s: any,
-                                                                                    ) =>
-                                                                                        s.id,
-                                                                                )
-                                                                                .filter(
-                                                                                    Boolean,
-                                                                                );
-                                                                        const selectedIds =
-                                                                            getSelectedSpecimensForInvoice(
-                                                                                invoice,
-                                                                            );
-                                                                        const isAllSelected =
-                                                                            selectedIds.length ===
-                                                                                allIds.length &&
-                                                                            allIds.length >
-                                                                                0;
-
-                                                                        return (
-                                                                            <DropdownMenuSub>
-                                                                                <DropdownMenuSubTrigger>
-                                                                                    <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
-                                                                                    <span>
-                                                                                        Crear
-                                                                                        orden
-                                                                                        de
-                                                                                        trabajo
-                                                                                    </span>
-                                                                                </DropdownMenuSubTrigger>
-                                                                                <DropdownMenuSubContent
-                                                                                    alignOffset={
-                                                                                        -4
-                                                                                    }
-                                                                                    className="w-64 p-0 shadow-lg"
-                                                                                    onClick={(
-                                                                                        e,
-                                                                                    ) =>
-                                                                                        e.stopPropagation()
-                                                                                    }
-                                                                                >
-                                                                                    <div className="flex items-center justify-between border-b border-border/60 bg-muted/40 px-3 py-2 text-xs">
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={(
-                                                                                                e,
-                                                                                            ) => {
-                                                                                                e.stopPropagation();
-                                                                                                setGroupSpecimenSelections(
-                                                                                                    (
-                                                                                                        prev,
-                                                                                                    ) => ({
-                                                                                                        ...prev,
-                                                                                                        [invoice.id]:
-                                                                                                            allIds,
-                                                                                                    }),
-                                                                                                );
-                                                                                            }}
-                                                                                            className="cursor-pointer font-medium text-primary transition-all hover:underline"
-                                                                                        >
-                                                                                            Seleccionar
-                                                                                            todos
-                                                                                        </button>
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={(
-                                                                                                e,
-                                                                                            ) => {
-                                                                                                e.stopPropagation();
-                                                                                                setGroupSpecimenSelections(
-                                                                                                    (
-                                                                                                        prev,
-                                                                                                    ) => ({
-                                                                                                        ...prev,
-                                                                                                        [invoice.id]:
-                                                                                                            [],
-                                                                                                    }),
-                                                                                                );
-                                                                                            }}
-                                                                                            className="cursor-pointer font-medium text-muted-foreground transition-all hover:text-destructive hover:underline"
-                                                                                        >
-                                                                                            Deseleccionar
-                                                                                            todos
-                                                                                        </button>
-                                                                                    </div>
-
-                                                                                    <div className="max-h-56 space-y-0.5 overflow-y-auto p-1">
-                                                                                        {specimens.map(
-                                                                                            (
-                                                                                                specimen: any,
-                                                                                            ) => {
-                                                                                                const isChecked =
-                                                                                                    selectedIds.includes(
-                                                                                                        specimen.id,
-                                                                                                    );
-                                                                                                const codeOrId =
-                                                                                                    specimen.sequence_code ||
-                                                                                                    specimen.id;
-                                                                                                const name =
-                                                                                                    specimen
-                                                                                                        .examination
-                                                                                                        ?.name ||
-                                                                                                    specimen
-                                                                                                        .type
-                                                                                                        ?.name ||
-                                                                                                    'Muestra';
-
-                                                                                                return (
-                                                                                                    <DropdownMenuItem
-                                                                                                        key={
-                                                                                                            specimen.id
-                                                                                                        }
-                                                                                                        onSelect={(
-                                                                                                            e,
-                                                                                                        ) => {
-                                                                                                            e.preventDefault();
-                                                                                                            toggleSpecimenForInvoice(
-                                                                                                                invoice.id,
-                                                                                                                specimen.id,
-                                                                                                                allIds,
-                                                                                                            );
-                                                                                                        }}
-                                                                                                        className="flex cursor-pointer items-center text-xs"
-                                                                                                    >
-                                                                                                        <div
-                                                                                                            className={cn(
-                                                                                                                'group mr-2 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-all',
-                                                                                                                isChecked
-                                                                                                                    ? 'border-primary bg-primary text-white'
-                                                                                                                    : 'border-muted-foreground/40 bg-transparent text-muted-foreground/20',
-                                                                                                            )}
-                                                                                                        >
-                                                                                                            <Check
-                                                                                                                className={cn(
-                                                                                                                    'h-2 w-2 stroke-[3]',
-                                                                                                                    isChecked
-                                                                                                                        ? 'stroke-white/80'
-                                                                                                                        : 'text-muted-foreground/50',
-                                                                                                                )}
-                                                                                                            />
-                                                                                                        </div>
-                                                                                                        <span className="truncate">
-                                                                                                            [
-                                                                                                            {
-                                                                                                                codeOrId
-                                                                                                            }
-
-                                                                                                            ]{' '}
-                                                                                                            {
-                                                                                                                name
-                                                                                                            }
-                                                                                                        </span>
-                                                                                                    </DropdownMenuItem>
-                                                                                                );
-                                                                                            },
-                                                                                        )}
-                                                                                    </div>
-
-                                                                                    <div className="border-t border-border/60 p-1">
-                                                                                        <DropdownMenuItem
-                                                                                            disabled={
-                                                                                                selectedIds.length ===
-                                                                                                0
-                                                                                            }
-                                                                                            onClick={() => {
-                                                                                                if (
-                                                                                                    selectedIds.length ===
-                                                                                                    1
-                                                                                                ) {
-                                                                                                    handleCreateWorkOrder(
-                                                                                                        selectedIds[0],
-                                                                                                    );
-                                                                                                } else if (
-                                                                                                    selectedIds.length >
-                                                                                                    1
-                                                                                                ) {
-                                                                                                    handleCreateBulkWorkOrders(
-                                                                                                        selectedIds,
-                                                                                                    );
-                                                                                                }
-                                                                                            }}
-                                                                                            className="justify-center text-xs font-semibold text-primary focus:bg-primary/10 focus:text-primary"
-                                                                                        >
-                                                                                            <ClipboardList className="mr-1.5 h-3.5 w-3.5 text-primary" />
-                                                                                            <span>
-                                                                                                {selectedIds.length ===
-                                                                                                0
-                                                                                                    ? 'Sin seleccionadas'
-                                                                                                    : selectedIds.length ===
-                                                                                                        1
-                                                                                                      ? 'Crear 1 orden'
-                                                                                                      : `Crear ${selectedIds.length} órdenes`}
-                                                                                            </span>
-                                                                                        </DropdownMenuItem>
-                                                                                    </div>
-                                                                                </DropdownMenuSubContent>
-                                                                            </DropdownMenuSub>
-                                                                        );
-                                                                    }
-
-                                                                    return (
-                                                                        <DropdownMenuItem
-                                                                            disabled
-                                                                        >
-                                                                            <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground" />
-                                                                            <span>
-                                                                                Crear
-                                                                                orden
-                                                                                de
-                                                                                trabajo
-                                                                            </span>
-                                                                        </DropdownMenuItem>
-                                                                    );
-                                                                })()}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                                                    })()}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
                             ) : (
                                 <TableRow>
                                     <TableCell
