@@ -64,6 +64,7 @@ interface Specimen {
     sequence_code?: string;
     customer_relation?: {
         name: string;
+        id_number?: string;
     };
     type?: {
         name: string;
@@ -232,6 +233,10 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                         .includes(searchLower)) ||
                 (wo.specimen?.customer_relation?.name &&
                     wo.specimen.customer_relation.name
+                        .toLowerCase()
+                        .includes(searchLower)) ||
+                (wo.specimen?.customer_relation?.id_number &&
+                    wo.specimen.customer_relation.id_number
                         .toLowerCase()
                         .includes(searchLower)) ||
                 (wo.types &&
