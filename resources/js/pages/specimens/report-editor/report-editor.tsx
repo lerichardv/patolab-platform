@@ -822,8 +822,9 @@ const editorStyles = `
   .tiptap [data-resize-wrapper] {
     position: relative;
   }
-  /* Only show on standalone images – image-grid has its own crop UI */
-  .tiptap [data-type="image-grid"] [data-resize-wrapper] .image-crop-btn {
+  /* Only show on standalone images – image-grid has its own crop/resize UI */
+  .tiptap [data-type="image-grid"] [data-resize-wrapper] .image-crop-btn,
+  .tiptap [data-type="image-grid"] [data-resize-handle] {
     display: none !important;
   }
   .tiptap [data-resize-wrapper] .image-crop-btn {
@@ -1047,6 +1048,20 @@ const CustomImage = Image.extend({
             const el = document.createElement('img');
             el.draggable = false;
 
+            const pos = typeof getPos === 'function' ? getPos() : undefined;
+            let isInsideGrid = false;
+
+            if (pos !== undefined) {
+                try {
+                    const $pos = editor.state.doc.resolve(pos);
+                    if ($pos.parent && $pos.parent.type.name === 'imageGrid') {
+                        isInsideGrid = true;
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            }
+
             const mergedAttributes = mergeAttributes(
                 this.options.HTMLAttributes,
                 HTMLAttributes,
@@ -1059,7 +1074,7 @@ const CustomImage = Image.extend({
                         case 'height':
                             break;
                         default:
-                            el.setAttribute(key, value);
+                            el.setAttribute(key, value as string);
                             break;
                     }
                 }
@@ -1067,6 +1082,21 @@ const CustomImage = Image.extend({
 
             if (mergedAttributes.src !== null) {
                 el.src = mergedAttributes.src;
+            }
+
+            if (isInsideGrid) {
+                return {
+                    dom: el,
+                    update: (updatedNode) => {
+                        if (updatedNode.type !== node.type) {
+                            return false;
+                        }
+                        if (updatedNode.attrs.src) {
+                            el.src = updatedNode.attrs.src;
+                        }
+                        return true;
+                    },
+                };
             }
 
             // Create the pill overlay for dimension display
@@ -1281,6 +1311,28 @@ export const ImageGrid = TiptapNode.create<ImageGridOptions>({
                     'data-columns': attributes.columns,
                 }),
             },
+            alignment: {
+                default: 'center',
+                parseHTML: (element: HTMLElement) => {
+                    return element.getAttribute('data-align') || 'center';
+                },
+                renderHTML: (attributes: Record<string, any>) => ({
+                    'data-align': attributes.alignment || 'center',
+                }),
+            },
+            width: {
+                default: null,
+                parseHTML: (element: HTMLElement) => {
+                    const w = element.getAttribute('width') || element.style.width;
+                    return w ? parseInt(w, 10) : null;
+                },
+                renderHTML: (attributes: Record<string, any>) => {
+                    if (!attributes.width) return {};
+                    return {
+                        width: attributes.width,
+                    };
+                },
+            },
         };
     },
 
@@ -1288,10 +1340,32 @@ export const ImageGrid = TiptapNode.create<ImageGridOptions>({
         return [{ tag: 'div[data-type="image-grid"]' }];
     },
 
-    renderHTML({ HTMLAttributes }: { HTMLAttributes: Record<string, any> }) {
+    renderHTML({ node, HTMLAttributes }) {
+        const align = node?.attrs?.alignment || 'center';
+        const isLeft = align === 'left';
+        const isRight = align === 'right';
+        const marginLeft = isLeft ? '0' : 'auto';
+        const marginRight = isRight ? '0' : 'auto';
+
+        const styles = [
+            `display: grid`,
+            `margin-left: ${marginLeft}`,
+            `margin-right: ${marginRight}`,
+        ];
+        const width = node?.attrs?.width;
+
+        if (width) {
+            styles.push(`width: ${width}px`);
+        }
+
         return [
             'div',
-            mergeAttributes(HTMLAttributes, { 'data-type': 'image-grid' }),
+            mergeAttributes(HTMLAttributes, {
+                'data-type': 'image-grid',
+                'data-align': align,
+                class: `align-${align}`,
+                style: styles.join('; ') + ';',
+            }),
             0,
         ];
     },
@@ -2004,7 +2078,15 @@ function EditorToolbar({
                         {/* Alignments */}
                         <ToolbarBtn
                             onClick={() => {
-                                if (editor?.isActive('image')) {
+                                if (editor?.isActive('imageGrid')) {
+                                    editor
+                                        .chain()
+                                        .focus()
+                                        .updateAttributes('imageGrid', {
+                                            alignment: 'left',
+                                        })
+                                        .run();
+                                } else if (editor?.isActive('image')) {
                                     editor
                                         .chain()
                                         .focus()
@@ -2021,8 +2103,11 @@ function EditorToolbar({
                                 }
                             }}
                             active={
-                                editor?.isActive({ textAlign: 'left' }) ||
-                                editor?.isActive('image', { alignment: 'left' })
+                                editor?.isActive('imageGrid')
+                                    ? editor?.isActive('imageGrid', { alignment: 'left' })
+                                    : editor?.isActive('image')
+                                        ? editor?.isActive('image', { alignment: 'left' })
+                                        : editor?.isActive({ textAlign: 'left' })
                             }
                             title="Alinear a la izquierda"
                         >
@@ -2030,7 +2115,15 @@ function EditorToolbar({
                         </ToolbarBtn>
                         <ToolbarBtn
                             onClick={() => {
-                                if (editor?.isActive('image')) {
+                                if (editor?.isActive('imageGrid')) {
+                                    editor
+                                        .chain()
+                                        .focus()
+                                        .updateAttributes('imageGrid', {
+                                            alignment: 'center',
+                                        })
+                                        .run();
+                                } else if (editor?.isActive('image')) {
                                     editor
                                         .chain()
                                         .focus()
@@ -2047,10 +2140,11 @@ function EditorToolbar({
                                 }
                             }}
                             active={
-                                editor?.isActive({ textAlign: 'center' }) ||
-                                editor?.isActive('image', {
-                                    alignment: 'center',
-                                })
+                                editor?.isActive('imageGrid')
+                                    ? editor?.isActive('imageGrid', { alignment: 'center' })
+                                    : editor?.isActive('image')
+                                        ? editor?.isActive('image', { alignment: 'center' })
+                                        : editor?.isActive({ textAlign: 'center' })
                             }
                             title="Centrar"
                         >
@@ -2058,7 +2152,15 @@ function EditorToolbar({
                         </ToolbarBtn>
                         <ToolbarBtn
                             onClick={() => {
-                                if (editor?.isActive('image')) {
+                                if (editor?.isActive('imageGrid')) {
+                                    editor
+                                        .chain()
+                                        .focus()
+                                        .updateAttributes('imageGrid', {
+                                            alignment: 'right',
+                                        })
+                                        .run();
+                                } else if (editor?.isActive('image')) {
                                     editor
                                         .chain()
                                         .focus()
@@ -2075,10 +2177,11 @@ function EditorToolbar({
                                 }
                             }}
                             active={
-                                editor?.isActive({ textAlign: 'right' }) ||
-                                editor?.isActive('image', {
-                                    alignment: 'right',
-                                })
+                                editor?.isActive('imageGrid')
+                                    ? editor?.isActive('imageGrid', { alignment: 'right' })
+                                    : editor?.isActive('image')
+                                        ? editor?.isActive('image', { alignment: 'right' })
+                                        : editor?.isActive({ textAlign: 'right' })
                             }
                             title="Alinear a la derecha"
                         >
@@ -2086,7 +2189,15 @@ function EditorToolbar({
                         </ToolbarBtn>
                         <ToolbarBtn
                             onClick={() => {
-                                if (editor?.isActive('image')) {
+                                if (editor?.isActive('imageGrid')) {
+                                    editor
+                                        .chain()
+                                        .focus()
+                                        .updateAttributes('imageGrid', {
+                                            alignment: 'justify',
+                                        })
+                                        .run();
+                                } else if (editor?.isActive('image')) {
                                     editor
                                         .chain()
                                         .focus()
@@ -2103,10 +2214,11 @@ function EditorToolbar({
                                 }
                             }}
                             active={
-                                editor?.isActive({ textAlign: 'justify' }) ||
-                                editor?.isActive('image', {
-                                    alignment: 'justify',
-                                })
+                                editor?.isActive('imageGrid')
+                                    ? editor?.isActive('imageGrid', { alignment: 'justify' })
+                                    : editor?.isActive('image')
+                                        ? editor?.isActive('image', { alignment: 'justify' })
+                                        : editor?.isActive({ textAlign: 'justify' })
                             }
                             title="Justificar"
                         >
@@ -3248,6 +3360,18 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             columns = 2;
         }
 
+        let align = 'center';
+        const alignMatch = blockHtml.match(/data-align=["\']([^"\']+)["\']/i);
+        if (alignMatch) {
+            align = alignMatch[1];
+        }
+
+        let width: number | null = null;
+        const widthMatch = blockHtml.match(/(?:width|data-width)=["\'](\d+)["\']/i);
+        if (widthMatch) {
+            width = parseInt(widthMatch[1], 10);
+        }
+
         const imgRegex = /<img[^>]+>/gi;
         const imgTags: string[] = [];
         let match;
@@ -3256,7 +3380,10 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             imgTags.push(match[0]);
         }
 
-        const itemWidth = 185.9 / columns;
+        let itemWidth = 185.9 / columns;
+        if (width) {
+            itemWidth = (185.9 * (width / 704)) / columns;
+        }
 
         // Group images into rows
         const rowsOfImages: string[][] = [];
@@ -3291,6 +3418,8 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             type: 'image-grid',
             html: blockHtml,
             columns,
+            alignment: align,
+            width,
             images: imgTags,
             height: gridHeight,
         };
@@ -4896,7 +5025,23 @@ export default function ReportWorkspace({
                             });
                         }
 
-                        const sliceHtml = `<div data-type="image-grid" data-columns="${columns}">${sliceImages.join('')}</div>`;
+                        const align = block.alignment || 'center';
+                        const width = block.width || null;
+                        const isLeft = align === 'left';
+                        const isRight = align === 'right';
+                        const marginLeft = isLeft ? '0' : 'auto';
+                        const marginRight = isRight ? '0' : 'auto';
+                        const styles = [
+                            'display: grid',
+                            `margin-left: ${marginLeft}`,
+                            `margin-right: ${marginRight}`,
+                        ];
+                        if (width) {
+                            styles.push(`width: ${width}px`);
+                        }
+                        const styleStr = styles.join('; ') + ';';
+
+                        const sliceHtml = `<div data-type="image-grid" class="align-${align}" data-columns="${columns}" data-align="${align}"${width ? ` width="${width}"` : ''} style="${styleStr}">${sliceImages.join('')}</div>`;
 
                         let cost = 2.0;
 

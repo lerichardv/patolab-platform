@@ -486,6 +486,16 @@ class ReportPaginator
                 $columns = 2;
             }
 
+            $align = 'center';
+            if (preg_match('/data-align=["\']([^"\']+)["\']/i', $blockHtml, $alignMatch)) {
+                $align = $alignMatch[1];
+            }
+
+            $width = null;
+            if (preg_match('/(?:width|data-width)=["\'](\d+)["\']/i', $blockHtml, $widthMatch)) {
+                $width = (int) $widthMatch[1];
+            }
+
             preg_match_all('/<img[^>]+>/i', $blockHtml, $imgMatches);
             $imgTags = $imgMatches[0] ?? [];
             if (empty($imgTags)) {
@@ -494,6 +504,9 @@ class ReportPaginator
 
             $rowsOfImages = array_chunk($imgTags, $columns);
             $itemWidth = 185.9 / $columns;
+            if ($width) {
+                $itemWidth = (185.9 * ($width / 704.0)) / $columns;
+            }
             $gridHeight = 2.0;
             foreach ($rowsOfImages as $i => $rowImages) {
                 $maxRowAspectRatio = 0.0;
@@ -516,6 +529,8 @@ class ReportPaginator
                 'type' => 'image-grid',
                 'html' => $blockHtml,
                 'columns' => $columns,
+                'alignment' => $align,
+                'width' => $width,
                 'images' => $imgTags,
                 'height' => $gridHeight,
             ];
@@ -1033,7 +1048,11 @@ class ReportPaginator
                     continue;
                 }
 
+                $width = $block['width'] ?? null;
                 $itemWidth = 185.9 / $columns;
+                if ($width) {
+                    $itemWidth = (185.9 * ($width / 704.0)) / $columns;
+                }
                 $rowsRemaining = array_chunk($images, $columns);
 
                 // Pre-calculate height of each row using actual aspect ratios
@@ -1117,9 +1136,25 @@ class ReportPaginator
                             $sliceImages[] = $imgTag;
                         }
                     }
+                    $align = $block['alignment'] ?? 'center';
+                    $width = $block['width'] ?? null;
+                    $isLeft = $align === 'left';
+                    $isRight = $align === 'right';
+                    $marginLeft = $isLeft ? '0' : 'auto';
+                    $marginRight = $isRight ? '0' : 'auto';
+                    $styles = [
+                        'display: grid',
+                        "margin-left: {$marginLeft}",
+                        "margin-right: {$marginRight}",
+                    ];
+                    if ($width) {
+                        $styles[] = "width: {$width}px";
+                    }
+                    $styleStr = implode('; ', $styles).';';
 
-                    $sliceHtml = "<div data-type=\"image-grid\" data-columns=\"{$columns}\">".implode('', $sliceImages).'</div>';
+                    $widthAttr = $width ? " width=\"{$width}\"" : '';
 
+                    $sliceHtml = "<div data-type=\"image-grid\" class=\"align-{$align}\" data-columns=\"{$columns}\" data-align=\"{$align}\"{$widthAttr} style=\"{$styleStr}\">".implode('', $sliceImages).'</div>';
                     $cost = 2.0;
                     for ($i = 0; $i < $r; $i++) {
                         $cost += $rowHeights[$currentIndex + $i];

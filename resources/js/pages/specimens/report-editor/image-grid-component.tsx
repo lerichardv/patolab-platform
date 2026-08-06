@@ -37,13 +37,107 @@ export default function ImageGridComponent({
     updateAttributes,
 }: ImageGridProps) {
     const columns = node.attrs.columns || 2;
+    const align = node.attrs.alignment || 'center';
+    const width = node.attrs.width;
     const isEditable = editor.isEditable;
+    
     const [isOpen, setIsOpen] = useState(false);
     const [croppingImage, setCroppingImage] = useState<{
         src: string;
         offset: number;
         nodeSize: number;
     } | null>(null);
+
+    const [isResizing, setIsResizing] = useState(false);
+    const [resizeWidth, setResizeWidth] = useState<number | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const lastWidthRef = useRef<number | null>(null);
+
+    const startResize = (e: React.MouseEvent | React.TouchEvent, direction: 'left' | 'right') => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const isTouch = 'touches' in e;
+        const startX = isTouch ? e.touches[0].clientX : e.clientX;
+        const initialWidth = containerRef.current?.getBoundingClientRect().width || 600;
+
+        setIsResizing(true);
+        setResizeWidth(initialWidth);
+        lastWidthRef.current = initialWidth;
+
+        const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+            const currentX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
+            const deltaX = currentX - startX;
+            
+            let newWidth = initialWidth;
+            if (direction === 'right') {
+                if (align === 'center') {
+                    newWidth = initialWidth + deltaX * 2;
+                } else if (align === 'left') {
+                    newWidth = initialWidth + deltaX;
+                } else if (align === 'right') {
+                    newWidth = initialWidth - deltaX;
+                }
+            } else { // left
+                if (align === 'center') {
+                    newWidth = initialWidth - deltaX * 2;
+                } else if (align === 'left') {
+                    newWidth = initialWidth - deltaX;
+                } else if (align === 'right') {
+                    newWidth = initialWidth + deltaX;
+                }
+            }
+
+            // Min and max limits
+            const minWidth = 200;
+            const maxWidth = containerRef.current?.parentElement?.getBoundingClientRect().width || 1200;
+            newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+            const finalW = Math.round(newWidth);
+            lastWidthRef.current = finalW;
+            setResizeWidth(finalW);
+        };
+
+        const handleEnd = () => {
+            setIsResizing(false);
+            
+            document.removeEventListener('mousemove', handleMove);
+            document.removeEventListener('mouseup', handleEnd);
+            document.removeEventListener('touchmove', handleMove);
+            document.removeEventListener('touchend', handleEnd);
+
+            if (lastWidthRef.current !== null) {
+                updateAttributes({ width: lastWidthRef.current });
+            }
+            setResizeWidth(null);
+            lastWidthRef.current = null;
+        };
+
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleEnd);
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('touchend', handleEnd);
+    };
+
+    const handleSelectGrid = (e: React.MouseEvent) => {
+        const pos = getPos();
+        if (pos !== undefined) {
+            const target = e.target as HTMLElement;
+            if (target.closest('button') || target.closest('[role="dialog"]') || target.closest('input') || target.closest('[data-type="dialog"]')) {
+                return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            editor.commands.setNodeSelection(pos);
+        }
+    };
+
+    const currentWidth = isResizing ? resizeWidth : width;
+    const wrapperStyle = {
+        width: currentWidth ? `${currentWidth}px` : '100%',
+        marginLeft: align === 'left' ? '0' : 'auto',
+        marginRight: align === 'right' ? '0' : 'auto',
+    };
 
     // Fetch the specimenSequenceCode from the extension options
     const extOptions = editor.extensionManager.extensions.find(
@@ -251,10 +345,59 @@ export default function ImageGridComponent({
 
     return (
         <NodeViewWrapper
+            ref={containerRef}
             data-type="image-grid"
             data-columns={columns}
-            className="image-grid-container group relative my-4 rounded-lg border border-slate-200 bg-slate-50/10 p-1.5 transition-all duration-200 dark:border-slate-800/80 dark:bg-slate-950/5"
+            style={wrapperStyle}
+            onClick={handleSelectGrid}
+            className="image-grid-container group relative my-4 rounded-lg border border-slate-200 bg-slate-50/10 p-1.5 dark:border-slate-800/80 dark:bg-slate-950/5"
         >
+            {/* Left and Right Resize Handles */}
+            {isEditable && currentImages.length > 0 && (
+                <>
+                    <div
+                        className={cn(
+                            "absolute top-2 bottom-2 left-0 w-2 cursor-ew-resize bg-indigo-500/20 hover:bg-indigo-500/40 rounded-l transition-all z-20 flex items-center justify-center",
+                            isResizing ? "opacity-100" : "opacity-0 group-hover:opacity-100 hover:opacity-100"
+                        )}
+                        onMouseDown={(e) => startResize(e, 'left')}
+                        onTouchStart={(e) => startResize(e, 'left')}
+                    >
+                        <div className="w-[2px] h-4 bg-indigo-600 rounded" />
+                    </div>
+
+                    <div
+                        className={cn(
+                            "absolute top-2 bottom-2 right-0 w-2 cursor-ew-resize bg-indigo-500/20 hover:bg-indigo-500/40 rounded-r transition-all z-20 flex items-center justify-center",
+                            isResizing ? "opacity-100" : "opacity-0 group-hover:opacity-100 hover:opacity-100"
+                        )}
+                        onMouseDown={(e) => startResize(e, 'right')}
+                        onTouchStart={(e) => startResize(e, 'right')}
+                    >
+                        <div className="w-[2px] h-4 bg-indigo-600 rounded" />
+                    </div>
+
+                    {isResizing && currentWidth && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                bottom: '-25px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                                color: '#fff',
+                                fontSize: '10px',
+                                padding: '2px 8px',
+                                borderRadius: '9999px',
+                                pointerEvents: 'none',
+                                zIndex: 50,
+                            }}
+                        >
+                            {currentWidth}px
+                        </div>
+                    )}
+                </>
+            )}
             {/* Gallery settings trigger button (visible on hover) */}
             {isEditable && currentImages.length > 0 && (
                 <div className="absolute top-2 right-2 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
@@ -524,7 +667,7 @@ export default function ImageGridComponent({
             {/* Grid display layout */}
             <NodeViewContent
                 className={cn(
-                    'w-full p-1 transition-all duration-300',
+                    'w-full p-1',
                     isEditable && currentImages.length === 0 && 'hidden',
                 )}
             />

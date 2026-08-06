@@ -907,10 +907,13 @@ export default function SpecimenForm({
                     'El monto de pago inicial es requerido.';
             } else {
                 const amt = parseFloat(data.initial_payment_amount);
+                const minAllowed = totalVal === 0 ? 0 : 0.01;
 
-                if (isNaN(amt) || amt <= 0) {
+                if (isNaN(amt) || amt < minAllowed) {
                     localErrors.initial_payment_amount =
-                        'El monto de pago inicial debe ser mayor a cero.';
+                        totalVal === 0
+                            ? 'El monto de pago inicial debe ser mayor o igual a cero.'
+                            : 'El monto de pago inicial debe ser mayor a cero.';
                 } else if (amt > totalVal) {
                     localErrors.initial_payment_amount = `El monto de pago inicial no puede superar el total de la factura (L. ${totalVal.toFixed(2)}).`;
                 }

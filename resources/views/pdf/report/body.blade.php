@@ -441,6 +441,21 @@
             background-color: rgba(248, 250, 252, 0.1);
         }
 
+        .section-content div[data-type="image-grid"].align-center {
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
+
+        .section-content div[data-type="image-grid"].align-left {
+            margin-left: 0 !important;
+            margin-right: auto !important;
+        }
+
+        .section-content div[data-type="image-grid"].align-right {
+            margin-left: auto !important;
+            margin-right: 0 !important;
+        }
+
         .section-content div[data-type="image-grid"][data-columns="1"] {
             grid-template-columns: repeat(1, 1fr);
         }
