@@ -40,7 +40,31 @@ export default function ImageGridComponent({
     const align = node.attrs.alignment || 'center';
     const width = node.attrs.width;
     const isEditable = editor.isEditable;
-    
+
+    // Fetch the specimenSequenceCode from the extension options
+    const extOptions = editor.extensionManager.extensions.find(
+        (ext: any) => ext.name === 'imageGrid',
+    )?.options;
+    const specimenSequenceCode = extOptions?.specimenSequenceCode || '';
+
+    // Collect current images reactively
+    const currentImages: Array<{
+        src: string;
+        offset: number;
+        nodeSize: number;
+    }> = [];
+    node.content.forEach((childNode: any, offset: number) => {
+        if (childNode.type.name === 'image') {
+            currentImages.push({
+                src: childNode.attrs.src,
+                offset,
+                nodeSize: childNode.nodeSize,
+            });
+        }
+    });
+
+    const imagesSrcString = currentImages.map(img => img.src).join(',');
+
     const [isOpen, setIsOpen] = useState(false);
     const [croppingImage, setCroppingImage] = useState<{
         src: string;
@@ -52,6 +76,136 @@ export default function ImageGridComponent({
     const [resizeWidth, setResizeWidth] = useState<number | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const lastWidthRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+
+        const contentEl = (containerRef.current.querySelector('[data-node-view-content]') || containerRef.current.querySelector('.w-full')) as HTMLElement;
+        if (!contentEl) return;
+
+        // In TipTap React Node Views, NodeViewContent creates an inner container
+        // with data-node-view-content-react that holds the child image elements.
+        const targetContainer = (contentEl.querySelector('[data-node-view-content-react]') || contentEl) as HTMLElement;
+
+        // Apply flex layout to content container
+        targetContainer.style.display = 'flex';
+        targetContainer.style.flexWrap = 'nowrap';
+        targetContainer.style.gap = '12px';
+        targetContainer.style.justifyContent = 'flex-start';
+        targetContainer.style.width = '100%';
+
+        if (targetContainer !== contentEl) {
+            contentEl.style.display = 'flex';
+            contentEl.style.width = '100%';
+        }
+
+        const updateLayout = () => {
+            const containerWidth = targetContainer.getBoundingClientRect().width || contentEl.getBoundingClientRect().width || width || 600;
+            const children = Array.from(targetContainer.children) as HTMLElement[];
+            if (children.length === 0) return;
+
+            // Get image details (element and aspect ratio)
+            const imgItems = children.map((child) => {
+                let img: HTMLImageElement | null = null;
+                if (child.tagName.toLowerCase() === 'img') {
+                    img = child as HTMLImageElement;
+                } else {
+                    img = child.querySelector('img');
+                }
+                const aspect = (img && img.naturalWidth > 0 && img.naturalHeight > 0)
+                    ? img.naturalHeight / img.naturalWidth
+                    : 1.0;
+                return { child, img, aspect };
+            });
+
+            // Group into exactly one row of up to 4 images
+            const slicedImgItems = imgItems.slice(0, 4);
+            const rows = [slicedImgItems];
+
+            // Hide any extra images beyond 4
+            imgItems.forEach((item, idx) => {
+                if (idx >= 4) {
+                    item.child.style.display = 'none';
+                }
+            });
+
+            const gapPx = 12; // gap size in pixels
+
+            rows.forEach((row) => {
+                let aspectSum = 0;
+                row.forEach((item) => {
+                    aspectSum += 1.0 / item.aspect;
+                });
+                if (aspectSum <= 0) aspectSum = 1.0;
+
+                const N = row.length;
+                const targetRowHeight = Math.max(350, Math.round(containerWidth * 0.55));
+                const calculatedHeight = (containerWidth - (N - 1) * gapPx) / aspectSum;
+                const rowHeight = Math.min(calculatedHeight, targetRowHeight);
+
+                row.forEach((item) => {
+                    const itemWidth = rowHeight / item.aspect;
+                    item.child.style.width = `${itemWidth}px`;
+                    item.child.style.height = `${rowHeight}px`;
+                    item.child.style.display = 'block';
+                    item.child.style.margin = '0';
+
+                    if (item.img && item.img !== item.child) {
+                        item.img.style.width = '100%';
+                        item.img.style.height = '100%';
+                        item.img.style.objectFit = 'cover';
+                        item.img.style.margin = '0';
+                    } else if (item.img) {
+                        item.img.style.objectFit = 'cover';
+                        item.img.style.margin = '0';
+                    }
+                });
+            });
+        };
+
+        // Run initially
+        updateLayout();
+
+        // Monitor child additions/removals and image load states
+        let imgs: HTMLImageElement[] = [];
+        const handleLoad = () => updateLayout();
+
+        const setupImageListeners = () => {
+            // Remove old listeners
+            imgs.forEach((img) => img.removeEventListener('load', handleLoad));
+
+            // Find current images and add listeners
+            imgs = Array.from(targetContainer.querySelectorAll('img'));
+            imgs.forEach((img) => {
+                if (img.complete && img.naturalWidth > 0) {
+                    // Already loaded
+                } else {
+                    img.addEventListener('load', handleLoad);
+                }
+            });
+            updateLayout();
+        };
+
+        setupImageListeners();
+
+        // Observe child changes inside the grid
+        const mutationObserver = new MutationObserver(() => {
+            setupImageListeners();
+        });
+        mutationObserver.observe(targetContainer, { childList: true, subtree: true });
+
+        // ResizeObserver to handle container resizing dynamically
+        const resizeObserver = new ResizeObserver(() => {
+            updateLayout();
+        });
+        resizeObserver.observe(targetContainer);
+
+        return () => {
+            imgs.forEach((img) => img.removeEventListener('load', handleLoad));
+            mutationObserver.disconnect();
+            resizeObserver.disconnect();
+        };
+    }, [columns, width, currentImages.length, imagesSrcString]);
 
     const startResize = (e: React.MouseEvent | React.TouchEvent, direction: 'left' | 'right') => {
         e.preventDefault();
@@ -138,28 +292,6 @@ export default function ImageGridComponent({
         marginLeft: align === 'left' ? '0' : 'auto',
         marginRight: align === 'right' ? '0' : 'auto',
     };
-
-    // Fetch the specimenSequenceCode from the extension options
-    const extOptions = editor.extensionManager.extensions.find(
-        (ext: any) => ext.name === 'imageGrid',
-    )?.options;
-    const specimenSequenceCode = extOptions?.specimenSequenceCode || '';
-
-    // Collect current images reactively
-    const currentImages: Array<{
-        src: string;
-        offset: number;
-        nodeSize: number;
-    }> = [];
-    node.content.forEach((childNode: any, offset: number) => {
-        if (childNode.type.name === 'image') {
-            currentImages.push({
-                src: childNode.attrs.src,
-                offset,
-                nodeSize: childNode.nodeSize,
-            });
-        }
-    });
 
     const updateColumns = (cols: number) => {
         updateAttributes({ columns: cols });
@@ -667,7 +799,7 @@ export default function ImageGridComponent({
             {/* Grid display layout */}
             <NodeViewContent
                 className={cn(
-                    'w-full p-1',
+                    'w-full',
                     isEditable && currentImages.length === 0 && 'hidden',
                 )}
             />

@@ -501,29 +501,37 @@ class ReportPaginator
             if (empty($imgTags)) {
                 $imgTags = [];
             }
+            $imgTags = array_slice($imgTags, 0, 4);
+            $columns = count($imgTags);
+            if ($columns < 1) {
+                $columns = 1;
+            }
 
-            $rowsOfImages = array_chunk($imgTags, $columns);
-            $itemWidth = 185.9 / $columns;
-            if ($width) {
-                $itemWidth = (185.9 * ($width / 704.0)) / $columns;
-            }
+            $usableWidth = $width ? (185.9 * ($width / 704.0)) : 185.9;
+            $gap = 1.50; // mm
             $gridHeight = 2.0;
-            foreach ($rowsOfImages as $i => $rowImages) {
-                $maxRowAspectRatio = 0.0;
-                foreach ($rowImages as $imgTag) {
-                    $aspectRatio = self::getImageAspectRatio($imgTag);
-                    if ($aspectRatio > $maxRowAspectRatio) {
-                        $maxRowAspectRatio = $aspectRatio;
-                    }
-                }
-                if ($maxRowAspectRatio <= 0.0) {
-                    $maxRowAspectRatio = 1.0;
-                }
-                $gridHeight += $itemWidth * $maxRowAspectRatio;
-                if ($i > 0) {
-                    $gridHeight += 1.5;
+
+            $aspectSum = 0.0;
+            foreach ($imgTags as $imgTag) {
+                $aspectRatio = self::getImageAspectRatio($imgTag);
+                if ($aspectRatio > 0.0) {
+                    $aspectSum += 1.0 / $aspectRatio;
+                } else {
+                    $aspectSum += 1.0;
                 }
             }
+            if ($aspectSum <= 0.0) {
+                $aspectSum = 1.0;
+            }
+
+            $N = count($imgTags);
+            $rowHeight = 0.0;
+            if ($N > 0) {
+                $calculatedHeight = ($usableWidth - ($N - 1) * $gap) / $aspectSum;
+                $maxRowHeight = $N === 1 ? min(120.0, $usableWidth) : ($usableWidth * 1.5);
+                $rowHeight = min($calculatedHeight, $maxRowHeight);
+            }
+            $gridHeight += $rowHeight;
 
             return [
                 'type' => 'image-grid',
@@ -1049,26 +1057,30 @@ class ReportPaginator
                 }
 
                 $width = $block['width'] ?? null;
-                $itemWidth = 185.9 / $columns;
-                if ($width) {
-                    $itemWidth = (185.9 * ($width / 704.0)) / $columns;
-                }
-                $rowsRemaining = array_chunk($images, $columns);
+                $usableWidth = $width ? (185.9 * ($width / 704.0)) : 185.9;
+                $gap = 1.50; // mm
+                $slicedImages = array_slice($images, 0, 4);
+                $rowsRemaining = [$slicedImages];
 
-                // Pre-calculate height of each row using actual aspect ratios
+                // Pre-calculate height of each row using justified aspect ratios
                 $rowHeights = [];
                 foreach ($rowsRemaining as $rowIndex => $rowImages) {
-                    $maxRowAspectRatio = 0.0;
+                    $aspectSum = 0.0;
                     foreach ($rowImages as $imgTag) {
                         $aspectRatio = self::getImageAspectRatio($imgTag);
-                        if ($aspectRatio > $maxRowAspectRatio) {
-                            $maxRowAspectRatio = $aspectRatio;
+                        if ($aspectRatio > 0.0) {
+                            $aspectSum += 1.0 / $aspectRatio;
+                        } else {
+                            $aspectSum += 1.0;
                         }
                     }
-                    if ($maxRowAspectRatio <= 0.0) {
-                        $maxRowAspectRatio = 1.0;
+                    if ($aspectSum <= 0.0) {
+                        $aspectSum = 1.0;
                     }
-                    $rowHeights[$rowIndex] = $itemWidth * $maxRowAspectRatio;
+                    $N = count($rowImages);
+                    $maxRowHeight = $N === 1 ? min(120.0, $usableWidth) : ($usableWidth * 1.5);
+                    $calculatedHeight = ($usableWidth - ($N - 1) * $gap) / $aspectSum;
+                    $rowHeights[$rowIndex] = min($calculatedHeight, $maxRowHeight);
                 }
 
                 while (! empty($rowsRemaining)) {
@@ -1124,14 +1136,21 @@ class ReportPaginator
                     // Build the slice of rows
                     $sliceImages = [];
                     for ($i = 0; $i < $r; $i++) {
-                        foreach ($rowsRemaining[$i] as $imgTag) {
+                        $rowIdx = $currentIndex + $i;
+                        $rowImages = $rowsRemaining[$i];
+                        $H_j = $rowHeights[$rowIdx];
+
+                        foreach ($rowImages as $imgTag) {
                             $aspect = self::getImageAspectRatio($imgTag);
+                            $widthMm = $aspect > 0.0 ? ($H_j / $aspect) : $H_j;
+                            $styleRule = "height: {$H_j}mm; width: {$widthMm}mm; object-fit: cover;";
+
                             if (preg_match('/style=["\']([^"\']*)["\']/i', $imgTag, $styleMatch)) {
                                 $existingStyle = rtrim($styleMatch[1], ';');
-                                $newStyle = "{$existingStyle}; aspect-ratio: 1 / {$aspect}; object-fit: cover;";
+                                $newStyle = "{$existingStyle}; {$styleRule}";
                                 $imgTag = preg_replace('/style=["\']([^"\']*)["\']/i', 'style="'.$newStyle.'"', $imgTag);
                             } else {
-                                $imgTag = str_replace('<img', '<img style="aspect-ratio: 1 / '.$aspect.'; object-fit: cover;"', $imgTag);
+                                $imgTag = str_replace('<img', '<img style="'.$styleRule.'"', $imgTag);
                             }
                             $sliceImages[] = $imgTag;
                         }
@@ -1143,7 +1162,9 @@ class ReportPaginator
                     $marginLeft = $isLeft ? '0' : 'auto';
                     $marginRight = $isRight ? '0' : 'auto';
                     $styles = [
-                        'display: grid',
+                        'display: flex',
+                        'flex-wrap: nowrap',
+                        "gap: {$gap}mm",
                         "margin-left: {$marginLeft}",
                         "margin-right: {$marginRight}",
                     ];

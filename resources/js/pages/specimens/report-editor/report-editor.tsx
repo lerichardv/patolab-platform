@@ -505,7 +505,8 @@ const editorStyles = `
 
   /* ── Image Grid ── */
   .preview-content div[data-type="image-grid"] {
-    display: grid;
+    display: flex;
+    flex-wrap: nowrap;
     gap: 1.50mm;
     margin: 1.00mm 0mm;
     width: 100%;
@@ -521,76 +522,36 @@ const editorStyles = `
     background-color: rgba(2, 6, 23, 0.05);
   }
 
-  .preview-content div[data-type="image-grid"][data-columns="1"] {
-    grid-template-columns: repeat(1, 1fr);
-  }
-
-  .preview-content div[data-type="image-grid"][data-columns="2"] {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .preview-content div[data-type="image-grid"][data-columns="3"] {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .preview-content div[data-type="image-grid"][data-columns="4"] {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
   .preview-content div[data-type="image-grid"] img {
-    width: 100% !important;
-    height: auto !important;
     object-fit: cover;
-    margin: 0 auto !important;
+    margin: 0 auto;
     display: block;
     border-radius: 4px;
   }
 
   /* Active Editor inside TipTap (React Node View container) */
-  .tiptap .node-imageGrid {
+  .tiptap [data-type="image-grid"] {
     display: block;
     margin: 1rem 0;
     width: 100%;
   }
 
-  .tiptap .node-imageGrid [data-node-view-content] {
-    display: block;
-    width: 100%;
-  }
-
+  .tiptap [data-type="image-grid"] [data-node-view-content],
   .tiptap [data-type="image-grid"] [data-node-view-content-react] {
-    display: grid;
+    display: flex;
+    flex-wrap: nowrap;
     gap: 12px;
     width: 100%;
   }
 
-  .tiptap [data-type="image-grid"][data-columns="1"] [data-node-view-content-react] {
-    grid-template-columns: repeat(1, 1fr);
-  }
-
-  .tiptap [data-type="image-grid"][data-columns="2"] [data-node-view-content-react] {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .tiptap [data-type="image-grid"][data-columns="3"] [data-node-view-content-react] {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .tiptap [data-type="image-grid"][data-columns="4"] [data-node-view-content-react] {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
+  .tiptap [data-type="image-grid"] [data-node-view-content] > *,
   .tiptap [data-type="image-grid"] [data-node-view-content-react] > * {
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    display: block;
     margin: 0 !important;
-    width: 100%;
   }
 
+  .tiptap [data-type="image-grid"] [data-node-view-content] img,
   .tiptap [data-type="image-grid"] [data-node-view-content-react] img {
-    width: 100% !important;
-    height: auto !important;
     object-fit: cover;
     margin: 0 !important;
     border-radius: 4px;
@@ -3415,34 +3376,37 @@ function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             imgTags.push(match[0]);
         }
 
-        let itemWidth = 185.9 / columns;
-        if (width) {
-            itemWidth = (185.9 * (width / 704)) / columns;
-        }
+        const usableWidth = width ? (185.9 * (width / 704)) : 185.9;
+        const gap = 1.50; // mm
 
-        // Group images into rows
-        const rowsOfImages: string[][] = [];
-
-        for (let i = 0; i < imgTags.length; i += columns) {
-            rowsOfImages.push(imgTags.slice(i, i + columns));
-        }
+        // Group images into a single row of up to 4 images
+        const slicedTags = imgTags.slice(0, 4);
+        const rowsOfImages: string[][] = [slicedTags];
 
         let gridHeight = 2.0;
         rowsOfImages.forEach((rowImages, i) => {
-            let maxRowAspectRatio = 0.0;
+            let aspectSum = 0.0;
             rowImages.forEach((imgTag) => {
                 const aspect = getImageAspectRatio(imgTag);
-
-                if (aspect > maxRowAspectRatio) {
-                    maxRowAspectRatio = aspect;
+                if (aspect > 0.0) {
+                    aspectSum += 1.0 / aspect;
+                } else {
+                    aspectSum += 1.0;
                 }
             });
 
-            if (maxRowAspectRatio <= 0.0) {
-                maxRowAspectRatio = 1.0;
+            if (aspectSum <= 0.0) {
+                aspectSum = 1.0;
             }
 
-            gridHeight += itemWidth * maxRowAspectRatio;
+            const N = rowImages.length;
+            const maxRowHeight = N === 1 ? Math.min(120.0, usableWidth) : (usableWidth * 1.5);
+            let rowHeight = 0.0;
+            if (N > 0) {
+                const calculatedHeight = (usableWidth - (N - 1) * gap) / aspectSum;
+                rowHeight = Math.min(calculatedHeight, maxRowHeight);
+            }
+            gridHeight += rowHeight;
 
             if (i > 0) {
                 gridHeight += 1.5;
@@ -4955,31 +4919,30 @@ export default function ReportWorkspace({
                     }
 
                     const width = block.width || null;
-                    let itemWidth = 185.9 / columns;
-                    if (width) {
-                        itemWidth = (185.9 * (width / 704)) / columns;
-                    }
-                    const rowsRemaining: string[][] = [];
-
-                    for (let i = 0; i < images.length; i += columns) {
-                        rowsRemaining.push(images.slice(i, i + columns));
-                    }
+                    const usableWidth = width ? (185.9 * (width / 704)) : 185.9;
+                    const gap = 1.50; // mm
+                    const slicedImages = images.slice(0, 4);
+                    const rowsRemaining: string[][] = [slicedImages];
 
                     const rowHeights = rowsRemaining.map((rowImages) => {
-                        let maxRowAspectRatio = 0.0;
+                        let aspectSum = 0.0;
                         rowImages.forEach((imgTag: string) => {
                             const aspect = getImageAspectRatio(imgTag);
-
-                            if (aspect > maxRowAspectRatio) {
-                                maxRowAspectRatio = aspect;
+                            if (aspect > 0.0) {
+                                aspectSum += 1.0 / aspect;
+                            } else {
+                                aspectSum += 1.0;
                             }
                         });
 
-                        if (maxRowAspectRatio <= 0) {
-                            maxRowAspectRatio = 1.0;
+                        if (aspectSum <= 0) {
+                            aspectSum = 1.0;
                         }
 
-                        return itemWidth * maxRowAspectRatio;
+                        const N = rowImages.length;
+                        const maxRowHeight = N === 1 ? Math.min(120.0, usableWidth) : (usableWidth * 1.5);
+                        const calculatedHeight = (usableWidth - (N - 1) * gap) / aspectSum;
+                        return Math.min(calculatedHeight, maxRowHeight);
                     });
 
                     let rowIndex = 0;
@@ -5036,8 +4999,15 @@ export default function ReportWorkspace({
                         const sliceImages: string[] = [];
 
                         for (let i = 0; i < r; i++) {
-                            rowsRemaining[rowIndex + i].forEach((imgTag) => {
+                            const rowIdx = rowIndex + i;
+                            const rowImages = rowsRemaining[rowIdx];
+                            const H_j = rowHeights[rowIdx];
+
+                            rowImages.forEach((imgTag) => {
                                 const aspect = getImageAspectRatio(imgTag);
+                                const widthMm = aspect > 0.0 ? (H_j / aspect) : H_j;
+                                const styleRule = `height: ${H_j}mm; width: ${widthMm}mm; object-fit: cover;`;
+
                                 let processedTag = imgTag;
                                 const styleMatch = processedTag.match(
                                     /style=["\']([^"\']*)["\']/i,
@@ -5048,7 +5018,7 @@ export default function ReportWorkspace({
                                         /;$/,
                                         '',
                                     );
-                                    const newStyle = `${existingStyle}; aspect-ratio: 1 / ${aspect}; object-fit: cover;`;
+                                    const newStyle = `${existingStyle}; ${styleRule}`;
                                     processedTag = processedTag.replace(
                                         /style=["\']([^"\']*)["\']/i,
                                         `style="${newStyle}"`,
@@ -5056,7 +5026,7 @@ export default function ReportWorkspace({
                                 } else {
                                     processedTag = processedTag.replace(
                                         '<img',
-                                        `<img style="aspect-ratio: 1 / ${aspect}; object-fit: cover;"`,
+                                        `<img style="${styleRule}"`,
                                     );
                                 }
 
@@ -5065,13 +5035,14 @@ export default function ReportWorkspace({
                         }
 
                         const align = block.alignment || 'center';
-                        const width = block.width || null;
                         const isLeft = align === 'left';
                         const isRight = align === 'right';
                         const marginLeft = isLeft ? '0' : 'auto';
                         const marginRight = isRight ? '0' : 'auto';
                         const styles = [
-                            'display: grid',
+                            'display: flex',
+                            'flex-wrap: nowrap',
+                            `gap: ${gap}mm`,
                             `margin-left: ${marginLeft}`,
                             `margin-right: ${marginRight}`,
                         ];

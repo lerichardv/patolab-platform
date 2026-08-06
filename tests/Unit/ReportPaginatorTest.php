@@ -59,8 +59,8 @@ test('report paginator paginates image grid and handles base64 images', function
                 $foundImageGrid = true;
                 // Assert height is numeric and calculated using dimensions
                 expect($block['height'])->toBeGreaterThan(5.3); // grid cost + image row heights
-                // Assert aspect-ratio style is injected to the img tags
-                expect($block['html'])->toContain('style="aspect-ratio: 1 / 1; object-fit: cover;"');
+                // Assert justified styles are injected to the img tags
+                expect($block['html'])->toContain('object-fit: cover;');
             }
         }
     }
