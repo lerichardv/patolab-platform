@@ -1,4 +1,5 @@
 import { useForm, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Check,
     ChevronsUpDown,
@@ -74,7 +75,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import CustomerForm from '../customers/customer-form';
+import CustomerSheet from '../customers/customer-sheet';
 import {
     PaymentMethodSheet,
     PaymentResume,
@@ -237,6 +238,8 @@ export default function SpecimenForm({
     );
     const [isLoadingTemplates, setIsLoadingTemplates] = React.useState(false);
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = React.useState(false);
+    const [customerToEdit, setCustomerToEdit] =
+        React.useState<CustomerOption | null>(null);
     const [isReferrerSheetOpen, setIsReferrerSheetOpen] = React.useState(false);
     const [isSequenceSheetOpen, setIsSequenceSheetOpen] = React.useState(false);
     const [isSpecimenTypeSheetOpen, setIsSpecimenTypeSheetOpen] =
@@ -373,6 +376,7 @@ export default function SpecimenForm({
         React.useState(false);
     const [isFacturating, setIsFacturating] = React.useState(false);
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = React.useState(false);
+    const [isReservingCode, setIsReservingCode] = React.useState(false);
 
     const [currentStep, setCurrentStep] = React.useState(1);
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -422,6 +426,7 @@ export default function SpecimenForm({
               ? priorities[0].id.toString()
               : '',
         medical_order_file: null as File | null,
+        reserved_code: '',
 
         // Billing fields (creation only)
         quantity: 1,
@@ -804,9 +809,37 @@ export default function SpecimenForm({
         return true;
     };
 
-    const handleNextStep = () => {
+    const handleNextStep = async () => {
         if (currentStep === 1 && validateStep1()) {
-            setCurrentStep(2);
+            if (data.reserved_code) {
+                setCurrentStep(2);
+
+                return;
+            }
+
+            setIsReservingCode(true);
+
+            try {
+                const response = await axios.post('/specimens/reserve-code', {
+                    specimen_type_id: parseInt(data.specimen_type),
+                    location_id: activeLocationId
+                        ? parseInt(activeLocationId.toString())
+                        : null,
+                });
+                setData((d) => ({
+                    ...d,
+                    reserved_code: response.data.code,
+                }));
+                setCurrentStep(2);
+            } catch (error: any) {
+                console.error('Error reserving code:', error);
+                const errMsg =
+                    error.response?.data?.message ||
+                    'Error al reservar el código de secuencia.';
+                toast.error(errMsg);
+            } finally {
+                setIsReservingCode(false);
+            }
         }
     };
 
@@ -1327,7 +1360,10 @@ export default function SpecimenForm({
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setIsCustomerSheetOpen(true)}
+                                onClick={() => {
+                                    setCustomerToEdit(null);
+                                    setIsCustomerSheetOpen(true);
+                                }}
                                 className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
                             >
                                 <Plus className="h-3 w-3" /> Nuevo
@@ -1340,35 +1376,56 @@ export default function SpecimenForm({
                         )}
 
                         {selectedCustomer && (
-                            <div className="grid grid-cols-1 gap-4 border-t border-border/50 pt-3 text-xs sm:grid-cols-3">
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                        RTN / Identidad
-                                    </span>
-                                    <span className="font-mono font-medium text-foreground">
-                                        {selectedCustomer.id_number || 'N/A'}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                        Correo Electrónico
-                                    </span>
-                                    <span className="font-medium break-all text-foreground">
-                                        {selectedCustomer.email || 'Sin correo'}
-                                    </span>
-                                </div>
-                                {selectedCustomer.type !== 'empresa' && (
+                            <div className="relative border-t border-border/50 pt-3 text-xs">
+                                {pageProps.auth?.permissions?.includes(
+                                    'patients.edit',
+                                ) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCustomerToEdit(
+                                                selectedCustomerData,
+                                            );
+                                            setIsCustomerSheetOpen(true);
+                                        }}
+                                        className="absolute top-3 right-0 flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                    >
+                                        <Edit2 className="h-3 w-3" /> Editar
+                                        cliente
+                                    </button>
+                                )}
+                                <div className="grid grid-cols-1 gap-4 pr-28 sm:grid-cols-3">
                                     <div className="flex flex-col gap-1">
                                         <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                            Edad
+                                            RTN / Identidad
                                         </span>
-                                        <span className="font-medium text-foreground">
-                                            {selectedCustomer.age
-                                                ? `${selectedCustomer.age} años`
-                                                : 'N/A'}
+                                        <span className="font-mono font-medium text-foreground">
+                                            {selectedCustomer.id_number ||
+                                                'N/A'}
                                         </span>
                                     </div>
-                                )}
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                            Correo Electrónico
+                                        </span>
+                                        <span className="font-medium break-all text-foreground">
+                                            {selectedCustomer.email ||
+                                                'Sin correo'}
+                                        </span>
+                                    </div>
+                                    {selectedCustomer.type !== 'empresa' && (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                                Edad
+                                            </span>
+                                            <span className="font-medium text-foreground">
+                                                {selectedCustomer.age
+                                                    ? `${selectedCustomer.age} años`
+                                                    : 'N/A'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1469,9 +1526,13 @@ export default function SpecimenForm({
                                 <FormCombobox
                                     placeholder="Seleccionar tipo"
                                     value={data.specimen_type}
-                                    onChange={(v) =>
-                                        setData('specimen_type', v)
-                                    }
+                                    onChange={(v) => {
+                                        setData((d) => ({
+                                            ...d,
+                                            specimen_type: v,
+                                            reserved_code: '',
+                                        }));
+                                    }}
                                     options={sortedSpecimenTypes.map((t) => ({
                                         label: t.name,
                                         value: t.id.toString(),
@@ -1534,23 +1595,13 @@ export default function SpecimenForm({
                             {!specimen && data.specimen_type && (
                                 <div className="mt-1 transition-all duration-300">
                                     {matchingSequence ? (
-                                        <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                            <Tag className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="text-xs font-semibold">
-                                                    Secuencia num. activa
-                                                    configurada
-                                                </span>
-                                                <span className="text-[10.5px] text-emerald-600 dark:text-emerald-400">
-                                                    Ejemplo de próximo código
-                                                    correlativo a ser asignado:
-                                                </span>
-                                                <div className="mt-1">
-                                                    <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
-                                                        {nextSequencePreview}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                            <Tag className="h-4 w-4 shrink-0 text-emerald-500" />
+                                            <span className="text-xs font-semibold">
+                                                Secuencia de numeración activa
+                                                configurada para el tipo de
+                                                muestra
+                                            </span>
                                         </div>
                                     ) : (
                                         <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
@@ -2581,6 +2632,18 @@ export default function SpecimenForm({
                 {/* SECCIÓN 2: FACTURACIÓN (CREACIÓN SOLAMENTE) */}
                 {!specimen && currentStep === 2 && (
                     <>
+                        {data.reserved_code && (
+                            <div className="mb-4 flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                <span className="flex items-center gap-2 text-xs font-semibold">
+                                    <Tag className="h-4 w-4 shrink-0 text-emerald-500" />
+                                    Código de Muestra Reservado:
+                                </span>
+                                <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                    {data.reserved_code}
+                                </span>
+                            </div>
+                        )}
+
                         <div className="space-y-4">
                             <h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
                                 Facturación
@@ -3489,13 +3552,21 @@ export default function SpecimenForm({
                             onClick={handleNextStep}
                             className="w-full sm:w-auto"
                             disabled={
-                                !specimen &&
-                                currentStep === 1 &&
-                                !!data.specimen_type &&
-                                !matchingSequence
+                                isReservingCode ||
+                                (!specimen &&
+                                    currentStep === 1 &&
+                                    !!data.specimen_type &&
+                                    !matchingSequence)
                             }
                         >
-                            Siguiente
+                            {isReservingCode ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Reservando Código de Muestra...
+                                </>
+                            ) : (
+                                'Siguiente'
+                            )}
                         </Button>
                     ) : (
                         <Button
@@ -3592,25 +3663,17 @@ export default function SpecimenForm({
                 </SheetContent>
             </Sheet>
 
-            <Sheet
+            <CustomerSheet
                 open={isCustomerSheetOpen}
                 onOpenChange={setIsCustomerSheetOpen}
-            >
-                <SheetContent
-                    side="right"
-                    className="w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                >
-                    <HeadingSheet
-                        title="Nuevo Cliente"
-                        description="Complete los campos para registrar un nuevo cliente."
-                    />
-                    <div className="-mx-5 mt-4 px-5">
-                        <CustomerForm
-                            onSuccess={() => setIsCustomerSheetOpen(false)}
-                        />
-                    </div>
-                </SheetContent>
-            </Sheet>
+                customer={customerToEdit as any}
+                className="w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                onSuccess={(updatedCustomer: any) => {
+                    if (updatedCustomer) {
+                        setSelectedCustomerData(updatedCustomer);
+                    }
+                }}
+            />
 
             <Sheet
                 open={isReferrerSheetOpen}

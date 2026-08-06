@@ -1,4 +1,5 @@
 import { router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Check,
     ChevronsUpDown,
@@ -16,6 +17,7 @@ import {
     Receipt,
     Trash2,
     Edit2,
+    Loader2,
     Info,
     ChevronDown,
     ChevronUp,
@@ -82,7 +84,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 // Reuse on-the-fly creators
-import CustomerForm from '../customers/customer-form';
+import CustomerSheet from '../customers/customer-sheet';
 import type { PaymentData } from '../invoices/payment-method-sheet';
 import {
     PaymentMethodSheet,
@@ -262,6 +264,7 @@ export default function SpecimenGroupSheet({
     const [nestedErrors, setNestedErrors] = useState<Record<string, string>>(
         {},
     );
+    const [nestedReservedCode, setNestedReservedCode] = useState('');
 
     // Nested form inputs
     const [nestedCustomer, setNestedCustomer] = useState('');
@@ -282,11 +285,13 @@ export default function SpecimenGroupSheet({
     const [nestedInsumos, setNestedInsumos] = useState<any[]>([]);
     const [supplySearchQuery, setSupplySearchQuery] = useState('');
 
-    // On-the-fly creator sheet states
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
     const [customerSheetSource, setCustomerSheetSource] = useState<
         'global' | 'nested'
     >('global');
+    const [customerToEdit, setCustomerToEdit] = useState<CustomerOption | null>(
+        null,
+    );
     // Track selected customer data for display (async combobox)
     const [selectedGlobalCustomerData, setSelectedGlobalCustomerData] =
         useState<CustomerOption | null>(null);
@@ -343,6 +348,7 @@ export default function SpecimenGroupSheet({
 
     // Global billing fields (Step 2)
     const [paymentType, setPaymentType] = useState('');
+    const [isReservingCode, setIsReservingCode] = useState(false);
     const [paymentMethodDate, setPaymentMethodDate] = useState(
         new Date().toISOString().split('T')[0],
     );
@@ -642,6 +648,7 @@ export default function SpecimenGroupSheet({
                 ? priorities[0].id.toString()
                 : '',
         );
+        setNestedReservedCode('');
         setNestedMedicalOrderFile(null);
         setNestedAgregarInsumos(false);
         setNestedInsumos([]);
@@ -662,6 +669,7 @@ export default function SpecimenGroupSheet({
         setNestedClinicalNotes(spec.clinical_notes || '');
         setNestedStatus(spec.status || 'received');
         setNestedPriority(spec.priority_id ? spec.priority_id.toString() : '');
+        setNestedReservedCode(spec.sequence_code || '');
         setNestedMedicalOrderFile(spec.medical_order_file || null);
         setNestedAgregarInsumos(spec.agregar_insumos || false);
         setNestedInsumos(spec.insumos || []);
@@ -792,7 +800,7 @@ export default function SpecimenGroupSheet({
         return Object.keys(errors).length === 0;
     };
 
-    const handleSaveNestedSpecimen = () => {
+    const handleSaveNestedSpecimen = async () => {
         if (!validateNestedSpecimen()) {
             toast.error(
                 'Complete todos los campos obligatorios del espécimen.',
@@ -816,12 +824,41 @@ export default function SpecimenGroupSheet({
             ? specimens.find((s) => s.client_id === nestedSpecimenToEditId)
             : null;
 
+        let reservedCode = nestedReservedCode;
+
+        if (!reservedCode) {
+            setIsReservingCode(true);
+
+            try {
+                const response = await axios.post('/specimens/reserve-code', {
+                    specimen_type_id: parseInt(nestedSpecimenType),
+                    location_id: activeLocationId
+                        ? parseInt(activeLocationId.toString())
+                        : null,
+                });
+                reservedCode = response.data.code;
+                setNestedReservedCode(reservedCode);
+            } catch (error: any) {
+                console.error(
+                    'Error reserving code for group specimen:',
+                    error,
+                );
+                const errMsg =
+                    error.response?.data?.message ||
+                    'Error al reservar el código de secuencia.';
+                toast.error(errMsg);
+                setIsReservingCode(false);
+
+                return;
+            } finally {
+                setIsReservingCode(false);
+            }
+        }
+
         const specObject = {
             id: existingSpec ? existingSpec.id : undefined,
             isExisting: existingSpec ? existingSpec.isExisting : undefined,
-            sequence_code: existingSpec
-                ? existingSpec.sequence_code
-                : undefined,
+            sequence_code: reservedCode || undefined,
             client_id:
                 nestedSpecimenToEditId ||
                 Math.random().toString(36).substring(2, 9),
@@ -1097,8 +1134,9 @@ export default function SpecimenGroupSheet({
         const map: Record<string, string> = {};
 
         specimens.forEach((spec) => {
-            if (spec.isExisting && spec.sequence_code) {
+            if (spec.sequence_code) {
                 map[spec.client_id] = spec.sequence_code;
+
                 return;
             }
 
@@ -1367,6 +1405,7 @@ export default function SpecimenGroupSheet({
                 id: s.id,
                 customer: s.customer,
                 specimen_type: s.specimen_type,
+                reserved_code: s.id ? null : (s.sequence_code || null),
                 specimen_type_examination: s.specimen_type_examination,
                 specimen_category: s.specimen_category,
                 referrer: s.referrer,
@@ -1568,6 +1607,7 @@ export default function SpecimenGroupSheet({
                                     <button
                                         type="button"
                                         onClick={() => {
+                                            setCustomerToEdit(null);
                                             setCustomerSheetSource('global');
                                             setIsCustomerSheetOpen(true);
                                         }}
@@ -1579,33 +1619,55 @@ export default function SpecimenGroupSheet({
                             </div>
 
                             {selectedGlobalCustomer && (
-                                <div className="grid grid-cols-1 gap-4 border-t border-border/50 pt-3 text-xs sm:grid-cols-3">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                            RTN / Identidad
-                                        </span>
-                                        <span className="font-mono font-medium text-foreground">
-                                            {selectedGlobalCustomer.id_number ||
-                                                'N/A'}
-                                        </span>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                            Correo Electrónico
-                                        </span>
-                                        <span className="font-medium break-all text-foreground">
-                                            {selectedGlobalCustomer.email ||
-                                                'Sin correo'}
-                                        </span>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                            Teléfono
-                                        </span>
-                                        <span className="font-medium text-foreground">
-                                            {selectedGlobalCustomer.phone ||
-                                                'N/A'}
-                                        </span>
+                                <div className="relative border-t border-border/50 pt-3 text-xs">
+                                    {pageProps.auth?.permissions?.includes(
+                                        'patients.edit',
+                                    ) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setCustomerToEdit(
+                                                    selectedGlobalCustomerData,
+                                                );
+                                                setCustomerSheetSource(
+                                                    'global',
+                                                );
+                                                setIsCustomerSheetOpen(true);
+                                            }}
+                                            className="absolute top-3 right-0 flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                        >
+                                            <Edit2 className="h-3 w-3" /> Editar
+                                            cliente
+                                        </button>
+                                    )}
+                                    <div className="grid grid-cols-1 gap-4 pr-28 sm:grid-cols-3">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                                RTN / Identidad
+                                            </span>
+                                            <span className="font-mono font-medium text-foreground">
+                                                {selectedGlobalCustomer.id_number ||
+                                                    'N/A'}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                                Correo Electrónico
+                                            </span>
+                                            <span className="font-medium break-all text-foreground">
+                                                {selectedGlobalCustomer.email ||
+                                                    'Sin correo'}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                                Teléfono
+                                            </span>
+                                            <span className="font-medium text-foreground">
+                                                {selectedGlobalCustomer.phone ||
+                                                    'N/A'}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -1696,6 +1758,7 @@ export default function SpecimenGroupSheet({
                                                                 ] && (
                                                                     <span className="inline-flex items-center rounded-md border border-sky-100 bg-sky-50 px-2 py-0.5 font-mono text-[10px] font-bold text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-400">
                                                                         {!spec.isExisting &&
+                                                                            !spec.sequence_code &&
                                                                             '*'}
                                                                         {
                                                                             estimatedCodes[
@@ -2988,6 +3051,7 @@ export default function SpecimenGroupSheet({
                                         <button
                                             type="button"
                                             onClick={() => {
+                                                setCustomerToEdit(null);
                                                 setCustomerSheetSource(
                                                     'nested',
                                                 );
@@ -3067,6 +3131,7 @@ export default function SpecimenGroupSheet({
                                             value={nestedSpecimenType}
                                             onChange={(v) => {
                                                 setNestedSpecimenType(v);
+                                                setNestedReservedCode('');
                                                 setNestedExamination(''); // reset exam
                                                 setNestedErrors((prev) => ({
                                                     ...prev,
@@ -3144,26 +3209,13 @@ export default function SpecimenGroupSheet({
                                 {nestedSpecimenType && (
                                     <div className="mt-2 transition-all duration-300">
                                         {matchingSequence ? (
-                                            <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                                <Tag className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                                                <div className="flex flex-col gap-0.5">
-                                                    <span className="text-xs font-semibold">
-                                                        Secuencia num. activa
-                                                        configurada
-                                                    </span>
-                                                    <span className="text-[10.5px] text-emerald-600 dark:text-emerald-400">
-                                                        Ejemplo de próximo
-                                                        código correlativo a ser
-                                                        asignado:
-                                                    </span>
-                                                    <div className="mt-1">
-                                                        <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
-                                                            {
-                                                                nextSequencePreview
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                </div>
+                                            <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                                <Tag className="h-4 w-4 shrink-0 text-emerald-500" />
+                                                <span className="text-xs font-semibold">
+                                                    Secuencia de numeración
+                                                    activa configurada para el
+                                                    tipo de muestra
+                                                </span>
                                             </div>
                                         ) : (
                                             <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
@@ -3696,11 +3748,22 @@ export default function SpecimenGroupSheet({
                                         onClick={() =>
                                             setIsNestedFormOpen(false)
                                         }
+                                        disabled={isReservingCode}
                                     >
                                         Cancelar
                                     </Button>
-                                    <Button onClick={handleSaveNestedSpecimen}>
-                                        Guardar Muestra
+                                    <Button
+                                        onClick={handleSaveNestedSpecimen}
+                                        disabled={isReservingCode}
+                                    >
+                                        {isReservingCode ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Reservando Código...
+                                            </>
+                                        ) : (
+                                            'Guardar Muestra'
+                                        )}
                                     </Button>
                                 </div>
                             </div>
@@ -3830,25 +3893,26 @@ export default function SpecimenGroupSheet({
                         </SheetContent>
                     </Sheet>
 
-                    <Sheet
+                    <CustomerSheet
                         open={isCustomerSheetOpen}
                         onOpenChange={setIsCustomerSheetOpen}
-                    >
-                        <SheetContent
-                            side="right"
-                            className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                            overlayClassName="z-[100]"
-                        >
-                            <HeadingSheet
-                                title="Nuevo Paciente"
-                                description="Ingrese los datos del nuevo paciente a registrar en el sistema."
-                            />
-                            <CustomerForm
-                                customer={undefined}
-                                onSuccess={() => setIsCustomerSheetOpen(false)}
-                            />
-                        </SheetContent>
-                    </Sheet>
+                        customer={customerToEdit as any}
+                        className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+                        overlayClassName="z-[100]"
+                        onSuccess={(updatedCustomer: any) => {
+                            if (updatedCustomer) {
+                                if (customerSheetSource === 'global') {
+                                    setSelectedGlobalCustomerData(
+                                        updatedCustomer,
+                                    );
+                                } else {
+                                    setSelectedNestedCustomerData(
+                                        updatedCustomer,
+                                    );
+                                }
+                            }
+                        }}
+                    />
 
                     <Sheet
                         open={isReferrerSheetOpen}

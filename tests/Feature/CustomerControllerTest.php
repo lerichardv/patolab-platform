@@ -30,6 +30,7 @@ test('customers can be created with duplicate rtn/id_number', function () {
             'id_number' => '0801-1990-12345', // Duplicate
             'type' => 'cliente',
             'phone' => '9999-9999',
+            'email' => 'test@example.com',
         ]);
 
     // Assert

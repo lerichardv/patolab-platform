@@ -70,6 +70,7 @@ class SpecimenGroupController extends Controller
             'specimens' => 'required|array|min:1',
             'specimens.*.customer' => 'required|exists:customers,id',
             'specimens.*.specimen_type' => 'required|exists:specimen_type,id',
+            'specimens.*.reserved_code' => 'nullable|string|unique:specimen,sequence_code',
             'specimens.*.specimen_type_examination' => 'required|exists:specimen_type_examination,id',
             'specimens.*.specimen_category' => 'required|exists:specimen_category,id',
             'specimens.*.referrer' => 'required|exists:referrers,id',
@@ -284,32 +285,34 @@ class SpecimenGroupController extends Controller
             // Create each specimen and its supplies
             $createdSpecimensDataForPdf = [];
             foreach ($specimensData as $index => $specData) {
-                // Find active sequence
-                $sequence = Sequence::where('location_id', $caiRange->location_id)
-                    ->where('specimen_type', $specData['specimen_type'])
-                    ->where('active', true)
-                    ->lockForUpdate()
-                    ->first();
+                $sequenceCode = $specData['reserved_code'] ?? null;
+                if (! $sequenceCode) {
+                    $sequence = Sequence::where('location_id', $caiRange->location_id)
+                        ->where('specimen_type', $specData['specimen_type'])
+                        ->where('active', true)
+                        ->lockForUpdate()
+                        ->first();
 
-                if (! $sequence) {
-                    throw new \Exception('No hay una secuencia de numeración activa configurada para esta sucursal y tipo de muestra: '.$specData['specimen_type']);
-                }
-
-                // Find next available sequence code
-                $currentMonth = now()->format('m');
-                $currentYear = now()->format('Y');
-                do {
-                    $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
-                    $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
-                    $sequenceCode = $sequence->prefix.$sequence->separator.$paddedSeq.$sequence->separator.$paddedMonth.$sequence->separator.$currentYear;
-
-                    $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
-                    if ($exists) {
-                        $sequence->increment('current_sequence');
+                    if (! $sequence) {
+                        throw new \Exception('No hay una secuencia de numeración activa configurada para esta sucursal y tipo de muestra: '.$specData['specimen_type']);
                     }
-                } while ($exists);
 
-                $sequence->increment('current_sequence');
+                    // Find next available sequence code
+                    $currentMonth = now()->format('m');
+                    $currentYear = now()->format('Y');
+                    do {
+                        $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
+                        $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
+                        $sequenceCode = $sequence->prefix.$sequence->separator.$paddedSeq.$sequence->separator.$paddedMonth.$sequence->separator.$currentYear;
+
+                        $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
+                        if ($exists) {
+                            $sequence->increment('current_sequence');
+                        }
+                    } while ($exists);
+
+                    $sequence->increment('current_sequence');
+                }
 
                 // Handle medical order file if present
                 $medOrderPath = null;
@@ -620,6 +623,7 @@ class SpecimenGroupController extends Controller
             'specimens.*.id' => 'nullable|exists:specimen,id',
             'specimens.*.customer' => 'required|exists:customers,id',
             'specimens.*.specimen_type' => 'required|exists:specimen_type,id',
+            'specimens.*.reserved_code' => 'nullable|string|unique:specimen,sequence_code',
             'specimens.*.specimen_type_examination' => 'required|exists:specimen_type_examination,id',
             'specimens.*.specimen_category' => 'required|exists:specimen_category,id',
             'specimens.*.referrer' => 'required|exists:referrers,id',
@@ -899,30 +903,33 @@ class SpecimenGroupController extends Controller
 
                 } else {
                     // NEW specimen!
-                    $sequence = Sequence::where('location_id', $caiRange->location_id)
-                        ->where('specimen_type', $specData['specimen_type'])
-                        ->where('active', true)
-                        ->lockForUpdate()
-                        ->first();
+                    $sequenceCode = $specData['reserved_code'] ?? null;
+                    if (! $sequenceCode) {
+                        $sequence = Sequence::where('location_id', $caiRange->location_id)
+                            ->where('specimen_type', $specData['specimen_type'])
+                            ->where('active', true)
+                            ->lockForUpdate()
+                            ->first();
 
-                    if (! $sequence) {
-                        throw new \Exception('No hay una secuencia de numeración activa configurada para esta sucursal y tipo de muestra: '.$specData['specimen_type']);
-                    }
-
-                    $currentMonth = now()->format('m');
-                    $currentYear = now()->format('Y');
-                    do {
-                        $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
-                        $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
-                        $sequenceCode = $sequence->prefix.$sequence->separator.$paddedSeq.$sequence->separator.$paddedMonth.$sequence->separator.$currentYear;
-
-                        $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
-                        if ($exists) {
-                            $sequence->increment('current_sequence');
+                        if (! $sequence) {
+                            throw new \Exception('No hay una secuencia de numeración activa configurada para esta sucursal y tipo de muestra: '.$specData['specimen_type']);
                         }
-                    } while ($exists);
 
-                    $sequence->increment('current_sequence');
+                        $currentMonth = now()->format('m');
+                        $currentYear = now()->format('Y');
+                        do {
+                            $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
+                            $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
+                            $sequenceCode = $sequence->prefix.$sequence->separator.$paddedSeq.$sequence->separator.$paddedMonth.$sequence->separator.$currentYear;
+
+                            $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
+                            if ($exists) {
+                                $sequence->increment('current_sequence');
+                            }
+                        } while ($exists);
+
+                        $sequence->increment('current_sequence');
+                    }
 
                     $medOrderPath = null;
                     $fileKey = "specimens.{$index}.medical_order_file";

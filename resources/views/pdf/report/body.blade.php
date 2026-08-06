@@ -521,7 +521,7 @@
                                 </td>
                                 <td style="width: 45%; padding-left: 12px;">
 									<strong>Diagnóstico Clínico:</strong> {{ $specimen->diagnosis ?? 'N/A' }}<br>
-                                    <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? 'HDV' }}<br>
+                                    <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? '' }}<br>
                                     <strong>Fecha de Recibo:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }}<br>
                                     <strong>Sitio Anatómico:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}
                                 </td>

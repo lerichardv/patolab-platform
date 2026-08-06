@@ -20,7 +20,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $role = Role::create(['slug' => 'pathologist', 'name' => 'Patólogo']);
-    $viewPermission = Permission::create(['slug' => 'invoices.view', 'name' => 'Ver Facturas / Reportes']);
+    $viewPermission = Permission::create(['slug' => 'reports.cuttings.view', 'name' => 'Ver Facturas / Reportes']);
     $role->permissions()->attach($viewPermission);
 
     $this->user = User::factory()->create([

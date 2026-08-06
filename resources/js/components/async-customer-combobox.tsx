@@ -19,6 +19,10 @@ export interface CustomerOption {
     gender?: string | null;
     type?: string | null;
     age?: number | null;
+    secondary_phone?: string | null;
+    state?: string | number | null;
+    city?: string | number | null;
+    address?: string | null;
 }
 
 interface Props {
@@ -67,19 +71,31 @@ export default function AsyncCustomerCombobox({
     });
 
     // Sync the known-customers cache when the initial customer changes
-    const prevInitialCustomerId = React.useRef(initialCustomer?.id);
     React.useEffect(() => {
         if (!initialCustomer) {
             return;
         }
 
-        if (initialCustomer.id === prevInitialCustomerId.current) {
-            return;
-        }
-
-        prevInitialCustomerId.current = initialCustomer.id;
-
         setKnownCustomers((prev) => {
+            const current = prev.get(initialCustomer.id);
+
+            if (
+                current &&
+                current.name === initialCustomer.name &&
+                current.id_number === initialCustomer.id_number &&
+                current.phone === initialCustomer.phone &&
+                current.email === initialCustomer.email &&
+                current.gender === initialCustomer.gender &&
+                current.type === initialCustomer.type &&
+                current.age === initialCustomer.age &&
+                current.secondary_phone === initialCustomer.secondary_phone &&
+                current.state === initialCustomer.state &&
+                current.city === initialCustomer.city &&
+                current.address === initialCustomer.address
+            ) {
+                return prev;
+            }
+
             const next = new Map(prev);
             next.set(initialCustomer.id, initialCustomer);
 

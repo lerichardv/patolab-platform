@@ -24,6 +24,7 @@ interface Props {
     onOpenChange: (open: boolean) => void;
     className?: string;
     overlayClassName?: string;
+    onSuccess?: (customer?: any) => void;
 }
 
 export default function CustomerSheet({
@@ -32,6 +33,7 @@ export default function CustomerSheet({
     onOpenChange,
     className,
     overlayClassName,
+    onSuccess,
 }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -52,7 +54,10 @@ export default function CustomerSheet({
                 />
                 <CustomerForm
                     customer={customer || undefined}
-                    onSuccess={() => onOpenChange(false)}
+                    onSuccess={(updatedCustomer) => {
+                        onSuccess?.(updatedCustomer);
+                        onOpenChange(false);
+                    }}
                 />
             </SheetContent>
         </Sheet>

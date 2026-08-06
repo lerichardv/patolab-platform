@@ -73,6 +73,7 @@ test('can import single row, resolving names to IDs and normalizing data', funct
         'age' => 28,
         'gender' => 'femenino',
         'phone' => '8888-8888',
+        'email' => 'jane@example.com',
         'state' => 'CORTES', // Case-and-accent insensitive department resolution
         'city' => 'San Pedro Sula', // Municipality resolution
     ];

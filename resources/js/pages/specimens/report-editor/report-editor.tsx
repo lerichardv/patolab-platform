@@ -3537,7 +3537,7 @@ function PatientMetadataCard({ specimen }: { specimen: Specimen }) {
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Hospital/Clínica:
                         </strong>{' '}
-                        {specimen.referrer_relation.notes || 'HDV'}
+                        {specimen.referrer_relation.notes || ''}
                         <br />
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Fecha de Recibo:

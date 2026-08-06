@@ -32,6 +32,7 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SpecimenCategoryController;
 use App\Http\Controllers\SpecimenController;
 use App\Http\Controllers\SpecimenGroupController;
+use App\Http\Controllers\SpecimenSequenceController;
 use App\Http\Controllers\SpecimenTypeController;
 use App\Http\Controllers\SpecimenTypeExaminationController;
 use App\Http\Controllers\SpecimenTypeTemplateController;
@@ -129,6 +130,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('user-commission-rules', UserCommissionRuleController::class);
     Route::resource('user-commissions', UserCommissionController::class)->only(['index', 'update', 'destroy']);
     Route::resource('roles', RoleController::class);
+    Route::post('specimens/reserve-code', [SpecimenSequenceController::class, 'reserve'])->name('specimens.reserve-code');
     Route::post('specimens/update-order', [SpecimenController::class, 'updateOrder'])->name('specimens.update-order');
     Route::post('specimens/bulk-action', [SpecimenController::class, 'bulkAction'])->name('specimens.bulk-action');
     Route::post('specimens/{specimen}/assign-user', [SpecimenController::class, 'assignUser'])->name('specimens.assign-user');

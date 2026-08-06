@@ -48,7 +48,7 @@ interface Customer {
 
 interface Props {
     customer?: Customer;
-    onSuccess: () => void;
+    onSuccess: (updatedCustomer?: any) => void;
 }
 
 export default function CustomerForm({ customer, onSuccess }: Props) {
@@ -124,7 +124,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
             put(updateCustomer(customer.id).url, {
                 onSuccess: () => {
                     toast.success('Cliente actualizado correctamente');
-                    onSuccess();
+                    onSuccess({ ...customer, ...data });
                     reset();
                 },
             });

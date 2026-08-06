@@ -14,7 +14,7 @@ class WorkOrderTypeSeeder extends Seeder
     {
         $types = [
             [
-                'name' => 'Biopsia Regular',
+                'name' => 'Recortes',
                 'duration_unit' => 'days',
                 'duration_value' => 5,
                 'same_day_rule_enabled' => false,
@@ -22,7 +22,7 @@ class WorkOrderTypeSeeder extends Seeder
                 'same_day_cutoff_end' => null,
             ],
             [
-                'name' => 'Biopsia Urgente',
+                'name' => 'Niveles',
                 'duration_unit' => 'days',
                 'duration_value' => 2,
                 'same_day_rule_enabled' => false,
@@ -30,7 +30,7 @@ class WorkOrderTypeSeeder extends Seeder
                 'same_day_cutoff_end' => null,
             ],
             [
-                'name' => 'Citología Regular',
+                'name' => 'Reorientaciones',
                 'duration_unit' => 'days',
                 'duration_value' => 3,
                 'same_day_rule_enabled' => false,
@@ -38,7 +38,7 @@ class WorkOrderTypeSeeder extends Seeder
                 'same_day_cutoff_end' => null,
             ],
             [
-                'name' => 'Inmunohistoquímica',
+                'name' => 'Giemsa',
                 'duration_unit' => 'days',
                 'duration_value' => 7,
                 'same_day_rule_enabled' => false,
@@ -46,7 +46,7 @@ class WorkOrderTypeSeeder extends Seeder
                 'same_day_cutoff_end' => null,
             ],
             [
-                'name' => 'Diagnóstico Rápido de Mismo Día',
+                'name' => 'Ziehl Neelsen',
                 'duration_unit' => 'hours',
                 'duration_value' => 8,
                 'same_day_rule_enabled' => true,

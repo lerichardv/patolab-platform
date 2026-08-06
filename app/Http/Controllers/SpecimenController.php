@@ -237,6 +237,7 @@ class SpecimenController extends Controller
         $validated = $request->validate([
             'customer' => 'required|exists:customers,id',
             'specimen_type' => 'required|exists:specimen_type,id',
+            'reserved_code' => 'nullable|string|unique:specimen,sequence_code',
             'specimen_type_examination' => 'required|exists:specimen_type_examination,id',
             'specimen_category' => 'required|exists:specimen_category,id',
             'referrer' => 'required|exists:referrers,id',
@@ -330,35 +331,39 @@ class SpecimenController extends Controller
                 throw new \Exception('No hay un rango CAI activo configurado en el sistema.');
             }
 
-            $sequence = Sequence::where('location_id', $caiRange->location_id)
-                ->where('specimen_type', $validated['specimen_type'])
-                ->where('active', true)
-                ->lockForUpdate()
-                ->first();
+            $sequenceCode = $validated['reserved_code'] ?? null;
+            if (! $sequenceCode) {
+                $sequence = Sequence::where('location_id', $caiRange->location_id)
+                    ->where('specimen_type', $validated['specimen_type'])
+                    ->where('active', true)
+                    ->lockForUpdate()
+                    ->first();
 
-            if (! $sequence) {
-                throw new \Exception('No hay una secuencia de numeración activa configurada para esta sucursal y tipo de muestra.');
-            }
-
-            // Find next available sequence code
-            $currentMonth = now()->format('m');
-            $currentYear = now()->format('Y');
-            do {
-                $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
-                $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
-                $sequenceCode = $sequence->prefix.$sequence->separator.$paddedSeq.$sequence->separator.$paddedMonth.$sequence->separator.$currentYear;
-
-                $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
-                if ($exists) {
-                    $sequence->increment('current_sequence');
+                if (! $sequence) {
+                    throw new \Exception('No hay una secuencia de numeración activa configurada para esta sucursal y tipo de muestra.');
                 }
-            } while ($exists);
 
-            // Increment current sequence
-            $sequence->increment('current_sequence');
+                // Find next available sequence code
+                $currentMonth = now()->format('m');
+                $currentYear = now()->format('Y');
+                do {
+                    $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
+                    $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
+                    $sequenceCode = $sequence->prefix.$sequence->separator.$paddedSeq.$sequence->separator.$paddedMonth.$sequence->separator.$currentYear;
+
+                    $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
+                    if ($exists) {
+                        $sequence->increment('current_sequence');
+                    }
+                } while ($exists);
+
+                // Increment current sequence
+                $sequence->increment('current_sequence');
+            }
 
             $specimenData = $validated;
             unset(
+                $specimenData['reserved_code'],
                 $specimenData['quantity'],
                 $specimenData['amount'],
                 $specimenData['discount'],
@@ -625,6 +630,7 @@ class SpecimenController extends Controller
         $validated = $request->validate([
             'customer' => 'required|exists:customers,id',
             'specimen_type' => 'required|exists:specimen_type,id',
+            'reserved_code' => 'nullable|string|unique:specimen,sequence_code,'.$specimen->id,
             'specimen_type_examination' => 'required|exists:specimen_type_examination,id',
             'specimen_category' => 'required|exists:specimen_category,id',
             'referrer' => 'required|exists:referrers,id',
@@ -726,44 +732,49 @@ class SpecimenController extends Controller
             $newSpecimenType = (int) $validated['specimen_type'];
 
             if ($oldSpecimenType !== $newSpecimenType) {
-                $locationId = $specimen->location_id;
-                if (! $locationId) {
-                    if ($specimen->invoiceRelation && $specimen->invoiceRelation->caiRange) {
-                        $locationId = $specimen->invoiceRelation->caiRange->location_id;
-                    } else {
-                        $caiRange = CaiRange::where('status', 'active')->first();
-                        $locationId = $caiRange ? $caiRange->location_id : null;
+                $sequenceCode = $validated['reserved_code'] ?? null;
+                if (! $sequenceCode) {
+                    $locationId = $specimen->location_id;
+                    if (! $locationId) {
+                        if ($specimen->invoiceRelation && $specimen->invoiceRelation->caiRange) {
+                            $locationId = $specimen->invoiceRelation->caiRange->location_id;
+                        } else {
+                            $caiRange = CaiRange::where('status', 'active')->first();
+                            $locationId = $caiRange ? $caiRange->location_id : null;
+                        }
+                    }
+
+                    if ($locationId) {
+                        $sequence = Sequence::where('location_id', $locationId)
+                            ->where('specimen_type', $newSpecimenType)
+                            ->where('active', true)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if (! $sequence) {
+                            throw new \Exception('No hay una secuencia de numeración activa configurada para esta sucursal y tipo de muestra.');
+                        }
+
+                        $currentMonth = now()->format('m');
+                        $currentYear = now()->format('Y');
+                        do {
+                            $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
+                            $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
+                            $sequenceCode = $sequence->prefix.$sequence->separator.$paddedSeq.$sequence->separator.$paddedMonth.$sequence->separator.$currentYear;
+
+                            $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
+                            if ($exists) {
+                                $sequence->increment('current_sequence');
+                            }
+                        } while ($exists);
+
+                        $sequence->increment('current_sequence');
+                        $validated['location_id'] = $locationId;
                     }
                 }
 
-                if ($locationId) {
-                    $sequence = Sequence::where('location_id', $locationId)
-                        ->where('specimen_type', $newSpecimenType)
-                        ->where('active', true)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (! $sequence) {
-                        throw new \Exception('No hay una secuencia de numeración activa configurada para esta sucursal y tipo de muestra.');
-                    }
-
-                    $currentMonth = now()->format('m');
-                    $currentYear = now()->format('Y');
-                    do {
-                        $paddedSeq = str_pad($sequence->current_sequence, $sequence->fill ?? 4, '0', STR_PAD_LEFT);
-                        $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
-                        $sequenceCode = $sequence->prefix.$sequence->separator.$paddedSeq.$sequence->separator.$paddedMonth.$sequence->separator.$currentYear;
-
-                        $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
-                        if ($exists) {
-                            $sequence->increment('current_sequence');
-                        }
-                    } while ($exists);
-
-                    $sequence->increment('current_sequence');
-
+                if ($sequenceCode) {
                     $validated['sequence_code'] = $sequenceCode;
-                    $validated['location_id'] = $locationId;
                 }
             }
 
