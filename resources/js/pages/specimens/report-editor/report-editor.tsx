@@ -3283,7 +3283,7 @@ function splitHtmlIntoLines(
 function getImageHeight(blockHtml: string): number {
     const wAttrMatch = blockHtml.match(/<img[^>]+width=["\'](\d+)["\']/i);
     const swMatch = blockHtml.match(/width:\s*(\d+)px/i);
-    const attrWidth = wAttrMatch
+    let attrWidth = wAttrMatch
         ? parseInt(wAttrMatch[1], 10)
         : swMatch
           ? parseInt(swMatch[1], 10)
@@ -3291,11 +3291,29 @@ function getImageHeight(blockHtml: string): number {
 
     const hAttrMatch = blockHtml.match(/<img[^>]+height=["\'](\d+)["\']/i);
     const shMatch = blockHtml.match(/height:\s*(\d+)px/i);
-    const attrHeight = hAttrMatch
+    let attrHeight = hAttrMatch
         ? parseInt(hAttrMatch[1], 10)
         : shMatch
           ? parseInt(shMatch[1], 10)
           : null;
+
+    if ((!attrWidth || !attrHeight) && typeof document !== 'undefined') {
+        const srcMatch = blockHtml.match(/src=["\']([^"\']+)["\']/i);
+        if (srcMatch && srcMatch[1]) {
+            const src = srcMatch[1];
+            const imgs = document.getElementsByTagName('img');
+            for (let i = 0; i < imgs.length; i++) {
+                const imgEl = imgs[i];
+                if (imgEl.src === src || imgEl.getAttribute('src') === src) {
+                    if (imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
+                        if (!attrWidth) attrWidth = imgEl.naturalWidth;
+                        if (!attrHeight) attrHeight = imgEl.naturalHeight;
+                    }
+                    break;
+                }
+            }
+        }
+    }
 
     const width = attrWidth ?? 704;
     let height = attrHeight;
@@ -3316,7 +3334,7 @@ function getImageHeight(blockHtml: string): number {
 function getImageAspectRatio(imgTag: string): number {
     const wAttrMatch = imgTag.match(/width=["\'](\d+)["\']/i);
     const swMatch = imgTag.match(/width:\s*(\d+)px/i);
-    const attrWidth = wAttrMatch
+    let attrWidth = wAttrMatch
         ? parseInt(wAttrMatch[1], 10)
         : swMatch
           ? parseInt(swMatch[1], 10)
@@ -3324,7 +3342,7 @@ function getImageAspectRatio(imgTag: string): number {
 
     const hAttrMatch = imgTag.match(/height=["\'](\d+)["\']/i);
     const shMatch = imgTag.match(/height:\s*(\d+)px/i);
-    const attrHeight = hAttrMatch
+    let attrHeight = hAttrMatch
         ? parseInt(hAttrMatch[1], 10)
         : shMatch
           ? parseInt(shMatch[1], 10)
@@ -3332,6 +3350,23 @@ function getImageAspectRatio(imgTag: string): number {
 
     if (attrHeight && attrWidth && attrWidth > 0) {
         return attrHeight / attrWidth;
+    }
+
+    if (typeof document !== 'undefined') {
+        const srcMatch = imgTag.match(/src=["\']([^"\']+)["\']/i);
+        if (srcMatch && srcMatch[1]) {
+            const src = srcMatch[1];
+            const imgs = document.getElementsByTagName('img');
+            for (let i = 0; i < imgs.length; i++) {
+                const imgEl = imgs[i];
+                if (imgEl.src === src || imgEl.getAttribute('src') === src) {
+                    if (imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
+                        return imgEl.naturalHeight / imgEl.naturalWidth;
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     return 1.0;
@@ -4919,7 +4954,11 @@ export default function ReportWorkspace({
                         continue;
                     }
 
-                    const itemWidth = 185.9 / columns;
+                    const width = block.width || null;
+                    let itemWidth = 185.9 / columns;
+                    if (width) {
+                        itemWidth = (185.9 * (width / 704)) / columns;
+                    }
                     const rowsRemaining: string[][] = [];
 
                     for (let i = 0; i < images.length; i += columns) {
