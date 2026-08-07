@@ -1,6 +1,7 @@
 import type { DropResult } from '@hello-pangea/dnd';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Head, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     formatDistanceToNow,
     add,
@@ -970,6 +971,21 @@ export default function SpecimensIndex({
             setSelectedSpecimen(selectedSpecimenForView);
             setIsViewSheetOpen(false);
             setIsSheetOpen(true);
+        }
+    };
+
+    const handleLoadGroupAndOpenSheet = async (groupId: number) => {
+        const toastId = toast.loading('Cargando detalles del grupo...');
+        try {
+            const response = await axios.get(`/specimen-groups/${groupId}/details`);
+            setSelectedGroup(response.data);
+            setIsGroupSheetOpen(true);
+            toast.dismiss(toastId);
+        } catch (error) {
+            console.error('Error loading group details:', error);
+            toast.error('Error al cargar los detalles del grupo', {
+                id: toastId,
+            });
         }
     };
 
@@ -2245,11 +2261,8 @@ export default function SpecimensIndex({
                                                                                                                         e,
                                                                                                                     ) => {
                                                                                                                         e.stopPropagation();
-                                                                                                                        setSelectedGroup(
-                                                                                                                            specimen.group,
-                                                                                                                        );
-                                                                                                                        setIsGroupSheetOpen(
-                                                                                                                            true,
+                                                                                                                        handleLoadGroupAndOpenSheet(
+                                                                                                                            specimen.group.id,
                                                                                                                         );
                                                                                                                     }}
                                                                                                                 >
