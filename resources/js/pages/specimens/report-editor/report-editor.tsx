@@ -4007,7 +4007,6 @@ export default function ReportWorkspace({
     const [editorTemplateId, setEditorTemplateId] = useState<string>('');
     const [isApplyTemplateOpen, setIsApplyTemplateOpen] =
         useState<boolean>(false);
-    const [confirmText, setConfirmText] = useState<string>('');
     const editorRefs = useRef<Record<string, any>>({});
 
     const registerEditor = (field: string, editor: any) => {
@@ -4799,19 +4798,19 @@ export default function ReportWorkspace({
                 }
 
                 /*
-                // Cuttings summary block always goes after the macroscopy editor/blocks
-                if (!hasPushedCuttings) {
-                    if (cuttingsBlock) {
-                        blocks.push(cuttingsBlock);
-                    }
+				// Cuttings summary block always goes after the macroscopy editor/blocks
+				if (!hasPushedCuttings) {
+					if (cuttingsBlock) {
+						blocks.push(cuttingsBlock);
+					}
 
-                    if (newCuttingsBlock) {
-                        blocks.push(newCuttingsBlock);
-                    }
+					if (newCuttingsBlock) {
+						blocks.push(newCuttingsBlock);
+					}
 
-                    hasPushedCuttings = true;
-                }
-                */
+					hasPushedCuttings = true;
+				}
+				*/
             } else if (section.key === 'microscopy_html') {
                 if (isMicroscopyVisible) {
                     const microHtml = microscopyHtml || '';
@@ -4918,17 +4917,17 @@ export default function ReportWorkspace({
         });
 
         /*
-        // Fallback: If for some reason cuttings summary wasn't pushed (e.g. macroscopy section was inactive or missing)
-        if (!hasPushedCuttings) {
-            if (cuttingsBlock) {
-                blocks.push(cuttingsBlock);
-            }
+		// Fallback: If for some reason cuttings summary wasn't pushed (e.g. macroscopy section was inactive or missing)
+		if (!hasPushedCuttings) {
+			if (cuttingsBlock) {
+				blocks.push(cuttingsBlock);
+			}
 
-            if (newCuttingsBlock) {
-                blocks.push(newCuttingsBlock);
-            }
-        }
-        */
+			if (newCuttingsBlock) {
+				blocks.push(newCuttingsBlock);
+			}
+		}
+		*/
 
         const paginateBlocksJS = (blocksList: any[]): MeasuredBlock[][] => {
             const pagesList: MeasuredBlock[][] = [];
@@ -5875,10 +5874,18 @@ export default function ReportWorkspace({
                 Object.keys(fieldToTemplateKey).forEach((field) => {
                     const editor = editorRefs.current[field];
                     const templateKey = fieldToTemplateKey[field];
-                    const content = template[templateKey] || '';
+                    const templateContent = template[templateKey] || '';
 
                     if (editor) {
-                        editor.commands.setContent(content);
+                        const currentContent = editor.getHTML();
+                        const isCurrentEmpty =
+                            !currentContent ||
+                            currentContent === '<p></p>' ||
+                            currentContent === '<p></p><p></p>';
+                        const mergedContent = isCurrentEmpty
+                            ? templateContent
+                            : templateContent + currentContent;
+                        editor.commands.setContent(mergedContent);
                     }
                 });
 
@@ -5957,7 +5964,6 @@ export default function ReportWorkspace({
 
                 toast.success('Plantilla aplicada y sincronizada con éxito.');
                 setIsApplyTemplateOpen(false);
-                setConfirmText('');
                 setEditorTemplateId('');
             })
             .catch((err) => {
@@ -6827,7 +6833,7 @@ export default function ReportWorkspace({
             >
                 <Head title={`Crear Reporte - ${specimen.sequence_code}`} />
                 <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
-                    <div className="relative max-w-md overflow-hidden rounded-2xl border border-border/80 bg-card p-8 shadow-xl backdrop-blur-md">
+                    <div className="relative max-w-2xl overflow-hidden rounded-2xl border border-border/80 bg-card p-8 shadow-xl backdrop-blur-md">
                         <div className="absolute top-0 right-0 left-0 h-1.5 bg-primary" />
                         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
                             <FileText className="h-8 w-8" />
@@ -6884,10 +6890,9 @@ export default function ReportWorkspace({
                                                         className="group"
                                                     >
                                                         <div className="flex flex-row flex-nowrap gap-3 py-1 text-left">
-                                                            <span className="text-sm font-medium text-foreground group-focus:text-white group-data-[highlighted]:text-white">
-                                                                {temp.user
-                                                                    ?.name ||
-                                                                    'Sin propietario'}
+                                                            <span className="text-sm font-semibold text-foreground group-focus:text-white group-data-[highlighted]:text-white">
+                                                                {temp.name ||
+                                                                    'Plantilla sin nombre'}
                                                             </span>
                                                             <span className="mt-0.5 text-xs text-muted-foreground group-focus:text-white/80 group-data-[highlighted]:text-white/80">
                                                                 {
@@ -6900,7 +6905,12 @@ export default function ReportWorkspace({
                                                                     temp
                                                                         .specimen_type_examination
                                                                         ?.name
-                                                                }
+                                                                }{' '}
+                                                                (
+                                                                {temp.user
+                                                                    ?.name ||
+                                                                    'Sin propietario'}
+                                                                )
                                                             </span>
                                                         </div>
                                                     </SelectItem>
@@ -7972,10 +7982,9 @@ export default function ReportWorkspace({
                                                             className="group"
                                                         >
                                                             <div className="flex flex-row flex-nowrap gap-3 py-1 text-left">
-                                                                <span className="text-sm font-medium text-foreground group-focus:text-white group-data-[highlighted]:text-white">
-                                                                    {temp.user
-                                                                        ?.name ||
-                                                                        'Sin propietario'}
+                                                                <span className="text-sm font-semibold text-foreground group-focus:text-white group-data-[highlighted]:text-white">
+                                                                    {temp.name ||
+                                                                        'Plantilla sin nombre'}
                                                                 </span>
                                                                 <span className="mt-0.5 text-xs text-muted-foreground group-focus:text-white/80 group-data-[highlighted]:text-white/80">
                                                                     {
@@ -7988,7 +7997,12 @@ export default function ReportWorkspace({
                                                                         temp
                                                                             .specimen_type_examination
                                                                             ?.name
-                                                                    }
+                                                                    }{' '}
+                                                                    (
+                                                                    {temp.user
+                                                                        ?.name ||
+                                                                        'Sin propietario'}
+                                                                    )
                                                                 </span>
                                                             </div>
                                                         </SelectItem>
@@ -8019,48 +8033,22 @@ export default function ReportWorkspace({
                             {/* Confirmation dialog for applying a new template */}
                             <AlertDialog
                                 open={isApplyTemplateOpen}
-                                onOpenChange={(open) => {
-                                    setIsApplyTemplateOpen(open);
-
-                                    if (!open) {
-                                        setConfirmText('');
-                                    }
-                                }}
+                                onOpenChange={setIsApplyTemplateOpen}
                             >
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
                                         <AlertDialogTitle>
-                                            ¿Está seguro de que desea cambiar la
+                                            ¿Está seguro de que desea aplicar la
                                             plantilla?
                                         </AlertDialogTitle>
                                         <AlertDialogDescription className="space-y-3 text-left">
                                             <span>
-                                                Esto reemplazará todo el
-                                                contenido del reporte con el
-                                                contenido de la nueva plantilla.
+                                                Esto colocará el contenido de la
+                                                plantilla al inicio de cada
+                                                editor y mantendrá el contenido
+                                                actual del reporte a
+                                                continuación.
                                             </span>
-                                            <span className="block font-semibold text-destructive">
-                                                Esta acción no se puede deshacer
-                                                y se perderán todos los cambios
-                                                actuales.
-                                            </span>
-                                            <div className="pt-2">
-                                                <label className="mb-1 block text-xs font-semibold text-muted-foreground uppercase">
-                                                    Escriba "reemplazar" para
-                                                    confirmar:
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={confirmText}
-                                                    onChange={(e) =>
-                                                        setConfirmText(
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="reemplazar"
-                                                    className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-xs focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden"
-                                                />
-                                            </div>
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -8069,13 +8057,9 @@ export default function ReportWorkspace({
                                         </AlertDialogCancel>
                                         <AlertDialogAction
                                             onClick={handleApplyTemplate}
-                                            disabled={
-                                                confirmText !== 'reemplazar' &&
-                                                confirmText !== 'REEMPLAZAR'
-                                            }
-                                            className="bg-destructive text-white hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
+                                            className="bg-primary text-primary-foreground hover:bg-primary/90"
                                         >
-                                            Confirmar y Reemplazar
+                                            Aplicar plantilla
                                         </AlertDialogAction>
                                     </AlertDialogFooter>
                                 </AlertDialogContent>

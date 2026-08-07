@@ -3,8 +3,8 @@ import {
     update as updateTemplate,
 } from '@/actions/App/Http/Controllers/SpecimenTypeTemplateController';
 import HeadingSheet from '@/components/heading-sheet';
-import type { Template, SpecimenType, User } from '@/components/template-form';
-import TemplateForm from '@/components/template-form';
+import type { Template, SpecimenType, User } from './template-form';
+import TemplateForm from './template-form';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 
 interface Props {

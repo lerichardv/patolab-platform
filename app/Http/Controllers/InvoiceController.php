@@ -172,6 +172,17 @@ class InvoiceController extends Controller
                             }
                         });
                 });
+
+                // Scenario D: Credit payment and social security invoices within date range
+                $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
+                    $sub->whereIn('invoice_type', ['credit payment', 'social security']);
+                    if (! empty($dateFrom)) {
+                        $sub->whereDate('invoices.created_at', '>=', $dateFrom);
+                    }
+                    if (! empty($dateTo)) {
+                        $sub->whereDate('invoices.created_at', '<=', $dateTo);
+                    }
+                });
             });
         }
 

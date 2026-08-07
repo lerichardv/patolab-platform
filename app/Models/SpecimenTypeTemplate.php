@@ -17,6 +17,7 @@ class SpecimenTypeTemplate extends Model
     protected $table = 'specimen_type_templates';
 
     protected $fillable = [
+        'name',
         'specimen_type_id',
         'specimen_type_examination_id',
         'clinical_details_html',

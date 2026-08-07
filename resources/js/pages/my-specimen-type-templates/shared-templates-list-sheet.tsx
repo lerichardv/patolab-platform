@@ -50,6 +50,10 @@ interface SharedPermission {
     specimen_type_examination_id: number;
     specimen_type_examination: SpecimenTypeExamination | null;
     template_id: number;
+    template?: {
+        id: number;
+        name: string | null;
+    } | null;
     shared_with_id: number;
     shared_with: User | null;
     created_at: string;
@@ -118,12 +122,14 @@ export default function SharedTemplatesListSheet({
                 permission.specimen_type?.name?.toLowerCase() || '';
             const examName =
                 permission.specimen_type_examination?.name?.toLowerCase() || '';
+            const templateName = permission.template?.name?.toLowerCase() || '';
 
             return (
                 userName.includes(query) ||
                 userEmail.includes(query) ||
                 specName.includes(query) ||
-                examName.includes(query)
+                examName.includes(query) ||
+                templateName.includes(query)
             );
         });
     }, [sharedPermissions, search]);
@@ -183,7 +189,7 @@ export default function SharedTemplatesListSheet({
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="flex h-full flex-col overflow-hidden p-0 sm:max-w-[900px]">
+            <SheetContent className="flex h-full flex-col overflow-hidden p-0 sm:max-w-[1100px]">
                 <HeadingSheet
                     title="Plantillas Compartidas"
                     description="Historial de plantillas que ha compartido con otros patólogos/usuarios y administración de sus accesos."
@@ -231,6 +237,7 @@ export default function SharedTemplatesListSheet({
                                         />
                                     </TableHead>
                                     <TableHead>Compartido con</TableHead>
+                                    <TableHead>Plantilla</TableHead>
                                     <TableHead>Tipo de Muestra</TableHead>
                                     <TableHead>Examen</TableHead>
                                     <TableHead className="text-right">
@@ -267,6 +274,10 @@ export default function SharedTemplatesListSheet({
                                                     </span>
                                                 </div>
                                             </TableCell>
+                                            <TableCell className="font-medium">
+                                                {permission.template?.name ||
+                                                    'Plantilla sin nombre'}
+                                            </TableCell>
                                             <TableCell>
                                                 {permission.specimen_type
                                                     ?.name || 'Desconocido'}
@@ -296,7 +307,7 @@ export default function SharedTemplatesListSheet({
                                 ) : (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={5}
+                                            colSpan={6}
                                             className="h-24 text-center"
                                         >
                                             <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">

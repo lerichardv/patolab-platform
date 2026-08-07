@@ -4,33 +4,33 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { FormEventHandler } from 'react';
 import { toast } from 'sonner';
 import {
-	store as storeCutting,
-	update as updateCutting,
+    store as storeCutting,
+    update as updateCutting,
 } from '@/actions/App/Http/Controllers/Editor/CuttingController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
 } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberPicker } from '@/components/ui/number-picker';
 import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
 } from '@/components/ui/popover';
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,888 +40,892 @@ import CuttingCodeSheet from './cutting-code-sheet';
 import CuttingPrefixSheet from './prefixes/cutting-prefix-sheet';
 
 interface Cutting {
-	id?: number;
-	code_id: number;
-	specimen_id: number;
-	description: string;
-	number_of_cuttings: number;
-	cuttings_description: string;
-	number_of_slides: number | null;
-	cutting_slide_types: number[] | null;
-	status: 'processing' | 'macroscopy' | 'delivered';
-	comments: string | null;
-	responsible_id: number;
-	is_new_cut: boolean;
-	prefix_id?: number | null;
+    id?: number;
+    code_id: number;
+    specimen_id: number;
+    description: string;
+    number_of_cuttings: number;
+    cuttings_description: string;
+    number_of_slides: number | null;
+    cutting_slide_types: number[] | null;
+    status: 'processing' | 'macroscopy' | 'delivered';
+    comments: string | null;
+    responsible_id: number;
+    is_new_cut: boolean;
+    prefix_id?: number | null;
 }
 
 interface CuttingCode {
-	id: number;
-	code: string;
-	color: string;
+    id: number;
+    code: string;
+    color: string;
 }
 
 interface CuttingSlideType {
-	id: number;
-	name: string;
+    id: number;
+    name: string;
 }
 
 interface CuttingPrefix {
-	id: number;
-	prefix: string;
+    id: number;
+    prefix: string;
 }
 
 interface User {
-	id: number;
-	name: string;
+    id: number;
+    name: string;
 }
 
 interface Props {
-	cutting?: Cutting | null;
-	specimen: {
-		id: number;
-		sequence_code: string;
-		cuttings?: Cutting[];
-	};
-	cuttingCodes: CuttingCode[];
-	cuttingPrefixes: CuttingPrefix[];
-	cuttingSlideTypes: CuttingSlideType[];
-	users: User[];
-	isDuplicate?: boolean;
-	onSuccess: () => void;
+    cutting?: Cutting | null;
+    specimen: {
+        id: number;
+        sequence_code: string;
+        cuttings?: Cutting[];
+    };
+    cuttingCodes: CuttingCode[];
+    cuttingPrefixes: CuttingPrefix[];
+    cuttingSlideTypes: CuttingSlideType[];
+    users: User[];
+    isDuplicate?: boolean;
+    onSuccess: () => void;
 }
 
 function FormCombobox({
-	options,
-	value,
-	onChange,
-	placeholder,
-	emptyMessage = 'No se encontraron resultados.',
-	disabled = false,
-	multiple = false,
+    options,
+    value,
+    onChange,
+    placeholder,
+    emptyMessage = 'No se encontraron resultados.',
+    disabled = false,
+    multiple = false,
 }: {
-	options: {
-		label: string;
-		value: string;
-		color?: string;
-		disabled?: boolean;
-	}[];
-	value: string | string[];
-	onChange: (value: any) => void;
-	placeholder: string;
-	emptyMessage?: string;
-	disabled?: boolean;
-	multiple?: boolean;
+    options: {
+        label: string;
+        value: string;
+        color?: string;
+        disabled?: boolean;
+    }[];
+    value: string | string[];
+    onChange: (value: any) => void;
+    placeholder: string;
+    emptyMessage?: string;
+    disabled?: boolean;
+    multiple?: boolean;
 }) {
-	const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(false);
 
-	const selectedValues = Array.isArray(value) ? value : value ? [value] : [];
-	const selectedOptions = options.filter((opt) =>
-		selectedValues.includes(opt.value),
-	);
+    const selectedValues = Array.isArray(value) ? value : value ? [value] : [];
+    const selectedOptions = options.filter((opt) =>
+        selectedValues.includes(opt.value),
+    );
 
-	return (
-		<Popover open={open} onOpenChange={setOpen} modal={true}>
-			<PopoverTrigger asChild className="w-full">
-				<Button
-					variant="outline"
-					role="combobox"
-					aria-expanded={open}
-					className="h-auto min-h-10 w-full justify-between px-3 py-1.5 text-left font-normal"
-					disabled={disabled}
-				>
-					<div className="flex max-h-24 max-w-[90%] flex-wrap items-center gap-1 overflow-y-auto pr-1">
-						{selectedOptions.length > 0 ? (
-							selectedOptions.map((opt) => (
-								<span
-									key={opt.value}
-									className="inline-flex items-center gap-1.5 rounded border bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground"
-								>
-									{opt.color && (
-										<span
-											className="h-2 w-2 rounded-full border border-slate-300 shadow-sm"
-											style={{
-												backgroundColor: opt.color,
-											}}
-										/>
-									)}
-									{opt.label}
-									{multiple && (
-										<span
-											onClick={(e) => {
-												e.stopPropagation();
-												const newValue =
-													selectedValues.filter(
-														(v) => v !== opt.value,
-													);
-												onChange(newValue);
-											}}
-											className="ml-1 cursor-pointer rounded-full p-0.5 hover:bg-muted-foreground/20"
-										>
-											<X className="h-3 w-3" />
-										</span>
-									)}
-								</span>
-							))
-						) : (
-							<span className="text-muted-foreground">
-								{placeholder}
-							</span>
-						)}
-					</div>
-					<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-				</Button>
-			</PopoverTrigger>
-			<PopoverContent
-				className="z-[120] w-[var(--radix-popover-trigger-width)] p-0"
-				align="start"
-				onWheel={(e) => e.stopPropagation()}
-				onTouchMove={(e) => e.stopPropagation()}
-			>
-				<Command>
-					<CommandInput placeholder={`Buscar...`} />
-					<CommandList>
-						{multiple && options.length > 0 && (
-							<div className="flex items-center justify-between border-b border-border/60 bg-muted/40 px-3 py-2 text-xs">
-								<button
-									type="button"
-									onClick={() => {
-										onChange(
-											options
-												.filter((o) => !o.disabled)
-												.map((o) => o.value),
-										);
-									}}
-									className="cursor-pointer font-medium text-primary transition-all hover:underline"
-								>
-									Seleccionar todos
-								</button>
-								<button
-									type="button"
-									onClick={() => {
-										onChange([]);
-									}}
-									className="cursor-pointer font-medium text-muted-foreground transition-all hover:text-destructive hover:underline"
-								>
-									Deseleccionar todos
-								</button>
-							</div>
-						)}
-						<CommandEmpty>{emptyMessage}</CommandEmpty>
-						<CommandGroup>
-							{options.map((option) => {
-								const isSelected = selectedValues.includes(
-									option.value,
-								);
-								const isUsed = option.disabled;
+    return (
+        <Popover open={open} onOpenChange={setOpen} modal={true}>
+            <PopoverTrigger asChild className="w-full">
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="h-auto min-h-10 w-full justify-between px-3 py-1.5 text-left font-normal"
+                    disabled={disabled}
+                >
+                    <div className="flex max-h-24 max-w-[90%] flex-wrap items-center gap-1 overflow-y-auto pr-1">
+                        {selectedOptions.length > 0 ? (
+                            selectedOptions.map((opt) => (
+                                <span
+                                    key={opt.value}
+                                    className="inline-flex items-center gap-1.5 rounded border bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground"
+                                >
+                                    {opt.color && (
+                                        <span
+                                            className="h-2 w-2 rounded-full border border-slate-300 shadow-sm"
+                                            style={{
+                                                backgroundColor: opt.color,
+                                            }}
+                                        />
+                                    )}
+                                    {opt.label}
+                                    {multiple && (
+                                        <span
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const newValue =
+                                                    selectedValues.filter(
+                                                        (v) => v !== opt.value,
+                                                    );
+                                                onChange(newValue);
+                                            }}
+                                            className="ml-1 cursor-pointer rounded-full p-0.5 hover:bg-muted-foreground/20"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </span>
+                                    )}
+                                </span>
+                            ))
+                        ) : (
+                            <span className="text-muted-foreground">
+                                {placeholder}
+                            </span>
+                        )}
+                    </div>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent
+                className="z-[120] w-[var(--radix-popover-trigger-width)] p-0"
+                align="start"
+                onWheel={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+            >
+                <Command>
+                    <CommandInput placeholder={`Buscar...`} />
+                    <CommandList>
+                        {multiple && options.length > 0 && (
+                            <div className="flex items-center justify-between border-b border-border/60 bg-muted/40 px-3 py-2 text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onChange(
+                                            options
+                                                .filter((o) => !o.disabled)
+                                                .map((o) => o.value),
+                                        );
+                                    }}
+                                    className="cursor-pointer font-medium text-primary transition-all hover:underline"
+                                >
+                                    Seleccionar todos
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onChange([]);
+                                    }}
+                                    className="cursor-pointer font-medium text-muted-foreground transition-all hover:text-destructive hover:underline"
+                                >
+                                    Deseleccionar todos
+                                </button>
+                            </div>
+                        )}
+                        <CommandEmpty>{emptyMessage}</CommandEmpty>
+                        <CommandGroup>
+                            {options.map((option) => {
+                                const isSelected = selectedValues.includes(
+                                    option.value,
+                                );
+                                const isUsed = option.disabled;
 
-								return (
-									<CommandItem
-										key={option.value}
-										value={option.label}
-										disabled={isUsed}
-										onSelect={() => {
-											if (isUsed) {
-												return;
-											}
+                                return (
+                                    <CommandItem
+                                        key={option.value}
+                                        value={option.label}
+                                        disabled={isUsed}
+                                        onSelect={() => {
+                                            if (isUsed) {
+                                                return;
+                                            }
 
-											if (multiple) {
-												const newValue = isSelected
-													? selectedValues.filter(
-														(v) =>
-															v !==
-															option.value,
-													)
-													: [
-														...selectedValues,
-														option.value,
-													];
-												onChange(newValue);
-											} else {
-												onChange(option.value);
-												setOpen(false);
-											}
-										}}
-										className={cn(
-											isUsed &&
-											'pointer-events-none cursor-not-allowed opacity-50',
-										)}
-									>
-										<div className="flex w-full items-center justify-between">
-											<div className="flex items-center gap-2">
-												{multiple ? (
-													<div
-														className={cn(
-															'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-all',
-															isSelected
-																? 'bg-primary text-primary-foreground'
-																: 'opacity-50',
-														)}
-													>
-														<Check className="h-3 w-3 stroke-[3]" />
-													</div>
-												) : (
-													<Check
-														className={cn(
-															'mr-2 h-4 w-4 shrink-0',
-															isSelected
-																? 'opacity-100'
-																: 'opacity-0',
-														)}
-													/>
-												)}
-												{option.color && (
-													<span
-														className="h-3 w-3 rounded-full border border-slate-300 shadow-sm"
-														style={{
-															backgroundColor:
-																option.color,
-														}}
-													/>
-												)}
-												<span className="font-bold text-slate-800 dark:text-slate-200">
-													{option.label}
-												</span>
-											</div>
-											{isUsed && (
-												<span className="rounded border border-amber-200/40 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
-													Ya usado
-												</span>
-											)}
-										</div>
-									</CommandItem>
-								);
-							})}
-						</CommandGroup>
-					</CommandList>
-				</Command>
-			</PopoverContent>
-		</Popover>
-	);
+                                            if (multiple) {
+                                                const newValue = isSelected
+                                                    ? selectedValues.filter(
+                                                          (v) =>
+                                                              v !==
+                                                              option.value,
+                                                      )
+                                                    : [
+                                                          ...selectedValues,
+                                                          option.value,
+                                                      ];
+                                                onChange(newValue);
+                                            } else {
+                                                onChange(option.value);
+                                                setOpen(false);
+                                            }
+                                        }}
+                                        className={cn(
+                                            isUsed &&
+                                                'pointer-events-none cursor-not-allowed opacity-50',
+                                        )}
+                                    >
+                                        <div className="flex w-full items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                {multiple ? (
+                                                    <div
+                                                        className={cn(
+                                                            'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-all',
+                                                            isSelected
+                                                                ? 'bg-primary text-primary-foreground'
+                                                                : 'opacity-50',
+                                                        )}
+                                                    >
+                                                        <Check className="h-3 w-3 stroke-[3]" />
+                                                    </div>
+                                                ) : (
+                                                    <Check
+                                                        className={cn(
+                                                            'mr-2 h-4 w-4 shrink-0',
+                                                            isSelected
+                                                                ? 'opacity-100'
+                                                                : 'opacity-0',
+                                                        )}
+                                                    />
+                                                )}
+                                                {option.color && (
+                                                    <span
+                                                        className="h-3 w-3 rounded-full border border-slate-300 shadow-sm"
+                                                        style={{
+                                                            backgroundColor:
+                                                                option.color,
+                                                        }}
+                                                    />
+                                                )}
+                                                <span className="font-bold text-slate-800 dark:text-slate-200">
+                                                    {option.label}
+                                                </span>
+                                            </div>
+                                            {isUsed && (
+                                                <span className="rounded border border-amber-200/40 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
+                                                    Ya usado
+                                                </span>
+                                            )}
+                                        </div>
+                                    </CommandItem>
+                                );
+                            })}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
 }
 export default function CuttingForm({
-	cutting,
-	specimen,
-	cuttingCodes,
-	cuttingPrefixes,
-	cuttingSlideTypes,
-	users,
-	isDuplicate = false,
-	onSuccess,
+    cutting,
+    specimen,
+    cuttingCodes,
+    cuttingPrefixes,
+    cuttingSlideTypes,
+    users,
+    isDuplicate = false,
+    onSuccess,
 }: Props) {
-	const { props } = usePage() as any;
-	const hasCuttingsPermission =
-		props.auth?.user?.role?.slug === 'admin' ||
-		props.auth?.permissions?.includes('cuttings.manage');
+    const { props } = usePage() as any;
+    const hasCuttingsPermission =
+        props.auth?.user?.role?.slug === 'admin' ||
+        props.auth?.permissions?.includes('cuttings.manage');
 
-	if (!hasCuttingsPermission) {
-		return null;
-	}
+    if (!hasCuttingsPermission) {
+        return null;
+    }
 
-	const isEditMode = !!cutting?.id && !isDuplicate;
+    const isEditMode = !!cutting?.id && !isDuplicate;
 
-	const usedCodeIds = (specimen.cuttings || [])
-		.filter((c) => {
-			if (isEditMode && c.id === cutting?.id) {
-				return false;
-			}
+    const usedCodeIds = (specimen.cuttings || [])
+        .filter((c) => {
+            if (isEditMode && c.id === cutting?.id) {
+                return false;
+            }
 
-			return true;
-		})
-		.map((c) => c.code_id);
+            return true;
+        })
+        .map((c) => c.code_id);
 
-	const allCodesUsed =
-		cuttingCodes.length > 0 &&
-		cuttingCodes.every((code) => usedCodeIds.includes(code.id));
+    const allCodesUsed =
+        cuttingCodes.length > 0 &&
+        cuttingCodes.every((code) => usedCodeIds.includes(code.id));
 
-	const { data, setData, post, put, processing, errors, reset, transform } =
-		useForm<{
-			code_id: string;
-			code_ids: string[];
-			description: string;
-			number_of_cuttings: number;
-			cuttings_description: string;
-			number_of_slides: number;
-			cutting_slide_types: string[];
-			comments: string;
-			responsible_id: string;
-			status: string;
-			is_new_cut: boolean;
-			prefix_id: string | null;
-		}>({
-			code_id:
-				isEditMode && cutting?.code_id ? String(cutting.code_id) : '',
-			code_ids: [],
-			description: cutting?.description || '',
-			number_of_cuttings: cutting?.number_of_cuttings ?? 1,
-			cuttings_description: cutting?.cuttings_description || '',
-			number_of_slides: cutting?.number_of_slides ?? 1,
-			cutting_slide_types: cutting?.cutting_slide_types
-				? cutting.cutting_slide_types.map(String)
-				: [],
-			comments: cutting?.comments || '',
-			responsible_id: cutting?.responsible_id
-				? String(cutting.responsible_id)
-				: '',
-			status: isEditMode ? cutting?.status || 'macroscopy' : 'macroscopy',
-			is_new_cut: cutting?.is_new_cut ?? false,
-			prefix_id: cutting?.prefix_id ? String(cutting.prefix_id) : null,
-		});
+    const { data, setData, post, put, processing, errors, reset, transform } =
+        useForm<{
+            code_id: string;
+            code_ids: string[];
+            description: string;
+            number_of_cuttings: number;
+            cuttings_description: string;
+            number_of_slides: number;
+            cutting_slide_types: string[];
+            comments: string;
+            responsible_id: string;
+            status: string;
+            is_new_cut: boolean;
+            prefix_id: string | null;
+        }>({
+            code_id:
+                isEditMode && cutting?.code_id ? String(cutting.code_id) : '',
+            code_ids: [],
+            description: cutting?.description || '',
+            number_of_cuttings: cutting?.number_of_cuttings ?? 1,
+            cuttings_description: cutting?.cuttings_description || '',
+            number_of_slides: cutting?.number_of_slides ?? 1,
+            cutting_slide_types: cutting?.cutting_slide_types
+                ? cutting.cutting_slide_types.map(String)
+                : [],
+            comments: cutting?.comments || '',
+            responsible_id: cutting?.responsible_id
+                ? String(cutting.responsible_id)
+                : '',
+            status: isEditMode ? cutting?.status || 'macroscopy' : 'macroscopy',
+            is_new_cut: cutting?.is_new_cut ?? false,
+            prefix_id: cutting?.prefix_id ? String(cutting.prefix_id) : null,
+        });
 
-	const [isCreateCodeSheetOpen, setIsCreateCodeSheetOpen] = useState(false);
-	const [isCreateWorkOrderTypeOpen, setIsCreateWorkOrderTypeOpen] =
-		useState(false);
-	const [isCreatePrefixSheetOpen, setIsCreatePrefixSheetOpen] = useState(false);
-	const prevCodesRef = useRef<any[]>(cuttingCodes);
-	const prevSlideTypesRef = useRef<any[]>(cuttingSlideTypes);
-	const prevPrefixesRef = useRef<any[]>(cuttingPrefixes);
+    const [isCreateCodeSheetOpen, setIsCreateCodeSheetOpen] = useState(false);
+    const [isCreateWorkOrderTypeOpen, setIsCreateWorkOrderTypeOpen] =
+        useState(false);
+    const [isCreatePrefixSheetOpen, setIsCreatePrefixSheetOpen] =
+        useState(false);
+    const prevCodesRef = useRef<any[]>(cuttingCodes);
+    const prevSlideTypesRef = useRef<any[]>(cuttingSlideTypes);
+    const prevPrefixesRef = useRef<any[]>(cuttingPrefixes);
 
-	const hasPrefixesPermission =
-		props.auth?.user?.role?.slug === 'admin' ||
-		props.auth?.permissions?.includes('cutting_prefixes.create') ||
-		props.auth?.permissions?.includes('cutting_prefixes.edit');
+    const hasPrefixesPermission =
+        props.auth?.user?.role?.slug === 'admin' ||
+        props.auth?.permissions?.includes('cutting_prefixes.create') ||
+        props.auth?.permissions?.includes('cutting_prefixes.edit');
 
-	useEffect(() => {
-		if (cuttingPrefixes.length > prevPrefixesRef.current.length) {
-			const newPrefixes = cuttingPrefixes.filter(
-				(p) => !prevPrefixesRef.current.some((prev) => prev.id === p.id),
-			);
+    useEffect(() => {
+        if (cuttingPrefixes.length > prevPrefixesRef.current.length) {
+            const newPrefixes = cuttingPrefixes.filter(
+                (p) =>
+                    !prevPrefixesRef.current.some((prev) => prev.id === p.id),
+            );
 
-			if (newPrefixes.length > 0) {
-				setData('prefix_id', String(newPrefixes[0].id));
-				toast.success(
-					`Prefijo "${newPrefixes[0].prefix}" seleccionado automáticamente`,
-				);
-			}
-		}
+            if (newPrefixes.length > 0) {
+                setData('prefix_id', String(newPrefixes[0].id));
+                toast.success(
+                    `Prefijo "${newPrefixes[0].prefix}" seleccionado automáticamente`,
+                );
+            }
+        }
 
-		prevPrefixesRef.current = cuttingPrefixes;
-	}, [cuttingPrefixes, setData]);
+        prevPrefixesRef.current = cuttingPrefixes;
+    }, [cuttingPrefixes, setData]);
 
-	useEffect(() => {
-		if (cuttingCodes.length > prevCodesRef.current.length) {
-			const newCodes = cuttingCodes.filter(
-				(c) => !prevCodesRef.current.some((prev) => prev.id === c.id),
-			);
+    useEffect(() => {
+        if (cuttingCodes.length > prevCodesRef.current.length) {
+            const newCodes = cuttingCodes.filter(
+                (c) => !prevCodesRef.current.some((prev) => prev.id === c.id),
+            );
 
-			if (newCodes.length > 0) {
-				if (isEditMode) {
-					setData('code_id', String(newCodes[0].id));
-				} else {
-					setData('code_ids', [
-						...data.code_ids,
-						String(newCodes[0].id),
-					]);
-				}
+            if (newCodes.length > 0) {
+                if (isEditMode) {
+                    setData('code_id', String(newCodes[0].id));
+                } else {
+                    setData('code_ids', [
+                        ...data.code_ids,
+                        String(newCodes[0].id),
+                    ]);
+                }
 
-				toast.success(
-					`Código de casete "${newCodes[0].code}" seleccionado automáticamente`,
-				);
-			}
-		}
+                toast.success(
+                    `Código de casete "${newCodes[0].code}" seleccionado automáticamente`,
+                );
+            }
+        }
 
-		prevCodesRef.current = cuttingCodes;
-	}, [cuttingCodes, isEditMode, data.code_ids, setData]);
+        prevCodesRef.current = cuttingCodes;
+    }, [cuttingCodes, isEditMode, data.code_ids, setData]);
 
-	useEffect(() => {
-		if (cuttingSlideTypes.length > prevSlideTypesRef.current.length) {
-			const newTypes = cuttingSlideTypes.filter(
-				(st) =>
-					!prevSlideTypesRef.current.some(
-						(prev) => prev.id === st.id,
-					),
-			);
+    useEffect(() => {
+        if (cuttingSlideTypes.length > prevSlideTypesRef.current.length) {
+            const newTypes = cuttingSlideTypes.filter(
+                (st) =>
+                    !prevSlideTypesRef.current.some(
+                        (prev) => prev.id === st.id,
+                    ),
+            );
 
-			if (newTypes.length > 0) {
-				setData('cutting_slide_types', [
-					...data.cutting_slide_types,
-					String(newTypes[0].id),
-				]);
-				toast.success(
-					`Tipo de lámina "${newTypes[0].name}" seleccionado automáticamente`,
-				);
-			}
-		}
+            if (newTypes.length > 0) {
+                setData('cutting_slide_types', [
+                    ...data.cutting_slide_types,
+                    String(newTypes[0].id),
+                ]);
+                toast.success(
+                    `Tipo de lámina "${newTypes[0].name}" seleccionado automáticamente`,
+                );
+            }
+        }
 
-		prevSlideTypesRef.current = cuttingSlideTypes;
-	}, [cuttingSlideTypes, data.cutting_slide_types, setData]);
+        prevSlideTypesRef.current = cuttingSlideTypes;
+    }, [cuttingSlideTypes, data.cutting_slide_types, setData]);
 
-	useEffect(() => {
-		transform((data) => ({
-			...data,
-			code_id: Number(data.code_id) || 0,
-			code_ids: data.code_ids ? data.code_ids.map(Number) : [],
-			responsible_id: Number(data.responsible_id) || 0,
-			number_of_cuttings: Number(data.number_of_cuttings),
-			number_of_slides: data.number_of_slides
-				? Number(data.number_of_slides)
-				: null,
-			cutting_slide_types: data.cutting_slide_types.map(Number),
-			prefix_id: data.prefix_id ? Number(data.prefix_id) : null,
-		}));
-	}, [
-		data.code_id,
-		data.code_ids,
-		data.responsible_id,
-		data.number_of_cuttings,
-		data.number_of_slides,
-		data.cutting_slide_types,
-		data.is_new_cut,
-		data.prefix_id,
-		transform,
-	]);
+    useEffect(() => {
+        transform((data) => ({
+            ...data,
+            code_id: Number(data.code_id) || 0,
+            code_ids: data.code_ids ? data.code_ids.map(Number) : [],
+            responsible_id: Number(data.responsible_id) || 0,
+            number_of_cuttings: Number(data.number_of_cuttings),
+            number_of_slides: data.number_of_slides
+                ? Number(data.number_of_slides)
+                : null,
+            cutting_slide_types: data.cutting_slide_types.map(Number),
+            prefix_id: data.prefix_id ? Number(data.prefix_id) : null,
+        }));
+    }, [
+        data.code_id,
+        data.code_ids,
+        data.responsible_id,
+        data.number_of_cuttings,
+        data.number_of_slides,
+        data.cutting_slide_types,
+        data.is_new_cut,
+        data.prefix_id,
+        transform,
+    ]);
 
-	useEffect(() => {
-		if (cutting) {
-			setData({
-				code_id: isEditMode ? String(cutting.code_id) : '',
-				code_ids: [],
-				description: cutting.description,
-				number_of_cuttings: cutting.number_of_cuttings,
-				cuttings_description: cutting.cuttings_description || '',
-				number_of_slides: cutting.number_of_slides ?? 1,
-				cutting_slide_types: (cutting.cutting_slide_types || []).map(
-					String,
-				),
-				comments: cutting.comments || '',
-				responsible_id: String(cutting.responsible_id),
-				status: isEditMode ? cutting.status : 'macroscopy',
-				is_new_cut: cutting.is_new_cut ?? false,
-				prefix_id: cutting.prefix_id ? String(cutting.prefix_id) : null,
-			});
-		} else {
-			reset();
-		}
-	}, [cutting, isEditMode, setData, reset]);
+    useEffect(() => {
+        if (cutting) {
+            setData({
+                code_id: isEditMode ? String(cutting.code_id) : '',
+                code_ids: [],
+                description: cutting.description,
+                number_of_cuttings: cutting.number_of_cuttings,
+                cuttings_description: cutting.cuttings_description || '',
+                number_of_slides: cutting.number_of_slides ?? 1,
+                cutting_slide_types: (cutting.cutting_slide_types || []).map(
+                    String,
+                ),
+                comments: cutting.comments || '',
+                responsible_id: String(cutting.responsible_id),
+                status: isEditMode ? cutting.status : 'macroscopy',
+                is_new_cut: cutting.is_new_cut ?? false,
+                prefix_id: cutting.prefix_id ? String(cutting.prefix_id) : null,
+            });
+        } else {
+            reset();
+        }
+    }, [cutting, isEditMode, setData, reset]);
 
-	const submit: FormEventHandler = (e) => {
-		e.preventDefault();
-		e.stopPropagation();
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
 
-		if (!isEditMode && data.code_ids.length === 0) {
-			toast.error('Debe seleccionar al menos un código de casete');
+        if (!isEditMode && data.code_ids.length === 0) {
+            toast.error('Debe seleccionar al menos un código de casete');
 
-			return;
-		}
+            return;
+        }
 
-		if (data.cutting_slide_types.length === 0) {
-			toast.error('Debe seleccionar al menos un tipo de lámina especial');
+        if (data.cutting_slide_types.length === 0) {
+            toast.error('Debe seleccionar al menos un tipo de lámina especial');
 
-			return;
-		}
+            return;
+        }
 
-		if (isEditMode) {
-			// Note: We use put since update maps to PUT route
-			put(updateCutting(cutting!.id!).url, {
-				onSuccess: () => {
-					toast.success('Corte actualizado correctamente');
-					onSuccess();
-				},
-			});
-		} else {
-			post(storeCutting(specimen.sequence_code).url, {
-				onSuccess: () => {
-					toast.success(
-						isDuplicate
-							? 'Corte duplicado correctamente'
-							: 'Corte registrado correctamente',
-					);
-					onSuccess();
-					reset();
-				},
-			});
-		}
-	};
+        if (isEditMode) {
+            // Note: We use put since update maps to PUT route
+            put(updateCutting(cutting!.id!).url, {
+                onSuccess: () => {
+                    toast.success('Corte actualizado correctamente');
+                    onSuccess();
+                },
+            });
+        } else {
+            post(storeCutting(specimen.sequence_code).url, {
+                onSuccess: () => {
+                    toast.success(
+                        isDuplicate
+                            ? 'Corte duplicado correctamente'
+                            : 'Corte registrado correctamente',
+                    );
+                    onSuccess();
+                    reset();
+                },
+            });
+        }
+    };
 
-	const selectedCode = cuttingCodes.find(
-		(c) => String(c.id) === data.code_id,
-	);
+    const selectedCode = cuttingCodes.find(
+        (c) => String(c.id) === data.code_id,
+    );
 
-	const cassetteCodeOptions = cuttingCodes.map((code) => ({
-		label: code.code,
-		value: String(code.id),
-		color: code.color,
-		disabled: usedCodeIds.includes(code.id),
-	}));
+    const cassetteCodeOptions = cuttingCodes.map((code) => ({
+        label: code.code,
+        value: String(code.id),
+        color: code.color,
+        disabled: usedCodeIds.includes(code.id),
+    }));
 
-	const specialStainOptions = cuttingSlideTypes.map((st) => ({
-		label: st.name,
-		value: String(st.id),
-	}));
+    const specialStainOptions = cuttingSlideTypes.map((st) => ({
+        label: st.name,
+        value: String(st.id),
+    }));
 
-	return (
-		<>
-			<form onSubmit={submit} className="space-y-5 px-5 py-4">
-				{isDuplicate && (
-					<div className="flex gap-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3.5 text-xs text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300">
-						<Info className="mt-0.5 h-4.5 w-4.5 shrink-0 text-blue-600 dark:text-blue-400" />
-						<div>
-							<span className="font-semibold">
-								Modo Duplicación:
-							</span>{' '}
-							Se ha copiado la información del corte original.
-							Realice las modificaciones necesarias para registrar
-							este nuevo corte.
-						</div>
-					</div>
-				)}
+    return (
+        <>
+            <form onSubmit={submit} className="space-y-5 px-5 py-4">
+                {isDuplicate && (
+                    <div className="flex gap-3 rounded-lg border border-blue-200 bg-blue-50/50 p-3.5 text-xs text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300">
+                        <Info className="mt-0.5 h-4.5 w-4.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                        <div>
+                            <span className="font-semibold">
+                                Modo Duplicación:
+                            </span>{' '}
+                            Se ha copiado la información del corte original.
+                            Realice las modificaciones necesarias para registrar
+                            este nuevo corte.
+                        </div>
+                    </div>
+                )}
 
-				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					{/* Cassette Code */}
-					<div className="space-y-2">
-						<div className="flex items-center justify-between">
-							<Label htmlFor="code_id">Código de Casete</Label>
-							<button
-								type="button"
-								onClick={() => setIsCreateCodeSheetOpen(true)}
-								className="flex cursor-pointer items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-							>
-								<Plus className="h-3 w-3" /> Nuevo
-							</button>
-						</div>
-						{isEditMode ? (
-							<Select
-								value={data.code_id}
-								onValueChange={(val) => setData('code_id', val)}
-							>
-								<SelectTrigger id="code_id" className="w-full">
-									<SelectValue placeholder="Seleccione código">
-										{selectedCode ? (
-											<div className="flex items-center gap-2">
-												<span
-													className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300 shadow-sm"
-													style={{
-														backgroundColor:
-															selectedCode.color,
-													}}
-												/>
-												<span className="font-bold text-slate-800 dark:text-slate-200">
-													{selectedCode.code}
-												</span>
-											</div>
-										) : (
-											'Seleccione código'
-										)}
-									</SelectValue>
-								</SelectTrigger>
-								<SelectContent>
-									{cuttingCodes.map((code) => {
-										const isUsed = usedCodeIds.includes(
-											code.id,
-										);
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {/* Cassette Code */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="code_id">Código de Casete</Label>
+                            <button
+                                type="button"
+                                onClick={() => setIsCreateCodeSheetOpen(true)}
+                                className="flex cursor-pointer items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                            >
+                                <Plus className="h-3 w-3" /> Nuevo
+                            </button>
+                        </div>
+                        {isEditMode ? (
+                            <Select
+                                value={data.code_id}
+                                onValueChange={(val) => setData('code_id', val)}
+                            >
+                                <SelectTrigger id="code_id" className="w-full">
+                                    <SelectValue placeholder="Seleccione código">
+                                        {selectedCode ? (
+                                            <div className="flex items-center gap-2">
+                                                <span
+                                                    className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300 shadow-sm"
+                                                    style={{
+                                                        backgroundColor:
+                                                            selectedCode.color,
+                                                    }}
+                                                />
+                                                <span className="font-bold text-slate-800 dark:text-slate-200">
+                                                    {selectedCode.code}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            'Seleccione código'
+                                        )}
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {cuttingCodes.map((code) => {
+                                        const isUsed = usedCodeIds.includes(
+                                            code.id,
+                                        );
 
-										return (
-											<SelectItem
-												key={code.id}
-												value={String(code.id)}
-												disabled={isUsed}
-											>
-												<div className="flex w-full items-center justify-between gap-4">
-													<div className="flex items-center gap-2">
-														<span
-															className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300 shadow-sm"
-															style={{
-																backgroundColor:
-																	code.color,
-															}}
-														/>
-														<span className="font-bold text-slate-800 dark:text-slate-200">
-															{code.code}
-														</span>
-													</div>
-													{isUsed && (
-														<span className="rounded border border-amber-200/40 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
-															Ya usado
-														</span>
-													)}
-												</div>
-											</SelectItem>
-										);
-									})}
-								</SelectContent>
-							</Select>
-						) : (
-							<FormCombobox
-								options={cassetteCodeOptions}
-								value={data.code_ids}
-								multiple={true}
-								onChange={(val) => setData('code_ids', val)}
-								placeholder="Seleccione códigos de casete"
-								emptyMessage="No se encontraron códigos."
-							/>
-						)}
-						{allCodesUsed && (
-							<div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-2.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
-								<Info className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-								<div>
-									Todos los códigos de casete ya están en uso
-									para esta muestra. Cree uno nuevo haciendo
-									clic en <strong>Nuevo</strong>.
-								</div>
-							</div>
-						)}
-						<InputError
-							message={errors.code_id || errors.code_ids}
-						/>
-					</div>
+                                        return (
+                                            <SelectItem
+                                                key={code.id}
+                                                value={String(code.id)}
+                                                disabled={isUsed}
+                                            >
+                                                <div className="flex w-full items-center justify-between gap-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span
+                                                            className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300 shadow-sm"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    code.color,
+                                                            }}
+                                                        />
+                                                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                                                            {code.code}
+                                                        </span>
+                                                    </div>
+                                                    {isUsed && (
+                                                        <span className="rounded border border-amber-200/40 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-400">
+                                                            Ya usado
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </SelectItem>
+                                        );
+                                    })}
+                                </SelectContent>
+                            </Select>
+                        ) : (
+                            <FormCombobox
+                                options={cassetteCodeOptions}
+                                value={data.code_ids}
+                                multiple={true}
+                                onChange={(val) => setData('code_ids', val)}
+                                placeholder="Seleccione códigos de casete"
+                                emptyMessage="No se encontraron códigos."
+                            />
+                        )}
+                        {allCodesUsed && (
+                            <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-2.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+                                <Info className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                <div>
+                                    Todos los códigos de casete ya están en uso
+                                    para esta muestra. Cree uno nuevo haciendo
+                                    clic en <strong>Nuevo</strong>.
+                                </div>
+                            </div>
+                        )}
+                        <InputError
+                            message={errors.code_id || errors.code_ids}
+                        />
+                    </div>
 
-					{/* Responsible */}
-					<div className="space-y-2">
-						<Label htmlFor="responsible_id">
-							Responsable del Corte
-						</Label>
-						<Select
-							value={data.responsible_id}
-							onValueChange={(val) =>
-								setData('responsible_id', val)
-							}
-						>
-							<SelectTrigger
-								id="responsible_id"
-								className="w-full"
-							>
-								<SelectValue placeholder="Seleccione responsable" />
-							</SelectTrigger>
-							<SelectContent>
-								{users.map((user) => (
-									<SelectItem
-										key={user.id}
-										value={String(user.id)}
-									>
-										{user.name}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						<InputError message={errors.responsible_id} />
-					</div>
-				</div>
+                    {/* Responsible */}
+                    <div className="space-y-2">
+                        <Label htmlFor="responsible_id">
+                            Responsable del Corte
+                        </Label>
+                        <Select
+                            value={data.responsible_id}
+                            onValueChange={(val) =>
+                                setData('responsible_id', val)
+                            }
+                        >
+                            <SelectTrigger
+                                id="responsible_id"
+                                className="w-full"
+                            >
+                                <SelectValue placeholder="Seleccione responsable" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {users.map((user) => (
+                                    <SelectItem
+                                        key={user.id}
+                                        value={String(user.id)}
+                                    >
+                                        {user.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <InputError message={errors.responsible_id} />
+                    </div>
+                </div>
 
-				{/* Description */}
-				<div className="space-y-2">
-					<Label htmlFor="description">Descripción del Corte</Label>
-					<Input
-						id="description"
-						value={data.description}
-						onChange={(e) => setData('description', e.target.value)}
-						placeholder="Ej. Lesión 1 - Borde proximal"
-						required
-					/>
-					<InputError message={errors.description} />
-				</div>
+                {/* Description */}
+                <div className="space-y-2">
+                    <Label htmlFor="description">Descripción del Corte</Label>
+                    <Input
+                        id="description"
+                        value={data.description}
+                        onChange={(e) => setData('description', e.target.value)}
+                        placeholder="Ej. Lesión 1 - Borde proximal"
+                        required
+                    />
+                    <InputError message={errors.description} />
+                </div>
 
-				<div className="flex items-center justify-start gap-5">
-					{/* Prefix */}
-					<div className="space-y-2">
-						<div className="flex items-center justify-between">
-							<Label htmlFor="prefix_id">Prefijo</Label>
-							{hasPrefixesPermission && (
-								<button
-									type="button"
-									onClick={() => setIsCreatePrefixSheetOpen(true)}
-									className="flex cursor-pointer items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-								>
-									<Plus className="h-3 w-3" /> Nuevo
-								</button>
-							)}
-						</div>
-						<Select
-							value={data.prefix_id ?? 'none'}
-							onValueChange={(val) =>
-								setData(
-									'prefix_id',
-									val === 'none' ? null : val,
-								)
-							}
-						>
-							<SelectTrigger id="prefix_id" className="mb-0">
-								<SelectValue placeholder="Ninguno" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="none">Ninguno</SelectItem>
-								{cuttingPrefixes.map((p) => (
-									<SelectItem key={p.id} value={String(p.id)}>
-										{p.prefix}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						<InputError message={errors.prefix_id} />
-					</div>
+                <div className="flex items-center justify-start gap-5">
+                    {/* Prefix */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="prefix_id">Prefijo</Label>
+                            {hasPrefixesPermission && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setIsCreatePrefixSheetOpen(true)
+                                    }
+                                    className="flex cursor-pointer items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                >
+                                    <Plus className="h-3 w-3" /> Nuevo
+                                </button>
+                            )}
+                        </div>
+                        <Select
+                            value={data.prefix_id ?? 'none'}
+                            onValueChange={(val) =>
+                                setData(
+                                    'prefix_id',
+                                    val === 'none' ? null : val,
+                                )
+                            }
+                        >
+                            <SelectTrigger id="prefix_id" className="mb-0">
+                                <SelectValue placeholder="Ninguno" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">Ninguno</SelectItem>
+                                {cuttingPrefixes.map((p) => (
+                                    <SelectItem key={p.id} value={String(p.id)}>
+                                        {p.prefix}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <InputError message={errors.prefix_id} />
+                    </div>
 
-					{/* Number of Cuttings */}
-					<div className="space-y-2">
-						<Label htmlFor="number_of_cuttings">
-							# de Cortes/Casete
-						</Label>
-						<NumberPicker
-							id="number_of_cuttings"
-							value={data.number_of_cuttings}
-							onChange={(val) =>
-								setData('number_of_cuttings', val)
-							}
-							min={0}
-						/>
-						<InputError message={errors.number_of_cuttings} />
-					</div>
+                    {/* Number of Cuttings */}
+                    <div className="space-y-2">
+                        <Label htmlFor="number_of_cuttings">
+                            # de Cortes/Casete
+                        </Label>
+                        <NumberPicker
+                            id="number_of_cuttings"
+                            value={data.number_of_cuttings}
+                            onChange={(val) =>
+                                setData('number_of_cuttings', val)
+                            }
+                            min={0}
+                        />
+                        <InputError message={errors.number_of_cuttings} />
+                    </div>
 
-					{/* Routine Slides */}
-					<div className="space-y-2">
-						<Label htmlFor="number_of_slides">
-							# de Láminas de Rutina (Opcional)
-						</Label>
-						<NumberPicker
-							id="number_of_slides"
-							value={data.number_of_slides ?? 0}
-							onChange={(val) => setData('number_of_slides', val)}
-							min={0}
-						/>
-						<InputError message={errors.number_of_slides} />
-					</div>
-				</div>
+                    {/* Routine Slides */}
+                    <div className="space-y-2">
+                        <Label htmlFor="number_of_slides">
+                            # de Láminas de Rutina (Opcional)
+                        </Label>
+                        <NumberPicker
+                            id="number_of_slides"
+                            value={data.number_of_slides ?? 0}
+                            onChange={(val) => setData('number_of_slides', val)}
+                            min={0}
+                        />
+                        <InputError message={errors.number_of_slides} />
+                    </div>
+                </div>
 
-				{/* Special Stain Slide Types */}
-				<div className="space-y-2">
-					<div className="flex items-center justify-between">
-						<Label htmlFor="cutting_slide_types">
-							Tipo Láminas T. Especial{' '}
-							<small>(Tipo Orden de Trabajo)</small>
-						</Label>
-						<button
-							type="button"
-							onClick={() => setIsCreateWorkOrderTypeOpen(true)}
-							className="flex cursor-pointer items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-						>
-							<Plus className="h-3 w-3" /> Nuevo
-						</button>
-					</div>
-					<FormCombobox
-						options={specialStainOptions}
-						value={data.cutting_slide_types}
-						multiple={true}
-						onChange={(val) => setData('cutting_slide_types', val)}
-						placeholder="Seleccione tipos de láminas especiales"
-						emptyMessage="No se encontraron tipos de láminas."
-					/>
-					<InputError message={errors.cutting_slide_types} />
-				</div>
+                {/* Special Stain Slide Types */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="cutting_slide_types">
+                            Tipo Láminas T. Especial{' '}
+                            <small>(Tipo Orden de Trabajo)</small>
+                        </Label>
+                        <button
+                            type="button"
+                            onClick={() => setIsCreateWorkOrderTypeOpen(true)}
+                            className="flex cursor-pointer items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                        >
+                            <Plus className="h-3 w-3" /> Nuevo
+                        </button>
+                    </div>
+                    <FormCombobox
+                        options={specialStainOptions}
+                        value={data.cutting_slide_types}
+                        multiple={true}
+                        onChange={(val) => setData('cutting_slide_types', val)}
+                        placeholder="Seleccione tipos de láminas especiales"
+                        emptyMessage="No se encontraron tipos de láminas."
+                    />
+                    <InputError message={errors.cutting_slide_types} />
+                </div>
 
-				{/* Cuts Description (Cuttings Description) */}
-				<div className="space-y-2">
-					<Label htmlFor="cuttings_description">
-						Descripción Cortes/Casete (Opcional)
-					</Label>
-					<Input
-						id="cuttings_description"
-						value={data.cuttings_description}
-						onChange={(e) =>
-							setData('cuttings_description', e.target.value)
-						}
-						placeholder="Ej. CR (Cortes Representativos)"
-					/>
-					<InputError message={errors.cuttings_description} />
-				</div>
+                {/* Cuts Description (Cuttings Description) */}
+                <div className="space-y-2">
+                    <Label htmlFor="cuttings_description">
+                        Descripción Cortes/Casete (Opcional)
+                    </Label>
+                    <Input
+                        id="cuttings_description"
+                        value={data.cuttings_description}
+                        onChange={(e) =>
+                            setData('cuttings_description', e.target.value)
+                        }
+                        placeholder="Ej. CR (Cortes Representativos)"
+                    />
+                    <InputError message={errors.cuttings_description} />
+                </div>
 
-				{/* Comments */}
-				<div className="space-y-2">
-					<Label htmlFor="comments">
-						Comentarios / Notas (Opcional)
-					</Label>
-					<Textarea
-						id="comments"
-						value={data.comments}
-						onChange={(e) => setData('comments', e.target.value)}
-						placeholder="Ej. Se dejó más tiempo en alcohol..."
-						className="min-h-[80px]"
-					/>
-					<InputError message={errors.comments} />
-				</div>
+                {/* Comments */}
+                <div className="space-y-2">
+                    <Label htmlFor="comments">
+                        Comentarios / Notas (Opcional)
+                    </Label>
+                    <Textarea
+                        id="comments"
+                        value={data.comments}
+                        onChange={(e) => setData('comments', e.target.value)}
+                        placeholder="Ej. Se dejó más tiempo en alcohol..."
+                        className="min-h-[80px]"
+                    />
+                    <InputError message={errors.comments} />
+                </div>
 
-				{/* Edit mode Status Selection */}
-				{isEditMode && (
-					<div className="space-y-2">
-						<Label htmlFor="status">Estado del Corte</Label>
-						<Select
-							value={data.status}
-							onValueChange={(val: any) => setData('status', val)}
-						>
-							<SelectTrigger id="status" className="w-full">
-								<SelectValue placeholder="Seleccione estado" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="processing">
-									Procesamiento
-								</SelectItem>
-								<SelectItem value="macroscopy">
-									Macroscopía
-								</SelectItem>
-								<SelectItem value="delivered">
-									Entregado
-								</SelectItem>
-							</SelectContent>
-						</Select>
-						<InputError message={errors.status} />
-					</div>
-				)}
+                {/* Edit mode Status Selection */}
+                {isEditMode && (
+                    <div className="space-y-2">
+                        <Label htmlFor="status">Estado del Corte</Label>
+                        <Select
+                            value={data.status}
+                            onValueChange={(val: any) => setData('status', val)}
+                        >
+                            <SelectTrigger id="status" className="w-full">
+                                <SelectValue placeholder="Seleccione estado" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="processing">
+                                    Procesamiento
+                                </SelectItem>
+                                <SelectItem value="macroscopy">
+                                    Macroscopía
+                                </SelectItem>
+                                <SelectItem value="delivered">
+                                    Entregado
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <InputError message={errors.status} />
+                    </div>
+                )}
 
-				{/* is_new_cut Toggle */}
-				<div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
-					<div className="space-y-0.5">
-						<Label
-							htmlFor="is_new_cut"
-							className="cursor-pointer text-sm font-semibold"
-						>
-							Nuevo Corte
-						</Label>
-						<p className="text-xs text-muted-foreground">
-							Marcar si este corte es un nuevo corte adicional al
-							original.
-						</p>
-					</div>
-					<Switch
-						id="is_new_cut"
-						checked={data.is_new_cut}
-						onCheckedChange={(checked) =>
-							setData('is_new_cut', checked)
-						}
-					/>
-				</div>
+                {/* is_new_cut Toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <div className="space-y-0.5">
+                        <Label
+                            htmlFor="is_new_cut"
+                            className="cursor-pointer text-sm font-semibold"
+                        >
+                            Nuevo Corte
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                            Marcar si este corte es un nuevo corte adicional al
+                            original.
+                        </p>
+                    </div>
+                    <Switch
+                        id="is_new_cut"
+                        checked={data.is_new_cut}
+                        onCheckedChange={(checked) =>
+                            setData('is_new_cut', checked)
+                        }
+                    />
+                </div>
 
-				{/* Form actions */}
-				<div className="flex justify-end pt-3">
-					<Button
-						type="submit"
-						disabled={processing}
-						className="w-full px-6 sm:w-auto"
-					>
-						{isEditMode
-							? 'Actualizar Corte'
-							: isDuplicate
-								? 'Duplicar Corte'
-								: 'Registrar Corte'}
-					</Button>
-				</div>
-			</form>
+                {/* Form actions */}
+                <div className="flex justify-end pt-3">
+                    <Button
+                        type="submit"
+                        disabled={processing}
+                        className="w-full px-6 sm:w-auto"
+                    >
+                        {isEditMode
+                            ? 'Actualizar Corte'
+                            : isDuplicate
+                              ? 'Duplicar Corte'
+                              : 'Registrar Corte'}
+                    </Button>
+                </div>
+            </form>
 
-			{/* Create Cassette Code Sheet */}
-			<CuttingCodeSheet
-				open={isCreateCodeSheetOpen}
-				onOpenChange={setIsCreateCodeSheetOpen}
-			/>
+            {/* Create Cassette Code Sheet */}
+            <CuttingCodeSheet
+                open={isCreateCodeSheetOpen}
+                onOpenChange={setIsCreateCodeSheetOpen}
+            />
 
-			{/* Create Cutting Prefix Sheet */}
-			<CuttingPrefixSheet
-				cuttingPrefix={null}
-				open={isCreatePrefixSheetOpen}
-				onOpenChange={setIsCreatePrefixSheetOpen}
-			/>
+            {/* Create Cutting Prefix Sheet */}
+            <CuttingPrefixSheet
+                cuttingPrefix={null}
+                open={isCreatePrefixSheetOpen}
+                onOpenChange={setIsCreatePrefixSheetOpen}
+            />
 
-			{/* Create Work Order Type Sheet */}
-			<WorkOrderTypeSheet
-				workOrderType={null}
-				open={isCreateWorkOrderTypeOpen}
-				onOpenChange={setIsCreateWorkOrderTypeOpen}
-			/>
-		</>
-	);
+            {/* Create Work Order Type Sheet */}
+            <WorkOrderTypeSheet
+                workOrderType={null}
+                open={isCreateWorkOrderTypeOpen}
+                onOpenChange={setIsCreateWorkOrderTypeOpen}
+            />
+        </>
+    );
 }

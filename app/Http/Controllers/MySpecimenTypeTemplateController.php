@@ -12,7 +12,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class MySpecimenTypeTemplateController extends Controller
@@ -41,6 +40,14 @@ class MySpecimenTypeTemplateController extends Controller
                     $q2->where('name', 'like', "%{$search}%");
                 });
             });
+        }
+
+        if ($request->filled('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
+            $query->where('specimen_type_id', $request->get('specimen_type_id'));
+        }
+
+        if ($request->filled('examination_id') && $request->get('examination_id') !== 'all') {
+            $query->where('specimen_type_examination_id', $request->get('examination_id'));
         }
 
         $templates = $query->paginate(10)->withQueryString();
@@ -73,9 +80,14 @@ class MySpecimenTypeTemplateController extends Controller
             ->orderBy('name')
             ->get();
 
-        $sharedPermissions = UserTemplatePermission::with(['specimenType', 'specimenTypeExamination', 'sharedWith'])
+        $sharedPermissions = UserTemplatePermission::with(['specimenType', 'specimenTypeExamination', 'sharedWith', 'template'])
             ->where('owner_id', Auth::id())
             ->orderBy('created_at', 'desc')
+            ->get();
+
+        $allTemplates = SpecimenTypeTemplate::where('user_id', Auth::id())
+            ->with(['specimenType', 'specimenTypeExamination'])
+            ->orderBy('name')
             ->get();
 
         return Inertia::render('my-specimen-type-templates/index', [
@@ -84,6 +96,7 @@ class MySpecimenTypeTemplateController extends Controller
             'users' => $users,
             'examinations' => $examinations,
             'sharedPermissions' => $sharedPermissions,
+            'allTemplates' => $allTemplates,
             'filters' => $request->only(['search']),
         ]);
     }
@@ -95,6 +108,7 @@ class MySpecimenTypeTemplateController extends Controller
         $userId = Auth::id();
 
         $validated = $request->validate([
+            'name' => 'required|string|max:255',
             'specimen_type_ids' => 'required|array|min:1',
             'specimen_type_ids.*' => 'exists:specimen_type,id',
             'specimen_type_examination_ids' => 'required|array|min:1',
@@ -141,16 +155,8 @@ class MySpecimenTypeTemplateController extends Controller
         $createdCount = 0;
 
         foreach ($examinations as $exam) {
-            $exists = SpecimenTypeTemplate::where('user_id', $userId)
-                ->where('specimen_type_id', $exam->specimen_type)
-                ->where('specimen_type_examination_id', $exam->id)
-                ->exists();
-
-            if ($exists) {
-                continue;
-            }
-
             SpecimenTypeTemplate::create([
+                'name' => $validated['name'],
                 'user_id' => $userId,
                 'specimen_type_id' => $exam->specimen_type,
                 'specimen_type_examination_id' => $exam->id,
@@ -169,12 +175,6 @@ class MySpecimenTypeTemplateController extends Controller
             ]);
 
             $createdCount++;
-        }
-
-        if ($createdCount === 0) {
-            return redirect()->back()->withErrors([
-                'specimen_type_examination_ids' => 'Ya existen plantillas para todas las combinaciones de tipo de muestra y examen seleccionadas.',
-            ]);
         }
 
         return redirect()->back();
@@ -196,15 +196,9 @@ class MySpecimenTypeTemplateController extends Controller
         $userId = $my_specimen_type_template->user_id;
 
         $validated = $request->validate([
+            'name' => 'required|string|max:255',
             'specimen_type_id' => 'required|exists:specimen_type,id',
-            'specimen_type_examination_id' => [
-                'required',
-                'exists:specimen_type_examination,id',
-                Rule::unique('specimen_type_templates')
-                    ->where('user_id', $userId)
-                    ->where('specimen_type_examination_id', $request->specimen_type_examination_id)
-                    ->ignore($my_specimen_type_template->id),
-            ],
+            'specimen_type_examination_id' => 'required|exists:specimen_type_examination,id',
             'clinical_details_html' => 'nullable|string',
             'diagnosis_html' => 'nullable|string',
             'macroscopy_html' => 'nullable|string',
@@ -272,40 +266,20 @@ class MySpecimenTypeTemplateController extends Controller
         $validated = $request->validate([
             'user_ids' => 'required|array|min:1',
             'user_ids.*' => 'exists:users,id',
-            'specimen_type_ids' => 'required|array|min:1',
-            'specimen_type_ids.*' => 'exists:specimen_type,id',
-            'specimen_type_examination_ids' => 'required|array|min:1',
-            'specimen_type_examination_ids.*' => 'exists:specimen_type_examination,id',
+            'template_ids' => 'required|array|min:1',
+            'template_ids.*' => 'exists:specimen_type_templates,id',
         ]);
 
         $userId = Auth::id();
 
-        // Retrieve examinations that belong to the selected specimen types
-        $examinations = SpecimenTypeExamination::whereIn('id', $validated['specimen_type_examination_ids'])
-            ->whereIn('specimen_type', $validated['specimen_type_ids'])
-            ->get();
-
-        if ($examinations->isEmpty()) {
-            return redirect()->back()->withErrors([
-                'specimen_type_examination_ids' => 'Ninguno de los exámenes seleccionados pertenece a los tipos de muestra seleccionados.',
-            ]);
-        }
-
-        // Find all templates owned by the current user that match the selected combinations
+        // Find all templates owned by the current user that match the selected template_ids
         $templates = SpecimenTypeTemplate::where('user_id', $userId)
-            ->where(function ($query) use ($examinations) {
-                foreach ($examinations as $exam) {
-                    $query->orWhere(function ($q) use ($exam) {
-                        $q->where('specimen_type_id', $exam->specimen_type)
-                            ->where('specimen_type_examination_id', $exam->id);
-                    });
-                }
-            })
+            ->whereIn('id', $validated['template_ids'])
             ->get();
 
         if ($templates->isEmpty()) {
             return redirect()->back()->withErrors([
-                'specimen_type_examination_ids' => 'No tiene plantillas creadas para las combinaciones de tipo de muestra y examen seleccionadas.',
+                'template_ids' => 'No tiene plantillas creadas que coincidan con la selección.',
             ]);
         }
 

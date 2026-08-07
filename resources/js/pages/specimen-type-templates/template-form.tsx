@@ -41,6 +41,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 export interface User {
@@ -68,6 +69,7 @@ export interface SectionsOrderElement {
 
 export interface Template {
     id: number;
+    name: string | null;
     user_id: number;
     specimen_type_id: number;
     specimen_type_examination_id: number;
@@ -328,6 +330,7 @@ export default function TemplateForm({
     const isEditMode = !!template;
 
     const { data, setData, post, put, processing, errors } = useForm({
+        name: template?.name || '',
         user_id: template?.user_id?.toString() || '',
         specimen_type_id: isEditMode
             ? template?.specimen_type_id?.toString() || ''
@@ -359,6 +362,7 @@ export default function TemplateForm({
 
     useEffect(() => {
         setData({
+            name: template?.name || '',
             user_id: template?.user_id?.toString() || '',
             specimen_type_id: isEditMode
                 ? template?.specimen_type_id?.toString() || ''
@@ -474,6 +478,23 @@ export default function TemplateForm({
             >
                 {/* Header selection */}
                 <div className="shrink-0 space-y-4 border-b border-border bg-card px-4 py-4">
+                    {/* Template Name Input */}
+                    <div className="space-y-2">
+                        <Label htmlFor="name">Nombre de la Plantilla *</Label>
+                        <Input
+                            id="name"
+                            value={data.name}
+                            onChange={(e) => setData('name', e.target.value)}
+                            placeholder="Ej. Biopsia Gástrica Estándar"
+                            required
+                        />
+                        {errors.name && (
+                            <p className="text-sm text-destructive">
+                                {errors.name}
+                            </p>
+                        )}
+                    </div>
+
                     {/* User Combobox (Only shown if users prop is provided) */}
                     {users && (
                         <div className="space-y-2">

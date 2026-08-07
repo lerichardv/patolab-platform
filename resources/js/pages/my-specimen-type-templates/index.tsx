@@ -8,6 +8,9 @@ import {
     Trash2,
     Share2,
     ChevronDown,
+    Microscope,
+    FileText,
+    Check,
 } from 'lucide-react';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
@@ -35,6 +38,19 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
+import {
     Table,
     TableBody,
     TableCell,
@@ -42,6 +58,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import ShareTemplatesSheet from './share-templates-sheet';
 import SharedTemplatesListSheet from './shared-templates-list-sheet';
 import TemplateSheet from './template-sheet';
@@ -72,6 +89,7 @@ interface SectionsOrderElement {
 
 interface Template {
     id: number;
+    name: string | null;
     user_id: number;
     user?: User | null;
     specimen_type_id: number;
@@ -107,6 +125,10 @@ interface SharedPermission {
     specimen_type_examination_id: number;
     specimen_type_examination: { id: number; name: string } | null;
     template_id: number;
+    template?: {
+        id: number;
+        name: string | null;
+    } | null;
     shared_with_id: number;
     shared_with: User | null;
     created_at: string;
@@ -130,8 +152,11 @@ interface Props {
     users: User[];
     examinations: SpecimenTypeExamination[];
     sharedPermissions: SharedPermission[];
+    allTemplates?: Template[];
     filters: {
         search?: string;
+        specimen_type_id?: string;
+        examination_id?: string;
     };
 }
 
@@ -141,6 +166,7 @@ export default function MyTemplatesIndex({
     users,
     examinations,
     sharedPermissions,
+    allTemplates = [],
     filters,
 }: Props) {
     const { auth } = usePage<any>().props;
@@ -160,13 +186,47 @@ export default function MyTemplatesIndex({
     );
     const [search, setSearch] = useState(filters.search || '');
 
-    const handleFilterChange = useCallback(
-        (key: string, value: string) => {
-            const newFilters = { ...filters, [key]: value };
+    const [selectedSpecimenTypeId, setSelectedSpecimenTypeId] =
+        useState<string>(() => filters.specimen_type_id || 'all');
+    const [selectedExaminationId, setSelectedExaminationId] = useState<string>(
+        () => filters.examination_id || 'all',
+    );
+    const [isSpecimenTypeFilterOpen, setIsSpecimenTypeFilterOpen] =
+        useState(false);
+    const [isExaminationFilterOpen, setIsExaminationFilterOpen] =
+        useState(false);
 
-            if (value === '') {
+    // Get examinations options for the selected specimen type
+    const availableExaminations = useMemo(() => {
+        if (selectedSpecimenTypeId === 'all') {
+            return examinations;
+        }
+        return examinations.filter(
+            (exam) => exam.specimen_type.toString() === selectedSpecimenTypeId,
+        );
+    }, [examinations, selectedSpecimenTypeId]);
+
+    const handleFilterChange = useCallback(
+        (
+            key: string,
+            value: string,
+            extraFilters: Record<string, string> = {},
+        ) => {
+            const newFilters = { ...filters, ...extraFilters, [key]: value };
+
+            if (value === '' || value === 'all') {
                 delete newFilters[key as keyof typeof filters];
             }
+
+            // Remove empty filters
+            Object.keys(newFilters).forEach((k) => {
+                if (
+                    newFilters[k as keyof typeof filters] === '' ||
+                    newFilters[k as keyof typeof filters] === 'all'
+                ) {
+                    delete newFilters[k as keyof typeof filters];
+                }
+            });
 
             router.get(myTemplatesIndex().url, newFilters, {
                 preserveState: true,
@@ -189,6 +249,11 @@ export default function MyTemplatesIndex({
             debouncedSearch(search);
         }
     }, [search, filters.search, debouncedSearch]);
+
+    useEffect(() => {
+        setSelectedSpecimenTypeId(filters.specimen_type_id || 'all');
+        setSelectedExaminationId(filters.examination_id || 'all');
+    }, [filters.specimen_type_id, filters.examination_id]);
 
     const handleEdit = (template: Template) => {
         setSelectedTemplate(template);
@@ -301,6 +366,219 @@ export default function MyTemplatesIndex({
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
+
+                    {/* Filtro de Tipo de Muestra */}
+                    <Popover
+                        open={isSpecimenTypeFilterOpen}
+                        onOpenChange={setIsSpecimenTypeFilterOpen}
+                    >
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={isSpecimenTypeFilterOpen}
+                                className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
+                            >
+                                <div className="flex items-center gap-2 truncate">
+                                    <Microscope className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="truncate">
+                                        {selectedSpecimenTypeId === 'all'
+                                            ? 'Todos los tipos'
+                                            : (() => {
+                                                  const t = specimenTypes.find(
+                                                      (t) =>
+                                                          t.id.toString() ===
+                                                          selectedSpecimenTypeId,
+                                                  );
+                                                  return t
+                                                      ? t.name
+                                                      : 'Tipo seleccionado';
+                                              })()}
+                                    </span>
+                                </div>
+                                <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0" align="start">
+                            <Command>
+                                <CommandInput placeholder="Buscar tipo..." />
+                                <CommandList>
+                                    <CommandEmpty>
+                                        No se encontraron tipos.
+                                    </CommandEmpty>
+                                    <CommandGroup>
+                                        <CommandItem
+                                            value="todos"
+                                            onSelect={() => {
+                                                setSelectedSpecimenTypeId(
+                                                    'all',
+                                                );
+                                                setSelectedExaminationId('all');
+                                                setIsSpecimenTypeFilterOpen(
+                                                    false,
+                                                );
+                                                handleFilterChange(
+                                                    'specimen_type_id',
+                                                    'all',
+                                                    { examination_id: 'all' },
+                                                );
+                                            }}
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    'mr-2 h-4 w-4',
+                                                    selectedSpecimenTypeId ===
+                                                        'all'
+                                                        ? 'opacity-100'
+                                                        : 'opacity-0',
+                                                )}
+                                            />
+                                            Todos los tipos
+                                        </CommandItem>
+                                        {specimenTypes.map((type) => (
+                                            <CommandItem
+                                                key={type.id}
+                                                value={`${type.name} - ${type.id}`}
+                                                onSelect={() => {
+                                                    setSelectedSpecimenTypeId(
+                                                        type.id.toString(),
+                                                    );
+                                                    setSelectedExaminationId(
+                                                        'all',
+                                                    );
+                                                    setIsSpecimenTypeFilterOpen(
+                                                        false,
+                                                    );
+                                                    handleFilterChange(
+                                                        'specimen_type_id',
+                                                        type.id.toString(),
+                                                        {
+                                                            examination_id:
+                                                                'all',
+                                                        },
+                                                    );
+                                                }}
+                                            >
+                                                <Check
+                                                    className={cn(
+                                                        'mr-2 h-4 w-4',
+                                                        selectedSpecimenTypeId ===
+                                                            type.id.toString()
+                                                            ? 'opacity-100'
+                                                            : 'opacity-0',
+                                                    )}
+                                                />
+                                                {type.name}
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+
+                    {/* Filtro de Examen */}
+                    <Popover
+                        open={isExaminationFilterOpen}
+                        onOpenChange={setIsExaminationFilterOpen}
+                    >
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={isExaminationFilterOpen}
+                                className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
+                                disabled={selectedSpecimenTypeId === 'all'}
+                            >
+                                <div className="flex items-center gap-2 truncate">
+                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="truncate">
+                                        {selectedSpecimenTypeId === 'all'
+                                            ? 'Seleccione tipo primero'
+                                            : selectedExaminationId === 'all'
+                                              ? 'Todos los análisis'
+                                              : (() => {
+                                                    const e =
+                                                        availableExaminations.find(
+                                                            (e) =>
+                                                                e.id.toString() ===
+                                                                selectedExaminationId,
+                                                        );
+                                                    return e
+                                                        ? e.name
+                                                        : 'Análisis seleccionado';
+                                                })()}
+                                    </span>
+                                </div>
+                                <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0" align="start">
+                            <Command>
+                                <CommandInput placeholder="Buscar análisis..." />
+                                <CommandList>
+                                    <CommandEmpty>
+                                        No se encontraron análisis.
+                                    </CommandEmpty>
+                                    <CommandGroup>
+                                        <CommandItem
+                                            value="todos"
+                                            onSelect={() => {
+                                                setSelectedExaminationId('all');
+                                                setIsExaminationFilterOpen(
+                                                    false,
+                                                );
+                                                handleFilterChange(
+                                                    'examination_id',
+                                                    'all',
+                                                );
+                                            }}
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    'mr-2 h-4 w-4',
+                                                    selectedExaminationId ===
+                                                        'all'
+                                                        ? 'opacity-100'
+                                                        : 'opacity-0',
+                                                )}
+                                            />
+                                            Todos los análisis
+                                        </CommandItem>
+                                        {availableExaminations.map((exam) => (
+                                            <CommandItem
+                                                key={exam.id}
+                                                value={`${exam.name} - ${exam.id}`}
+                                                onSelect={() => {
+                                                    setSelectedExaminationId(
+                                                        exam.id.toString(),
+                                                    );
+                                                    setIsExaminationFilterOpen(
+                                                        false,
+                                                    );
+                                                    handleFilterChange(
+                                                        'examination_id',
+                                                        exam.id.toString(),
+                                                    );
+                                                }}
+                                            >
+                                                <Check
+                                                    className={cn(
+                                                        'mr-2 h-4 w-4',
+                                                        selectedExaminationId ===
+                                                            exam.id.toString()
+                                                            ? 'opacity-100'
+                                                            : 'opacity-0',
+                                                    )}
+                                                />
+                                                {exam.name}
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
                 </div>
 
                 <div className="rounded-md border bg-card">
@@ -308,6 +586,7 @@ export default function MyTemplatesIndex({
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Usuario</TableHead>
+                                <TableHead>Nombre</TableHead>
                                 <TableHead>Tipo de Muestra</TableHead>
                                 <TableHead>Examen</TableHead>
                                 <TableHead>Diagnóstico</TableHead>
@@ -335,6 +614,9 @@ export default function MyTemplatesIndex({
                                                     </span>
                                                 )}
                                             </div>
+                                        </TableCell>
+                                        <TableCell className="font-semibold text-foreground">
+                                            {template.name || '—'}
                                         </TableCell>
                                         <TableCell className="font-medium">
                                             {template.specimen_type?.name ||
@@ -393,7 +675,7 @@ export default function MyTemplatesIndex({
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={7}
+                                        colSpan={8}
                                         className="h-24 text-center"
                                     >
                                         No se encontraron resultados.
@@ -427,6 +709,7 @@ export default function MyTemplatesIndex({
                 users={users}
                 specimenTypes={specimenTypes}
                 examinations={examinations}
+                allTemplates={allTemplates}
             />
 
             <SharedTemplatesListSheet

@@ -10,7 +10,6 @@ use App\Services\ImageOptimizerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class SpecimenTypeTemplateController extends Controller
@@ -33,6 +32,14 @@ class SpecimenTypeTemplateController extends Controller
                     $q2->where('name', 'like', "%{$search}%");
                 });
             });
+        }
+
+        if ($request->filled('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
+            $query->where('specimen_type_id', $request->get('specimen_type_id'));
+        }
+
+        if ($request->filled('examination_id') && $request->get('examination_id') !== 'all') {
+            $query->where('specimen_type_examination_id', $request->get('examination_id'));
         }
 
         $templates = $query->paginate(10)->withQueryString();
@@ -72,6 +79,7 @@ class SpecimenTypeTemplateController extends Controller
     {
         Gate::authorize('specimen_type_templates.create');
         $validated = $request->validate([
+            'name' => 'required|string|max:255',
             'user_id' => 'required|exists:users,id',
             'specimen_type_ids' => 'required|array|min:1',
             'specimen_type_ids.*' => 'exists:specimen_type,id',
@@ -119,16 +127,8 @@ class SpecimenTypeTemplateController extends Controller
         $createdCount = 0;
 
         foreach ($examinations as $exam) {
-            $exists = SpecimenTypeTemplate::where('user_id', $validated['user_id'])
-                ->where('specimen_type_id', $exam->specimen_type)
-                ->where('specimen_type_examination_id', $exam->id)
-                ->exists();
-
-            if ($exists) {
-                continue;
-            }
-
             SpecimenTypeTemplate::create([
+                'name' => $validated['name'],
                 'user_id' => $validated['user_id'],
                 'specimen_type_id' => $exam->specimen_type,
                 'specimen_type_examination_id' => $exam->id,
@@ -149,12 +149,6 @@ class SpecimenTypeTemplateController extends Controller
             $createdCount++;
         }
 
-        if ($createdCount === 0) {
-            return redirect()->back()->withErrors([
-                'specimen_type_examination_ids' => 'Ya existen plantillas para todas las combinaciones de tipo de muestra y examen seleccionadas.',
-            ]);
-        }
-
         return redirect()->back();
     }
 
@@ -162,16 +156,10 @@ class SpecimenTypeTemplateController extends Controller
     {
         Gate::authorize('specimen_type_templates.edit');
         $validated = $request->validate([
+            'name' => 'required|string|max:255',
             'user_id' => 'required|exists:users,id',
             'specimen_type_id' => 'required|exists:specimen_type,id',
-            'specimen_type_examination_id' => [
-                'required',
-                'exists:specimen_type_examination,id',
-                Rule::unique('specimen_type_templates')
-                    ->where('user_id', $request->user_id)
-                    ->where('specimen_type_examination_id', $request->specimen_type_examination_id)
-                    ->ignore($specimenTypeTemplate->id),
-            ],
+            'specimen_type_examination_id' => 'required|exists:specimen_type_examination,id',
             'clinical_details_html' => 'nullable|string',
             'diagnosis_html' => 'nullable|string',
             'macroscopy_html' => 'nullable|string',

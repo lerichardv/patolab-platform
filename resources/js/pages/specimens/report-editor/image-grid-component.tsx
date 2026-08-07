@@ -82,9 +82,12 @@ export default function ImageGridComponent({
 
         const getTargetContainer = () => {
             if (!containerRef.current) return null;
-            const contentEl = (containerRef.current.querySelector('[data-node-view-content]') || containerRef.current.querySelector('.w-full')) as HTMLElement;
+            const contentEl = (containerRef.current.querySelector(
+                '[data-node-view-content]',
+            ) || containerRef.current.querySelector('.w-full')) as HTMLElement;
             if (!contentEl) return null;
-            return (contentEl.querySelector('[data-node-view-content-react]') || contentEl) as HTMLElement;
+            return (contentEl.querySelector('[data-node-view-content-react]') ||
+                contentEl) as HTMLElement;
         };
 
         const updateLayout = () => {
@@ -98,14 +101,22 @@ export default function ImageGridComponent({
             targetContainer.style.justifyContent = 'flex-start';
             targetContainer.style.width = '100%';
 
-            const contentEl = (containerRef.current?.querySelector('[data-node-view-content]') || containerRef.current?.querySelector('.w-full')) as HTMLElement;
+            const contentEl = (containerRef.current?.querySelector(
+                '[data-node-view-content]',
+            ) || containerRef.current?.querySelector('.w-full')) as HTMLElement;
             if (contentEl && targetContainer !== contentEl) {
                 contentEl.style.display = 'flex';
                 contentEl.style.width = '100%';
             }
 
-            const containerWidth = targetContainer.getBoundingClientRect().width || contentEl?.getBoundingClientRect().width || width || 600;
-            const children = Array.from(targetContainer.children) as HTMLElement[];
+            const containerWidth =
+                targetContainer.getBoundingClientRect().width ||
+                contentEl?.getBoundingClientRect().width ||
+                width ||
+                600;
+            const children = Array.from(
+                targetContainer.children,
+            ) as HTMLElement[];
             if (children.length === 0) return;
 
             // Get image details (element and aspect ratio)
@@ -116,9 +127,10 @@ export default function ImageGridComponent({
                 } else {
                     img = child.querySelector('img');
                 }
-                const aspect = (img && img.naturalWidth > 0 && img.naturalHeight > 0)
-                    ? img.naturalHeight / img.naturalWidth
-                    : 1.0;
+                const aspect =
+                    img && img.naturalWidth > 0 && img.naturalHeight > 0
+                        ? img.naturalHeight / img.naturalWidth
+                        : 1.0;
                 return { child, img, aspect };
             });
 
@@ -208,7 +220,10 @@ export default function ImageGridComponent({
         });
 
         if (containerRef.current) {
-            mutationObserver.observe(containerRef.current, { childList: true, subtree: true });
+            mutationObserver.observe(containerRef.current, {
+                childList: true,
+                subtree: true,
+            });
         }
 
         // ResizeObserver to handle container resizing dynamically
@@ -376,21 +391,26 @@ export default function ImageGridComponent({
         formData.append('image', file);
 
         try {
-            const response = await fetch(
-                `/specimens/${specimenSequenceCode}/report-editor/upload-image`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN':
-                            (
-                                document.querySelector(
-                                    'meta[name="csrf-token"]',
-                                ) as HTMLMetaElement
-                            )?.content ?? '',
-                    },
-                    body: formData,
-                },
+            const isMyTemplates = window.location.pathname.includes(
+                '/my-specimen-type-templates',
             );
+            const uploadUrl = specimenSequenceCode
+                ? `/specimens/${specimenSequenceCode}/report-editor/upload-image`
+                : isMyTemplates
+                  ? `/my-specimen-type-templates/upload-image`
+                  : `/specimen-type-templates/upload-image`;
+            const response = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN':
+                        (
+                            document.querySelector(
+                                'meta[name="csrf-token"]',
+                            ) as HTMLMetaElement
+                        )?.content ?? '',
+                },
+                body: formData,
+            });
 
             if (response.ok) {
                 const data = await response.json();
@@ -459,21 +479,26 @@ export default function ImageGridComponent({
                 formData.append('image', file);
 
                 try {
-                    const response = await fetch(
-                        `/specimens/${specimenSequenceCode}/report-editor/upload-image`,
-                        {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN':
-                                    (
-                                        document.querySelector(
-                                            'meta[name="csrf-token"]',
-                                        ) as HTMLMetaElement
-                                    )?.content ?? '',
-                            },
-                            body: formData,
-                        },
+                    const isMyTemplates = window.location.pathname.includes(
+                        '/my-specimen-type-templates',
                     );
+                    const uploadUrl = specimenSequenceCode
+                        ? `/specimens/${specimenSequenceCode}/report-editor/upload-image`
+                        : isMyTemplates
+                          ? `/my-specimen-type-templates/upload-image`
+                          : `/specimen-type-templates/upload-image`;
+                    const response = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN':
+                                (
+                                    document.querySelector(
+                                        'meta[name="csrf-token"]',
+                                    ) as HTMLMetaElement
+                                )?.content ?? '',
+                        },
+                        body: formData,
+                    });
 
                     if (response.ok) {
                         const data = await response.json();

@@ -695,6 +695,17 @@ class BillingSummaryReportController extends Controller
                             }
                         });
                 });
+
+                // Scenario D: Credit payment and social security invoices within date range
+                $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
+                    $sub->whereIn('invoice_type', ['credit payment', 'social security']);
+                    if (! empty($dateFrom)) {
+                        $sub->whereDate('invoices.created_at', '>=', $dateFrom);
+                    }
+                    if (! empty($dateTo)) {
+                        $sub->whereDate('invoices.created_at', '<=', $dateTo);
+                    }
+                });
             });
         }
 
@@ -749,7 +760,7 @@ class BillingSummaryReportController extends Controller
     {
         $rows = [];
         foreach ($invoices as $invoice) {
-            if ($invoice->is_group) {
+            if ($invoice->is_group && !in_array($invoice->invoice_type, ['credit payment', 'social security'])) {
                 if ($invoice->payment_type === 'credit') {
                     $cisItems = $invoice->creditInvoiceSpecimens;
                     if (! empty($dateFrom)) {
@@ -823,6 +834,10 @@ class BillingSummaryReportController extends Controller
                 if ($invoice->specimen) {
                     $service = ($invoice->specimen->type?->name ?? 'N/A').' - '.($invoice->specimen->examination?->name ?? 'N/A');
                     $specimenCode = $invoice->specimen->sequence_code ?? 'N/A';
+                } elseif ($invoice->invoice_type === 'credit payment') {
+                    $service = 'Abono de Crédito';
+                } elseif ($invoice->invoice_type === 'social security') {
+                    $service = 'Pago IHSS (Seguridad Social)';
                 } else {
                     $service = $invoice->description ?? 'Alquiler';
                 }

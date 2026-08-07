@@ -1,4 +1,4 @@
-import { ResizableNodeView } from '@tiptap/core';
+import { Node as TiptapNode, ResizableNodeView } from '@tiptap/core';
 import BulletList from '@tiptap/extension-bullet-list';
 import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
@@ -6,7 +6,12 @@ import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
 import type { Editor } from '@tiptap/react';
-import { useEditor, EditorContent, mergeAttributes } from '@tiptap/react';
+import {
+    useEditor,
+    EditorContent,
+    mergeAttributes,
+    ReactNodeViewRenderer,
+} from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import {
     Bold,
@@ -24,6 +29,7 @@ import {
     ListOrdered,
     Quote,
     ImagePlus,
+    LayoutGrid,
     Grid3x3,
     Undo2,
     Redo2,
@@ -52,6 +58,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import ImageGridComponent from '@/pages/specimens/report-editor/image-grid-component';
 
 export const editorStyles = `
   /* ── Base ── */
@@ -681,6 +688,104 @@ const CustomBulletList = BulletList.extend({
     },
 });
 
+interface ImageGridOptions {
+    specimenSequenceCode: string;
+}
+
+export const ImageGrid = TiptapNode.create<ImageGridOptions>({
+    name: 'imageGrid',
+    group: 'block',
+    content: 'image*',
+    defining: true,
+
+    addOptions() {
+        return {
+            specimenSequenceCode: '',
+        };
+    },
+
+    addAttributes() {
+        return {
+            columns: {
+                default: 2,
+                parseHTML: (element: HTMLElement) => {
+                    const cols = element.getAttribute('data-columns');
+
+                    return cols ? parseInt(cols, 10) : 2;
+                },
+                renderHTML: (attributes: Record<string, any>) => ({
+                    'data-columns': attributes.columns,
+                }),
+            },
+            alignment: {
+                default: 'center',
+                parseHTML: (element: HTMLElement) => {
+                    return element.getAttribute('data-align') || 'center';
+                },
+                renderHTML: (attributes: Record<string, any>) => ({
+                    'data-align': attributes.alignment || 'center',
+                }),
+            },
+            width: {
+                default: null,
+                parseHTML: (element: HTMLElement) => {
+                    const w =
+                        element.getAttribute('width') || element.style.width;
+
+                    return w ? parseInt(w, 10) : null;
+                },
+                renderHTML: (attributes: Record<string, any>) => {
+                    if (!attributes.width) {
+                        return {};
+                    }
+
+                    return {
+                        width: attributes.width,
+                    };
+                },
+            },
+        };
+    },
+
+    parseHTML() {
+        return [{ tag: 'div[data-type="image-grid"]' }];
+    },
+
+    renderHTML({ node, HTMLAttributes }) {
+        const align = node?.attrs?.alignment || 'center';
+        const isLeft = align === 'left';
+        const isRight = align === 'right';
+        const marginLeft = isLeft ? '0' : 'auto';
+        const marginRight = isRight ? '0' : 'auto';
+
+        const styles = [
+            `display: grid`,
+            `margin-left: ${marginLeft}`,
+            `margin-right: ${marginRight}`,
+        ];
+        const width = node?.attrs?.width;
+
+        if (width) {
+            styles.push(`width: ${width}px`);
+        }
+
+        return [
+            'div',
+            mergeAttributes(HTMLAttributes, {
+                'data-type': 'image-grid',
+                'data-align': align,
+                class: `align-${align}`,
+                style: styles.join('; ') + ';',
+            }),
+            0,
+        ];
+    },
+
+    addNodeView() {
+        return ReactNodeViewRenderer(ImageGridComponent);
+    },
+});
+
 const sharedExtensions = [
     CustomImage.configure({
         allowBase64: false,
@@ -689,6 +794,7 @@ const sharedExtensions = [
             alwaysPreserveAspectRatio: true,
         },
     }),
+    ImageGrid,
     TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
     Highlight.configure({ multicolor: true }),
     CustomBulletList,
@@ -768,21 +874,24 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
             formData.append('image', file);
 
             try {
-                const response = await fetch(
-                    `/specimen-type-templates/upload-image`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN':
-                                (
-                                    document.querySelector(
-                                        'meta[name="csrf-token"]',
-                                    ) as HTMLMetaElement
-                                )?.content ?? '',
-                        },
-                        body: formData,
-                    },
+                const isMyTemplates = window.location.pathname.includes(
+                    '/my-specimen-type-templates',
                 );
+                const uploadUrl = isMyTemplates
+                    ? `/my-specimen-type-templates/upload-image`
+                    : `/specimen-type-templates/upload-image`;
+                const response = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN':
+                            (
+                                document.querySelector(
+                                    'meta[name="csrf-token"]',
+                                ) as HTMLMetaElement
+                            )?.content ?? '',
+                    },
+                    body: formData,
+                });
 
                 if (response.ok) {
                     const data = await response.json();
@@ -1338,6 +1447,22 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
 
                 <ToolbarBtn onClick={handleImageUpload} title="Subir imagen">
                     <ImagePlus className="h-3.5 w-3.5" />
+                </ToolbarBtn>
+                <ToolbarBtn
+                    onClick={() =>
+                        editor
+                            ?.chain()
+                            .focus()
+                            .insertContent({
+                                type: 'imageGrid',
+                                attrs: { columns: 2 },
+                                content: [],
+                            })
+                            .run()
+                    }
+                    title="Insertar cuadrícula de imágenes"
+                >
+                    <LayoutGrid className="h-3.5 w-3.5" />
                 </ToolbarBtn>
                 <ToolbarBtn
                     onClick={() =>

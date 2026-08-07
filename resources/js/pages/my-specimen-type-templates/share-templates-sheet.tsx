@@ -41,12 +41,26 @@ interface SpecimenType {
     name: string;
 }
 
+interface Template {
+    id: number;
+    name: string | null;
+    specimen_type: {
+        id: number;
+        name: string;
+    } | null;
+    specimen_type_examination: {
+        id: number;
+        name: string;
+    } | null;
+}
+
 interface ShareTemplatesSheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     users: User[];
     specimenTypes: SpecimenType[];
     examinations: SpecimenTypeExamination[];
+    allTemplates?: Template[];
 }
 
 function FormCombobox({
@@ -215,13 +229,11 @@ export default function ShareTemplatesSheet({
     open,
     onOpenChange,
     users,
-    specimenTypes,
-    examinations,
+    allTemplates = [],
 }: ShareTemplatesSheetProps) {
     const { data, setData, post, processing, errors, reset } = useForm({
         user_ids: [] as string[],
-        specimen_type_ids: [] as string[],
-        specimen_type_examination_ids: [] as string[],
+        template_ids: [] as string[],
     });
 
     const submit: FormEventHandler = (e) => {
@@ -241,26 +253,19 @@ export default function ShareTemplatesSheet({
         value: u.id.toString(),
     }));
 
-    const specimenTypeOptions = specimenTypes.map((st) => ({
-        label: `[${st.id}] ${st.name}`,
-        value: st.id.toString(),
-    }));
-
-    const filteredExaminations = examinations.filter((e) =>
-        data.specimen_type_ids.includes(e.specimen_type.toString()),
-    );
-
-    const examinationOptions = filteredExaminations.map((e) => ({
-        label: `[${e.id}] ${e.name}`,
-        value: e.id.toString(),
+    const templateOptions = allTemplates.map((t) => ({
+        label: t.name
+            ? `${t.name} (${t.specimen_type?.name} - ${t.specimen_type_examination?.name})`
+            : `Plantilla sin nombre #${t.id} (${t.specimen_type?.name} - ${t.specimen_type_examination?.name})`,
+        value: t.id.toString(),
     }));
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="flex h-full flex-col overflow-hidden p-0 sm:max-w-[600px]">
+            <SheetContent className="flex h-full flex-col overflow-hidden p-0 sm:max-w-[900px]">
                 <HeadingSheet
                     title="Compartir Plantillas"
-                    description="Seleccione los tipos de muestra, exámenes y usuarios con los que desea compartir sus plantillas."
+                    description="Seleccione los usuarios y las plantillas específicas que desea compartir."
                 />
                 <form
                     onSubmit={submit}
@@ -281,67 +286,18 @@ export default function ShareTemplatesSheet({
                             <InputError message={errors.user_ids} />
                         </div>
 
-                        {/* Specimen Type Dropdown */}
+                        {/* Templates Dropdown */}
                         <div className="space-y-2">
-                            <Label>Tipos de Muestra *</Label>
+                            <Label>Plantillas a compartir *</Label>
                             <FormCombobox
-                                options={specimenTypeOptions}
-                                value={data.specimen_type_ids}
+                                options={templateOptions}
+                                value={data.template_ids}
                                 multiple={true}
-                                onChange={(val) => {
-                                    const newSpecimenTypeIds = val as string[];
-                                    const validExaminations =
-                                        examinations.filter((e) =>
-                                            newSpecimenTypeIds.includes(
-                                                e.specimen_type.toString(),
-                                            ),
-                                        );
-                                    const newExamIds =
-                                        data.specimen_type_examination_ids.filter(
-                                            (id) =>
-                                                validExaminations.some(
-                                                    (e) =>
-                                                        e.id.toString() === id,
-                                                ),
-                                        );
-
-                                    setData((prev) => ({
-                                        ...prev,
-                                        specimen_type_ids: newSpecimenTypeIds,
-                                        specimen_type_examination_ids:
-                                            newExamIds,
-                                    }));
-                                }}
-                                placeholder="Seleccione tipos de muestra"
-                                emptyMessage="No se encontraron tipos de muestra."
+                                onChange={(val) => setData('template_ids', val)}
+                                placeholder="Seleccione una o más plantillas"
+                                emptyMessage="No se encontraron plantillas."
                             />
-                            <InputError message={errors.specimen_type_ids} />
-                        </div>
-
-                        {/* Specimen Type Examination Dropdown */}
-                        <div className="space-y-2">
-                            <Label>Exámenes *</Label>
-                            <FormCombobox
-                                options={examinationOptions}
-                                value={data.specimen_type_examination_ids}
-                                multiple={true}
-                                onChange={(val) =>
-                                    setData(
-                                        'specimen_type_examination_ids',
-                                        val,
-                                    )
-                                }
-                                placeholder={
-                                    data.specimen_type_ids.length > 0
-                                        ? 'Seleccione exámenes'
-                                        : 'Seleccione primero tipos de muestra'
-                                }
-                                disabled={data.specimen_type_ids.length === 0}
-                                emptyMessage="No se encontraron exámenes."
-                            />
-                            <InputError
-                                message={errors.specimen_type_examination_ids}
-                            />
+                            <InputError message={errors.template_ids} />
                         </div>
                     </div>
 
