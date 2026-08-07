@@ -3663,9 +3663,11 @@ function parseHtmlToBlocks(html: string): string[] {
 function PatientMetadataCard({
     specimen,
     sampleCollectionDate,
+    reportDate,
 }: {
     specimen: Specimen;
     sampleCollectionDate: string;
+    reportDate: string;
 }) {
     return (
         <table
@@ -3751,9 +3753,11 @@ function PatientMetadataCard({
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Fecha de Recepción:
                         </strong>{' '}
-                        {new Date(specimen.created_at).toLocaleDateString(
-                            'es-HN',
-                        )}
+                        {reportDate
+                            ? new Date(
+                                  reportDate + 'T00:00:00',
+                              ).toLocaleDateString('es-HN')
+                            : 'N/A'}
                         &nbsp;&nbsp;&nbsp;{' '}
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Fecha de la toma:
@@ -7191,6 +7195,7 @@ export default function ReportWorkspace({
                                     key={block.id}
                                     specimen={specimen}
                                     sampleCollectionDate={sampleCollectionDate}
+                                    reportDate={reportDate}
                                 />
                             );
                         }

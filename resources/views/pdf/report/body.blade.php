@@ -520,7 +520,7 @@
                                     <strong>Tipo de muestra:</strong> {{ ($specimen->type->name ?? 'N/A') . ' - ' . ($specimen->examination->name ?? 'N/A') }}<br>
                                     <strong>Diagnóstico Clínicos:</strong> {{ $specimen->diagnosis ?? '' }}<br>
                                     <strong>Sitio Anatómico:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}<br>
-                                    <strong>Fecha de Recepción:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }} &nbsp;&nbsp;&nbsp; <strong>Fecha de la toma:</strong> {{ $report->sample_collection_date ? \Carbon\Carbon::parse($report->sample_collection_date)->format('d/m/Y') : 'N/A' }}
+                                    <strong>Fecha de Recepción:</strong> {{ $report->report_date ? \Carbon\Carbon::parse($report->report_date)->format('d/m/Y') : 'N/A' }} &nbsp;&nbsp;&nbsp; <strong>Fecha de la toma:</strong> {{ $report->sample_collection_date ? \Carbon\Carbon::parse($report->sample_collection_date)->format('d/m/Y') : 'N/A' }}
                                 </td>
                             </tr>
                         </table>
