@@ -3740,7 +3740,7 @@ function PatientMetadataCard({
 						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
 							Diagnóstico Clínico:
 						</strong>{' '}
-						{specimen.referrer_relation.notes || ''}
+						{specimen.diagnosis || ''}
 						<br />
 						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
 							Sitio Anatómico:
