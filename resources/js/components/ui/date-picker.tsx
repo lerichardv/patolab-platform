@@ -12,6 +12,8 @@ interface DatePickerProps {
     disabled?: boolean;
     placeholder?: string;
     className?: string;
+    popoverClassName?: string;
+    modal?: boolean;
 }
 
 export function DatePicker({
@@ -20,6 +22,8 @@ export function DatePicker({
     disabled = false,
     placeholder = 'Seleccione fecha...',
     className,
+    popoverClassName,
+    modal = true,
 }: DatePickerProps) {
     const [isOpen, setIsOpen] = React.useState(false);
     
@@ -71,7 +75,7 @@ export function DatePicker({
     const days = Array.from({ length: startDayOffset }).concat(daysInMonth) as (Date | null)[];
 
     return (
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <Popover open={isOpen} onOpenChange={setIsOpen} modal={modal}>
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
@@ -90,7 +94,7 @@ export function DatePicker({
                     </span>
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 z-50 bg-card border rounded-md shadow-md" align="start">
+            <PopoverContent className={cn("w-auto p-0 z-[120] bg-card border rounded-md shadow-md", popoverClassName)} align="start">
                 <div className="p-3 w-[280px]">
                     <div className="flex items-center justify-between mb-2">
                         <Button
