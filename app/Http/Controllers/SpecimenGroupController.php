@@ -79,6 +79,7 @@ class SpecimenGroupController extends Controller
             'specimens.*.clinical_notes' => 'nullable|string',
             'specimens.*.status' => 'required|string',
             'specimens.*.priority_id' => 'required|exists:priorities,id',
+            'specimens.*.sample_collection_date' => 'nullable|date',
 
             // Nested pricing config for each specimen
             'specimens.*.selected_price' => 'required|string',
@@ -338,6 +339,7 @@ class SpecimenGroupController extends Controller
                     'delivery_token' => Str::random(32),
                     'is_group' => true,
                     'group_id' => $group->id,
+                    'sample_collection_date' => $specData['sample_collection_date'] ?? null,
                 ]);
 
                 $qty = (int) ($specData['quantity'] ?? 1);
@@ -632,6 +634,7 @@ class SpecimenGroupController extends Controller
             'specimens.*.clinical_notes' => 'nullable|string',
             'specimens.*.status' => 'required|string',
             'specimens.*.priority_id' => 'required|exists:priorities,id',
+            'specimens.*.sample_collection_date' => 'nullable|date',
 
             // Nested pricing config for each specimen
             'specimens.*.selected_price' => 'required|string',
@@ -967,6 +970,7 @@ class SpecimenGroupController extends Controller
                         'delivery_token' => Str::random(32),
                         'is_group' => true,
                         'group_id' => $group->id,
+                        'sample_collection_date' => $specData['sample_collection_date'] ?? null,
                     ]);
 
                     InvoiceGroupSpecimen::create([

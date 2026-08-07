@@ -246,6 +246,7 @@ class SpecimenController extends Controller
             'clinical_notes' => 'nullable|string',
             'status' => 'required|string',
             'priority_id' => 'required|exists:priorities,id',
+            'sample_collection_date' => 'nullable|date',
             'medical_order_file' => [
                 'nullable',
                 'file',
@@ -639,6 +640,7 @@ class SpecimenController extends Controller
             'clinical_notes' => 'nullable|string',
             'status' => 'required|string',
             'priority_id' => 'required|exists:priorities,id',
+            'sample_collection_date' => 'nullable|date',
             'medical_order_file' => [
                 'nullable',
                 'file',
