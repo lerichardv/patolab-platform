@@ -518,7 +518,7 @@
                                 </td>
                                 <td style="width: 45%; padding-left: 12px;">
                                     <strong>Tipo de muestra:</strong> {{ ($specimen->type->name ?? 'N/A') . ' - ' . ($specimen->examination->name ?? 'N/A') }}<br>
-                                    <strong>Diagnóstico Clínicos:</strong> {{ $specimen->diagnosis ?? 'N/A' }}{{ $referrer->notes ?? '' }}<br>
+                                    <strong>Diagnóstico Clínicos:</strong> {{ $referrer->notes ?? '' }}<br>
                                     <strong>Sitio Anatómico:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}<br>
                                     <strong>Fecha de Recepción:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }} &nbsp;&nbsp;&nbsp; <strong>Fecha de la toma:</strong> {{ $report->sample_collection_date ? \Carbon\Carbon::parse($report->sample_collection_date)->format('d/m/Y') : 'N/A' }}
                                 </td>
