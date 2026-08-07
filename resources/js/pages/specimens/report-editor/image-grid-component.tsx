@@ -78,25 +78,19 @@ export default function ImageGridComponent({
     const lastWidthRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (!containerRef.current) {
-            return;
-        }
+        if (!containerRef.current) return;
 
-        const contentEl = (containerRef.current.querySelector(
-            '[data-node-view-content]',
-        ) || containerRef.current.querySelector('.w-full')) as HTMLElement;
-
-        if (!contentEl) {
-            return;
-        }
-
-        // In TipTap React Node Views, NodeViewContent creates an inner container
-        // with data-node-view-content-react that holds the child image elements.
-        const targetContainer = (contentEl.querySelector(
-            '[data-node-view-content-react]',
-        ) || contentEl) as HTMLElement;
+        const getTargetContainer = () => {
+            if (!containerRef.current) return null;
+            const contentEl = (containerRef.current.querySelector('[data-node-view-content]') || containerRef.current.querySelector('.w-full')) as HTMLElement;
+            if (!contentEl) return null;
+            return (contentEl.querySelector('[data-node-view-content-react]') || contentEl) as HTMLElement;
+        };
 
         const updateLayout = () => {
+            const targetContainer = getTargetContainer();
+            if (!targetContainer) return;
+
             // Apply flex layout to content container
             targetContainer.style.display = 'flex';
             targetContainer.style.flexWrap = 'nowrap';
@@ -104,44 +98,27 @@ export default function ImageGridComponent({
             targetContainer.style.justifyContent = 'flex-start';
             targetContainer.style.width = '100%';
 
-            if (targetContainer !== contentEl) {
+            const contentEl = (containerRef.current?.querySelector('[data-node-view-content]') || containerRef.current?.querySelector('.w-full')) as HTMLElement;
+            if (contentEl && targetContainer !== contentEl) {
                 contentEl.style.display = 'flex';
                 contentEl.style.width = '100%';
             }
 
-            const containerWidth =
-                targetContainer.getBoundingClientRect().width ||
-                contentEl.getBoundingClientRect().width ||
-                width ||
-                600;
-
-            if (containerWidth < 100) {
-                return;
-            }
-
-            const children = Array.from(
-                targetContainer.children,
-            ) as HTMLElement[];
-
-            if (children.length === 0) {
-                return;
-            }
+            const containerWidth = targetContainer.getBoundingClientRect().width || contentEl?.getBoundingClientRect().width || width || 600;
+            const children = Array.from(targetContainer.children) as HTMLElement[];
+            if (children.length === 0) return;
 
             // Get image details (element and aspect ratio)
             const imgItems = children.map((child) => {
                 let img: HTMLImageElement | null = null;
-
                 if (child.tagName.toLowerCase() === 'img') {
                     img = child as HTMLImageElement;
                 } else {
                     img = child.querySelector('img');
                 }
-
-                const aspect =
-                    img && img.naturalWidth > 0 && img.naturalHeight > 0
-                        ? img.naturalHeight / img.naturalWidth
-                        : 1.0;
-
+                const aspect = (img && img.naturalWidth > 0 && img.naturalHeight > 0)
+                    ? img.naturalHeight / img.naturalWidth
+                    : 1.0;
                 return { child, img, aspect };
             });
 
@@ -208,8 +185,11 @@ export default function ImageGridComponent({
             // Remove old listeners
             imgs.forEach((img) => img.removeEventListener('load', handleLoad));
 
-            // Find current images and add listeners
-            imgs = Array.from(targetContainer.querySelectorAll('img'));
+            const rootEl = containerRef.current;
+            if (!rootEl) return;
+
+            // Find current images inside root container
+            imgs = Array.from(rootEl.querySelectorAll('img'));
             imgs.forEach((img) => {
                 if (img.complete && img.naturalWidth > 0) {
                     // Already loaded
@@ -222,20 +202,23 @@ export default function ImageGridComponent({
 
         setupImageListeners();
 
-        // Observe child changes inside the grid
+        // Observe child changes inside the grid container
         const mutationObserver = new MutationObserver(() => {
             setupImageListeners();
         });
-        mutationObserver.observe(targetContainer, {
-            childList: true,
-            subtree: true,
-        });
+
+        if (containerRef.current) {
+            mutationObserver.observe(containerRef.current, { childList: true, subtree: true });
+        }
 
         // ResizeObserver to handle container resizing dynamically
         const resizeObserver = new ResizeObserver(() => {
             updateLayout();
         });
-        resizeObserver.observe(targetContainer);
+
+        if (containerRef.current) {
+            resizeObserver.observe(containerRef.current);
+        }
 
         return () => {
             imgs.forEach((img) => img.removeEventListener('load', handleLoad));

@@ -146,6 +146,30 @@ const ImageGrid = Node.create({
 					'data-columns': attributes.columns,
 				}),
 			},
+			alignment: {
+				default: 'center',
+				parseHTML: element => {
+					return element.getAttribute('data-align') || 'center';
+				},
+				renderHTML: attributes => ({
+					'data-align': attributes.alignment || 'center',
+				}),
+			},
+			width: {
+				default: null,
+				parseHTML: element => {
+					const w = element.getAttribute('width') || element.style.width;
+
+					return w ? parseInt(w, 10) : null;
+				},
+				renderHTML: attributes => {
+					if (!attributes.width) return {};
+
+					return {
+						width: attributes.width,
+					};
+				},
+			},
 		};
 	},
 
@@ -153,8 +177,35 @@ const ImageGrid = Node.create({
 		return [{ tag: 'div[data-type="image-grid"]' }];
 	},
 
-	renderHTML({ HTMLAttributes }) {
-		return ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'image-grid' }), 0];
+	renderHTML({ node, HTMLAttributes }) {
+		const align = node?.attrs?.alignment || HTMLAttributes?.alignment || 'center';
+		const isLeft = align === 'left';
+		const isRight = align === 'right';
+		const marginLeft = isLeft ? '0' : 'auto';
+		const marginRight = isRight ? '0' : 'auto';
+
+		const styles = [
+			`display: flex`,
+			`flex-wrap: nowrap`,
+			`margin-left: ${marginLeft}`,
+			`margin-right: ${marginRight}`,
+		];
+		const width = node?.attrs?.width || HTMLAttributes?.width;
+
+		if (width) {
+			styles.push(`width: ${width}px`);
+		}
+
+		return [
+			'div',
+			mergeAttributes(HTMLAttributes, {
+				'data-type': 'image-grid',
+				'data-align': align,
+				class: `align-${align}`,
+				style: styles.join('; ') + ';',
+			}),
+			0,
+		];
 	},
 });
 
