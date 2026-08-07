@@ -3,12 +3,12 @@ import {
     update as updateTemplate,
 } from '@/actions/App/Http/Controllers/MySpecimenTypeTemplateController';
 import HeadingSheet from '@/components/heading-sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import type {
     Template,
     SpecimenType,
 } from '../specimen-type-templates/template-form';
 import TemplateForm from '../specimen-type-templates/template-form';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
 
 interface Props {
     template: Template | null;

@@ -3,17 +3,26 @@
 namespace App\Http\Controllers\Editor;
 
 use App\Http\Controllers\Controller;
+use App\Models\CaiRange;
 use App\Models\CuttingCode;
 use App\Models\CuttingPrefix;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\InvoiceGroupSpecimen;
+use App\Models\Location;
 use App\Models\Permission;
+use App\Models\Priority;
 use App\Models\Product;
+use App\Models\Referrer;
+use App\Models\ReferrerType;
 use App\Models\Role;
+use App\Models\Sequence;
 use App\Models\Setting;
 use App\Models\Specimen;
+use App\Models\SpecimenCategory;
 use App\Models\SpecimenReport;
+use App\Models\SpecimenType;
+use App\Models\SpecimenTypeExamination;
 use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
 use App\Models\UserCommission;
@@ -304,6 +313,35 @@ class ReportEditorController extends Controller
             ->with(['user:id,name', 'specimenType:id,name', 'specimenTypeExamination:id,name'])
             ->get();
 
+        $priorities = Priority::orderBy('order')->get();
+        $specimenTypes = SpecimenType::where('active', true)->get();
+        $examinations = SpecimenTypeExamination::where('active', true)->with('prices')->get();
+        $categories = SpecimenCategory::where('active', true)->get();
+        $referrers = Referrer::where('active', true)->get();
+        $referrerTypes = ReferrerType::where('active', true)->get();
+        $locations = Location::where('active', true)->get();
+
+        $activeCai = CaiRange::where('status', 'active')->first();
+        $activeLocationId = $activeCai ? $activeCai->location_id : null;
+        $sequences = Sequence::where('active', true)->get()->map(function ($sequence) {
+            $tempSequence = clone $sequence;
+            $currentMonth = now()->format('m');
+            $currentYear = now()->format('Y');
+            do {
+                $paddedSeq = str_pad($tempSequence->current_sequence, $tempSequence->fill ?? 4, '0', STR_PAD_LEFT);
+                $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
+                $sequenceCode = $tempSequence->prefix.$tempSequence->separator.$paddedSeq.$tempSequence->separator.$paddedMonth.$tempSequence->separator.$currentYear;
+
+                $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
+                if ($exists) {
+                    $tempSequence->current_sequence++;
+                }
+            } while ($exists);
+            $sequence->current_sequence = $tempSequence->current_sequence;
+
+            return $sequence;
+        });
+
         return Inertia::render('specimens/report-editor/report-editor', [
             'specimen' => $specimen,
             'report' => $specimen->report,
@@ -326,6 +364,15 @@ class ReportEditorController extends Controller
             'cutting_prefixes' => CuttingPrefix::orderByRaw('LENGTH(prefix) asc')->orderBy('prefix', 'asc')->get(),
             'cutting_slide_types' => WorkOrderType::all(),
             'users' => User::where('active', true)->select('id', 'name')->get(),
+            'specimenTypes' => $specimenTypes,
+            'examinations' => $examinations,
+            'categories' => $categories,
+            'referrers' => $referrers,
+            'referrerTypes' => $referrerTypes,
+            'priorities' => $priorities,
+            'locations' => $locations,
+            'sequences' => $sequences,
+            'activeLocationId' => $activeLocationId,
         ]);
     }
 
@@ -389,6 +436,7 @@ class ReportEditorController extends Controller
 
             $report = SpecimenReport::create([
                 'report_date' => now()->format('Y-m-d'),
+                'sample_collection_date' => now()->format('Y-m-d'),
                 'macroscopy_html' => $template?->macroscopy_html ?? '',
                 'microscopy_html' => $template?->microscopy_html ?? '',
                 'diagnosis_html' => $template?->diagnosis_html ?? '',
@@ -528,6 +576,7 @@ class ReportEditorController extends Controller
 
         $request->validate([
             'report_date' => 'nullable|string',
+            'sample_collection_date' => 'nullable|string',
             'macroscopy_html' => 'nullable|string',
             'microscopy_html' => 'nullable|string',
             'diagnosis_html' => 'nullable|string',
@@ -574,6 +623,13 @@ class ReportEditorController extends Controller
             $reportDate = $request->input('report_date');
             if (! empty($reportDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportDate)) {
                 $updateData['report_date'] = $reportDate;
+            }
+        }
+
+        if ($request->has('sample_collection_date')) {
+            $sampleCollectionDate = $request->input('sample_collection_date');
+            if (! empty($sampleCollectionDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $sampleCollectionDate)) {
+                $updateData['sample_collection_date'] = $sampleCollectionDate;
             }
         }
 

@@ -102,6 +102,7 @@ interface Props {
     activeLocationId: number | null;
     products?: any[];
     banks?: any[];
+    showPaymentMethodEdition?: boolean;
 }
 
 function FormCombobox({
@@ -230,6 +231,7 @@ export default function SpecimenForm({
     activeLocationId = null,
     products = [],
     banks = [],
+    showPaymentMethodEdition = true,
 }: Props) {
     const { props: pageProps } = usePage<any>();
     const flash = pageProps.flash as Record<string, any> | undefined;
@@ -1966,19 +1968,23 @@ export default function SpecimenForm({
                                                     )}
                                                 </span>
                                             </div>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                    setIsPaymentSheetOpen(true)
-                                                }
-                                                className="h-8 font-semibold"
-                                            >
-                                                {data.payment_type
-                                                    ? 'Cambiar método de Pago'
-                                                    : 'Seleccionar método de pago'}
-                                            </Button>
+                                            {showPaymentMethodEdition && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        setIsPaymentSheetOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                    className="h-8 font-semibold"
+                                                >
+                                                    {data.payment_type
+                                                        ? 'Cambiar método de Pago'
+                                                        : 'Seleccionar método de pago'}
+                                                </Button>
+                                            )}
                                         </div>
 
                                         {data.payment_type ? (
@@ -3068,21 +3074,23 @@ export default function SpecimenForm({
                                                         )}
                                                     </span>
                                                 </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        setIsPaymentSheetOpen(
-                                                            true,
-                                                        )
-                                                    }
-                                                    className="h-8 font-semibold"
-                                                >
-                                                    {data.payment_type
-                                                        ? 'Cambiar método de Pago'
-                                                        : 'Seleccionar método de pago'}
-                                                </Button>
+                                                {showPaymentMethodEdition && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setIsPaymentSheetOpen(
+                                                                true,
+                                                            )
+                                                        }
+                                                        className="h-8 font-semibold"
+                                                    >
+                                                        {data.payment_type
+                                                            ? 'Cambiar método de Pago'
+                                                            : 'Seleccionar método de pago'}
+                                                    </Button>
+                                                )}
                                             </div>
 
                                             {data.payment_type ? (

@@ -304,6 +304,7 @@ function getInvoiceDisplayValues(
     filters: { date_from?: string; date_to?: string },
 ) {
     const isGroup = Boolean(invoice.is_group || invoice.group);
+
     if (!isGroup) {
         return {
             amount: parseFloat(String(invoice.amount || 0)),
@@ -354,16 +355,19 @@ function getInvoiceDisplayValues(
         const dateStr = rawDate ? String(rawDate).substring(0, 10) : '';
 
         let inRange = true;
+
         if (hasDateFilter) {
             if (dateFrom && dateStr < dateFrom) {
                 inRange = false;
             }
+
             if (dateTo && dateStr > dateTo) {
                 inRange = false;
             }
         }
 
         specimensInRangeMap[specimen.id] = inRange;
+
         if (inRange) {
             inRangeCount++;
         }
@@ -383,9 +387,11 @@ function getInvoiceDisplayValues(
             const rawDate = b.created_at;
             const dateStr = rawDate ? String(rawDate).substring(0, 10) : '';
             let inRange = true;
+
             if (dateFrom && dateStr < dateFrom) {
                 inRange = false;
             }
+
             if (dateTo && dateStr > dateTo) {
                 inRange = false;
             }
@@ -1446,6 +1452,7 @@ export default function InvoicesIndex({
                                             invoice,
                                             filters,
                                         );
+
                                     return (
                                         <TableRow
                                             key={invoice.id}

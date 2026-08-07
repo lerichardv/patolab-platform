@@ -163,7 +163,9 @@ const ImageGrid = Node.create({
 					return w ? parseInt(w, 10) : null;
 				},
 				renderHTML: attributes => {
-					if (!attributes.width) return {};
+					if (!attributes.width) {
+return {};
+}
 
 					return {
 						width: attributes.width,

@@ -29,12 +29,6 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
 import {
     Command,
     CommandEmpty,
@@ -43,6 +37,12 @@ import {
     CommandItem,
     CommandList,
 } from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import {
     Table,
     TableBody,
@@ -167,9 +167,11 @@ export default function TemplatesIndex({
         if (selectedSpecimenTypeId === 'all') {
             return specimenTypes.flatMap((t) => t.examinations);
         }
+
         const selectedType = specimenTypes.find(
             (t) => t.id.toString() === selectedSpecimenTypeId,
         );
+
         return selectedType ? selectedType.examinations : [];
     }, [specimenTypes, selectedSpecimenTypeId]);
 
@@ -327,6 +329,7 @@ export default function TemplatesIndex({
                                                           t.id.toString() ===
                                                           selectedSpecimenTypeId,
                                                   );
+
                                                   return t
                                                       ? t.name
                                                       : 'Tipo seleccionado';
@@ -441,6 +444,7 @@ export default function TemplatesIndex({
                                                                 e.id.toString() ===
                                                                 selectedExaminationId,
                                                         );
+
                                                     return e
                                                         ? e.name
                                                         : 'Análisis seleccionado';

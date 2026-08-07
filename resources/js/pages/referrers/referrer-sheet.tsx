@@ -22,6 +22,7 @@ interface Props {
     referrerTypes: ReferrerType[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onSuccess?: () => void;
 }
 
 export default function ReferrerSheet({
@@ -29,6 +30,7 @@ export default function ReferrerSheet({
     referrerTypes,
     open,
     onOpenChange,
+    onSuccess,
 }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -44,7 +46,10 @@ export default function ReferrerSheet({
                 <ReferrerForm
                     referrer={referrer}
                     referrerTypes={referrerTypes}
-                    onSuccess={() => onOpenChange(false)}
+                    onSuccess={() => {
+                        onSuccess?.();
+                        onOpenChange(false);
+                    }}
                 />
             </SheetContent>
         </Sheet>

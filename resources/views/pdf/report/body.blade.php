@@ -514,13 +514,13 @@
                                     <strong>Nombre:</strong> {{ $customer->name ?? 'N/A' }}<br>
                                     <strong>Edad:</strong> {{ $customer->age ?? 'N/A' }} años &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ $customer->gender === 'M' || $customer->gender === 'masculino' || $customer->gender === 'Masculino' ? 'M' : 'F' }}<br>
                                     <strong>Médico Remitente:</strong> {{ $referrer->name ?? 'N/A' }}<br>
-									<strong>Tipo de muestra:</strong> {{ ($specimen->type->name ?? 'N/A') . ' - ' . ($specimen->examination->name ?? 'N/A') }}<br>
+                                    <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? '' }}<br>
                                 </td>
                                 <td style="width: 45%; padding-left: 12px;">
-									<strong>Diagnóstico Clínico:</strong> {{ $specimen->diagnosis ?? 'N/A' }}<br>
-                                    <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? '' }}<br>
-                                    <strong>Fecha de Recibo:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }}<br>
-                                    <strong>Sitio Anatómico:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}
+                                    <strong>Tipo de muestra:</strong> {{ ($specimen->type->name ?? 'N/A') . ' - ' . ($specimen->examination->name ?? 'N/A') }}<br>
+                                    <strong>Diagnóstico Clínicos:</strong> {{ $specimen->diagnosis ?? 'N/A' }}{{ $referrer->notes ?? '' }}<br>
+                                    <strong>Sitio Anatómico:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}<br>
+                                    <strong>Fecha de Recepción:</strong> {{ $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A' }} &nbsp;&nbsp;&nbsp; <strong>Fecha de la toma:</strong> {{ $report->sample_collection_date ? \Carbon\Carbon::parse($report->sample_collection_date)->format('d/m/Y') : 'N/A' }}
                                 </td>
                             </tr>
                         </table>

@@ -18,6 +18,10 @@ import {
     X,
     UserPlus,
     CalendarClock,
+    ClipboardList,
+    Check,
+    ChevronUp,
+    ChevronsUpDown,
 } from 'lucide-react';
 import * as React from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -79,7 +83,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { addWithoutWeekends } from '@/lib/utils';
+import { cn, addWithoutWeekends } from '@/lib/utils';
 import WorkOrderViewSheet from '../my-work-orders/work-order-view-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 
@@ -149,13 +153,23 @@ interface WorkOrder {
     } | null;
 }
 
+interface WorkOrderTask {
+    id: number;
+    name: string;
+    description: string;
+}
+
 interface Props {
     workOrders: WorkOrder[];
     technicians: User[];
+    tasks: WorkOrderTask[];
     filters: {
         status?: string[];
         date_from?: string;
         date_to?: string;
+        task_ids?: number[];
+        sort_field?: string;
+        sort_direction?: string;
     };
 }
 
@@ -286,6 +300,7 @@ const getDueDateInfo = (wo: WorkOrder) => {
 export default function HistotechnologistWorkOrdersControl({
     workOrders,
     technicians,
+    tasks,
     filters,
 }: Props) {
     const { props } = usePage() as any;
@@ -318,6 +333,72 @@ export default function HistotechnologistWorkOrdersControl({
         workOrderId: number;
         nextStatus: 'En Proceso' | 'Finalizada';
     } | null>(null);
+    const [selectedTasks, setSelectedTasks] = useState<number[]>(
+        () => filters.task_ids?.map(Number) || tasks.map((t) => t.id),
+    );
+
+    const handleTaskSelectionChange = (nextTasks: number[]) => {
+        setSelectedTasks(nextTasks);
+        const userId = props.auth?.user?.id;
+
+        if (userId) {
+            setCookie(
+                `task_filter_histotechnologist_work_orders_user_${userId}`,
+                JSON.stringify(nextTasks),
+            );
+        }
+
+        router.get(
+            '/histotechnologist-work-orders',
+            {
+                ...filters,
+                task_ids: nextTasks,
+            },
+            {
+                preserveState: true,
+                replace: true,
+            },
+        );
+    };
+
+    const handleSort = (field: string) => {
+        const isCurrentField = filters.sort_field === field;
+        const direction =
+            isCurrentField && filters.sort_direction === 'asc' ? 'desc' : 'asc';
+        router.get(
+            '/histotechnologist-work-orders',
+            {
+                ...filters,
+                sort_field: field,
+                sort_direction: direction,
+            },
+            {
+                preserveState: true,
+                replace: true,
+            },
+        );
+    };
+
+    const renderSortHeader = (field: string, label: string) => {
+        const isSorted = filters.sort_field === field;
+        const direction = isSorted ? filters.sort_direction || 'asc' : null;
+
+        return (
+            <button
+                onClick={() => handleSort(field)}
+                className="group/btn flex items-center gap-1.5 text-left font-semibold transition-colors hover:text-foreground"
+            >
+                <span>{label}</span>
+                {direction === 'asc' ? (
+                    <ChevronUp className="h-4 w-4 shrink-0 text-primary" />
+                ) : direction === 'desc' ? (
+                    <ChevronDown className="h-4 w-4 shrink-0 text-primary" />
+                ) : (
+                    <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover/btn:opacity-100" />
+                )}
+            </button>
+        );
+    };
 
     const ALL_STATUSES = [
         { value: 'Enviada', label: 'Enviada' },
@@ -400,6 +481,10 @@ export default function HistotechnologistWorkOrdersControl({
                 from: filters.date_from || '',
                 to: filters.date_to || '',
             });
+        }
+
+        if (filters.task_ids) {
+            setSelectedTasks(filters.task_ids.map(Number));
         }
     }, [filters]);
 
@@ -665,6 +750,90 @@ export default function HistotechnologistWorkOrdersControl({
                             </PopoverContent>
                         </Popover>
 
+                        {/* Task Filter */}
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className="h-10 gap-2 border bg-card transition-colors hover:bg-accent/50"
+                                >
+                                    <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                                    <span>Tareas ({selectedTasks.length})</span>
+                                    <ChevronDown className="h-4 w-4 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-56 p-2" align="end">
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+                                        <span>Filtrar por tarea</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                let nextTasks: number[] = [];
+
+                                                if (
+                                                    selectedTasks.length !==
+                                                    tasks.length
+                                                ) {
+                                                    nextTasks = tasks.map(
+                                                        (t) => t.id,
+                                                    );
+                                                }
+
+                                                handleTaskSelectionChange(
+                                                    nextTasks,
+                                                );
+                                            }}
+                                            className="cursor-pointer font-medium transition-colors hover:text-primary"
+                                        >
+                                            {selectedTasks.length ===
+                                            tasks.length
+                                                ? 'Ninguno'
+                                                : 'Todos'}
+                                        </button>
+                                    </div>
+                                    <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
+                                        {tasks?.map((task) => {
+                                            const isChecked =
+                                                selectedTasks.includes(task.id);
+
+                                            return (
+                                                <div
+                                                    key={task.id}
+                                                    className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+                                                    onClick={() => {
+                                                        const nextTasks =
+                                                            selectedTasks.includes(
+                                                                task.id,
+                                                            )
+                                                                ? selectedTasks.filter(
+                                                                      (id) =>
+                                                                          id !==
+                                                                          task.id,
+                                                                  )
+                                                                : [
+                                                                      ...selectedTasks,
+                                                                      task.id,
+                                                                  ];
+                                                        handleTaskSelectionChange(
+                                                            nextTasks,
+                                                        );
+                                                    }}
+                                                >
+                                                    <Checkbox
+                                                        checked={isChecked}
+                                                        className="pointer-events-none"
+                                                        onCheckedChange={() => {}}
+                                                    />
+                                                    <span>{task.name}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+
                         {/* Date Range Picker */}
                         <DateRangePicker
                             cookieKey="date_filter_histotechnologist_work_orders"
@@ -709,6 +878,10 @@ export default function HistotechnologistWorkOrdersControl({
                                             from: defaultRange.from,
                                             to: defaultRange.to,
                                         }),
+                                    );
+                                    setCookie(
+                                        `task_filter_histotechnologist_work_orders_user_${userId}`,
+                                        JSON.stringify(tasks.map((t) => t.id)),
                                     );
                                 }
 
@@ -772,16 +945,22 @@ export default function HistotechnologistWorkOrdersControl({
                                         Prioridad
                                     </TableHead>
                                     <TableHead className="min-w-[170px] text-center font-semibold">
-                                        Vencimiento
+                                        {renderSortHeader(
+                                            'due_date',
+                                            'Vencimiento',
+                                        )}
                                     </TableHead>
                                     <TableHead className="w-[100px] font-semibold">
                                         Muestra
                                     </TableHead>
                                     <TableHead className="min-w-[120px] font-semibold">
-                                        Tarea
+                                        {renderSortHeader('task', 'Tarea')}
                                     </TableHead>
                                     <TableHead className="min-w-[120px] font-semibold">
-                                        Tipo de Orden
+                                        {renderSortHeader(
+                                            'type',
+                                            'Tipo de Orden',
+                                        )}
                                     </TableHead>
                                     <TableHead className="w-[80px] text-center font-semibold">
                                         Cantidad

@@ -17,6 +17,7 @@ interface Props {
     specimen: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onSuccess?: () => void;
     specimenTypes: any[];
     examinations: any[];
     categories: any[];
@@ -28,12 +29,14 @@ interface Props {
     activeLocationId: number | null;
     products: any[];
     banks: any[];
+    showPaymentMethodEdition?: boolean;
 }
 
 export default function SpecimenSheet({
     specimen,
     open,
     onOpenChange,
+    onSuccess,
     specimenTypes,
     examinations,
     categories,
@@ -45,6 +48,7 @@ export default function SpecimenSheet({
     activeLocationId,
     products,
     banks,
+    showPaymentMethodEdition,
 }: Props) {
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -91,7 +95,10 @@ export default function SpecimenSheet({
                     />
                     <SpecimenForm
                         specimen={specimen}
-                        onSuccess={() => onOpenChange(false)}
+                        onSuccess={() => {
+                            onSuccess?.();
+                            onOpenChange(false);
+                        }}
                         setIsDirty={setIsFormDirty}
                         specimenTypes={specimenTypes}
                         examinations={examinations}
@@ -104,6 +111,7 @@ export default function SpecimenSheet({
                         activeLocationId={activeLocationId}
                         products={products}
                         banks={banks}
+                        showPaymentMethodEdition={showPaymentMethodEdition}
                     />
                 </SheetContent>
             </Sheet>

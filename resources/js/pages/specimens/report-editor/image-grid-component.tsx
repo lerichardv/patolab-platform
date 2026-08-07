@@ -78,21 +78,33 @@ export default function ImageGridComponent({
     const lastWidthRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (!containerRef.current) return;
+        if (!containerRef.current) {
+            return;
+        }
 
         const getTargetContainer = () => {
-            if (!containerRef.current) return null;
+            if (!containerRef.current) {
+                return null;
+            }
+
             const contentEl = (containerRef.current.querySelector(
                 '[data-node-view-content]',
             ) || containerRef.current.querySelector('.w-full')) as HTMLElement;
-            if (!contentEl) return null;
+
+            if (!contentEl) {
+                return null;
+            }
+
             return (contentEl.querySelector('[data-node-view-content-react]') ||
                 contentEl) as HTMLElement;
         };
 
         const updateLayout = () => {
             const targetContainer = getTargetContainer();
-            if (!targetContainer) return;
+
+            if (!targetContainer) {
+                return;
+            }
 
             // Apply flex layout to content container
             targetContainer.style.display = 'flex';
@@ -104,6 +116,7 @@ export default function ImageGridComponent({
             const contentEl = (containerRef.current?.querySelector(
                 '[data-node-view-content]',
             ) || containerRef.current?.querySelector('.w-full')) as HTMLElement;
+
             if (contentEl && targetContainer !== contentEl) {
                 contentEl.style.display = 'flex';
                 contentEl.style.width = '100%';
@@ -117,20 +130,26 @@ export default function ImageGridComponent({
             const children = Array.from(
                 targetContainer.children,
             ) as HTMLElement[];
-            if (children.length === 0) return;
+
+            if (children.length === 0) {
+                return;
+            }
 
             // Get image details (element and aspect ratio)
             const imgItems = children.map((child) => {
                 let img: HTMLImageElement | null = null;
+
                 if (child.tagName.toLowerCase() === 'img') {
                     img = child as HTMLImageElement;
                 } else {
                     img = child.querySelector('img');
                 }
+
                 const aspect =
                     img && img.naturalWidth > 0 && img.naturalHeight > 0
                         ? img.naturalHeight / img.naturalWidth
                         : 1.0;
+
                 return { child, img, aspect };
             });
 
@@ -198,7 +217,10 @@ export default function ImageGridComponent({
             imgs.forEach((img) => img.removeEventListener('load', handleLoad));
 
             const rootEl = containerRef.current;
-            if (!rootEl) return;
+
+            if (!rootEl) {
+                return;
+            }
 
             // Find current images inside root container
             imgs = Array.from(rootEl.querySelectorAll('img'));

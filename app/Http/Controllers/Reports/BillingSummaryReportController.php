@@ -760,7 +760,7 @@ class BillingSummaryReportController extends Controller
     {
         $rows = [];
         foreach ($invoices as $invoice) {
-            if ($invoice->is_group && !in_array($invoice->invoice_type, ['credit payment', 'social security'])) {
+            if ($invoice->is_group && ! in_array($invoice->invoice_type, ['credit payment', 'social security'])) {
                 if ($invoice->payment_type === 'credit') {
                     $cisItems = $invoice->creditInvoiceSpecimens;
                     if (! empty($dateFrom)) {
