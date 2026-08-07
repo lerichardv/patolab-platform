@@ -255,9 +255,15 @@ export default function Dashboard({
         );
     }
 
-    const showSpecimensCard = hasPermission('specimens.view');
-    const showEarningsCard = hasPermission('invoices.view');
-    const showCustomersCard = hasPermission('patients.view');
+    const showSpecimensCard =
+        hasPermission('dashboard.resume_cards.view') &&
+        hasPermission('specimens.view');
+    const showEarningsCard =
+        hasPermission('dashboard.resume_cards.view') &&
+        hasPermission('invoices.view');
+    const showCustomersCard =
+        hasPermission('dashboard.resume_cards.view') &&
+        hasPermission('patients.view');
     const visibleCardsCount = [
         showSpecimensCard,
         showEarningsCard,
@@ -452,24 +458,26 @@ export default function Dashboard({
                 )}
 
                 {/* Weekly Specimens Chart */}
-                {hasPermission('specimens.view') && (
-                    <div className="grid gap-6">
-                        <WeeklySpecimensChart
-                            data={specimensWeeklyData}
-                            showEarnings={hasPermission('invoices.view')}
-                        />
-                    </div>
-                )}
+                {hasPermission('dashboard.resume_cards.view') &&
+                    hasPermission('specimens.view') && (
+                        <div className="grid gap-6">
+                            <WeeklySpecimensChart
+                                data={specimensWeeklyData}
+                                showEarnings={hasPermission('invoices.view')}
+                            />
+                        </div>
+                    )}
 
                 {/* Today's Specimens List */}
-                {hasPermission('specimens.view') && (
-                    <div className="grid gap-6">
-                        <TodaySpecimensList
-                            specimens={todaySpecimens}
-                            showInvoices={hasPermission('invoices.view')}
-                        />
-                    </div>
-                )}
+                {hasPermission('dashboard.resume_cards.view') &&
+                    hasPermission('specimens.view') && (
+                        <div className="grid gap-6">
+                            <TodaySpecimensList
+                                specimens={todaySpecimens}
+                                showInvoices={hasPermission('invoices.view')}
+                            />
+                        </div>
+                    )}
             </div>
         </>
     );

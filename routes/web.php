@@ -62,47 +62,171 @@ Route::get('specimen-group/{id}', [SpecimenGroupController::class, 'showPublic']
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         $specimensCount = Specimen::where('active', true)->count();
-        $moneyMadeToday = Invoice::whereDate('created_at', Carbon::today())->sum('total');
         $customersCount = Customer::where('active', true)->count();
 
-        $startOfWeek = Carbon::now()->startOfWeek();
-        $endOfWeek = Carbon::now()->endOfWeek();
+        $getBillingRowsForRange = function ($dateFrom, $dateTo) {
+            $invoices = Invoice::with([
+                'customer',
+                'specimen.type',
+                'specimen.examination',
+                'specimen.priority',
+                'specimen.customerRelation',
+                'groupSpecimens.specimen.type',
+                'groupSpecimens.specimen.examination',
+                'groupSpecimens.specimen.priority',
+                'groupSpecimens.specimen.customerRelation',
+                'creditInvoiceSpecimens.specimen.type',
+                'creditInvoiceSpecimens.specimen.examination',
+                'creditInvoiceSpecimens.specimen.priority',
+                'creditInvoiceSpecimens.specimen.customerRelation',
+                'createdBy',
+            ])
+                ->where('invoice_type', '!=', 'cancelled')
+                ->where(function ($q) use ($dateFrom, $dateTo) {
+                    $q->where(function ($sub) use ($dateFrom, $dateTo) {
+                        $sub->where('is_group', false)
+                            ->whereDate('created_at', '>=', $dateFrom)
+                            ->whereDate('created_at', '<=', $dateTo);
+                    })
+                        ->orWhere(function ($sub) use ($dateFrom, $dateTo) {
+                            $sub->where('is_group', true)
+                                ->where('payment_type', 'credit')
+                                ->whereHas('creditInvoiceSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom)
+                                        ->whereDate('created_at', '<=', $dateTo);
+                                });
+                        })
+                        ->orWhere(function ($sub) use ($dateFrom, $dateTo) {
+                            $sub->where('is_group', true)
+                                ->where('payment_type', '!=', 'credit')
+                                ->whereHas('groupSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom)
+                                        ->whereDate('created_at', '<=', $dateTo);
+                                });
+                        });
+                })
+                ->get();
 
-        $specimensThisWeekCount = Specimen::where('active', true)
-            ->whereBetween('created_at', [$startOfWeek, $endOfWeek])
-            ->count();
+            $rows = [];
+            foreach ($invoices as $invoice) {
+                if ($invoice->is_group) {
+                    if ($invoice->payment_type === 'credit') {
+                        $cisItems = $invoice->creditInvoiceSpecimens;
+                        if (! empty($dateFrom)) {
+                            $cisItems = $cisItems->filter(fn ($cis) => $cis->created_at && $cis->created_at->toDateString() >= $dateFrom);
+                        }
+                        if (! empty($dateTo)) {
+                            $cisItems = $cisItems->filter(fn ($cis) => $cis->created_at && $cis->created_at->toDateString() <= $dateTo);
+                        }
 
-        // Get specimens created this week, grouped by date
-        $specimensThisWeek = Specimen::where('active', true)
-            ->whereBetween('created_at', [$startOfWeek, $endOfWeek])
-            ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
-            ->groupBy('date')
-            ->pluck('count', 'date');
+                        foreach ($cisItems as $cis) {
+                            $rows[] = [
+                                'net_amount' => $cis->is_paid ? (float) $cis->total : 0.0,
+                                'gross_amount' => (float) $cis->total,
+                                'amount' => (float) $cis->amount,
+                                'total' => (float) $cis->total,
+                                'date' => $cis->created_at ? $cis->created_at->toDateString() : null,
+                                'specimen' => $cis->specimen,
+                                'payment_type' => $invoice->payment_type,
+                                'invoice_id' => $invoice->id,
+                            ];
+                        }
+                    } else {
+                        $igsItems = $invoice->groupSpecimens;
+                        if (! empty($dateFrom)) {
+                            $igsItems = $igsItems->filter(fn ($igs) => $igs->created_at && $igs->created_at->toDateString() >= $dateFrom);
+                        }
+                        if (! empty($dateTo)) {
+                            $igsItems = $igsItems->filter(fn ($igs) => $igs->created_at && $igs->created_at->toDateString() <= $dateTo);
+                        }
 
-        // Get invoices created this week, grouped by date
-        $invoicesThisWeek = Invoice::whereBetween('created_at', [$startOfWeek, $endOfWeek])
-            ->selectRaw('DATE(created_at) as date, SUM(total) as total')
-            ->groupBy('date')
-            ->pluck('total', 'date');
+                        foreach ($igsItems as $igs) {
+                            $rows[] = [
+                                'net_amount' => (float) $igs->total,
+                                'gross_amount' => (float) $igs->total,
+                                'amount' => (float) $igs->amount,
+                                'total' => (float) $igs->total,
+                                'date' => $igs->created_at ? $igs->created_at->toDateString() : null,
+                                'specimen' => $igs->specimen,
+                                'payment_type' => $invoice->payment_type,
+                                'invoice_id' => $invoice->id,
+                            ];
+                        }
+                    }
+                } else {
+                    $rows[] = [
+                        'net_amount' => (float) $invoice->total_paid,
+                        'gross_amount' => (float) $invoice->total,
+                        'amount' => (float) $invoice->amount,
+                        'total' => (float) $invoice->total,
+                        'date' => $invoice->created_at ? $invoice->created_at->toDateString() : null,
+                        'specimen' => $invoice->specimen,
+                        'payment_type' => $invoice->payment_type,
+                        'invoice_id' => $invoice->id,
+                    ];
+                }
+            }
+
+            return $rows;
+        };
+
+        $todayStr = Carbon::today()->toDateString();
+        $todayRows = $getBillingRowsForRange($todayStr, $todayStr);
+        $moneyMadeToday = collect($todayRows)->sum('net_amount');
+
+        $startOfWeek = Carbon::now()->startOfWeek()->toDateString();
+        $endOfWeek = Carbon::now()->endOfWeek()->toDateString();
+        $weeklyRows = $getBillingRowsForRange($startOfWeek, $endOfWeek);
+
+        // Group weekly rows by date
+        $specimensByDate = [];
+        $earningsByDate = [];
+        foreach ($weeklyRows as $row) {
+            if ($row['date']) {
+                if (! isset($specimensByDate[$row['date']])) {
+                    $specimensByDate[$row['date']] = 0;
+                    $earningsByDate[$row['date']] = 0.0;
+                }
+                if ($row['specimen']) {
+                    $specimensByDate[$row['date']]++;
+                }
+                $earningsByDate[$row['date']] += $row['net_amount'];
+            }
+        }
 
         // Build a complete list of 7 days (Monday to Sunday)
         $weeklyData = [];
         $daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+        $startOfWeekCarbon = Carbon::now()->startOfWeek();
         for ($i = 0; $i < 7; $i++) {
-            $dateStr = $startOfWeek->copy()->addDays($i)->toDateString();
+            $dateStr = $startOfWeekCarbon->copy()->addDays($i)->toDateString();
             $weeklyData[] = [
                 'day' => $daysOfWeek[$i],
                 'date' => $dateStr,
-                'count' => (int) ($specimensThisWeek[$dateStr] ?? 0),
-                'earnings' => (float) ($invoicesThisWeek[$dateStr] ?? 0),
+                'count' => (int) ($specimensByDate[$dateStr] ?? 0),
+                'earnings' => (float) ($earningsByDate[$dateStr] ?? 0.0),
             ];
         }
 
-        $todaySpecimens = Specimen::where('active', true)
-            ->whereDate('created_at', Carbon::today())
-            ->with(['customerRelation', 'type', 'examination', 'priority', 'invoiceRelation'])
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $specimensThisWeekCount = collect($weeklyData)->sum('count');
+
+        $todaySpecimens = [];
+        foreach ($todayRows as $row) {
+            if ($row['specimen']) {
+                $specimen = $row['specimen'];
+                $specimen->setRelation('invoiceRelation', new Invoice([
+                    'id' => $row['invoice_id'],
+                    'amount' => $row['amount'],
+                    'total' => $row['total'],
+                    'payment_type' => $row['payment_type'],
+                ]));
+                $todaySpecimens[] = $specimen;
+            }
+        }
+
+        usort($todaySpecimens, function ($a, $b) {
+            return strcmp($b->created_at, $a->created_at);
+        });
 
         return inertia('dashboard', [
             'specimensCount' => $specimensCount,

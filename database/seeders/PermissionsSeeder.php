@@ -218,6 +218,13 @@ class PermissionsSeeder extends Seeder
             |--------------------------------------------------------------------------
             */
             ['name' => 'Ver Asistente de IA', 'slug' => 'ai_assistant.view'],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Dashboard
+            |--------------------------------------------------------------------------
+            */
+            ['name' => 'Ver Tarjetas de Resumen de Dashboard', 'slug' => 'dashboard.resume_cards.view'],
         ];
 
         foreach ($permissions as $permission) {
