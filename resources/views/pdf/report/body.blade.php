@@ -519,8 +519,8 @@
                                 <td style="width: 45%; padding-left: 12px;">
                                     <strong>Diagnóstico Clínicos:</strong> {{ $specimen->diagnosis ?? '' }}<br>
                                     <strong>Sitio Anatómico:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}<br>
+									<strong>Fecha de la toma:</strong> {{ $specimen->sample_collection_date ? \Carbon\Carbon::parse($specimen->sample_collection_date)->format('d/m/Y') : 'N/A' }}
                                     <strong>Fecha de Recepción:</strong> {{ $report->report_date ? \Carbon\Carbon::parse($report->report_date)->format('d/m/Y') : 'N/A' }}<br>
-									<strong>Fecha de la toma:</strong> {{ $report->sample_collection_date ? \Carbon\Carbon::parse($report->sample_collection_date)->format('d/m/Y') : 'N/A' }}
                                 </td>
                             </tr>
                         </table>
@@ -573,7 +573,7 @@
                                             <div class="signature-line" style="width: 100%; border-top: 0.40mm solid #4b5563; margin-bottom: 1.32mm;"></div>
                                             <div class="pathologist-name" style="font-size: 2.65mm; font-weight: 700; color: #1f2937; text-transform: uppercase;">{{ $pathologist->name }}</div>
                                             <div class="pathologist-title" style="font-size: 2.25mm; color: #4b5563; font-weight: 500; text-transform: uppercase;">{{ $pathologist->role ? $pathologist->role->name : 'PATOLOGÍA ONCOLÓGICA' }}</div>
-                                            <div class="date-signature" style="font-size: 2.38mm; font-weight: 600; color: #374151; margin-top: 1.32mm;">FECHA: {{ $report->report_date ? \Carbon\Carbon::parse($report->report_date)->format('d/m/y') : now()->format('d/m/y') }}</div>
+                                            <div class="date-signature" style="font-size: 2.38mm; font-weight: 600; color: #374151; margin-top: 1.32mm;">FECHA: {{ $report->finalization_date ? \Carbon\Carbon::parse($report->finalization_date)->format('d/m/y') : now()->format('d/m/y') }}</div>
                                         </div>
                                     @endforeach
                                 </div>

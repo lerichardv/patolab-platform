@@ -72,12 +72,14 @@ class Specimen extends Model
         'cancellation_reason',
         'cancelled_at',
         'cancelled_by_id',
+        'sample_collection_date',
     ];
 
     protected $casts = [
         'active' => 'boolean',
         'is_group' => 'boolean',
         'cancelled_at' => 'datetime',
+        'sample_collection_date' => 'date',
     ];
 
     protected $appends = [

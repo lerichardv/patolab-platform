@@ -151,6 +151,18 @@ export function DatePicker({
                             );
                         })}
                     </div>
+
+                    <div className="mt-3 pt-2 border-t flex justify-center">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            type="button"
+                            className="w-full text-xs font-semibold text-primary hover:text-primary hover:bg-primary/5 cursor-pointer h-7"
+                            onClick={() => handleSelect(new Date())}
+                        >
+                            Hoy
+                        </Button>
+                    </div>
                 </div>
             </PopoverContent>
         </Popover>

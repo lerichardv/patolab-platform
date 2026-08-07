@@ -144,7 +144,7 @@ interface Collaborator {
 interface SpecimenReport {
 	id: number;
 	report_date: string;
-	sample_collection_date?: string;
+	finalization_date?: string;
 	macroscopy_html: string | null;
 	microscopy_html: string | null;
 	diagnosis_html: string | null;
@@ -169,6 +169,7 @@ interface SpecimenReport {
 interface Specimen {
 	id: number;
 	sequence_code: string;
+	sample_collection_date?: string;
 	anatomic_site: string;
 	diagnosis: string | null;
 	clinical_notes: string | null;
@@ -3750,20 +3751,20 @@ function PatientMetadataCard({
 						{specimen.anatomic_site || 'N/A'}
 						<br />
 						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
-							Fecha de Recepción:
-						</strong>{' '}
-						{reportDate
-							? new Date(
-								reportDate + 'T00:00:00',
-							).toLocaleDateString('es-HN')
-							: 'N/A'}
-						<br />
-						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
 							Fecha de la toma:
 						</strong>{' '}
 						{sampleCollectionDate
 							? new Date(
 								sampleCollectionDate + 'T00:00:00',
+							).toLocaleDateString('es-HN')
+							: 'N/A'}
+						<br />
+						<strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
+							Fecha de Recepción:
+						</strong>{' '}
+						{reportDate
+							? new Date(
+								reportDate + 'T00:00:00',
 							).toLocaleDateString('es-HN')
 							: 'N/A'}
 					</td>
@@ -3796,6 +3797,7 @@ function SectionHeader({ title }: { title: string }) {
 function SignatureBlock({
 	users,
 	reportDate,
+	finalizationDate,
 }: {
 	users?: Array<{
 		id: number;
@@ -3807,6 +3809,7 @@ function SignatureBlock({
 		signature_url?: string | null;
 	}>;
 	reportDate: string;
+	finalizationDate: string;
 }) {
 	const assignedUsers =
 		users && users.length > 0
@@ -3913,9 +3916,9 @@ function SignatureBlock({
 								}}
 							>
 								FECHA:{' '}
-								{reportDate
+								{finalizationDate
 									? new Date(
-										reportDate + 'T00:00:00',
+										finalizationDate + 'T00:00:00',
 									).toLocaleDateString('es-HN', {
 										day: '2-digit',
 										month: '2-digit',
@@ -4307,8 +4310,13 @@ export default function ReportWorkspace({
 			: new Date().toISOString().split('T')[0],
 	);
 	const [sampleCollectionDate, setSampleCollectionDate] = useState(
-		report?.sample_collection_date
-			? report.sample_collection_date.split('T')[0]
+		specimen?.sample_collection_date
+			? specimen.sample_collection_date.split('T')[0]
+			: new Date().toISOString().split('T')[0],
+	);
+	const [finalizationDate, setFinalizationDate] = useState(
+		report?.finalization_date
+			? report.finalization_date.split('T')[0]
 			: new Date().toISOString().split('T')[0],
 	);
 	const [macroscopyHtml, setMacroscopyHtml] = useState(
@@ -5671,6 +5679,7 @@ export default function ReportWorkspace({
 		addendumHtml,
 		reportDate,
 		sampleCollectionDate,
+		finalizationDate,
 		specimen,
 		isMicroscopyVisible,
 		isLoading,
@@ -5720,6 +5729,7 @@ export default function ReportWorkspace({
 		addendumHtml,
 		reportDate,
 		sampleCollectionDate,
+		finalizationDate,
 	]);
 
 	const notifyCollaborationServer = async () => {
@@ -6112,6 +6122,7 @@ export default function ReportWorkspace({
 			body: JSON.stringify({
 				report_date: reportDate,
 				sample_collection_date: sampleCollectionDate,
+				finalization_date: finalizationDate,
 				macroscopy_html: macroscopyHtml,
 				microscopy_html: microscopyHtml,
 				diagnosis_html: diagnosisHtml,
@@ -6718,18 +6729,25 @@ export default function ReportWorkspace({
 			const rawDate = report.report_date || '';
 			const match = rawDate.match(/\d{4}-\d{2}-\d{2}/);
 			setReportDate(match ? match[0] : rawDate.split('T')[0] || '');
-			const rawCollectionDate = report.sample_collection_date || '';
+			const rawCollectionDate = specimen.sample_collection_date || '';
 			const matchColl = rawCollectionDate.match(/\d{4}-\d{2}-\d{2}/);
 			setSampleCollectionDate(
 				matchColl
 					? matchColl[0]
 					: rawCollectionDate.split('T')[0] || '',
 			);
+			const rawFinalDate = report.finalization_date || '';
+			const matchFinal = rawFinalDate.match(/\d{4}-\d{2}-\d{2}/);
+			setFinalizationDate(
+				matchFinal
+					? matchFinal[0]
+					: rawFinalDate.split('T')[0] || '',
+			);
 			setMacroscopyHtml(report.macroscopy_html || '');
 			setMicroscopyHtml(report.microscopy_html || '');
 			setDiagnosisHtml(report.diagnosis_html || '');
 		}
-	}, [report]);
+	}, [report, specimen]);
 
 	const handleCreateReport = () => {
 		if (templates && templates.length > 0 && !selectedTemplateId) {
@@ -7214,6 +7232,7 @@ export default function ReportWorkspace({
 									key={block.id}
 									users={specimen.users}
 									reportDate={reportDate}
+									finalizationDate={finalizationDate}
 								/>
 							);
 						}
@@ -7891,27 +7910,6 @@ export default function ReportWorkspace({
 												}
 											</strong>
 										</p>
-										<div className="mt-3 flex flex-col items-start gap-1.5">
-											<label
-												htmlFor="report-date"
-												className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-foreground"
-											>
-												<Calendar className="h-4 w-4 text-muted-foreground" />{' '}
-												Fecha de Recepción
-											</label>
-											<div className="w-[200px]">
-												<DatePicker
-													value={reportDate}
-													disabled={
-														(isFinished &&
-															!sessionEditingEnabled) ||
-														(!hasMacroAccess &&
-															!hasMicroAccess)
-													}
-													onChange={handleUpdateDate}
-												/>
-											</div>
-										</div>
 									</div>
 									<div className="space-y-2">
 										<p>
@@ -7940,6 +7938,30 @@ export default function ReportWorkspace({
 													'N/A'}
 											</strong>
 										</p>
+
+									</div>
+									<div className='flex flex-row flex-nowrap items-center gap-5'>
+										<div className="mt-3 flex flex-col items-start gap-1.5">
+											<label
+												htmlFor="report-date"
+												className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-foreground"
+											>
+												<Calendar className="h-4 w-4 text-muted-foreground" />{' '}
+												Fecha de Recepción
+											</label>
+											<div className="w-[200px]">
+												<DatePicker
+													value={reportDate}
+													disabled={
+														(isFinished &&
+															!sessionEditingEnabled) ||
+														(!hasMacroAccess &&
+															!hasMicroAccess)
+													}
+													onChange={handleUpdateDate}
+												/>
+											</div>
+										</div>
 										<div className="mt-3 flex flex-col items-start gap-1.5">
 											<label
 												htmlFor="sample-collection-date"
@@ -7960,6 +7982,27 @@ export default function ReportWorkspace({
 													onChange={
 														setSampleCollectionDate
 													}
+												/>
+											</div>
+										</div>
+										<div className="mt-3 flex flex-col items-start gap-1.5">
+											<label
+												htmlFor="finalization-date"
+												className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-foreground"
+											>
+												<Calendar className="h-4 w-4 text-muted-foreground" />{' '}
+												Fecha de finalización
+											</label>
+											<div className="w-[200px]">
+												<DatePicker
+													value={finalizationDate}
+													disabled={
+														(isFinished &&
+															!sessionEditingEnabled) ||
+														(!hasMacroAccess &&
+															!hasMicroAccess)
+													}
+													onChange={setFinalizationDate}
 												/>
 											</div>
 										</div>

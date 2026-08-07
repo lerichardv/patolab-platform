@@ -24,7 +24,7 @@ class SpecimenReport extends Model
      */
     protected $fillable = [
         'report_date',
-        'sample_collection_date',
+        'finalization_date',
         'generated_at',
         'macroscopy_html',
         'macroscopy_finalization_datetime',
@@ -46,7 +46,7 @@ class SpecimenReport extends Model
 
     protected $casts = [
         'report_date' => 'date',
-        'sample_collection_date' => 'date',
+        'finalization_date' => 'date',
         'generated_at' => 'datetime',
         'macroscopy_finalization_datetime' => 'datetime',
         'microscopy_finalization_datetime' => 'datetime',

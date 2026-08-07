@@ -436,7 +436,7 @@ class ReportEditorController extends Controller
 
             $report = SpecimenReport::create([
                 'report_date' => now()->format('Y-m-d'),
-                'sample_collection_date' => now()->format('Y-m-d'),
+                'finalization_date' => now()->format('Y-m-d'),
                 'macroscopy_html' => $template?->macroscopy_html ?? '',
                 'microscopy_html' => $template?->microscopy_html ?? '',
                 'diagnosis_html' => $template?->diagnosis_html ?? '',
@@ -577,6 +577,7 @@ class ReportEditorController extends Controller
         $request->validate([
             'report_date' => 'nullable|string',
             'sample_collection_date' => 'nullable|string',
+            'finalization_date' => 'nullable|string',
             'macroscopy_html' => 'nullable|string',
             'microscopy_html' => 'nullable|string',
             'diagnosis_html' => 'nullable|string',
@@ -629,7 +630,14 @@ class ReportEditorController extends Controller
         if ($request->has('sample_collection_date')) {
             $sampleCollectionDate = $request->input('sample_collection_date');
             if (! empty($sampleCollectionDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $sampleCollectionDate)) {
-                $updateData['sample_collection_date'] = $sampleCollectionDate;
+                $specimen->update(['sample_collection_date' => $sampleCollectionDate]);
+            }
+        }
+
+        if ($request->has('finalization_date')) {
+            $finalizationDate = $request->input('finalization_date');
+            if (! empty($finalizationDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $finalizationDate)) {
+                $updateData['finalization_date'] = $finalizationDate;
             }
         }
 
