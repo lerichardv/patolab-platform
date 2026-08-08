@@ -6793,6 +6793,86 @@ export default function ReportWorkspace({
 				});
 			}
 		}
+
+		// Also persist directly to database
+		const csrfToken =
+			(
+				document.querySelector(
+					'meta[name="csrf-token"]',
+				) as HTMLMetaElement
+			)?.content ?? '';
+
+		fetch(`/specimens/${specimen.sequence_code}/report-editor/save`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-CSRF-TOKEN': csrfToken,
+				Accept: 'application/json',
+			},
+			body: JSON.stringify({ report_date: sanitized }),
+		}).catch((err) => {
+			console.error('Failed to persist report_date:', err);
+		});
+	};
+
+	const handleUpdateSampleCollectionDate = (dateVal: string) => {
+		if (!dateVal) {
+			return;
+		}
+
+		const match = dateVal.match(/\d{4}-\d{2}-\d{2}/);
+		const sanitized = match ? match[0] : dateVal;
+
+		setSampleCollectionDate(sanitized);
+
+		const csrfToken =
+			(
+				document.querySelector(
+					'meta[name="csrf-token"]',
+				) as HTMLMetaElement
+			)?.content ?? '';
+
+		fetch(`/specimens/${specimen.sequence_code}/report-editor/save`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-CSRF-TOKEN': csrfToken,
+				Accept: 'application/json',
+			},
+			body: JSON.stringify({ sample_collection_date: sanitized }),
+		}).catch((err) => {
+			console.error('Failed to persist sample_collection_date:', err);
+		});
+	};
+
+	const handleUpdateFinalizationDate = (dateVal: string) => {
+		if (!dateVal) {
+			return;
+		}
+
+		const match = dateVal.match(/\d{4}-\d{2}-\d{2}/);
+		const sanitized = match ? match[0] : dateVal;
+
+		setFinalizationDate(sanitized);
+
+		const csrfToken =
+			(
+				document.querySelector(
+					'meta[name="csrf-token"]',
+				) as HTMLMetaElement
+			)?.content ?? '';
+
+		fetch(`/specimens/${specimen.sequence_code}/report-editor/save`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-CSRF-TOKEN': csrfToken,
+				Accept: 'application/json',
+			},
+			body: JSON.stringify({ finalization_date: sanitized }),
+		}).catch((err) => {
+			console.error('Failed to persist finalization_date:', err);
+		});
 	};
 
 	const handleStartMicroscopyFinalization = async () => {
@@ -7980,7 +8060,7 @@ export default function ReportWorkspace({
 															!hasMicroAccess)
 													}
 													onChange={
-														setSampleCollectionDate
+														handleUpdateSampleCollectionDate
 													}
 												/>
 											</div>
@@ -8002,7 +8082,7 @@ export default function ReportWorkspace({
 														(!hasMacroAccess &&
 															!hasMicroAccess)
 													}
-													onChange={setFinalizationDate}
+													onChange={handleUpdateFinalizationDate}
 												/>
 											</div>
 										</div>

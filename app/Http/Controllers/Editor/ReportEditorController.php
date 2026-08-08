@@ -760,6 +760,9 @@ class ReportEditorController extends Controller
             $reportData['microscopy_finalization_datetime'] = now();
         } elseif ($status === 'finalized') {
             $reportData['report_finalization_datetime'] = now();
+            if (empty($specimen->report->finalization_date)) {
+                $reportData['finalization_date'] = now()->format('Y-m-d');
+            }
         }
 
         DB::transaction(function () use ($specimen, $status, $reportData) {
