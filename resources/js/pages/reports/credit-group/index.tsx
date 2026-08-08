@@ -536,7 +536,7 @@ export default function CreditGroupReportIndex({
                                 Rango de Fechas
                             </span>
                             <DateRangePicker
-                                cookieKey={`date_filter_report_credit_group_user_${auth?.user?.id}`}
+                                cookieKey="date_filter_report_credit_group"
                                 value={{
                                     from: filters.date_from || '',
                                     to: filters.date_to || '',

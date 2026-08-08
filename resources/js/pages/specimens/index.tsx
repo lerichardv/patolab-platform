@@ -977,7 +977,9 @@ export default function SpecimensIndex({
     const handleLoadGroupAndOpenSheet = async (groupId: number) => {
         const toastId = toast.loading('Cargando detalles del grupo...');
         try {
-            const response = await axios.get(`/specimen-groups/${groupId}/details`);
+            const response = await axios.get(
+                `/specimen-groups/${groupId}/details`,
+            );
             setSelectedGroup(response.data);
             setIsGroupSheetOpen(true);
             toast.dismiss(toastId);
@@ -2262,7 +2264,9 @@ export default function SpecimensIndex({
                                                                                                                     ) => {
                                                                                                                         e.stopPropagation();
                                                                                                                         handleLoadGroupAndOpenSheet(
-                                                                                                                            specimen.group.id,
+                                                                                                                            specimen
+                                                                                                                                .group
+                                                                                                                                .id,
                                                                                                                         );
                                                                                                                     }}
                                                                                                                 >

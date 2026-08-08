@@ -6,6 +6,7 @@ import {
     Search,
     ChevronUp,
     ChevronDown,
+    ChevronRight,
     ChevronsUpDown,
     Check,
     Download,
@@ -83,7 +84,191 @@ interface CuttingReportItem {
     cassettes_range: string;
     cassette_color: string;
     special_stains: string;
+    is_new_cut?: boolean;
+    description?: string;
+    prefix?: {
+        id: number;
+        prefix: string;
+    } | null;
+    code?: {
+        id: number;
+        code: string;
+        color: string;
+    } | null;
+    cutting_slide_types?: number[] | null;
+    macroscopy_date?: string | null;
+    processing_date?: string | null;
+    delivery_date?: string | null;
 }
+
+const indexToLetter = (index: number): string => {
+    let letter = '';
+    let idx = index;
+
+    while (idx > 0) {
+        const temp = (idx - 1) % 26;
+        letter = String.fromCharCode(65 + temp) + letter;
+        idx = Math.floor((idx - temp - 1) / 26);
+    }
+
+    return letter;
+};
+
+const areTwoCodesConsecutive = (code1: string, code2: string): boolean => {
+    const len1 = code1.length;
+    const len2 = code2.length;
+
+    if (len1 !== len2 || len1 === 0) {
+        return false;
+    }
+
+    if (len1 > 1) {
+        const pref1 = code1.substring(0, len1 - 1);
+        const pref2 = code2.substring(0, len2 - 1);
+
+        if (pref1 !== pref2) {
+            return false;
+        }
+    }
+
+    const lastChar1 = code1.charCodeAt(len1 - 1);
+    const lastChar2 = code2.charCodeAt(len2 - 1);
+
+    return lastChar2 === lastChar1 + 1;
+};
+
+interface CuttingGroup {
+    key: string;
+    label: string;
+    description: string;
+    prefix: string;
+    totalCuts: number;
+    count: number;
+    items: CuttingReportItem[];
+    isNewCut: boolean;
+}
+
+const groupCuttings = (cuttingsList: CuttingReportItem[]): CuttingGroup[] => {
+    if (cuttingsList.length === 0) {
+        return [];
+    }
+
+    // Sort alphabetically (by length first, then natural comparison)
+    const sorted = [...cuttingsList].sort(
+        (a: CuttingReportItem, b: CuttingReportItem) => {
+            const codeA = a.code?.code || '';
+            const codeB = b.code?.code || '';
+            const lenA = codeA.length;
+            const lenB = codeB.length;
+
+            if (lenA !== lenB) {
+                return lenA - lenB;
+            }
+
+            return codeA.localeCompare(codeB, undefined, {
+                numeric: true,
+                sensitivity: 'base',
+            });
+        },
+    );
+
+    interface TempRun {
+        description: string;
+        prefix: string;
+        isNewCut: boolean;
+        items: CuttingReportItem[];
+    }
+
+    const tempRuns: TempRun[] = [];
+    sorted.forEach((cutting) => {
+        const desc = cutting.description || '';
+        const prefix = cutting.prefix?.prefix || '';
+        const isNew = !!cutting.is_new_cut;
+
+        if (
+            tempRuns.length > 0 &&
+            tempRuns[tempRuns.length - 1].description === desc &&
+            tempRuns[tempRuns.length - 1].prefix === prefix &&
+            tempRuns[tempRuns.length - 1].isNewCut === isNew
+        ) {
+            tempRuns[tempRuns.length - 1].items.push(cutting);
+        } else {
+            tempRuns.push({
+                description: desc,
+                prefix,
+                isNewCut: isNew,
+                items: [cutting],
+            });
+        }
+    });
+
+    const groups: CuttingGroup[] = [];
+
+    tempRuns.forEach((run) => {
+        const subGroups: CuttingReportItem[][] = [];
+        let currentSubGroup: CuttingReportItem[] = [];
+
+        run.items.forEach((item) => {
+            const globalIdx = sorted.indexOf(item);
+            const code = item.code?.code || indexToLetter(globalIdx + 1);
+
+            if (currentSubGroup.length === 0) {
+                currentSubGroup.push(item);
+            } else {
+                const prevItem = currentSubGroup[currentSubGroup.length - 1];
+                const prevGlobalIdx = sorted.indexOf(prevItem);
+                const prevCode =
+                    prevItem.code?.code || indexToLetter(prevGlobalIdx + 1);
+
+                if (areTwoCodesConsecutive(prevCode, code)) {
+                    currentSubGroup.push(item);
+                } else {
+                    subGroups.push(currentSubGroup);
+                    currentSubGroup = [item];
+                }
+            }
+        });
+
+        if (currentSubGroup.length > 0) {
+            subGroups.push(currentSubGroup);
+        }
+
+        subGroups.forEach((sub) => {
+            const subCount = sub.length;
+            let totalCuts = 0;
+            sub.forEach((item) => {
+                totalCuts += item.number_of_cuttings ?? 0;
+            });
+
+            const startCutting = sub[0];
+            const endCutting = sub[subCount - 1];
+            const startGlobalIdx = sorted.indexOf(startCutting);
+            const endGlobalIdx = sorted.indexOf(endCutting);
+
+            const startLetter =
+                startCutting.code?.code || indexToLetter(startGlobalIdx + 1);
+            const endLetter =
+                endCutting.code?.code || indexToLetter(endGlobalIdx + 1);
+
+            const label =
+                subCount === 1 ? startLetter : `${startLetter}-${endLetter}`;
+            const key = `${run.isNewCut ? 'new-' : 'reg-'}${run.description}-${run.prefix || ''}-${startLetter}-${endLetter}`;
+
+            groups.push({
+                key,
+                label,
+                description: run.description,
+                prefix: run.prefix,
+                totalCuts,
+                count: subCount,
+                items: sub,
+                isNewCut: run.isNewCut,
+            });
+        });
+    });
+
+    return groups;
+};
 
 interface Props {
     cuttings: {
@@ -215,6 +400,50 @@ export default function CuttingsReportIndex({
 
     const [isResponsibleFilterOpen, setIsResponsibleFilterOpen] =
         useState(false);
+
+    const [expandedGroups, setExpandedGroups] = useState<
+        Record<string, boolean>
+    >({});
+
+    const [expandedSpecimens, setExpandedSpecimens] = useState<
+        Record<number, boolean>
+    >({});
+
+    const groupedBySpecimen = useMemo(() => {
+        const groups: { specimen: any; cuttings: CuttingReportItem[] }[] = [];
+        cuttings.data.forEach((cutting) => {
+            const specId = cutting.specimen?.id || 0;
+            let group = groups.find((g) => g.specimen?.id === specId);
+            if (!group) {
+                group = { specimen: cutting.specimen, cuttings: [] };
+                groups.push(group);
+            }
+            group.cuttings.push(cutting);
+        });
+        return groups;
+    }, [cuttings.data]);
+
+    const formatStatusDate = (dateStr: string | null | undefined) => {
+        if (!dateStr)
+            return (
+                <span className="text-xs text-muted-foreground italic">-</span>
+            );
+        try {
+            return (
+                <span className="font-mono text-xs">
+                    {format(new Date(dateStr), 'dd/MM/yyyy HH:mm', {
+                        locale: es,
+                    })}
+                </span>
+            );
+        } catch (e) {
+            return (
+                <span className="font-mono text-xs text-muted-foreground">
+                    {dateStr}
+                </span>
+            );
+        }
+    };
 
     const containerRef = useRef<HTMLDivElement>(null);
     const [showLeftShadow, setShowLeftShadow] = useState(false);
@@ -354,7 +583,8 @@ export default function CuttingsReportIndex({
         }
     }, [search, filters.search, debouncedSearch]);
 
-    const getStatusBadge = (status: string) => {
+    const getStatusBadge = (status: string, count?: number) => {
+        const suffix = count && count > 1 ? ` x${count}` : '';
         switch (status) {
             case 'macroscopy':
                 return (
@@ -362,7 +592,7 @@ export default function CuttingsReportIndex({
                         variant="outline"
                         className="rounded-full border-blue-200 bg-blue-50 px-2.5 py-0.5 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-400"
                     >
-                        Macroscopía
+                        Macroscopía{suffix}
                     </Badge>
                 );
             case 'processing':
@@ -371,7 +601,7 @@ export default function CuttingsReportIndex({
                         variant="outline"
                         className="rounded-full border-amber-200 bg-amber-50 px-2.5 py-0.5 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400"
                     >
-                        Procesamiento
+                        Procesamiento{suffix}
                     </Badge>
                 );
             case 'delivered':
@@ -380,7 +610,7 @@ export default function CuttingsReportIndex({
                         variant="outline"
                         className="rounded-full border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400"
                     >
-                        Entregado
+                        Entregado{suffix}
                     </Badge>
                 );
             default:
@@ -390,6 +620,7 @@ export default function CuttingsReportIndex({
                         className="rounded-full px-2.5 py-0.5"
                     >
                         {status}
+                        {suffix}
                     </Badge>
                 );
         }
@@ -502,7 +733,7 @@ export default function CuttingsReportIndex({
                                 Rango de Fechas
                             </span>
                             <DateRangePicker
-                                cookieKey={`date_filter_report_cuttings_user_${auth?.user?.id}`}
+                                cookieKey="date_filter_report_cuttings"
                                 value={{
                                     from: filters.date_from || '',
                                     to: filters.date_to || '',
@@ -717,16 +948,20 @@ export default function CuttingsReportIndex({
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead
-                                    className={`pointer-events-none z-10 w-[200px] min-w-[200px] border-r border-border bg-card after:top-0 after:right-[-8px] after:bottom-0 after:hidden after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent after:transition-opacity after:duration-200 md:sticky md:left-0 md:after:absolute dark:after:from-black/[0.2] ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}
-                                >
+                                <TableHead className="min-w-[150px]">
                                     {renderSortHeader(
                                         'specimen_code',
-                                        'Muestra / Fecha',
+                                        'Código de Casete',
                                     )}
                                 </TableHead>
-                                <TableHead className="min-w-[200px] pl-5">
-                                    <span>Tipo de Muestra-Análisis</span>
+                                <TableHead className="min-w-[120px]">
+                                    {renderSortHeader('status', 'Estado')}
+                                </TableHead>
+                                <TableHead className="min-w-[120px]">
+                                    <span>Nuevo Corte</span>
+                                </TableHead>
+                                <TableHead className="min-w-[180px]">
+                                    <span>Descripción</span>
                                 </TableHead>
                                 <TableHead className="min-w-[100px] text-right">
                                     {renderSortHeader(
@@ -737,23 +972,14 @@ export default function CuttingsReportIndex({
                                 <TableHead className="min-w-[150px]">
                                     <span>Descripción Cortes</span>
                                 </TableHead>
-                                <TableHead className="min-w-[100px] text-right">
-                                    <span># Casetes</span>
-                                </TableHead>
-                                <TableHead className="min-w-[200px]">
-                                    <span>T. ESPECIALES (Señalar)</span>
-                                </TableHead>
-                                <TableHead className="min-w-[150px]">
-                                    <span>Código de Casete</span>
-                                </TableHead>
                                 <TableHead className="min-w-[120px] text-right">
                                     {renderSortHeader(
                                         'number_of_slides',
-                                        'Total Laminas',
+                                        '# Láminas',
                                     )}
                                 </TableHead>
-                                <TableHead className="min-w-[120px]">
-                                    {renderSortHeader('status', 'Estado')}
+                                <TableHead className="min-w-[200px]">
+                                    <span>T. ESPECIALES (Señalar)</span>
                                 </TableHead>
                                 <TableHead className="min-w-[200px]">
                                     <span>Comentarios</span>
@@ -764,13 +990,25 @@ export default function CuttingsReportIndex({
                                         'Responsables',
                                     )}
                                 </TableHead>
+                                <TableHead className="min-w-[160px] text-center">
+                                    {renderSortHeader('date', 'F. Macroscopía')}
+                                </TableHead>
+                                <TableHead className="min-w-[160px] text-center">
+                                    <span>F. Procesamiento</span>
+                                </TableHead>
+                                <TableHead className="min-w-[160px] text-center">
+                                    <span>F. Entrega</span>
+                                </TableHead>
+                                <TableHead className="min-w-[120px] text-right">
+                                    <span>Acciones</span>
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {cuttings.data.length === 0 ? (
+                            {groupedBySpecimen.length === 0 ? (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={11}
+                                        colSpan={14}
                                         className="h-32 text-center text-muted-foreground"
                                     >
                                         No se encontraron registros que
@@ -778,163 +1016,641 @@ export default function CuttingsReportIndex({
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                cuttings.data.map((cutting) => {
-                                    const specimenCode =
-                                        cutting.specimen?.sequence_code ||
-                                        'N/A';
-                                    const specimenTypeExam = cutting.specimen
-                                        ? `${cutting.specimen.type?.name || 'N/A'} - ${cutting.specimen.examination?.name || 'N/A'}`
-                                        : 'N/A';
+                                groupedBySpecimen.map(
+                                    ({
+                                        specimen,
+                                        cuttings: specimenCuttings,
+                                    }) => {
+                                        const groups =
+                                            groupCuttings(specimenCuttings);
+                                        const specimenCode =
+                                            specimen?.sequence_code || 'N/A';
+                                        const specimenTypeExam = specimen
+                                            ? `${specimen.type?.name || 'N/A'} - ${specimen.examination?.name || 'N/A'}`
+                                            : 'N/A';
+                                        const isSpecimenExpanded = specimen
+                                            ? expandedSpecimens[specimen.id] !==
+                                              false
+                                            : true;
 
-                                    return (
-                                        <TableRow
-                                            key={cutting.id}
-                                            className="group hover:bg-muted/50"
-                                        >
-                                            {/* Specimen Code and Date */}
-                                            <TableCell
-                                                className={`pointer-events-none z-10 w-[150px] min-w-[150px] border-r border-border bg-card transition-colors group-hover:bg-muted after:top-0 after:right-[-8px] after:bottom-0 after:hidden after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent after:transition-opacity after:duration-200 md:sticky md:left-0 md:after:absolute dark:after:from-black/[0.2] ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}
+                                        return (
+                                            <React.Fragment
+                                                key={
+                                                    specimen?.id ||
+                                                    Math.random()
+                                                }
                                             >
-                                                <div className="flex flex-col gap-0.5">
-                                                    {cutting.specimen ? (
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedSpecimenForView(
-                                                                    cutting.specimen,
-                                                                );
-                                                                setIsSpecimenViewSheetOpen(
-                                                                    true,
-                                                                );
-                                                            }}
-                                                            className="text-left font-mono text-sm font-semibold text-primary hover:underline"
-                                                        >
-                                                            {specimenCode}
-                                                        </button>
-                                                    ) : (
-                                                        <span className="font-mono text-sm text-muted-foreground">
-                                                            {specimenCode}
-                                                        </span>
-                                                    )}
-                                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                                        <span>
-                                                            {cutting.created_at
-                                                                ? format(
-                                                                      new Date(
-                                                                          cutting.created_at,
-                                                                      ),
-                                                                      'dd/MM/yyyy',
-                                                                      {
-                                                                          locale: es,
-                                                                      },
-                                                                  )
-                                                                : 'N/A'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-
-                                            {/* Specimen Type-Exam */}
-                                            <TableCell className="min-w-[200px] pl-5">
-                                                <span className="font-medium text-foreground">
-                                                    {specimenTypeExam}
-                                                </span>
-                                            </TableCell>
-
-                                            {/* Number of Cuttings */}
-                                            <TableCell className="min-w-[100px] text-right font-mono font-medium">
-                                                {cutting.number_of_cuttings}
-                                            </TableCell>
-
-                                            {/* Description Cuttings */}
-                                            <TableCell className="min-w-[150px]">
-                                                {cutting.cuttings_description || (
-                                                    <span className="text-xs text-muted-foreground italic">
-                                                        N/A
-                                                    </span>
-                                                )}
-                                            </TableCell>
-
-                                            {/* Number of Cassettes */}
-                                            <TableCell className="min-w-[100px] text-right font-mono font-semibold text-muted-foreground">
-                                                {cutting.number_of_cassettes}
-                                            </TableCell>
-
-                                            {/* Special slide stains */}
-                                            <TableCell className="min-w-[200px]">
-                                                {cutting.special_stains ? (
-                                                    <span className="font-medium text-indigo-600 dark:text-indigo-400">
-                                                        {cutting.special_stains}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground italic">
-                                                        Ninguna
-                                                    </span>
-                                                )}
-                                            </TableCell>
-
-                                            {/* Range of Cassettes */}
-                                            <TableCell className="min-w-[150px] font-mono">
-                                                <span
-                                                    className="inline-flex items-center justify-center rounded border border-slate-300/30 px-2.5 py-1 text-xs font-bold shadow-sm"
-                                                    style={{
-                                                        backgroundColor:
-                                                            cutting.cassette_color ||
-                                                            '#e2e8f0',
-                                                        color: getContrastColor(
-                                                            cutting.cassette_color ||
-                                                                '#e2e8f0',
-                                                        ),
+                                                {/* Specimen Header Row */}
+                                                <TableRow
+                                                    className="cursor-pointer border-t border-border bg-slate-100/80 select-none hover:bg-slate-100/90 dark:bg-slate-900/60 dark:hover:bg-slate-900/80"
+                                                    onClick={() => {
+                                                        if (specimen) {
+                                                            setExpandedSpecimens(
+                                                                (prev) => ({
+                                                                    ...prev,
+                                                                    [specimen.id]:
+                                                                        !isSpecimenExpanded,
+                                                                }),
+                                                            );
+                                                        }
                                                     }}
                                                 >
-                                                    {cutting.cassettes_range}
-                                                </span>
-                                            </TableCell>
+                                                    <TableCell
+                                                        colSpan={14}
+                                                        className="border-y border-border px-4 py-2.5 font-semibold text-foreground"
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            {specimen &&
+                                                                (isSpecimenExpanded ? (
+                                                                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                                ) : (
+                                                                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                                ))}
+                                                            <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                                                Muestra:
+                                                            </span>
+                                                            {specimen ? (
+                                                                <button
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedSpecimenForView(
+                                                                            specimen,
+                                                                        );
+                                                                        setIsSpecimenViewSheetOpen(
+                                                                            true,
+                                                                        );
+                                                                    }}
+                                                                    className="font-mono text-sm font-bold text-primary hover:underline"
+                                                                >
+                                                                    {
+                                                                        specimenCode
+                                                                    }
+                                                                </button>
+                                                            ) : (
+                                                                <span className="font-mono text-sm text-muted-foreground">
+                                                                    {
+                                                                        specimenCode
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                            <span className="text-muted-foreground">
+                                                                |
+                                                            </span>
+                                                            <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                                                Tipo/Examen:
+                                                            </span>
+                                                            <span className="text-sm font-medium">
+                                                                {
+                                                                    specimenTypeExam
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
 
-                                            {/* Total Slides */}
-                                            <TableCell className="min-w-[120px] text-right font-mono font-medium">
-                                                {cutting.number_of_slides ?? 0}
-                                            </TableCell>
+                                                {isSpecimenExpanded &&
+                                                    groups.map((group) => {
+                                                        const groupKey = `${specimen?.id || 0}-${group.key}`;
+                                                        const isExpanded =
+                                                            !!expandedGroups[
+                                                                groupKey
+                                                            ];
 
-                                            {/* Status Badge */}
-                                            <TableCell className="min-w-[120px]">
-                                                {getStatusBadge(cutting.status)}
-                                            </TableCell>
+                                                        const toggleExpand =
+                                                            () => {
+                                                                setExpandedGroups(
+                                                                    (prev) => ({
+                                                                        ...prev,
+                                                                        [groupKey]:
+                                                                            !prev[
+                                                                                groupKey
+                                                                            ],
+                                                                    }),
+                                                                );
+                                                            };
 
-                                            {/* Comments */}
-                                            <TableCell className="min-w-[200px] text-xs">
-                                                {cutting.comments || (
-                                                    <span className="text-muted-foreground italic">
-                                                        N/A
-                                                    </span>
-                                                )}
-                                            </TableCell>
+                                                        return (
+                                                            <React.Fragment
+                                                                key={group.key}
+                                                            >
+                                                                {/* Group Header Row */}
+                                                                <TableRow
+                                                                    className="cursor-pointer bg-slate-50/50 transition-colors hover:bg-slate-100/60 dark:bg-slate-900/20 dark:hover:bg-slate-800/40"
+                                                                    onClick={
+                                                                        toggleExpand
+                                                                    }
+                                                                >
+                                                                    {/* Cassette Code Range */}
+                                                                    <TableCell className="pl-4 align-middle font-bold text-slate-900 dark:text-slate-100">
+                                                                        <div className="flex items-center gap-1.5 text-xs">
+                                                                            {isExpanded ? (
+                                                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                            ) : (
+                                                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                            )}
+                                                                            <span>
+                                                                                {
+                                                                                    group.label
+                                                                                }
+                                                                            </span>
+                                                                        </div>
+                                                                    </TableCell>
 
-                                            {/* Responsible doctor name */}
-                                            <TableCell className="min-w-[180px]">
-                                                {cutting.responsible ? (
-                                                    <div className="flex flex-col">
-                                                        <span className="font-medium text-foreground">
-                                                            {
-                                                                cutting
-                                                                    .responsible
-                                                                    .name
-                                                            }
-                                                        </span>
-                                                        <span className="text-[10px] text-muted-foreground">
-                                                            {cutting.responsible
-                                                                .role?.name ||
-                                                                'Sin Rol'}
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground italic">
-                                                        N/A
-                                                    </span>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })
+                                                                    {/* Status badges */}
+                                                                    <TableCell className="align-middle">
+                                                                        <div className="flex flex-col gap-1">
+                                                                            {(() => {
+                                                                                const counts =
+                                                                                    group.items.reduce(
+                                                                                        (
+                                                                                            acc,
+                                                                                            item,
+                                                                                        ) => {
+                                                                                            acc[
+                                                                                                item.status
+                                                                                            ] =
+                                                                                                (acc[
+                                                                                                    item
+                                                                                                        .status
+                                                                                                ] ||
+                                                                                                    0) +
+                                                                                                1;
+                                                                                            return acc;
+                                                                                        },
+                                                                                        {} as Record<
+                                                                                            string,
+                                                                                            number
+                                                                                        >,
+                                                                                    );
+
+                                                                                return (
+                                                                                    Object.keys(
+                                                                                        counts,
+                                                                                    ) as Array<string>
+                                                                                ).map(
+                                                                                    (
+                                                                                        status,
+                                                                                    ) => {
+                                                                                        const count =
+                                                                                            counts[
+                                                                                                status
+                                                                                            ];
+                                                                                        const suffix =
+                                                                                            count >
+                                                                                            1
+                                                                                                ? ` x${count}`
+                                                                                                : '';
+                                                                                        return (
+                                                                                            <span
+                                                                                                key={
+                                                                                                    status
+                                                                                                }
+                                                                                                className="inline-block"
+                                                                                            >
+                                                                                                {getStatusBadge(
+                                                                                                    status,
+                                                                                                    count,
+                                                                                                )}
+                                                                                            </span>
+                                                                                        );
+                                                                                    },
+                                                                                );
+                                                                            })()}
+                                                                        </div>
+                                                                    </TableCell>
+
+                                                                    {/* Is New Cut */}
+                                                                    <TableCell className="align-middle">
+                                                                        {group.isNewCut ? (
+                                                                            <Badge
+                                                                                variant="outline"
+                                                                                className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-400"
+                                                                            >
+                                                                                Sí
+                                                                                (Nuevo)
+                                                                            </Badge>
+                                                                        ) : (
+                                                                            <Badge
+                                                                                variant="outline"
+                                                                                className="border-red-200 bg-red-50 text-red-700 dark:border-red-950 dark:bg-red-950/20 dark:text-red-400"
+                                                                            >
+                                                                                No
+                                                                            </Badge>
+                                                                        )}
+                                                                    </TableCell>
+
+                                                                    {/* Description */}
+                                                                    <TableCell className="align-middle font-semibold text-slate-800 dark:text-slate-200">
+                                                                        {group.description ||
+                                                                            '-'}
+                                                                    </TableCell>
+
+                                                                    {/* Total Cuts */}
+                                                                    <TableCell className="text-right align-middle font-bold text-slate-700 dark:text-slate-300">
+                                                                        {group.prefix
+                                                                            ? `${group.prefix} `
+                                                                            : ''}
+                                                                        {group.totalCuts >
+                                                                            0 && (
+                                                                            <span className="ml-1 rounded-sm border border-gray-200 bg-gray-100 px-1 text-gray-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400">
+                                                                                {
+                                                                                    group.totalCuts
+                                                                                }
+                                                                            </span>
+                                                                        )}
+                                                                    </TableCell>
+
+                                                                    {/* Cuts Description */}
+                                                                    <TableCell className="align-middle text-xs text-muted-foreground">
+                                                                        {Array.from(
+                                                                            new Set(
+                                                                                group.items
+                                                                                    .map(
+                                                                                        (
+                                                                                            item,
+                                                                                        ) =>
+                                                                                            item.cuttings_description,
+                                                                                    )
+                                                                                    .filter(
+                                                                                        Boolean,
+                                                                                    ),
+                                                                            ),
+                                                                        ).join(
+                                                                            ', ',
+                                                                        ) ||
+                                                                            '-'}
+                                                                    </TableCell>
+
+                                                                    {/* Total Slides */}
+                                                                    <TableCell className="text-right align-middle font-bold text-slate-700 dark:text-slate-300">
+                                                                        {group.items.reduce(
+                                                                            (
+                                                                                sum,
+                                                                                item,
+                                                                            ) =>
+                                                                                sum +
+                                                                                (item.number_of_slides ??
+                                                                                    0),
+                                                                            0,
+                                                                        )}
+                                                                    </TableCell>
+
+                                                                    {/* Special Stains */}
+                                                                    <TableCell className="align-middle">
+                                                                        {(() => {
+                                                                            const stains =
+                                                                                Array.from(
+                                                                                    new Set(
+                                                                                        group.items
+                                                                                            .map(
+                                                                                                (
+                                                                                                    item,
+                                                                                                ) =>
+                                                                                                    item.special_stains,
+                                                                                            )
+                                                                                            .filter(
+                                                                                                Boolean,
+                                                                                            )
+                                                                                            .flatMap(
+                                                                                                (
+                                                                                                    s,
+                                                                                                ) =>
+                                                                                                    s.split(
+                                                                                                        ', ',
+                                                                                                    ),
+                                                                                            ),
+                                                                                    ),
+                                                                                );
+                                                                            if (
+                                                                                stains.length >
+                                                                                0
+                                                                            ) {
+                                                                                return (
+                                                                                    <div className="flex flex-wrap gap-1">
+                                                                                        {stains.map(
+                                                                                            (
+                                                                                                stain,
+                                                                                                idx,
+                                                                                            ) => (
+                                                                                                <Badge
+                                                                                                    key={
+                                                                                                        idx
+                                                                                                    }
+                                                                                                    variant="outline"
+                                                                                                    className="border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-400"
+                                                                                                >
+                                                                                                    {
+                                                                                                        stain
+                                                                                                    }
+                                                                                                </Badge>
+                                                                                            ),
+                                                                                        )}
+                                                                                    </div>
+                                                                                );
+                                                                            }
+                                                                            return (
+                                                                                <span className="text-xs text-muted-foreground italic">
+                                                                                    Ninguna
+                                                                                </span>
+                                                                            );
+                                                                        })()}
+                                                                    </TableCell>
+
+                                                                    {/* Comments */}
+                                                                    <TableCell
+                                                                        className="max-w-[200px] truncate align-middle text-xs text-muted-foreground"
+                                                                        title={group.items
+                                                                            .map(
+                                                                                (
+                                                                                    i,
+                                                                                ) =>
+                                                                                    i.comments,
+                                                                            )
+                                                                            .filter(
+                                                                                Boolean,
+                                                                            )
+                                                                            .join(
+                                                                                ' | ',
+                                                                            )}
+                                                                    >
+                                                                        {Array.from(
+                                                                            new Set(
+                                                                                group.items
+                                                                                    .map(
+                                                                                        (
+                                                                                            i,
+                                                                                        ) =>
+                                                                                            i.comments,
+                                                                                    )
+                                                                                    .filter(
+                                                                                        Boolean,
+                                                                                    ),
+                                                                            ),
+                                                                        ).join(
+                                                                            ' | ',
+                                                                        ) ||
+                                                                            '-'}
+                                                                    </TableCell>
+
+                                                                    {/* Responsibles */}
+                                                                    <TableCell className="align-middle text-xs text-slate-700 dark:text-slate-300">
+                                                                        {(() => {
+                                                                            const names =
+                                                                                Array.from(
+                                                                                    new Set(
+                                                                                        group.items
+                                                                                            .map(
+                                                                                                (
+                                                                                                    i,
+                                                                                                ) =>
+                                                                                                    i
+                                                                                                        .responsible
+                                                                                                        ?.name,
+                                                                                            )
+                                                                                            .filter(
+                                                                                                Boolean,
+                                                                                            ),
+                                                                                    ),
+                                                                                );
+                                                                            if (
+                                                                                names.length ===
+                                                                                1
+                                                                            )
+                                                                                return names[0];
+                                                                            if (
+                                                                                names.length >
+                                                                                1
+                                                                            )
+                                                                                return 'Varios';
+                                                                            return 'No asignado';
+                                                                        })()}
+                                                                    </TableCell>
+
+                                                                    {/* Status change dates for Group (empty/dash since it aggregates multiple cuttings) */}
+                                                                    <TableCell className="text-center align-middle text-xs text-muted-foreground">
+                                                                        -
+                                                                    </TableCell>
+                                                                    <TableCell className="text-center align-middle text-xs text-muted-foreground">
+                                                                        -
+                                                                    </TableCell>
+                                                                    <TableCell className="text-center align-middle text-xs text-muted-foreground">
+                                                                        -
+                                                                    </TableCell>
+
+                                                                    {/* Toggle collapse action */}
+                                                                    <TableCell className="text-right align-middle">
+                                                                        <Button
+                                                                            variant="link"
+                                                                            size="sm"
+                                                                            className="h-7 text-xs font-semibold text-primary"
+                                                                        >
+                                                                            {isExpanded
+                                                                                ? 'Colapsar ▲'
+                                                                                : 'Expandir ▼'}
+                                                                        </Button>
+                                                                    </TableCell>
+                                                                </TableRow>
+
+                                                                {/* Individual Items */}
+                                                                {isExpanded &&
+                                                                    group.items.map(
+                                                                        (c) => (
+                                                                            <TableRow
+                                                                                key={
+                                                                                    c.id
+                                                                                }
+                                                                                className="group border-l-4 border-l-primary/30 bg-slate-50/20 transition-colors hover:bg-slate-50/50 dark:bg-slate-900/10 dark:hover:bg-slate-900/20"
+                                                                            >
+                                                                                {/* Cassette Code */}
+                                                                                <TableCell className="pl-6 align-middle">
+                                                                                    <div className="flex items-center gap-1.5">
+                                                                                        <span className="text-xs text-muted-foreground/60">
+                                                                                            ↳
+                                                                                        </span>
+                                                                                        <span
+                                                                                            className="inline-flex items-center justify-center rounded border border-slate-300/30 px-2.5 py-1 text-xs font-bold shadow-sm"
+                                                                                            style={{
+                                                                                                backgroundColor:
+                                                                                                    c.cassette_color ||
+                                                                                                    '#e2e8f0',
+                                                                                                color: getContrastColor(
+                                                                                                    c.cassette_color ||
+                                                                                                        '#e2e8f0',
+                                                                                                ),
+                                                                                            }}
+                                                                                        >
+                                                                                            {c
+                                                                                                .code
+                                                                                                ?.code ||
+                                                                                                '-'}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </TableCell>
+
+                                                                                {/* Status */}
+                                                                                <TableCell className="align-middle">
+                                                                                    {getStatusBadge(
+                                                                                        c.status,
+                                                                                    )}
+                                                                                </TableCell>
+
+                                                                                {/* New Cut */}
+                                                                                <TableCell className="align-middle">
+                                                                                    {c.is_new_cut ? (
+                                                                                        <Badge
+                                                                                            variant="outline"
+                                                                                            className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-400"
+                                                                                        >
+                                                                                            Sí
+                                                                                        </Badge>
+                                                                                    ) : (
+                                                                                        <Badge
+                                                                                            variant="outline"
+                                                                                            className="border-red-200 bg-red-50 text-red-700 dark:border-red-950 dark:bg-red-950/20 dark:text-red-400"
+                                                                                        >
+                                                                                            No
+                                                                                        </Badge>
+                                                                                    )}
+                                                                                </TableCell>
+
+                                                                                {/* Description */}
+                                                                                <TableCell className="align-middle font-medium text-slate-700 dark:text-slate-300">
+                                                                                    {c.description ||
+                                                                                        '-'}
+                                                                                </TableCell>
+
+                                                                                {/* Number of Cuttings */}
+                                                                                <TableCell className="text-right align-middle font-mono">
+                                                                                    {c
+                                                                                        .prefix
+                                                                                        ?.prefix
+                                                                                        ? `${c.prefix.prefix} `
+                                                                                        : ''}
+                                                                                    {c.number_of_cuttings >
+                                                                                        0 && (
+                                                                                        <span className="ml-1 rounded-sm border border-gray-200 bg-gray-100 px-1 font-bold text-gray-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400">
+                                                                                            {
+                                                                                                c.number_of_cuttings
+                                                                                            }
+                                                                                        </span>
+                                                                                    )}
+                                                                                </TableCell>
+
+                                                                                {/* Cuttings Description */}
+                                                                                <TableCell className="align-middle text-slate-600 dark:text-slate-400">
+                                                                                    {c.cuttings_description || (
+                                                                                        <span className="text-xs text-muted-foreground italic">
+                                                                                            N/A
+                                                                                        </span>
+                                                                                    )}
+                                                                                </TableCell>
+
+                                                                                {/* Number of Slides */}
+                                                                                <TableCell className="text-right align-middle font-mono font-medium">
+                                                                                    {c.number_of_slides ??
+                                                                                        0}
+                                                                                </TableCell>
+
+                                                                                {/* Special Stains */}
+                                                                                <TableCell className="align-middle">
+                                                                                    {c.special_stains ? (
+                                                                                        <div className="flex flex-wrap gap-1">
+                                                                                            {c.special_stains
+                                                                                                .split(
+                                                                                                    ', ',
+                                                                                                )
+                                                                                                .map(
+                                                                                                    (
+                                                                                                        stain,
+                                                                                                        idx,
+                                                                                                    ) => (
+                                                                                                        <Badge
+                                                                                                            key={
+                                                                                                                idx
+                                                                                                            }
+                                                                                                            variant="outline"
+                                                                                                            className="border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/30 dark:text-indigo-400"
+                                                                                                        >
+                                                                                                            {
+                                                                                                                stain
+                                                                                                            }
+                                                                                                        </Badge>
+                                                                                                    ),
+                                                                                                )}
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <span className="text-xs text-muted-foreground italic">
+                                                                                            Ninguna
+                                                                                        </span>
+                                                                                    )}
+                                                                                </TableCell>
+
+                                                                                {/* Comments */}
+                                                                                <TableCell className="max-w-[200px] truncate align-middle text-xs">
+                                                                                    {c.comments || (
+                                                                                        <span className="text-muted-foreground italic">
+                                                                                            N/A
+                                                                                        </span>
+                                                                                    )}
+                                                                                </TableCell>
+
+                                                                                {/* Responsible */}
+                                                                                <TableCell className="align-middle text-xs">
+                                                                                    {c.responsible ? (
+                                                                                        <div className="flex flex-col">
+                                                                                            <span className="font-medium text-foreground">
+                                                                                                {
+                                                                                                    c
+                                                                                                        .responsible
+                                                                                                        .name
+                                                                                                }
+                                                                                            </span>
+                                                                                            <span className="text-[10px] text-muted-foreground">
+                                                                                                {c
+                                                                                                    .responsible
+                                                                                                    .role
+                                                                                                    ?.name ||
+                                                                                                    'Sin Rol'}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <span className="text-xs text-muted-foreground italic">
+                                                                                            N/A
+                                                                                        </span>
+                                                                                    )}
+                                                                                </TableCell>
+
+                                                                                {/* Status change dates */}
+                                                                                <TableCell className="text-center align-middle">
+                                                                                    {formatStatusDate(
+                                                                                        c.macroscopy_date,
+                                                                                    )}
+                                                                                </TableCell>
+                                                                                <TableCell className="text-center align-middle">
+                                                                                    {formatStatusDate(
+                                                                                        c.processing_date,
+                                                                                    )}
+                                                                                </TableCell>
+                                                                                <TableCell className="text-center align-middle">
+                                                                                    {formatStatusDate(
+                                                                                        c.delivery_date,
+                                                                                    )}
+                                                                                </TableCell>
+
+                                                                                {/* Acciones */}
+                                                                                <TableCell className="text-right align-middle" />
+                                                                            </TableRow>
+                                                                        ),
+                                                                    )}
+                                                            </React.Fragment>
+                                                        );
+                                                    })}
+                                            </React.Fragment>
+                                        );
+                                    },
+                                )
                             )}
                         </TableBody>
                     </Table>

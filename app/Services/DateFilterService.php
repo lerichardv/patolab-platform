@@ -22,11 +22,15 @@ class DateFilterService
         if ($reqFrom !== null || $reqTo !== null) {
             $from = $reqFrom ?? '';
             $to = $reqTo ?? '';
-            $range = self::determineRange($from, $to, $today);
+
+            $resolvedTo = ($to === 'today') ? $today->toDateString() : $to;
+            $resolvedFrom = ($from === 'today') ? $today->toDateString() : $from;
+
+            $range = self::determineRange($resolvedFrom, $resolvedTo, $today);
 
             return [
-                'from' => $from,
-                'to' => $to,
+                'from' => $resolvedFrom,
+                'to' => $resolvedTo,
                 'range' => $range,
             ];
         }
@@ -36,12 +40,21 @@ class DateFilterService
             $decoded = json_decode($cookieValue, true);
             if (is_array($decoded)) {
                 $range = $decoded['range'] ?? null;
+                $decodedFrom = $decoded['from'] ?? '';
+                $decodedTo = $decoded['to'] ?? '';
 
                 // If legacy cookie without 'range' key, determine it from 'from' and 'to'
                 if ($range === null) {
-                    $from = $decoded['from'] ?? '';
-                    $to = $decoded['to'] ?? '';
-                    $range = self::determineRange($from, $to, $today);
+                    $resolvedTo = ($decodedTo === 'today') ? $today->toDateString() : $decodedTo;
+                    $resolvedFrom = ($decodedFrom === 'today') ? $today->toDateString() : $decodedFrom;
+                    $range = self::determineRange($resolvedFrom, $resolvedTo, $today);
+                }
+
+                if ($decodedTo === 'today') {
+                    $decodedTo = $today->toDateString();
+                }
+                if ($decodedFrom === 'today') {
+                    $decodedFrom = $today->toDateString();
                 }
 
                 switch ($range) {
@@ -84,9 +97,9 @@ class DateFilterService
                     case 'custom':
                     default:
                         return [
-                            'from' => $decoded['from'] ?? '',
-                            'to' => $decoded['to'] ?? '',
-                            'range' => 'custom',
+                            'from' => $decodedFrom,
+                            'to' => $decodedTo,
+                            'range' => $range ?? 'custom',
                         ];
                 }
             }
@@ -138,16 +151,23 @@ class DateFilterService
     public static function getCookieToQueue(string $cookieName, string $from, string $to, ?string $range = null)
     {
         $today = Carbon::today();
+        $todayStr = $today->toDateString();
+
+        $resolvedTo = ($to === 'today') ? $todayStr : $to;
+        $resolvedFrom = ($from === 'today') ? $todayStr : $from;
+
         if ($range === null) {
-            $range = self::determineRange($from, $to, $today);
+            $range = self::determineRange($resolvedFrom, $resolvedTo, $today);
         }
+
+        $cookieTo = ($resolvedTo === $todayStr) ? 'today' : $to;
 
         return cookie(
             $cookieName,
             json_encode([
                 'range' => $range,
                 'from' => $from,
-                'to' => $to,
+                'to' => $cookieTo,
             ]),
             525600, // 1 year
             null,

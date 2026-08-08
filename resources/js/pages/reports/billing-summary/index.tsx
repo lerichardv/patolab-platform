@@ -379,7 +379,7 @@ export default function BillingSummaryReportIndex({
                                 Rango de Fechas
                             </span>
                             <DateRangePicker
-                                cookieKey={`date_filter_report_billing_summary_user_${auth?.user?.id}`}
+                                cookieKey="date_filter_report_billing_summary"
                                 value={{
                                     from: filters.date_from || '',
                                     to: filters.date_to || '',

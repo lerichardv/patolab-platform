@@ -296,7 +296,7 @@ export default function DeliveryReportIndex({
                                 Fecha Estimada de Entrega
                             </span>
                             <DateRangePicker
-                                cookieKey={`date_filter_report_delivery_user_${auth?.user?.id}`}
+                                cookieKey="date_filter_report_delivery"
                                 value={{
                                     from: filters.date_from || '',
                                     to: filters.date_to || '',

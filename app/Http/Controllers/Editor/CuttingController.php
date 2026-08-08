@@ -42,6 +42,7 @@ class CuttingController extends Controller
             ]);
 
             foreach ($codeIds as $codeId) {
+                $status = $validated['status'] ?? 'macroscopy';
                 Cutting::create([
                     'specimen_id' => $specimen->id,
                     'code_id' => $codeId,
@@ -52,9 +53,12 @@ class CuttingController extends Controller
                     'cutting_slide_types' => $validated['cutting_slide_types'],
                     'comments' => $validated['comments'] ?? null,
                     'responsible_id' => $validated['responsible_id'],
-                    'status' => $validated['status'] ?? 'macroscopy',
+                    'status' => $status,
                     'is_new_cut' => $validated['is_new_cut'] ?? false,
                     'prefix_id' => $validated['prefix_id'] ?? null,
+                    'macroscopy_date' => now(),
+                    'processing_date' => $status === 'processing' ? now() : null,
+                    'delivery_date' => $status === 'delivered' ? now() : null,
                 ]);
             }
 
@@ -84,8 +88,15 @@ class CuttingController extends Controller
 
         $validated['specimen_id'] = $specimen->id;
         $validated['cuttings_description'] = $validated['cuttings_description'] ?? '';
-        $validated['status'] = $validated['status'] ?? 'macroscopy';
+        $validated['status'] = $status = $validated['status'] ?? 'macroscopy';
         $validated['is_new_cut'] = $validated['is_new_cut'] ?? false;
+
+        $validated['macroscopy_date'] = now();
+        if ($status === 'processing') {
+            $validated['processing_date'] = now();
+        } elseif ($status === 'delivered') {
+            $validated['delivery_date'] = now();
+        }
 
         Cutting::create($validated);
 
@@ -119,6 +130,17 @@ class CuttingController extends Controller
         ]);
 
         $validated['cuttings_description'] = $validated['cuttings_description'] ?? '';
+
+        if (isset($validated['status']) && $validated['status'] !== $cutting->status) {
+            if ($validated['status'] === 'macroscopy') {
+                $validated['macroscopy_date'] = now();
+            } elseif ($validated['status'] === 'processing') {
+                $validated['processing_date'] = now();
+            } elseif ($validated['status'] === 'delivered') {
+                $validated['delivery_date'] = now();
+            }
+        }
+
         $cutting->update($validated);
 
         return redirect()->back()->with('success', 'Corte actualizado correctamente.');
@@ -133,9 +155,21 @@ class CuttingController extends Controller
             'status' => 'required|string|in:processing,macroscopy,delivered',
         ]);
 
-        $cutting->update([
+        $updateData = [
             'status' => $validated['status'],
-        ]);
+        ];
+
+        if ($validated['status'] !== $cutting->status) {
+            if ($validated['status'] === 'macroscopy') {
+                $updateData['macroscopy_date'] = now();
+            } elseif ($validated['status'] === 'processing') {
+                $updateData['processing_date'] = now();
+            } elseif ($validated['status'] === 'delivered') {
+                $updateData['delivery_date'] = now();
+            }
+        }
+
+        $cutting->update($updateData);
 
         return redirect()->back()->with('success', 'Estado del corte actualizado.');
     }
@@ -182,6 +216,13 @@ class CuttingController extends Controller
 
         if ($request->has('status')) {
             $updateData['status'] = $validated['status'];
+            if ($validated['status'] === 'macroscopy') {
+                $updateData['macroscopy_date'] = now();
+            } elseif ($validated['status'] === 'processing') {
+                $updateData['processing_date'] = now();
+            } elseif ($validated['status'] === 'delivered') {
+                $updateData['delivery_date'] = now();
+            }
         }
 
         if ($request->has('responsible_id')) {

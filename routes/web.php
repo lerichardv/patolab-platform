@@ -218,6 +218,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'id' => $row['invoice_id'],
                     'amount' => $row['amount'],
                     'total' => $row['total'],
+                    'total_paid' => $row['net_amount'],
                     'payment_type' => $row['payment_type'],
                 ]));
                 $todaySpecimens[] = $specimen;

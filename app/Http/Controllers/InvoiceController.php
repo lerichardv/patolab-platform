@@ -26,7 +26,6 @@ use App\Models\WorkOrderTask;
 use App\Models\WorkOrderType;
 use App\Services\DateFilterService;
 use App\Services\InvoicePdfService;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -136,7 +135,7 @@ class InvoiceController extends Controller
             $query->where(function ($q) use ($dateFrom, $dateTo) {
                 // Scenario A: Non-grouped invoices within date range
                 $q->where(function ($sub) use ($dateFrom, $dateTo) {
-                    $sub->where('is_group', false);
+                    $sub->where('invoices.is_group', false);
                     if (! empty($dateFrom)) {
                         $sub->whereDate('invoices.created_at', '>=', $dateFrom);
                     }
@@ -147,9 +146,9 @@ class InvoiceController extends Controller
 
                 // Scenario B: Grouped credit invoices with specimens added within date range
                 $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
-                    $sub->where('is_group', true)
+                    $sub->where('invoices.is_group', true)
                         ->where('payment_type', 'credit')
-                        ->whereHas('creditInvoiceSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                        ->whereHas('creditInvoiceSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
                             if (! empty($dateFrom)) {
                                 $subQ->whereDate('created_at', '>=', $dateFrom);
                             }
@@ -161,9 +160,9 @@ class InvoiceController extends Controller
 
                 // Scenario C: Grouped non-credit invoices with specimens added within date range
                 $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
-                    $sub->where('is_group', true)
+                    $sub->where('invoices.is_group', true)
                         ->where('payment_type', '!=', 'credit')
-                        ->whereHas('groupSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                        ->whereHas('groupSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
                             if (! empty($dateFrom)) {
                                 $subQ->whereDate('created_at', '>=', $dateFrom);
                             }
@@ -375,12 +374,58 @@ class InvoiceController extends Controller
             ));
         }
 
-        if (! empty($dateFromExport)) {
-            $query->whereDate('invoices.created_at', '>=', $dateFromExport);
-        }
-        if (! empty($dateToExport)) {
-            $dateToExportEnd = Carbon::parse($dateToExport)->addDays(1)->toDateString();
-            $query->whereDate('invoices.created_at', '<=', $dateToExportEnd);
+        if (! empty($dateFromExport) || ! empty($dateToExport)) {
+            $query->where(function ($q) use ($dateFromExport, $dateToExport) {
+                // Scenario A: Non-grouped invoices within date range
+                $q->where(function ($sub) use ($dateFromExport, $dateToExport) {
+                    $sub->where('invoices.is_group', false);
+                    if (! empty($dateFromExport)) {
+                        $sub->whereDate('invoices.created_at', '>=', $dateFromExport);
+                    }
+                    if (! empty($dateToExport)) {
+                        $sub->whereDate('invoices.created_at', '<=', $dateToExport);
+                    }
+                });
+
+                // Scenario B: Grouped credit invoices with specimens added within date range
+                $q->orWhere(function ($sub) use ($dateFromExport, $dateToExport) {
+                    $sub->where('invoices.is_group', true)
+                        ->where('payment_type', 'credit')
+                        ->whereHas('creditInvoiceSpecimens.specimen', function ($subQ) use ($dateFromExport, $dateToExport) {
+                            if (! empty($dateFromExport)) {
+                                $subQ->whereDate('created_at', '>=', $dateFromExport);
+                            }
+                            if (! empty($dateToExport)) {
+                                $subQ->whereDate('created_at', '<=', $dateToExport);
+                            }
+                        });
+                });
+
+                // Scenario C: Grouped non-credit invoices with specimens added within date range
+                $q->orWhere(function ($sub) use ($dateFromExport, $dateToExport) {
+                    $sub->where('invoices.is_group', true)
+                        ->where('payment_type', '!=', 'credit')
+                        ->whereHas('groupSpecimens.specimen', function ($subQ) use ($dateFromExport, $dateToExport) {
+                            if (! empty($dateFromExport)) {
+                                $subQ->whereDate('created_at', '>=', $dateFromExport);
+                            }
+                            if (! empty($dateToExport)) {
+                                $subQ->whereDate('created_at', '<=', $dateToExport);
+                            }
+                        });
+                });
+
+                // Scenario D: Credit payment and social security invoices within date range
+                $q->orWhere(function ($sub) use ($dateFromExport, $dateToExport) {
+                    $sub->whereIn('invoice_type', ['credit payment', 'social security']);
+                    if (! empty($dateFromExport)) {
+                        $sub->whereDate('invoices.created_at', '>=', $dateFromExport);
+                    }
+                    if (! empty($dateToExport)) {
+                        $sub->whereDate('invoices.created_at', '<=', $dateToExport);
+                    }
+                });
+            });
         }
 
         // Sorting

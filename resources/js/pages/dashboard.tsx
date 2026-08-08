@@ -63,6 +63,7 @@ interface TodaySpecimen {
         id: number;
         amount: string | number;
         total: string | number;
+        total_paid: string | number;
         payment_type: string;
     };
     created_at: string;
@@ -845,14 +846,14 @@ function TodaySpecimensList({
     specimens: TodaySpecimen[];
     showInvoices?: boolean;
 }) {
-    const totalAmount = specimens.reduce(
-        (sum, spec) =>
-            sum + parseFloat(String(spec.invoice_relation?.amount || 0)),
-        0,
-    );
     const totalInvoiced = specimens.reduce(
         (sum, spec) =>
             sum + parseFloat(String(spec.invoice_relation?.total || 0)),
+        0,
+    );
+    const totalPaid = specimens.reduce(
+        (sum, spec) =>
+            sum + parseFloat(String(spec.invoice_relation?.total_paid || 0)),
         0,
     );
 
@@ -906,44 +907,47 @@ function TodaySpecimensList({
                         creadas hoy.
                     </p>
                 </div>
-                {specimens.length > 0 && (
+                {specimens.length > 0 && showInvoices && (
                     <div className="flex flex-wrap gap-2 sm:gap-3">
-                        <div className="rounded-xl border bg-background/50 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
-                            <span className="text-muted-foreground">
-                                Cantidad:{' '}
+                        <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
+                            <span className="text-blue-600 dark:text-blue-400">
+                                Total Facturado:{' '}
                             </span>
-                            <span className="font-bold text-foreground">
-                                {specimens.length}
+                            <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                                L.{' '}
+                                {totalInvoiced.toLocaleString('es-HN', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                })}
                             </span>
                         </div>
-                        {showInvoices && (
-                            <>
-                                <div className="rounded-xl border bg-background/50 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
-                                    <span className="text-muted-foreground">
-                                        Monto Base:{' '}
-                                    </span>
-                                    <span className="font-mono font-bold text-foreground">
-                                        L.{' '}
-                                        {totalAmount.toLocaleString('es-HN', {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
-                                        })}
-                                    </span>
-                                </div>
-                                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
-                                    <span className="text-emerald-600 dark:text-emerald-400">
-                                        Total Facturado:{' '}
-                                    </span>
-                                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                        L.{' '}
-                                        {totalInvoiced.toLocaleString('es-HN', {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
-                                        })}
-                                    </span>
-                                </div>
-                            </>
-                        )}
+                        <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
+                            <span className="text-rose-600 dark:text-rose-400">
+                                Pendiente de Pago:{' '}
+                            </span>
+                            <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
+                                L.{' '}
+                                {(totalInvoiced - totalPaid).toLocaleString(
+                                    'es-HN',
+                                    {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    },
+                                )}
+                            </span>
+                        </div>
+                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-md">
+                            <span className="text-emerald-600 dark:text-emerald-400">
+                                Total Pagado:{' '}
+                            </span>
+                            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                L.{' '}
+                                {totalPaid.toLocaleString('es-HN', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                })}
+                            </span>
+                        </div>
                     </div>
                 )}
             </CardHeader>

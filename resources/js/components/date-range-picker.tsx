@@ -3,7 +3,7 @@ import { format, add, startOfWeek, endOfWeek } from 'date-fns';
 import { CalendarClock, ChevronDown } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import {
     Popover,
@@ -57,6 +57,8 @@ export function determineRange(from: string, to: string): string {
 
     const today = new Date();
     const todayStr = format(today, 'yyyy-MM-dd');
+    const resolvedTo = to === 'today' ? todayStr : to;
+    const resolvedFrom = from === 'today' ? todayStr : from;
 
     const startOfWeekVal = format(
         startOfWeek(today, { weekStartsOn: 1 }),
@@ -71,23 +73,23 @@ export function determineRange(from: string, to: string): string {
     const fourteenDaysAgo = format(add(today, { days: -14 }), 'yyyy-MM-dd');
     const thirtyDaysAgo = format(add(today, { days: -30 }), 'yyyy-MM-dd');
 
-    if (from === todayStr && to === todayStr) {
+    if (resolvedFrom === todayStr && resolvedTo === todayStr) {
         return 'today';
     }
 
-    if (from === startOfWeekVal && to === endOfWeekVal) {
+    if (resolvedFrom === startOfWeekVal && resolvedTo === endOfWeekVal) {
         return 'this_week';
     }
 
-    if (from === sevenDaysAgo && to === todayStr) {
+    if (resolvedFrom === sevenDaysAgo && resolvedTo === todayStr) {
         return '7_days';
     }
 
-    if (from === fourteenDaysAgo && to === todayStr) {
+    if (resolvedFrom === fourteenDaysAgo && resolvedTo === todayStr) {
         return '14_days';
     }
 
-    if (from === thirtyDaysAgo && to === todayStr) {
+    if (resolvedFrom === thirtyDaysAgo && resolvedTo === todayStr) {
         return '30_days';
     }
 
@@ -112,26 +114,68 @@ export function DateRangePicker({
     const { props } = usePage() as any;
     const userId = props.auth?.user?.id;
 
+    const [open, setOpen] = React.useState(false);
+    const [localFrom, setLocalFrom] = React.useState(value.from || '');
+    const [localTo, setLocalTo] = React.useState(value.to || '');
+
+    const handleOpenChange = (isOpen: boolean) => {
+        setOpen(isOpen);
+
+        if (isOpen) {
+            setLocalFrom(value.from || '');
+            setLocalTo(value.to || '');
+        }
+    };
+
     const handleRangeChange = (newRange: DateRange, rangeName?: string) => {
         if (cookieKey && userId) {
-            const fullCookieKey = `${cookieKey}_user_${userId}`;
+            const fullCookieKey = cookieKey.includes('_user_')
+                ? cookieKey
+                : `${cookieKey}_user_${userId}`;
             const resolvedRange =
                 rangeName || determineRange(newRange.from, newRange.to);
+            const todayStr = format(new Date(), 'yyyy-MM-dd');
+            const isToToday =
+                newRange.to === todayStr || newRange.to === 'today';
+            const cookieTo = isToToday ? 'today' : newRange.to;
+
             setCookie(
                 fullCookieKey,
                 JSON.stringify({
                     range: resolvedRange,
                     from: newRange.from,
-                    to: newRange.to,
+                    to: cookieTo,
                 }),
             );
         }
 
         onChange(newRange);
+        setOpen(false);
     };
 
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const isFromToday = value.from === todayStr;
+    const isToToday = value.to === todayStr || value.to === 'today';
+
+    let displayText = placeholder;
+
+    if (value.from && value.to) {
+        if (isFromToday && isToToday) {
+            displayText = 'Hoy';
+        } else {
+            const displayFrom = format(
+                new Date(value.from + 'T00:00:00'),
+                'dd/MM/yyyy',
+            );
+            const displayTo = isToToday
+                ? 'Hoy'
+                : format(new Date(value.to + 'T00:00:00'), 'dd/MM/yyyy');
+            displayText = `${displayFrom} - ${displayTo}`;
+        }
+    }
+
     return (
-        <Popover>
+        <Popover open={open} onOpenChange={handleOpenChange}>
             <PopoverTrigger asChild>
                 <Button
                     variant="outline"
@@ -139,11 +183,7 @@ export function DateRangePicker({
                 >
                     <span className="flex items-center gap-2 truncate">
                         <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate">
-                            {value.from && value.to
-                                ? `${format(new Date(value.from + 'T00:00:00'), 'dd/MM/yyyy')} - ${format(new Date(value.to + 'T00:00:00'), 'dd/MM/yyyy')}`
-                                : placeholder}
-                        </span>
+                        <span className="truncate">{displayText}</span>
                     </span>
                     <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -161,36 +201,43 @@ export function DateRangePicker({
                             <Label htmlFor="date-from" className="text-xs">
                                 Desde
                             </Label>
-                            <Input
-                                id="date-from"
-                                type="date"
-                                value={value.from || ''}
-                                onChange={(e) =>
-                                    handleRangeChange({
-                                        ...value,
-                                        from: e.target.value,
-                                    })
-                                }
+                            <DatePicker
+                                value={localFrom}
+                                onChange={(val) => setLocalFrom(val)}
                                 className="h-9 w-full text-sm"
+                                placeholder="Desde..."
+                                modal={false}
                             />
                         </div>
                         <div className="space-y-1">
                             <Label htmlFor="date-to" className="text-xs">
                                 Hasta
                             </Label>
-                            <Input
-                                id="date-to"
-                                type="date"
-                                value={value.to || ''}
-                                onChange={(e) =>
-                                    handleRangeChange({
-                                        ...value,
-                                        to: e.target.value,
-                                    })
-                                }
+                            <DatePicker
+                                value={localTo}
+                                onChange={(val) => setLocalTo(val)}
                                 className="h-9 w-full text-sm"
+                                placeholder="Hasta..."
+                                modal={false}
                             />
                         </div>
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="col-span-2 mt-1 h-9 w-full text-sm font-medium"
+                            disabled={
+                                localFrom === (value.from || '') &&
+                                localTo === (value.to || '')
+                            }
+                            onClick={() => {
+                                handleRangeChange({
+                                    from: localFrom,
+                                    to: localTo,
+                                });
+                            }}
+                        >
+                            Aplicar
+                        </Button>
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 border-t pt-2 text-xs">
                         <Button

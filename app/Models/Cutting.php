@@ -19,6 +19,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'comments',
     'responsible_id',
     'is_new_cut',
+    'macroscopy_date',
+    'processing_date',
+    'delivery_date',
 ])]
 class Cutting extends Model
 {
@@ -31,6 +34,9 @@ class Cutting extends Model
             // as the table cutting_slide_types was deleted.
             'cutting_slide_types' => 'array',
             'is_new_cut' => 'boolean',
+            'macroscopy_date' => 'datetime',
+            'processing_date' => 'datetime',
+            'delivery_date' => 'datetime',
         ];
     }
 

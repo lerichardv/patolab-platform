@@ -125,7 +125,50 @@ test('creates a cookie to queue with range key', function () {
     expect($value)->toEqual([
         'range' => '7_days',
         'from' => '2026-07-21',
-        'to' => '2026-07-28',
+        'to' => 'today',
     ]);
     expect($cookie->isHttpOnly())->toBeFalse();
+});
+
+test('resolves cookie with dynamic today end date', function () {
+    $result = DateFilterService::resolveFilter(
+        json_encode(['range' => 'custom', 'from' => '2026-07-20', 'to' => 'today']),
+        null,
+        null
+    );
+
+    expect($result)->toEqual([
+        'from' => '2026-07-20',
+        'to' => '2026-07-28', // Carbon test now date
+        'range' => 'custom',
+    ]);
+});
+
+test('resolves explicit today query parameters', function () {
+    $result = DateFilterService::resolveFilter(
+        null,
+        '2026-07-20',
+        'today'
+    );
+
+    expect($result)->toEqual([
+        'from' => '2026-07-20',
+        'to' => '2026-07-28',
+        'range' => 'custom',
+    ]);
+});
+
+test('creates a cookie to queue with fixed end date other than today', function () {
+    $cookie = DateFilterService::getCookieToQueue(
+        'my_test_cookie',
+        '2026-07-21',
+        '2026-07-27' // yesterday (not today)
+    );
+
+    $value = json_decode($cookie->getValue(), true);
+    expect($value)->toEqual([
+        'range' => 'custom',
+        'from' => '2026-07-21',
+        'to' => '2026-07-27', // remains a fixed date range
+    ]);
 });

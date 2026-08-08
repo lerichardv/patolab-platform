@@ -351,7 +351,7 @@ function getInvoiceDisplayValues(
 
     allGroupSpecimens.forEach((specimen: any) => {
         const breakdown = breakdownBySpecimenId[specimen.id];
-        const rawDate = breakdown?.created_at || specimen.created_at;
+        const rawDate = specimen.created_at;
         const dateStr = rawDate ? String(rawDate).substring(0, 10) : '';
 
         let inRange = true;
@@ -384,7 +384,7 @@ function getInvoiceDisplayValues(
 
     if (hasDateFilter && breakdownRecords.length > 0) {
         breakdownRecords.forEach((b: any) => {
-            const rawDate = b.created_at;
+            const rawDate = b.specimen?.created_at;
             const dateStr = rawDate ? String(rawDate).substring(0, 10) : '';
             let inRange = true;
 
@@ -456,6 +456,122 @@ function getInvoiceDisplayValues(
     };
 }
 
+const getSpecimenDateRangeText = (
+    invoice: any,
+    filters: { date_from?: string; date_to?: string },
+) => {
+    if (!invoice.is_group) return null;
+
+    const dateFrom = filters.date_from || '';
+    const dateTo = filters.date_to || '';
+
+    if (!dateFrom && !dateTo) return null;
+
+    const invoiceDateStr = invoice.created_at
+        ? String(invoice.created_at).substring(0, 10)
+        : '';
+    const isOutsideRange =
+        (dateFrom && invoiceDateStr < dateFrom) ||
+        (dateTo && invoiceDateStr > dateTo);
+
+    if (!isOutsideRange) return null;
+
+    const creditSpecs =
+        invoice.credit_invoice_specimens || invoice.creditInvoiceSpecimens;
+    const groupSpecs = invoice.group_specimens || invoice.groupSpecimens;
+
+    let specimens: { code: string; date: string; time: string }[] = [];
+
+    if (invoice.payment_type === 'credit' && creditSpecs) {
+        specimens = creditSpecs
+            .map((cis: any) => {
+                if (!cis.specimen) return null;
+                const specDateStr = cis.specimen.created_at
+                    ? String(cis.specimen.created_at).substring(0, 10)
+                    : '';
+                let inRange = true;
+                if (dateFrom && specDateStr < dateFrom) inRange = false;
+                if (dateTo && specDateStr > dateTo) inRange = false;
+                if (!inRange) return null;
+
+                const formattedDate = format(
+                    new Date(cis.specimen.created_at),
+                    'dd/MM/yyyy',
+                    { locale: es },
+                );
+                const formattedTime = format(
+                    new Date(cis.specimen.created_at),
+                    'h:mm a',
+                    { locale: es },
+                );
+                return {
+                    code: cis.specimen.sequence_code,
+                    date: formattedDate,
+                    time: formattedTime,
+                };
+            })
+            .filter(
+                (s: any): s is { code: string; date: string; time: string } =>
+                    s !== null,
+            );
+    } else if (groupSpecs) {
+        specimens = groupSpecs
+            .map((gs: any) => {
+                if (!gs.specimen) return null;
+                const specDateStr = gs.specimen.created_at
+                    ? String(gs.specimen.created_at).substring(0, 10)
+                    : '';
+                let inRange = true;
+                if (dateFrom && specDateStr < dateFrom) inRange = false;
+                if (dateTo && specDateStr > dateTo) inRange = false;
+                if (!inRange) return null;
+
+                const formattedDate = format(
+                    new Date(gs.specimen.created_at),
+                    'dd/MM/yyyy',
+                    { locale: es },
+                );
+                const formattedTime = format(
+                    new Date(gs.specimen.created_at),
+                    'h:mm a',
+                    { locale: es },
+                );
+                return {
+                    code: gs.specimen.sequence_code,
+                    date: formattedDate,
+                    time: formattedTime,
+                };
+            })
+            .filter(
+                (s: any): s is { code: string; date: string; time: string } =>
+                    s !== null,
+            );
+    }
+
+    if (specimens.length === 0) return null;
+
+    return (
+        <div className="mt-1 flex w-full flex-col gap-1">
+            {specimens.map((spec, index) => (
+                <div
+                    key={index}
+                    className="flex w-fit flex-col items-start justify-center gap-0.5"
+                >
+                    <span className="font-mono text-[9px] font-semibold text-blue-800 dark:text-blue-400">
+                        {spec.code}:
+                    </span>
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <span>{spec.date}</span>
+                        <span className="font-mono text-[9px] text-muted-foreground/80 before:mr-1 before:content-['•']">
+                            {spec.time}
+                        </span>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
 export default function InvoicesIndex({
     invoices,
     filters,
@@ -487,6 +603,29 @@ export default function InvoicesIndex({
     const canManageInvoices = auth.permissions?.includes('invoices.manage');
     const canCreateWorkOrders =
         auth.permissions?.includes('work_orders.create');
+
+    const pageTotals = useMemo(() => {
+        let gross = 0;
+        let isv = 0;
+        let discount = 0;
+        let paid = 0;
+
+        invoices.data.forEach((inv) => {
+            const displayValues = getInvoiceDisplayValues(inv, filters);
+            gross += displayValues.total;
+            isv += displayValues.isv_15;
+            discount += displayValues.discount;
+            paid += displayValues.total_paid;
+        });
+
+        return {
+            gross,
+            isv,
+            discount,
+            pending: gross - paid,
+            paid,
+        };
+    }, [invoices.data, filters]);
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
@@ -977,7 +1116,7 @@ export default function InvoicesIndex({
     return (
         <>
             <Head title="Facturas de Muestras" />
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <div className="mb-20 flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header */}
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -1377,7 +1516,10 @@ export default function InvoicesIndex({
                                 <TableHead
                                     className={`pointer-events-none z-10 w-[150px] min-w-[150px] border-r border-border bg-card after:top-0 after:right-[-8px] after:bottom-0 after:hidden after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent after:transition-opacity after:duration-200 md:sticky md:left-0 md:after:absolute dark:after:from-black/[0.2] ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}
                                 >
-                                    {renderSortHeader('date', 'Número / Fecha')}
+                                    Nº Factura
+                                </TableHead>
+                                <TableHead className="min-w-[150px] pl-5">
+                                    {renderSortHeader('date', 'Fecha')}
                                 </TableHead>
                                 <TableHead className="min-w-[200px] pl-5">
                                     {renderSortHeader('customer', 'Cliente')}
@@ -1461,12 +1603,14 @@ export default function InvoicesIndex({
                                             <TableCell
                                                 className={`pointer-events-none z-10 w-[150px] min-w-[150px] border-r border-border bg-card transition-colors group-hover:bg-muted after:top-0 after:right-[-8px] after:bottom-0 after:hidden after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent after:transition-opacity after:duration-200 md:sticky md:left-0 md:after:absolute dark:after:from-black/[0.2] ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}
                                             >
+                                                <span className="font-mono text-sm font-semibold text-foreground">
+                                                    {
+                                                        invoice.full_invoice_number
+                                                    }
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="min-w-[150px] pl-5">
                                                 <div className="flex flex-col gap-0.5">
-                                                    <span className="font-mono text-sm font-semibold text-foreground">
-                                                        {
-                                                            invoice.full_invoice_number
-                                                        }
-                                                    </span>
                                                     <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                                                         <span>
                                                             {invoice.created_at
@@ -1495,6 +1639,10 @@ export default function InvoicesIndex({
                                                                 : 'N/A'}
                                                         </span>
                                                     </div>
+                                                    {getSpecimenDateRangeText(
+                                                        invoice,
+                                                        filters,
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="min-w-[200px] pl-5">
@@ -2448,6 +2596,59 @@ export default function InvoicesIndex({
                         </TableBody>
                     </Table>
                 </div>
+
+                {/* Overall totals summary */}
+                {invoices.data.length > 0 && (
+                    <div className="flex flex-col items-end gap-2 border-t pt-4 pr-10">
+                        <div className="grid grid-cols-2 gap-x-8 text-right text-sm">
+                            <span className="text-muted-foreground">
+                                Total Facturado:
+                            </span>
+                            <span className="font-semibold text-foreground">
+                                L.{' '}
+                                {pageTotals.gross.toLocaleString('es-HN', {
+                                    minimumFractionDigits: 2,
+                                })}
+                            </span>
+                            <span className="text-muted-foreground">
+                                Total ISV 15%:
+                            </span>
+                            <span className="font-semibold text-foreground">
+                                L.{' '}
+                                {pageTotals.isv.toLocaleString('es-HN', {
+                                    minimumFractionDigits: 2,
+                                })}
+                            </span>
+                            <span className="text-muted-foreground">
+                                Total Descuentos:
+                            </span>
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                L.{' '}
+                                {pageTotals.discount.toLocaleString('es-HN', {
+                                    minimumFractionDigits: 2,
+                                })}
+                            </span>
+                            <span className="text-muted-foreground">
+                                Pendiente de Pago:
+                            </span>
+                            <span className="font-semibold text-rose-600 dark:text-rose-400">
+                                L.{' '}
+                                {pageTotals.pending.toLocaleString('es-HN', {
+                                    minimumFractionDigits: 2,
+                                })}
+                            </span>
+                            <span className="border-t pt-1 font-bold text-primary">
+                                Total Pagado:
+                            </span>
+                            <span className="border-t pt-1 font-bold text-primary">
+                                L.{' '}
+                                {pageTotals.paid.toLocaleString('es-HN', {
+                                    minimumFractionDigits: 2,
+                                })}
+                            </span>
+                        </div>
+                    </div>
+                )}
 
                 {/* Pagination */}
                 <Pagination

@@ -106,6 +106,21 @@ class CuttingsReportController extends Controller
                 'cassettes_range' => $range ?: 'N/A',
                 'cassette_color' => $cutting->code?->color ?? '#e2e8f0',
                 'special_stains' => implode(', ', $specialStains),
+                'is_new_cut' => (bool) $cutting->is_new_cut,
+                'description' => $cutting->description,
+                'prefix' => $cutting->prefix ? [
+                    'id' => $cutting->prefix->id,
+                    'prefix' => $cutting->prefix->prefix,
+                ] : null,
+                'code' => $cutting->code ? [
+                    'id' => $cutting->code->id,
+                    'code' => $cutting->code->code,
+                    'color' => $cutting->code->color,
+                ] : null,
+                'cutting_slide_types' => $cutting->cutting_slide_types,
+                'macroscopy_date' => $cutting->macroscopy_date ? $cutting->macroscopy_date->toIso8601String() : null,
+                'processing_date' => $cutting->processing_date ? $cutting->processing_date->toIso8601String() : null,
+                'delivery_date' => $cutting->delivery_date ? $cutting->delivery_date->toIso8601String() : null,
             ];
         });
 
@@ -184,7 +199,19 @@ class CuttingsReportController extends Controller
                 break;
         }
 
-        $cuttings = $query->get();
+        $cuttings = $query->get()->sort(function ($a, $b) {
+            $specA = $a->specimen?->sequence_code ?? '';
+            $specB = $b->specimen?->sequence_code ?? '';
+            
+            $specComp = strnatcasecmp($specA, $specB);
+            if ($specComp !== 0) {
+                return $specComp;
+            }
+            
+            $codeA = $a->code?->code ?? '';
+            $codeB = $b->code?->code ?? '';
+            return strnatcasecmp($codeA, $codeB);
+        });
 
         // Resolve WorkOrderTypes names map for special stains mapping
         $workOrderTypes = WorkOrderType::withTrashed()->pluck('name', 'id')->toArray();
@@ -413,6 +440,7 @@ class CuttingsReportController extends Controller
             'specimen.type',
             'specimen.examination',
             'specimen.cuttings.code',
+            'prefix',
         ]);
 
         // Search spec code, comments, or doctor name
