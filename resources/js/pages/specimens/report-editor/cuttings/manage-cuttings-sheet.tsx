@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import { router, usePage } from '@inertiajs/react';
 import {
     Check,
@@ -80,6 +81,10 @@ interface Cutting {
     responsible_id: number;
     is_new_cut: boolean;
     prefix_id?: number | null;
+    macroscopy_date?: string | null;
+    processing_date?: string | null;
+    delivery_date?: string | null;
+    created_at?: string;
     code?: {
         id: number;
         code: string;
@@ -142,6 +147,15 @@ const indexToLetter = (index: number): string => {
     }
 
     return letter;
+};
+
+const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '-';
+    try {
+        return format(new Date(dateStr), 'dd/MM/yyyy h:mm a');
+    } catch (e) {
+        return dateStr;
+    }
 };
 
 const areTwoCodesConsecutive = (code1: string, code2: string): boolean => {
@@ -1100,6 +1114,18 @@ export default function ManageCuttingsSheet({
                                             <TableHead className="min-w-[150px] font-semibold text-slate-800 dark:text-slate-200">
                                                 Responsable
                                             </TableHead>
+                                            <TableHead className="w-[150px] min-w-[150px] font-semibold text-slate-800 dark:text-slate-200">
+                                                F. Macroscopía
+                                            </TableHead>
+                                            <TableHead className="w-[150px] min-w-[150px] font-semibold text-slate-800 dark:text-slate-200">
+                                                F. Proceso
+                                            </TableHead>
+                                            <TableHead className="w-[150px] min-w-[150px] font-semibold text-slate-800 dark:text-slate-200">
+                                                F. Entrega
+                                            </TableHead>
+                                            <TableHead className="w-[150px] min-w-[150px] font-semibold text-slate-800 dark:text-slate-200">
+                                                F. Creación
+                                            </TableHead>
                                             <TableHead className="z-10 w-[220px] min-w-[220px] bg-card text-right font-semibold text-slate-800 md:sticky md:right-0 dark:text-slate-200">
                                                 Acciones
                                             </TableHead>
@@ -1605,6 +1631,11 @@ export default function ManageCuttingsSheet({
                                                                 })()}
                                                             </TableCell>
 
+                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">-</TableCell>
+                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">-</TableCell>
+                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">-</TableCell>
+                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">-</TableCell>
+
                                                             {/* Toggle collapse action */}
                                                             <TableCell className="z-10 w-[220px] min-w-[220px] text-right align-middle">
                                                                 <Button
@@ -1863,6 +1894,20 @@ export default function ManageCuttingsSheet({
                                                                                 .responsible
                                                                                 ?.name ||
                                                                                 'No asignado'}
+                                                                        </TableCell>
+
+                                                                        {/* Dates */}
+                                                                        <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-600 dark:text-slate-400">
+                                                                            {formatDate(c.macroscopy_date)}
+                                                                        </TableCell>
+                                                                        <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-600 dark:text-slate-400">
+                                                                            {formatDate(c.processing_date)}
+                                                                        </TableCell>
+                                                                        <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-600 dark:text-slate-400">
+                                                                            {formatDate(c.delivery_date)}
+                                                                        </TableCell>
+                                                                        <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-600 dark:text-slate-400">
+                                                                            {formatDate(c.created_at)}
                                                                         </TableCell>
 
                                                                         {/* Actions */}

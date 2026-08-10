@@ -938,7 +938,7 @@ export default function CuttingsReportIndex({
                             <TableRow>
                                 <TableHead className="min-w-[200px]">
                                     <div className="flex flex-col gap-1 py-1">
-                                        <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">
+                                        <span className="text-[10px] font-bold tracking-wider text-muted-foreground/60 uppercase">
                                             Ordenar por
                                         </span>
                                         <div className="flex items-center gap-2">
@@ -946,7 +946,9 @@ export default function CuttingsReportIndex({
                                                 'specimen_code',
                                                 'Muestra',
                                             )}
-                                            <span className="text-muted-foreground/30">|</span>
+                                            <span className="text-muted-foreground/30">
+                                                |
+                                            </span>
                                             {renderSortHeader(
                                                 'cutting_code',
                                                 'Casete',
@@ -997,7 +999,10 @@ export default function CuttingsReportIndex({
                                     <span>F. Entrega</span>
                                 </TableHead>
                                 <TableHead className="min-w-[160px] text-center">
-                                    {renderSortHeader('created_at', 'F. Creación')}
+                                    {renderSortHeader(
+                                        'created_at',
+                                        'F. Creación',
+                                    )}
                                 </TableHead>
                                 <TableHead className="min-w-[200px]">
                                     <span>Comentarios</span>

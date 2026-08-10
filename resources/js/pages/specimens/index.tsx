@@ -33,6 +33,8 @@ import {
     Ban,
     AlertCircle,
     RotateCcw,
+    ArrowUp,
+    ArrowDown,
 } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -154,6 +156,20 @@ interface Props {
     };
 }
 
+const getDueDate = (specimen: Specimen): Date => {
+    const createdAt = new Date(specimen.created_at);
+
+    const unit = specimen.category?.intern_unit || specimen.category?.unit;
+    const quantity =
+        specimen.category?.intern_quantity || specimen.category?.quantity;
+
+    if (!unit || !quantity) {
+        return createdAt;
+    }
+
+    return addWithoutWeekends(createdAt, quantity, unit);
+};
+
 const getDueDateInfo = (specimen: Specimen) => {
     if (!specimen.category) {
         return null;
@@ -167,15 +183,7 @@ const getDueDateInfo = (specimen: Specimen) => {
         return null;
     }
 
-    const createdAt = new Date(specimen.created_at);
-    const unitMap: Record<string, string> = {
-        minutes: 'minutes',
-        hours: 'hours',
-        days: 'days',
-        weeks: 'weeks',
-    };
-
-    const dueDate = addWithoutWeekends(createdAt, quantity, unit);
+    const dueDate = getDueDate(specimen);
 
     const isCompleted = ['finalized', 'delivered', 'cancelled'].includes(
         specimen.status,
@@ -370,6 +378,9 @@ export default function SpecimensIndex({
     const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
+    const [showExpiredOnly, setShowExpiredOnly] = useState(false);
+    const [dueDateSortOrder, setDueDateSortOrder] = useState<'asc' | 'desc'>('desc');
+
     const [selectedSpecimenTypeId, setSelectedSpecimenTypeId] =
         useState<string>(() => filters.specimen_type_id || 'all');
     const [selectedExaminationId, setSelectedExaminationId] = useState<string>(
@@ -533,19 +544,31 @@ export default function SpecimensIndex({
                     selectedExaminationId === 'all' ||
                     examId?.toString() === selectedExaminationId;
 
+                const dueInfo = getDueDateInfo(specimen);
+                const isExpired = !!(dueInfo && dueInfo.isExpired && !['finalized', 'delivered', 'cancelled'].includes(specimen.status));
+                const matchesExpired = !showExpiredOnly || isExpired;
+
                 return (
                     matchesStatus &&
                     matchesDate &&
                     matchesGroup &&
                     matchesSearch &&
                     matchesSpecimenType &&
-                    matchesExamination
+                    matchesExamination &&
+                    matchesExpired
                 );
+            });
+
+            const sortedSpecimens = [...filteredSpecimens].sort((a, b) => {
+                const dateA = getDueDate(a).getTime();
+                const dateB = getDueDate(b).getTime();
+
+                return dueDateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
             });
 
             return {
                 ...priority,
-                specimens: filteredSpecimens,
+                specimens: sortedSpecimens,
             };
         });
     }, [
@@ -556,6 +579,8 @@ export default function SpecimensIndex({
         searchQuery,
         selectedSpecimenTypeId,
         selectedExaminationId,
+        showExpiredOnly,
+        dueDateSortOrder,
     ]);
 
     const visibleSpecimenIds = useMemo(() => {
@@ -1682,6 +1707,38 @@ export default function SpecimensIndex({
                             </Command>
                         </PopoverContent>
                     </Popover>
+
+                    {/* Switch Mostrar solo vencidos */}
+                    <div
+                        className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-between gap-2 rounded-md border bg-card px-3 transition-colors select-none hover:bg-accent/50 sm:w-auto sm:justify-start"
+                        onClick={() => {
+                            setShowExpiredOnly((prev) => !prev);
+                        }}
+                    >
+                        <span className="text-sm font-medium">Solo vencidos</span>
+                        <Switch
+                            checked={showExpiredOnly}
+                            onCheckedChange={(checked) => {
+                                setShowExpiredOnly(checked);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+
+                    {/* Botón Ordenar por Vencimiento */}
+                    <div
+                        className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-between gap-2 rounded-md border bg-card px-3 transition-colors select-none hover:bg-accent/50 sm:w-auto sm:justify-start"
+                        onClick={() => {
+                            setDueDateSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                        }}
+                    >
+                        <span className="text-sm font-medium">Orden vencimiento</span>
+                        {dueDateSortOrder === 'asc' ? (
+                            <ArrowUp className="h-4 w-4 text-muted-foreground animate-in fade-in" />
+                        ) : (
+                            <ArrowDown className="h-4 w-4 text-muted-foreground animate-in fade-in" />
+                        )}
+                    </div>
 
                     {/* Seleccionar control */}
                     <div
