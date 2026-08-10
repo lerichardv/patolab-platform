@@ -981,9 +981,6 @@ export default function CuttingsReportIndex({
                                 <TableHead className="min-w-[200px]">
                                     <span>T. ESPECIALES (Señalar)</span>
                                 </TableHead>
-                                <TableHead className="min-w-[200px]">
-                                    <span>Comentarios</span>
-                                </TableHead>
                                 <TableHead className="min-w-[180px]">
                                     {renderSortHeader(
                                         'responsible',
@@ -999,6 +996,12 @@ export default function CuttingsReportIndex({
                                 <TableHead className="min-w-[160px] text-center">
                                     <span>F. Entrega</span>
                                 </TableHead>
+                                <TableHead className="min-w-[160px] text-center">
+                                    {renderSortHeader('created_at', 'F. Creación')}
+                                </TableHead>
+                                <TableHead className="min-w-[200px]">
+                                    <span>Comentarios</span>
+                                </TableHead>
                                 <TableHead className="min-w-[120px] text-right">
                                     <span>Acciones</span>
                                 </TableHead>
@@ -1008,7 +1011,7 @@ export default function CuttingsReportIndex({
                             {groupedBySpecimen.length === 0 ? (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={14}
+                                        colSpan={15}
                                         className="h-32 text-center text-muted-foreground"
                                     >
                                         No se encontraron registros que
@@ -1090,7 +1093,7 @@ export default function CuttingsReportIndex({
                                                     }}
                                                 >
                                                     <TableCell
-                                                        colSpan={14}
+                                                        colSpan={15}
                                                         className="border-y border-border px-4 py-2.5 font-semibold text-foreground"
                                                     >
                                                         <div className="flex items-center gap-3">
@@ -1408,42 +1411,6 @@ export default function CuttingsReportIndex({
                                                                         })()}
                                                                     </TableCell>
 
-                                                                    {/* Comments */}
-                                                                    <TableCell
-                                                                        className="max-w-[200px] truncate align-middle text-xs text-muted-foreground"
-                                                                        title={group.items
-                                                                            .map(
-                                                                                (
-                                                                                    i,
-                                                                                ) =>
-                                                                                    i.comments,
-                                                                            )
-                                                                            .filter(
-                                                                                Boolean,
-                                                                            )
-                                                                            .join(
-                                                                                ' | ',
-                                                                            )}
-                                                                    >
-                                                                        {Array.from(
-                                                                            new Set(
-                                                                                group.items
-                                                                                    .map(
-                                                                                        (
-                                                                                            i,
-                                                                                        ) =>
-                                                                                            i.comments,
-                                                                                    )
-                                                                                    .filter(
-                                                                                        Boolean,
-                                                                                    ),
-                                                                            ),
-                                                                        ).join(
-                                                                            ' | ',
-                                                                        ) ||
-                                                                            '-'}
-                                                                    </TableCell>
-
                                                                     {/* Responsibles */}
                                                                     <TableCell className="align-middle text-xs text-slate-700 dark:text-slate-300">
                                                                         {(() => {
@@ -1487,6 +1454,45 @@ export default function CuttingsReportIndex({
                                                                     </TableCell>
                                                                     <TableCell className="text-center align-middle text-xs text-muted-foreground">
                                                                         -
+                                                                    </TableCell>
+                                                                    <TableCell className="text-center align-middle text-xs text-muted-foreground">
+                                                                        -
+                                                                    </TableCell>
+
+                                                                    {/* Comments */}
+                                                                    <TableCell
+                                                                        className="max-w-[200px] truncate align-middle text-xs text-muted-foreground"
+                                                                        title={group.items
+                                                                            .map(
+                                                                                (
+                                                                                    i,
+                                                                                ) =>
+                                                                                    i.comments,
+                                                                            )
+                                                                            .filter(
+                                                                                Boolean,
+                                                                            )
+                                                                            .join(
+                                                                                ' | ',
+                                                                            )}
+                                                                    >
+                                                                        {Array.from(
+                                                                            new Set(
+                                                                                group.items
+                                                                                    .map(
+                                                                                        (
+                                                                                            i,
+                                                                                        ) =>
+                                                                                            i.comments,
+                                                                                    )
+                                                                                    .filter(
+                                                                                        Boolean,
+                                                                                    ),
+                                                                            ),
+                                                                        ).join(
+                                                                            ' | ',
+                                                                        ) ||
+                                                                            '-'}
                                                                     </TableCell>
 
                                                                     {/* Toggle collapse action */}
@@ -1637,15 +1643,6 @@ export default function CuttingsReportIndex({
                                                                                     )}
                                                                                 </TableCell>
 
-                                                                                {/* Comments */}
-                                                                                <TableCell className="max-w-[200px] truncate align-middle text-xs">
-                                                                                    {c.comments || (
-                                                                                        <span className="text-muted-foreground italic">
-                                                                                            N/A
-                                                                                        </span>
-                                                                                    )}
-                                                                                </TableCell>
-
                                                                                 {/* Responsible */}
                                                                                 <TableCell className="align-middle text-xs">
                                                                                     {c.responsible ? (
@@ -1686,6 +1683,22 @@ export default function CuttingsReportIndex({
                                                                                 <TableCell className="text-center align-middle">
                                                                                     {formatStatusDate(
                                                                                         c.delivery_date,
+                                                                                    )}
+                                                                                </TableCell>
+
+                                                                                {/* Created At */}
+                                                                                <TableCell className="text-center align-middle">
+                                                                                    {formatStatusDate(
+                                                                                        c.created_at,
+                                                                                    )}
+                                                                                </TableCell>
+
+                                                                                {/* Comments */}
+                                                                                <TableCell className="max-w-[200px] truncate align-middle text-xs">
+                                                                                    {c.comments || (
+                                                                                        <span className="text-muted-foreground italic">
+                                                                                            N/A
+                                                                                        </span>
                                                                                     )}
                                                                                 </TableCell>
 

@@ -61,6 +61,7 @@ class CuttingsReportController extends Controller
                     ->select('cuttings.*');
                 break;
             case 'date':
+            case 'created_at':
             default:
                 $query->orderBy('cuttings.created_at', $sortDirection);
                 break;
