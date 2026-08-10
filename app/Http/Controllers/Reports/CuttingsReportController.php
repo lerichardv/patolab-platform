@@ -61,13 +61,13 @@ class CuttingsReportController extends Controller
                 break;
         }
 
-        $cuttings = $query->paginate(15)->withQueryString();
+        $cuttings = $query->get();
 
         // Resolve WorkOrderTypes names map for special stains mapping
         $workOrderTypes = WorkOrderType::withTrashed()->pluck('name', 'id')->toArray();
 
         // Transform results
-        $cuttings->through(function ($cutting) use ($workOrderTypes) {
+        $formattedCuttings = $cuttings->map(function ($cutting) use ($workOrderTypes) {
             $specimen = $cutting->specimen;
             $numberOfCassettes = 1;
             $range = $cutting->code?->code ?? '';
@@ -144,7 +144,7 @@ class CuttingsReportController extends Controller
         );
 
         return Inertia::render('reports/cuttings/index', [
-            'cuttings' => $cuttings,
+            'cuttings' => $formattedCuttings,
             'filters' => array_merge(
                 $request->only([
                     'search', 'responsible_id', 'specimen_type_id', 'examination_id', 'sort_field', 'sort_direction',
@@ -202,14 +202,15 @@ class CuttingsReportController extends Controller
         $cuttings = $query->get()->sort(function ($a, $b) {
             $specA = $a->specimen?->sequence_code ?? '';
             $specB = $b->specimen?->sequence_code ?? '';
-            
+
             $specComp = strnatcasecmp($specA, $specB);
             if ($specComp !== 0) {
                 return $specComp;
             }
-            
+
             $codeA = $a->code?->code ?? '';
             $codeB = $b->code?->code ?? '';
+
             return strnatcasecmp($codeA, $codeB);
         });
 

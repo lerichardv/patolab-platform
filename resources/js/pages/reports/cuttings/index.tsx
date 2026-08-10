@@ -20,7 +20,7 @@ import {
     setCookie,
     getLast2WeeksRange,
 } from '@/components/date-range-picker';
-import { Pagination } from '@/components/pagination';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -271,19 +271,7 @@ const groupCuttings = (cuttingsList: CuttingReportItem[]): CuttingGroup[] => {
 };
 
 interface Props {
-    cuttings: {
-        data: CuttingReportItem[];
-        links: {
-            url: string | null;
-            label: string;
-            active: boolean;
-        }[];
-        current_page: number;
-        last_page: number;
-        total: number;
-        from: number;
-        to: number;
-    };
+    cuttings: CuttingReportItem[];
     filters: {
         search?: string;
         responsible_id?: string;
@@ -411,7 +399,7 @@ export default function CuttingsReportIndex({
 
     const groupedBySpecimen = useMemo(() => {
         const groups: { specimen: any; cuttings: CuttingReportItem[] }[] = [];
-        cuttings.data.forEach((cutting) => {
+        cuttings.forEach((cutting) => {
             const specId = cutting.specimen?.id || 0;
             let group = groups.find((g) => g.specimen?.id === specId);
             if (!group) {
@@ -421,7 +409,7 @@ export default function CuttingsReportIndex({
             group.cuttings.push(cutting);
         });
         return groups;
-    }, [cuttings.data]);
+    }, [cuttings]);
 
     const formatStatusDate = (dateStr: string | null | undefined) => {
         if (!dateStr)
@@ -473,7 +461,7 @@ export default function CuttingsReportIndex({
             scrollContainer.removeEventListener('scroll', handleScroll);
             window.removeEventListener('resize', handleScroll);
         };
-    }, [cuttings.data]);
+    }, [cuttings]);
     const handleFilterChange = useCallback(
         (key: string, value: string) => {
             const newFilters = { ...filters, [key]: value };
@@ -1033,6 +1021,40 @@ export default function CuttingsReportIndex({
                                               false
                                             : true;
 
+                                        const sortedCuttings = [
+                                            ...specimenCuttings,
+                                        ].sort((a, b) => {
+                                            const codeA = a.code?.code || '';
+                                            const codeB = b.code?.code || '';
+                                            const lenA = codeA.length;
+                                            const lenB = codeB.length;
+
+                                            if (lenA !== lenB) {
+                                                return lenA - lenB;
+                                            }
+
+                                            return codeA.localeCompare(
+                                                codeB,
+                                                undefined,
+                                                {
+                                                    numeric: true,
+                                                    sensitivity: 'base',
+                                                },
+                                            );
+                                        });
+                                        const startCode =
+                                            sortedCuttings[0]?.code?.code;
+                                        const endCode =
+                                            sortedCuttings[
+                                                sortedCuttings.length - 1
+                                            ]?.code?.code;
+                                        const cuttingsRange =
+                                            startCode && endCode
+                                                ? startCode === endCode
+                                                    ? startCode
+                                                    : `${startCode}-${endCode}`
+                                                : startCode || endCode || '';
+
                                         return (
                                             <React.Fragment
                                                 key={
@@ -1106,6 +1128,22 @@ export default function CuttingsReportIndex({
                                                                     specimenTypeExam
                                                                 }
                                                             </span>
+                                                            {cuttingsRange && (
+                                                                <>
+                                                                    <span className="text-muted-foreground">
+                                                                        |
+                                                                    </span>
+                                                                    <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                                                        Rango de
+                                                                        Cortes:
+                                                                    </span>
+                                                                    <span className="font-mono text-sm font-medium">
+                                                                        {
+                                                                            cuttingsRange
+                                                                        }
+                                                                    </span>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
@@ -1655,16 +1693,6 @@ export default function CuttingsReportIndex({
                         </TableBody>
                     </Table>
                 </div>
-
-                {/* Pagination */}
-                <Pagination
-                    links={cuttings.links}
-                    meta={{
-                        from: cuttings.from,
-                        to: cuttings.to,
-                        total: cuttings.total,
-                    }}
-                />
             </div>
 
             {/* Specimen View Sheet */}
