@@ -936,11 +936,23 @@ export default function CuttingsReportIndex({
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="min-w-[150px]">
-                                    {renderSortHeader(
-                                        'specimen_code',
-                                        'Código de Casete',
-                                    )}
+                                <TableHead className="min-w-[200px]">
+                                    <div className="flex flex-col gap-1 py-1">
+                                        <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">
+                                            Ordenar por
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            {renderSortHeader(
+                                                'specimen_code',
+                                                'Muestra',
+                                            )}
+                                            <span className="text-muted-foreground/30">|</span>
+                                            {renderSortHeader(
+                                                'cutting_code',
+                                                'Casete',
+                                            )}
+                                        </div>
+                                    </div>
                                 </TableHead>
                                 <TableHead className="min-w-[120px]">
                                     {renderSortHeader('status', 'Estado')}

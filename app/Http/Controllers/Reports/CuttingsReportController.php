@@ -41,6 +41,11 @@ class CuttingsReportController extends Controller
                     ->orderBy('specimen.sequence_code', $sortDirection)
                     ->select('cuttings.*');
                 break;
+            case 'cutting_code':
+                $query->leftJoin('cutting_codes', 'cuttings.code_id', '=', 'cutting_codes.id')
+                    ->orderBy('cutting_codes.code', $sortDirection)
+                    ->select('cuttings.*');
+                break;
             case 'number_of_cuttings':
                 $query->orderBy('cuttings.number_of_cuttings', $sortDirection);
                 break;
