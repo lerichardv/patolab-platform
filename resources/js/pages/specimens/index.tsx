@@ -105,6 +105,7 @@ import SpecimenViewSheet from './specimen-view-sheet';
 interface Specimen {
     id: number;
     priority_id: number;
+    sample_collection_date?: string;
     specimen_type?: number;
     specimen_type_examination?: number;
     customer_relation: any;
@@ -620,6 +621,14 @@ export default function SpecimensIndex({
     useEffect(() => {
         setPriorities(deduplicateSpecimens(initialPriorities));
     }, [initialPriorities]);
+
+    useEffect(() => {
+        if (isSheetOpen || isGroupSheetOpen || isViewSheetOpen) {
+            router.reload({
+                only: ['priorities'],
+            });
+        }
+    }, [isSheetOpen, isGroupSheetOpen, isViewSheetOpen]);
 
     useEffect(() => {
         if (filters.status) {
@@ -2536,7 +2545,17 @@ export default function SpecimensIndex({
             </div>
 
             <SpecimenSheet
-                specimen={selectedSpecimen}
+                key={
+                    isSheetOpen && selectedSpecimen
+                        ? `edit_${selectedSpecimen.id}_${(findSpecimenById(selectedSpecimen.id) || selectedSpecimen).sample_collection_date || ''}`
+                        : 'closed_edit'
+                }
+                specimen={
+                    selectedSpecimen
+                        ? findSpecimenById(selectedSpecimen.id) ||
+                          selectedSpecimen
+                        : null
+                }
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
                 specimenTypes={specimenTypes}
@@ -2585,7 +2604,17 @@ export default function SpecimensIndex({
             />
 
             <SpecimenViewSheet
-                specimen={selectedSpecimenForView}
+                key={
+                    isViewSheetOpen && selectedSpecimenForView
+                        ? `view_${selectedSpecimenForView.id}_${(findSpecimenById(selectedSpecimenForView.id) || selectedSpecimenForView).sample_collection_date || ''}`
+                        : 'closed_view'
+                }
+                specimen={
+                    selectedSpecimenForView
+                        ? findSpecimenById(selectedSpecimenForView.id) ||
+                          selectedSpecimenForView
+                        : null
+                }
                 open={isViewSheetOpen}
                 onOpenChange={setIsViewSheetOpen}
                 onEditClick={handleEditFromView}

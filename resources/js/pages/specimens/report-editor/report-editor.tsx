@@ -3884,7 +3884,9 @@ function SignatureBlock({
                                 alignItems: 'center',
                             }}
                         >
-                            {pathologist.signature_url ? (
+                            {users && users.length > 0 ? (
+                                <div style={{ height: '14mm' }} />
+                            ) : pathologist.signature_url ? (
                                 <img
                                     src={pathologist.signature_url}
                                     alt={`Firma de ${pathologist.name}`}
@@ -6844,9 +6846,13 @@ export default function ReportWorkspace({
                 Accept: 'application/json',
             },
             body: JSON.stringify({ report_date: sanitized }),
-        }).catch((err) => {
-            console.error('Failed to persist report_date:', err);
-        });
+        })
+            .then(() => {
+                router.reload({ only: ['specimen', 'report'] });
+            })
+            .catch((err) => {
+                console.error('Failed to persist report_date:', err);
+            });
     };
 
     const handleUpdateSampleCollectionDate = (dateVal: string) => {
@@ -6874,9 +6880,13 @@ export default function ReportWorkspace({
                 Accept: 'application/json',
             },
             body: JSON.stringify({ sample_collection_date: sanitized }),
-        }).catch((err) => {
-            console.error('Failed to persist sample_collection_date:', err);
-        });
+        })
+            .then(() => {
+                router.reload({ only: ['specimen', 'report'] });
+            })
+            .catch((err) => {
+                console.error('Failed to persist sample_collection_date:', err);
+            });
     };
 
     const handleUpdateFinalizationDate = (dateVal: string) => {
@@ -6904,9 +6914,13 @@ export default function ReportWorkspace({
                 Accept: 'application/json',
             },
             body: JSON.stringify({ finalization_date: sanitized }),
-        }).catch((err) => {
-            console.error('Failed to persist finalization_date:', err);
-        });
+        })
+            .then(() => {
+                router.reload({ only: ['specimen', 'report'] });
+            })
+            .catch((err) => {
+                console.error('Failed to persist finalization_date:', err);
+            });
     };
 
     const handleStartMicroscopyFinalization = async () => {
@@ -9995,6 +10009,11 @@ export default function ReportWorkspace({
                 </div>
 
                 <SpecimenViewSheet
+                    key={
+                        isSpecimenSheetOpen
+                            ? `view_${specimen.id}_${specimen.sample_collection_date || ''}_${specimen.report?.report_date || ''}`
+                            : 'closed_view'
+                    }
                     specimen={specimen}
                     open={isSpecimenSheetOpen}
                     onOpenChange={setIsSpecimenSheetOpen}
@@ -10065,6 +10084,11 @@ export default function ReportWorkspace({
                 />
 
                 <SpecimenSheet
+                    key={
+                        isEditSpecimenOpen
+                            ? `edit_${specimen.id}_${specimen.sample_collection_date || ''}_${specimen.report?.report_date || ''}`
+                            : 'closed_edit'
+                    }
                     specimen={specimen}
                     open={isEditSpecimenOpen}
                     onOpenChange={setIsEditSpecimenOpen}

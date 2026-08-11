@@ -4011,8 +4011,9 @@ export default function SpecimenForm({
                             <div className="space-y-3 text-sm text-muted-foreground">
                                 {isGroupSpecimen ? (
                                     <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3.5 text-xs text-blue-900 dark:text-blue-200">
-                                        <span className="mb-1 block font-semibold">
-                                            ℹ️ Factura de Grupo de Muestras:
+                                        <span className="mb-1 flex items-center justify-start font-semibold">
+                                            <Info className="mr-1 h-4 w-4" />{' '}
+                                            Factura de Grupo de Muestras:
                                         </span>
                                         Debido a que esta muestra pertenece a un
                                         grupo de muestras, al guardar los

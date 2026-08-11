@@ -50,19 +50,11 @@ class ReportPdfService
         $examination = $specimen->examination;
         $referrer = $specimen->referrerRelation;
 
-        // Convert pathologists' signatures to Base64
+        // Convert pathologists' signatures to Base64 (disabled when pathologists are assigned to the specimen)
         foreach ($specimen->users as $user) {
             $user->signature_base64 = null;
-            if ($user->user_signature) {
-                if (Storage::disk('public')->exists($user->user_signature)) {
-                    $fileContent = Storage::disk('public')->get($user->user_signature);
-                    $mime = Storage::disk('public')->mimeType($user->user_signature) ?: 'image/png';
-                    $user->signature_base64 = 'data:'.$mime.';base64,'.base64_encode($fileContent);
-                } else {
-                    $url = Storage::disk('public')->url($user->user_signature);
-                    $user->signature_base64 = $this->getImageBase64($url);
-                }
-            }
+            $user->signature_url = null;
+            $user->user_signature = null;
         }
 
         // Convert all local/remote images in editor contents to Base64 data URIs so Browsershot can render them.

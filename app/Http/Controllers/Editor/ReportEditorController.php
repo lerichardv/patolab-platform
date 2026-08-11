@@ -281,6 +281,15 @@ class ReportEditorController extends Controller
             'cuttings.responsible',
         ]);
 
+        foreach ($specimen->users as $user) {
+            $user->signature_url = null;
+            $user->user_signature = null;
+        }
+        foreach ($specimen->collaborators as $user) {
+            $user->signature_url = null;
+            $user->user_signature = null;
+        }
+
         $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
         $pathologists = [];
         if ($pathologistRoleId) {

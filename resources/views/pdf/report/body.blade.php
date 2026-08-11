@@ -562,7 +562,9 @@
                                 <div class="signature-row" style="display: flex; justify-content: center; align-items: flex-end; gap: 15mm; width: 100%;">
                                     @foreach($row as $pathologist)
                                         <div class="signature-item" style="width: 58.21mm; text-align: center; display: flex; flex-direction: column; align-items: center;">
-                                            @if(!empty($pathologist->signature_base64))
+                                            @if($specimen->users->isNotEmpty())
+                                                <div style="height: 14mm;"></div>
+                                            @elseif(!empty($pathologist->signature_base64))
                                                 <img src="{{ $pathologist->signature_base64 }}" style="max-height: 12mm; width: auto; margin-bottom: 2mm; display: block;" />
                                             @elseif(!empty($pathologist->signature_url))
                                                 <img src="{{ $pathologist->signature_url }}" style="max-height: 12mm; width: auto; margin-bottom: 2mm; display: block;" />
