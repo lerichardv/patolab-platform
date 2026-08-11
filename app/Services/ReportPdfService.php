@@ -50,10 +50,10 @@ class ReportPdfService
         $examination = $specimen->examination;
         $referrer = $specimen->referrerRelation;
 
-        // Convert pathologists' signatures to Base64 (only if not in preview mode)
+        // Convert pathologists' signatures to Base64
         foreach ($specimen->users as $user) {
             $user->signature_base64 = null;
-            if (!$isPreview && $user->user_signature) {
+            if ($user->user_signature) {
                 if (Storage::disk('public')->exists($user->user_signature)) {
                     $fileContent = Storage::disk('public')->get($user->user_signature);
                     $mime = Storage::disk('public')->mimeType($user->user_signature) ?: 'image/png';

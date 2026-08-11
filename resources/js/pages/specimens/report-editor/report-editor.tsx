@@ -3877,7 +3877,20 @@ function SignatureBlock({
                                 alignItems: 'center',
                             }}
                         >
-                            <div style={{ height: '14mm' }} />
+                            {pathologist.signature_url ? (
+                                <img
+                                    src={pathologist.signature_url}
+                                    alt={`Firma de ${pathologist.name}`}
+                                    style={{
+                                        maxHeight: '12mm',
+                                        width: 'auto',
+                                        marginBottom: '2mm',
+                                        display: 'block',
+                                    }}
+                                />
+                            ) : (
+                                <div style={{ height: '14mm' }} />
+                            )}
                             <div
                                 style={{
                                     width: '100%',
