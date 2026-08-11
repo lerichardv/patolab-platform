@@ -36,7 +36,7 @@ class ReportPdfService
     /**
      * Helper to generate PDF content using Browsershot.
      */
-    public function generatePdfContent(Specimen $specimen, &$pages = null)
+    public function generatePdfContent(Specimen $specimen, &$pages = null, $isPreview = false)
     {
         $specimen->load(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'report', 'users.role', 'cuttings.code', 'cuttings.responsible']);
         if (! $specimen->report) {
@@ -50,11 +50,19 @@ class ReportPdfService
         $examination = $specimen->examination;
         $referrer = $specimen->referrerRelation;
 
-        // Convert pathologists' signatures to Base64 (disabled when pathologists are assigned to the specimen)
+        // Convert pathologists' signatures to Base64 (only if not in preview mode)
         foreach ($specimen->users as $user) {
             $user->signature_base64 = null;
-            $user->signature_url = null;
-            $user->user_signature = null;
+            if (!$isPreview && $user->user_signature) {
+                if (Storage::disk('public')->exists($user->user_signature)) {
+                    $fileContent = Storage::disk('public')->get($user->user_signature);
+                    $mime = Storage::disk('public')->mimeType($user->user_signature) ?: 'image/png';
+                    $user->signature_base64 = 'data:'.$mime.';base64,'.base64_encode($fileContent);
+                } else {
+                    $url = Storage::disk('public')->url($user->user_signature);
+                    $user->signature_base64 = $this->getImageBase64($url);
+                }
+            }
         }
 
         // Convert all local/remote images in editor contents to Base64 data URIs so Browsershot can render them.
@@ -72,7 +80,7 @@ class ReportPdfService
 
         $pages = ReportPaginator::paginate($specimen, $report, $customer, $referrer, $isMicroscopyVisible);
 
-        $htmlContent = view('pdf.report.body', compact('specimen', 'report', 'customer', 'examination', 'referrer', 'pages'))->render();
+        $htmlContent = view('pdf.report.body', compact('specimen', 'report', 'customer', 'examination', 'referrer', 'pages', 'isPreview'))->render();
 
         $browsershot = Browsershot::html($htmlContent);
 

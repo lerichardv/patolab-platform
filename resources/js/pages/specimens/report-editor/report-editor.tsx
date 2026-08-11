@@ -3830,18 +3830,11 @@ function SignatureBlock({
     reportDate: string;
     finalizationDate: string;
 }) {
-    const assignedUsers =
-        users && users.length > 0
-            ? users
-            : [
-                  {
-                      id: 0,
-                      name: 'DRA. ESTEFANY LAGOS',
-                      role: { name: 'PATOLOGÍA ONCOLÓGICA' },
-                      signature_url: null,
-                      user_signature: null,
-                  },
-              ];
+    if (!users || users.length === 0) {
+        return null;
+    }
+
+    const assignedUsers = users;
 
     // Chunk assignedUsers into rows of 2
     const chunks: (typeof assignedUsers)[] = [];
@@ -3884,22 +3877,7 @@ function SignatureBlock({
                                 alignItems: 'center',
                             }}
                         >
-                            {users && users.length > 0 ? (
-                                <div style={{ height: '14mm' }} />
-                            ) : pathologist.signature_url ? (
-                                <img
-                                    src={pathologist.signature_url}
-                                    alt={`Firma de ${pathologist.name}`}
-                                    style={{
-                                        maxHeight: '12mm',
-                                        width: 'auto',
-                                        marginBottom: '2mm',
-                                        display: 'block',
-                                    }}
-                                />
-                            ) : (
-                                <div style={{ height: '14mm' }} />
-                            )}
+                            <div style={{ height: '14mm' }} />
                             <div
                                 style={{
                                     width: '100%',
@@ -4615,7 +4593,7 @@ export default function ReportWorkspace({
         const pageContentHeight = 205.0; // mm
         const lineHeight = 3.97; // mm
         const maxCharsPerLine = 155;
-        const pathologistsCount = Math.max(1, specimen.users?.length || 0);
+        const pathologistsCount = specimen.users?.length || 0;
         const rowsCount = Math.ceil(pathologistsCount / 2);
         const signatureHeight = rowsCount * 25.0; // 25mm per row
 
@@ -5636,20 +5614,22 @@ export default function ReportWorkspace({
 
         const maxHeightForLastPage = pageContentHeight;
 
-        if (lastPageHeight + signatureHeight > maxHeightForLastPage) {
-            computedPages.push([
-                {
+        if (signatureHeight > 0) {
+            if (lastPageHeight + signatureHeight > maxHeightForLastPage) {
+                computedPages.push([
+                    {
+                        id: 'signature',
+                        type: 'signature',
+                        height: signatureHeight,
+                    },
+                ]);
+            } else {
+                computedPages[lastPageIndex].push({
                     id: 'signature',
                     type: 'signature',
                     height: signatureHeight,
-                },
-            ]);
-        } else {
-            computedPages[lastPageIndex].push({
-                id: 'signature',
-                type: 'signature',
-                height: signatureHeight,
-            });
+                });
+            }
         }
 
         // Addendum pagination

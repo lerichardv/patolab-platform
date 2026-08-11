@@ -9,7 +9,7 @@ class ReportPaginator
         $pageContentHeight = 205.00; // mm
         $lineHeight = 3.97; // mm
         $maxCharsPerLine = 155;
-        $pathologistsCount = max(1, $specimen->users ? $specimen->users->count() : 1);
+        $pathologistsCount = $specimen->users ? $specimen->users->count() : 0;
         $rowsCount = (int) ceil($pathologistsCount / 2);
         $signatureHeight = $rowsCount * 25.0; // 25mm per row
 
@@ -369,20 +369,22 @@ class ReportPaginator
 
         $maxHeightForLastPage = $pageContentHeight;
 
-        if ($lastPageHeight + $signatureHeight > $maxHeightForLastPage) {
-            // Add a new page just for signature
-            $pages[] = [
-                [
+        if ($signatureHeight > 0) {
+            if ($lastPageHeight + $signatureHeight > $maxHeightForLastPage) {
+                // Add a new page just for signature
+                $pages[] = [
+                    [
+                        'type' => 'signature',
+                        'height' => $signatureHeight,
+                    ],
+                ];
+            } else {
+                // Fits on the current last page
+                $pages[$lastPageIndex][] = [
                     'type' => 'signature',
                     'height' => $signatureHeight,
-                ],
-            ];
-        } else {
-            // Fits on the current last page
-            $pages[$lastPageIndex][] = [
-                'type' => 'signature',
-                'height' => $signatureHeight,
-            ];
+                ];
+            }
         }
 
         // 5. Paginate addendum onto new pages if it has content

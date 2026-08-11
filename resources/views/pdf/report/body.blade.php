@@ -540,47 +540,35 @@
                         </div>
                     --}}
                     @elseif($block['type'] === 'signature')
-                        <div class="signatures-container" style="display: flex; flex-direction: column; gap: 4mm; margin-top: 4mm; align-items: center; width: 100%;">
-                            @php
-                                $assignedUsers = $specimen->users;
-                                if ($assignedUsers->isEmpty()) {
-                                    $assignedUsers = collect([
-                                        (object)[
-                                            'id' => 0,
-                                            'name' => 'DRA. ESTEFANY LAGOS',
-                                            'role' => (object)['name' => 'PATOLOGÍA ONCOLÓGICA'],
-                                            'signature_url' => null,
-                                            'user_signature' => null,
-                                            'signature_base64' => null,
-                                        ]
-                                    ]);
-                                }
-                                $chunks = $assignedUsers->chunk(2);
-                            @endphp
+                        @if($specimen->users->isNotEmpty())
+                            <div class="signatures-container" style="display: flex; flex-direction: column; gap: 4mm; margin-top: 4mm; align-items: center; width: 100%;">
+                                @php
+                                    $chunks = $specimen->users->chunk(2);
+                                @endphp
 
-                            @foreach($chunks as $row)
-                                <div class="signature-row" style="display: flex; justify-content: center; align-items: flex-end; gap: 15mm; width: 100%;">
-                                    @foreach($row as $pathologist)
-                                        <div class="signature-item" style="width: 58.21mm; text-align: center; display: flex; flex-direction: column; align-items: center;">
-                                            @if($specimen->users->isNotEmpty())
-                                                <div style="height: 14mm;"></div>
-                                            @elseif(!empty($pathologist->signature_base64))
-                                                <img src="{{ $pathologist->signature_base64 }}" style="max-height: 12mm; width: auto; margin-bottom: 2mm; display: block;" />
-                                            @elseif(!empty($pathologist->signature_url))
-                                                <img src="{{ $pathologist->signature_url }}" style="max-height: 12mm; width: auto; margin-bottom: 2mm; display: block;" />
-                                            @else
-                                                <div style="height: 14mm;"></div>
-                                            @endif
-                                            <div class="signature-line" style="width: 100%; border-top: 0.40mm solid #4b5563; margin-bottom: 1.32mm;"></div>
-                                            <div class="pathologist-name" style="font-size: 2.65mm; font-weight: 700; color: #1f2937; text-transform: uppercase;">{{ $pathologist->name }}</div>
-                                            <div class="pathologist-title" style="font-size: 2.25mm; color: #4b5563; font-weight: 500; text-transform: uppercase;">{{ $pathologist->role ? $pathologist->role->name : 'PATOLOGÍA ONCOLÓGICA' }}</div>
-                                            <div class="date-signature" style="font-size: 2.38mm; font-weight: 600; color: #374151; margin-top: 1.32mm;">FECHA: {{ $report->finalization_date ? \Carbon\Carbon::parse($report->finalization_date)->format('d/m/y') : 'N/A' }}</div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
+                                @foreach($chunks as $row)
+                                    <div class="signature-row" style="display: flex; justify-content: center; align-items: flex-end; gap: 15mm; width: 100%;">
+                                        @foreach($row as $pathologist)
+                                            <div class="signature-item" style="width: 58.21mm; text-align: center; display: flex; flex-direction: column; align-items: center;">
+                                                @if(isset($isPreview) && $isPreview)
+                                                    <div style="height: 14mm;"></div>
+                                                @elseif(!empty($pathologist->signature_base64))
+                                                    <img src="{{ $pathologist->signature_base64 }}" style="max-height: 12mm; width: auto; margin-bottom: 2mm; display: block;" />
+                                                @elseif(!empty($pathologist->signature_url))
+                                                    <img src="{{ $pathologist->signature_url }}" style="max-height: 12mm; width: auto; margin-bottom: 2mm; display: block;" />
+                                                @else
+                                                    <div style="height: 14mm;"></div>
+                                                @endif
+                                                <div class="signature-line" style="width: 100%; border-top: 0.40mm solid #4b5563; margin-bottom: 1.32mm;"></div>
+                                                <div class="pathologist-name" style="font-size: 2.65mm; font-weight: 700; color: #1f2937; text-transform: uppercase;">{{ $pathologist->name }}</div>
+                                                <div class="pathologist-title" style="font-size: 2.25mm; color: #4b5563; font-weight: 500; text-transform: uppercase;">{{ $pathologist->role ? $pathologist->role->name : 'PATOLOGÍA ONCOLÓGICA' }}</div>
+                                                <div class="date-signature" style="font-size: 2.38mm; font-weight: 600; color: #374151; margin-top: 1.32mm;">FECHA: {{ $report->finalization_date ? \Carbon\Carbon::parse($report->finalization_date)->format('d/m/y') : 'N/A' }}</div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                 @endforeach
             </div>
 
