@@ -1631,10 +1631,18 @@ export default function ManageCuttingsSheet({
                                                                 })()}
                                                             </TableCell>
 
-                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">-</TableCell>
-                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">-</TableCell>
-                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">-</TableCell>
-                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">-</TableCell>
+                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">
+                                                                -
+                                                            </TableCell>
+                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">
+                                                                -
+                                                            </TableCell>
+                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">
+                                                                -
+                                                            </TableCell>
+                                                            <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-400">
+                                                                -
+                                                            </TableCell>
 
                                                             {/* Toggle collapse action */}
                                                             <TableCell className="z-10 w-[220px] min-w-[220px] text-right align-middle">
@@ -1898,16 +1906,24 @@ export default function ManageCuttingsSheet({
 
                                                                         {/* Dates */}
                                                                         <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-600 dark:text-slate-400">
-                                                                            {formatDate(c.macroscopy_date)}
+                                                                            {formatDate(
+                                                                                c.macroscopy_date,
+                                                                            )}
                                                                         </TableCell>
                                                                         <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-600 dark:text-slate-400">
-                                                                            {formatDate(c.processing_date)}
+                                                                            {formatDate(
+                                                                                c.processing_date,
+                                                                            )}
                                                                         </TableCell>
                                                                         <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-600 dark:text-slate-400">
-                                                                            {formatDate(c.delivery_date)}
+                                                                            {formatDate(
+                                                                                c.delivery_date,
+                                                                            )}
                                                                         </TableCell>
                                                                         <TableCell className="w-[150px] min-w-[150px] align-middle text-xs text-slate-600 dark:text-slate-400">
-                                                                            {formatDate(c.created_at)}
+                                                                            {formatDate(
+                                                                                c.created_at,
+                                                                            )}
                                                                         </TableCell>
 
                                                                         {/* Actions */}

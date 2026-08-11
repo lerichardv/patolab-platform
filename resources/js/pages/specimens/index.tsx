@@ -379,7 +379,9 @@ export default function SpecimensIndex({
     const [searchQuery, setSearchQuery] = useState('');
 
     const [showExpiredOnly, setShowExpiredOnly] = useState(false);
-    const [dueDateSortOrder, setDueDateSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [dueDateSortOrder, setDueDateSortOrder] = useState<'asc' | 'desc'>(
+        'desc',
+    );
 
     const [selectedSpecimenTypeId, setSelectedSpecimenTypeId] =
         useState<string>(() => filters.specimen_type_id || 'all');
@@ -545,7 +547,13 @@ export default function SpecimensIndex({
                     examId?.toString() === selectedExaminationId;
 
                 const dueInfo = getDueDateInfo(specimen);
-                const isExpired = !!(dueInfo && dueInfo.isExpired && !['finalized', 'delivered', 'cancelled'].includes(specimen.status));
+                const isExpired = !!(
+                    dueInfo &&
+                    dueInfo.isExpired &&
+                    !['finalized', 'delivered', 'cancelled'].includes(
+                        specimen.status,
+                    )
+                );
                 const matchesExpired = !showExpiredOnly || isExpired;
 
                 return (
@@ -563,7 +571,9 @@ export default function SpecimensIndex({
                 const dateA = getDueDate(a).getTime();
                 const dateB = getDueDate(b).getTime();
 
-                return dueDateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+                return dueDateSortOrder === 'asc'
+                    ? dateA - dateB
+                    : dateB - dateA;
             });
 
             return {
@@ -1715,7 +1725,9 @@ export default function SpecimensIndex({
                             setShowExpiredOnly((prev) => !prev);
                         }}
                     >
-                        <span className="text-sm font-medium">Solo vencidos</span>
+                        <span className="text-sm font-medium">
+                            Solo vencidos
+                        </span>
                         <Switch
                             checked={showExpiredOnly}
                             onCheckedChange={(checked) => {
@@ -1729,14 +1741,18 @@ export default function SpecimensIndex({
                     <div
                         className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-between gap-2 rounded-md border bg-card px-3 transition-colors select-none hover:bg-accent/50 sm:w-auto sm:justify-start"
                         onClick={() => {
-                            setDueDateSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                            setDueDateSortOrder((prev) =>
+                                prev === 'asc' ? 'desc' : 'asc',
+                            );
                         }}
                     >
-                        <span className="text-sm font-medium">Orden vencimiento</span>
+                        <span className="text-sm font-medium">
+                            Orden vencimiento
+                        </span>
                         {dueDateSortOrder === 'asc' ? (
-                            <ArrowUp className="h-4 w-4 text-muted-foreground animate-in fade-in" />
+                            <ArrowUp className="h-4 w-4 animate-in text-muted-foreground fade-in" />
                         ) : (
-                            <ArrowDown className="h-4 w-4 text-muted-foreground animate-in fade-in" />
+                            <ArrowDown className="h-4 w-4 animate-in text-muted-foreground fade-in" />
                         )}
                     </div>
 
