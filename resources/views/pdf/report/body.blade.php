@@ -11,6 +11,20 @@
             margin: 0;
             padding: 0;
         }
+
+        html, body, div, p, span, h1, h2, h3, h4, h5, h6, ul, ol, li, table, tr, th, td, blockquote, img {
+            margin: 0;
+            padding: 0;
+            border: 0;
+        }
+
+        .section-content > *:first-child {
+            margin-top: 0 !important;
+        }
+
+        .section-content > *:last-child {
+            margin-bottom: 0 !important;
+        }
  
         @page {
             size: 215.9mm 279.4mm;

@@ -31,6 +31,7 @@
         "typescript-eslint": "^8.23.0"
     },
     "dependencies": {
+        "@embedpdf/react-pdf-viewer": "^2.15.0",
         "@headlessui/react": "^2.2.0",
         "@hello-pangea/dnd": "^18.0.1",
         "@hocuspocus/provider": "^4.1.0",

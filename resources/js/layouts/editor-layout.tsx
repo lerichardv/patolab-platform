@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { Button } from '@/components/ui/button';
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar';
+import { useAppearance } from '@/hooks/use-appearance';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
@@ -86,6 +87,8 @@ export default function EditorLayout({
     headerRight?: React.ReactNode;
     children: React.ReactNode;
 }) {
+    useAppearance();
+
     return (
         <SidebarProvider defaultOpen={false}>
             <EditorLayoutContent
