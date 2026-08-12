@@ -1714,11 +1714,127 @@ export default function SpecimenViewSheet({
                                         auth.permissions?.includes(
                                             'credits.view',
                                         ) && (
-                                            <div className="space-y-4 rounded-lg border border-yellow-500/30 bg-card bg-yellow-500/[0.02] p-5 text-card-foreground shadow-sm">
-                                                <h3 className="flex items-center gap-2 text-lg font-semibold text-yellow-600 dark:text-yellow-400">
-                                                    <Coins className="h-5 w-5" />{' '}
-                                                    Estado de Cuenta de Crédito
-                                                </h3>
+                                            <div className="mb-12 space-y-4 rounded-lg border border-yellow-500/30 bg-card bg-yellow-500/[0.02] p-5 text-card-foreground shadow-sm">
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="flex items-center gap-2 text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                                                        <Coins className="h-5 w-5" />{' '}
+                                                        Estado de Cuenta de
+                                                        Crédito
+                                                    </h3>
+                                                    {(() => {
+                                                        const status =
+                                                            credit.status;
+
+                                                        if (status === 'paid') {
+                                                            return (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
+                                                                >
+                                                                    Pagado
+                                                                </Badge>
+                                                            );
+                                                        }
+
+                                                        if (
+                                                            status ===
+                                                            'invoice generated'
+                                                        ) {
+                                                            return (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                                                                >
+                                                                    Factura
+                                                                    Generada
+                                                                </Badge>
+                                                            );
+                                                        }
+
+                                                        if (
+                                                            status === 'partial'
+                                                        ) {
+                                                            return (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-amber-500/20 bg-amber-500/10 text-amber-600"
+                                                                >
+                                                                    Pago Parcial
+                                                                </Badge>
+                                                            );
+                                                        }
+
+                                                        if (
+                                                            status ===
+                                                            'cancelled'
+                                                        ) {
+                                                            return (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-slate-500/20 bg-slate-500/10 text-slate-600"
+                                                                >
+                                                                    Cancelado
+                                                                </Badge>
+                                                            );
+                                                        }
+
+                                                        if (
+                                                            status === 'pending'
+                                                        ) {
+                                                            return (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-destructive/20 bg-destructive/10 text-destructive"
+                                                                >
+                                                                    Pendiente
+                                                                </Badge>
+                                                            );
+                                                        }
+
+                                                        const remaining =
+                                                            parseFloat(
+                                                                String(
+                                                                    credit.amount_remaining,
+                                                                ),
+                                                            );
+                                                        const paid = parseFloat(
+                                                            String(
+                                                                credit.amount_paid,
+                                                            ),
+                                                        );
+
+                                                        if (remaining === 0) {
+                                                            return (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
+                                                                >
+                                                                    Pagado
+                                                                </Badge>
+                                                            );
+                                                        }
+
+                                                        if (paid > 0) {
+                                                            return (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-amber-500/20 bg-amber-500/10 text-amber-600"
+                                                                >
+                                                                    Pago Parcial
+                                                                </Badge>
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="border-destructive/20 bg-destructive/10 text-destructive"
+                                                            >
+                                                                Pendiente
+                                                            </Badge>
+                                                        );
+                                                    })()}
+                                                </div>
                                                 <Separator />
 
                                                 <div className="space-y-4">

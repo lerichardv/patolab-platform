@@ -1,20 +1,8 @@
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { PDFViewer } from '@embedpdf/react-pdf-viewer';
 import type { DropResult } from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 import { Head, router } from '@inertiajs/react';
-import { PDFViewer } from '@embedpdf/react-pdf-viewer';
-import { CompleteMicroscopyDialog } from './components/complete-microscopy-dialog';
-import { MissingSignaturesDialog } from './components/missing-signatures-dialog';
-import { CollaborativeEditor } from './components/collaborative-editor';
-import { EditorRegistryContext } from './components/editor-registry-context';
-import { editorStyles } from './components/editor-styles';
-import {
-    COLLABORATION_SERVER_URL,
-    WS_COLLABORATION_SERVER_URL,
-    CustomBulletList,
-    sharedExtensions,
-    HIGHLIGHT_COLORS,
-} from './components/tiptap-extensions';
 
 import { TableKit } from '@tiptap/extension-table';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -132,6 +120,18 @@ import SpecimenSheet from '../specimen-sheet';
 import SpecimenViewSheet from '../specimen-view-sheet';
 import AIDictationSheet from './ai-dictation-sheet';
 import AIGrammarSheet from './ai-grammar-sheet';
+import { CollaborativeEditor } from './components/collaborative-editor';
+import { CompleteMicroscopyDialog } from './components/complete-microscopy-dialog';
+import { EditorRegistryContext } from './components/editor-registry-context';
+import { editorStyles } from './components/editor-styles';
+import { MissingSignaturesDialog } from './components/missing-signatures-dialog';
+import {
+    COLLABORATION_SERVER_URL,
+    WS_COLLABORATION_SERVER_URL,
+    CustomBulletList,
+    sharedExtensions,
+    HIGHLIGHT_COLORS,
+} from './components/tiptap-extensions';
 import ManageCuttingsSheet from './cuttings/manage-cuttings-sheet';
 import ImageGridComponent, { ImageCropperDialog } from './image-grid-component';
 
@@ -4061,12 +4061,14 @@ export default function ReportWorkspace({
     useEffect(() => {
         const handleImageLoad = (e: Event) => {
             const target = e.target as HTMLElement;
+
             if (target && target.tagName === 'IMG') {
                 calculateLayoutRef.current();
             }
         };
 
         window.addEventListener('load', handleImageLoad, true);
+
         return () => {
             window.removeEventListener('load', handleImageLoad, true);
         };
@@ -5304,6 +5306,7 @@ export default function ReportWorkspace({
 
             const data = await response.json();
             let pdfUrl = data.url;
+
             if (pdfUrl && pdfUrl.startsWith('http')) {
                 try {
                     const parsed = new URL(pdfUrl);
@@ -5312,6 +5315,7 @@ export default function ReportWorkspace({
                     console.error(e);
                 }
             }
+
             setTempPdfUrl(pdfUrl);
             setTempPdfTotalPages(data.total_pages || 1);
             setShowCompleteMicroscopyDialog(true);

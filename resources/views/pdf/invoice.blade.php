@@ -336,7 +336,7 @@
                 </div>
                 <div class="factura-row">
                     <span>Fecha:</span>
-                    <span>{{ $invoice->created_at->format('d/m/Y h:i a') }}</span>
+                    <span>{{ ($invoice->invoice_date ?? $invoice->created_at)->format('d/m/Y h:i a') }}</span>
                 </div>
                 @if($caiRange)
                 <div class="factura-row" style="flex-direction: column;">
@@ -367,7 +367,7 @@
                 @endif
                 <div class="factura-row">
                     <span>Factura:</span>
-                    <span style="text-transform: capitalize;">{{ $invoice->payment_type === 'credit' ? 'Crédito' : ($invoice->payment_type === 'check' ? 'Cheque' : 'Contado') }}</span>
+                    <span style="text-transform: capitalize;">{{ ($invoice->invoice_type === 'social security' || $invoice->payment_type !== 'credit' || (float) $invoice->total_paid >= (float) $invoice->total || ($invoice->creditRelation && (float) $invoice->creditRelation->amount_remaining <= 0)) ? ($invoice->payment_type === 'check' ? 'Cheque' : 'Contado') : 'Crédito' }}</span>
                 </div>
                 @else
                 <div class="factura-row">
@@ -376,7 +376,7 @@
                 </div>
                 <div class="factura-row">
                     <span>Fecha:</span>
-                    <span>{{ $invoice->created_at->format('d/m/Y h:i a') }}</span>
+                    <span>{{ ($invoice->invoice_date ?? $invoice->created_at)->format('d/m/Y h:i a') }}</span>
                 </div>
                 <div class="factura-row">
                     <span>RTN:</span>
@@ -701,7 +701,7 @@
 
             @if($invoice->invoice_type === 'cancelled')
                 <div class="pagado-stamp" style="border-color: #ef4444; color: #ef4444;">CANCELADO</div>
-            @elseif($invoice->payment_type !== 'credit')
+            @elseif($invoice->payment_type !== 'credit' || $invoice->invoice_type === 'social security' || (float) $invoice->total_paid >= (float) $invoice->total || ($invoice->creditRelation && (float) $invoice->creditRelation->amount_remaining <= 0))
                 <div class="pagado-stamp">PAGADO</div>
             @else
                 <div class="pagado-stamp" style="border-color: #ef4444; color: #ef4444;">AL CRÉDITO</div>

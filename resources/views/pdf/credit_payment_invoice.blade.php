@@ -329,7 +329,7 @@
                 </div>
                 <div class="factura-row">
                     <span>Fecha:</span>
-                    <span>{{ $invoice->created_at->format('d/m/Y h:i a') }}</span>
+                    <span>{{ ($invoice->invoice_date ?? $invoice->created_at)->format('d/m/Y h:i a') }}</span>
                 </div>
                 <div class="factura-row" style="flex-direction: column;">
                     <span style="margin-bottom: 1px;">CAI:</span>

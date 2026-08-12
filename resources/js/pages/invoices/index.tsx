@@ -31,6 +31,7 @@ import {
     Calendar,
     AlertOctagon,
     Ban,
+    FolderMinus,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
@@ -105,6 +106,8 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import CreditExtractSpecimenSheet from '../credits/credit-extract-specimen-sheet';
+import CreditFinalPaymentSheet from '../credits/credit-final-payment-sheet';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import SpecimenGroupSheet from '../specimens/specimen-group-sheet';
 import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
@@ -144,12 +147,15 @@ interface Invoice {
     total_paid: string | number;
     proof_of_payment: string | null;
     invoice_file: string | null;
+    invoice_date?: string | null;
     created_at: string;
     group?: any;
     quantity?: number;
     age_discount_type?: string | null;
     age_discount_amount?: string | number | null;
     isv_15?: string | number | null;
+    is_group?: boolean;
+    group_id?: number | null;
 }
 
 interface Props {
@@ -460,12 +466,16 @@ const getSpecimenDateRangeText = (
     invoice: any,
     filters: { date_from?: string; date_to?: string },
 ) => {
-    if (!invoice.is_group) return null;
+    if (!invoice.is_group) {
+        return null;
+    }
 
     const dateFrom = filters.date_from || '';
     const dateTo = filters.date_to || '';
 
-    if (!dateFrom && !dateTo) return null;
+    if (!dateFrom && !dateTo) {
+        return null;
+    }
 
     const invoiceDateStr = invoice.created_at
         ? String(invoice.created_at).substring(0, 10)
@@ -474,7 +484,9 @@ const getSpecimenDateRangeText = (
         (dateFrom && invoiceDateStr < dateFrom) ||
         (dateTo && invoiceDateStr > dateTo);
 
-    if (!isOutsideRange) return null;
+    if (!isOutsideRange) {
+        return null;
+    }
 
     const creditSpecs =
         invoice.credit_invoice_specimens || invoice.creditInvoiceSpecimens;
@@ -485,14 +497,26 @@ const getSpecimenDateRangeText = (
     if (invoice.payment_type === 'credit' && creditSpecs) {
         specimens = creditSpecs
             .map((cis: any) => {
-                if (!cis.specimen) return null;
+                if (!cis.specimen) {
+                    return null;
+                }
+
                 const specDateStr = cis.specimen.created_at
                     ? String(cis.specimen.created_at).substring(0, 10)
                     : '';
                 let inRange = true;
-                if (dateFrom && specDateStr < dateFrom) inRange = false;
-                if (dateTo && specDateStr > dateTo) inRange = false;
-                if (!inRange) return null;
+
+                if (dateFrom && specDateStr < dateFrom) {
+                    inRange = false;
+                }
+
+                if (dateTo && specDateStr > dateTo) {
+                    inRange = false;
+                }
+
+                if (!inRange) {
+                    return null;
+                }
 
                 const formattedDate = format(
                     new Date(cis.specimen.created_at),
@@ -504,6 +528,7 @@ const getSpecimenDateRangeText = (
                     'h:mm a',
                     { locale: es },
                 );
+
                 return {
                     code: cis.specimen.sequence_code,
                     date: formattedDate,
@@ -517,14 +542,26 @@ const getSpecimenDateRangeText = (
     } else if (groupSpecs) {
         specimens = groupSpecs
             .map((gs: any) => {
-                if (!gs.specimen) return null;
+                if (!gs.specimen) {
+                    return null;
+                }
+
                 const specDateStr = gs.specimen.created_at
                     ? String(gs.specimen.created_at).substring(0, 10)
                     : '';
                 let inRange = true;
-                if (dateFrom && specDateStr < dateFrom) inRange = false;
-                if (dateTo && specDateStr > dateTo) inRange = false;
-                if (!inRange) return null;
+
+                if (dateFrom && specDateStr < dateFrom) {
+                    inRange = false;
+                }
+
+                if (dateTo && specDateStr > dateTo) {
+                    inRange = false;
+                }
+
+                if (!inRange) {
+                    return null;
+                }
 
                 const formattedDate = format(
                     new Date(gs.specimen.created_at),
@@ -536,6 +573,7 @@ const getSpecimenDateRangeText = (
                     'h:mm a',
                     { locale: es },
                 );
+
                 return {
                     code: gs.specimen.sequence_code,
                     date: formattedDate,
@@ -548,7 +586,9 @@ const getSpecimenDateRangeText = (
             );
     }
 
-    if (specimens.length === 0) return null;
+    if (specimens.length === 0) {
+        return null;
+    }
 
     return (
         <div className="mt-1 flex w-full flex-col gap-1">
@@ -601,6 +641,7 @@ export default function InvoicesIndex({
     const canViewSpecimen = auth.permissions?.includes('specimens.view');
     const canEditSpecimen = auth.permissions?.includes('specimens.edit');
     const canManageInvoices = auth.permissions?.includes('invoices.manage');
+    const canManageCredits = auth.permissions?.includes('credits.manage');
     const canCreateWorkOrders =
         auth.permissions?.includes('work_orders.create');
 
@@ -633,7 +674,27 @@ export default function InvoicesIndex({
         null,
     );
     const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null);
+    const [isFinalPaymentSheetOpen, setIsFinalPaymentSheetOpen] =
+        useState(false);
+    const [selectedCreditForFinalPayment, setSelectedCreditForFinalPayment] =
+        useState<any | null>(null);
+    const [isExtractSpecimenSheetOpen, setIsExtractSpecimenSheetOpen] =
+        useState(false);
+    const [
+        selectedCreditForExtractSpecimen,
+        setSelectedCreditForExtractSpecimen,
+    ] = useState<any | null>(null);
     const [search, setSearch] = useState(filters.search || '');
+
+    const handlePayFinalClick = (credit: any) => {
+        setSelectedCreditForFinalPayment(credit);
+        setIsFinalPaymentSheetOpen(true);
+    };
+
+    const handleExtractSpecimenClick = (credit: any) => {
+        setSelectedCreditForExtractSpecimen(credit);
+        setIsExtractSpecimenSheetOpen(true);
+    };
     const [isCancellationReasonSheetOpen, setIsCancellationReasonSheetOpen] =
         useState(false);
     const [
@@ -1514,12 +1575,36 @@ export default function InvoicesIndex({
                         <TableHeader>
                             <TableRow>
                                 <TableHead
-                                    className={`pointer-events-none z-10 w-[150px] min-w-[150px] border-r border-border bg-card after:top-0 after:right-[-8px] after:bottom-0 after:hidden after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent after:transition-opacity after:duration-200 md:sticky md:left-0 md:after:absolute dark:after:from-black/[0.2] ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}
+                                    className={`z-10 w-[150px] min-w-[150px] border-r border-border bg-card after:top-0 after:right-[-8px] after:bottom-0 after:hidden after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent after:transition-opacity after:duration-200 md:sticky md:left-0 md:after:absolute dark:after:from-black/[0.2] ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}
                                 >
-                                    Nº Factura
+                                    {renderSortHeader(
+                                        'invoice_number',
+                                        'Nº Factura',
+                                    )}
                                 </TableHead>
-                                <TableHead className="min-w-[150px] pl-5">
-                                    {renderSortHeader('date', 'Fecha')}
+                                <TableHead className="min-w-[300px] pl-5">
+                                    <div className="flex flex-col gap-0.5 py-1">
+                                        <span className="text-[10px] font-bold tracking-wider text-muted-foreground/80 uppercase">
+                                            Ordenar por
+                                        </span>
+                                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs">
+                                            <div className="text-left">
+                                                {renderSortHeader(
+                                                    'invoice_date',
+                                                    'Fecha Factura',
+                                                )}
+                                            </div>
+                                            <span className="text-muted-foreground/30">
+                                                |
+                                            </span>
+                                            <div className="text-left">
+                                                {renderSortHeader(
+                                                    'date',
+                                                    'Fecha Creación',
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </TableHead>
                                 <TableHead className="min-w-[200px] pl-5">
                                     {renderSortHeader('customer', 'Cliente')}
@@ -1608,35 +1693,74 @@ export default function InvoicesIndex({
                                                         '-'}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="min-w-[150px] pl-5">
-                                                <div className="flex flex-col gap-0.5">
-                                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                                        <span>
-                                                            {invoice.created_at
-                                                                ? format(
-                                                                      new Date(
-                                                                          invoice.created_at,
-                                                                      ),
-                                                                      'dd/MM/yyyy',
-                                                                      {
-                                                                          locale: es,
-                                                                      },
-                                                                  )
-                                                                : 'N/A'}
+                                            <TableCell className="min-w-[300px] pl-5">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[10px]">
+                                                        <div className="text-left">
+                                                            <div className="flex items-center gap-1 text-[11px] font-medium text-foreground">
+                                                                <span>
+                                                                    {invoice.invoice_date
+                                                                        ? format(
+                                                                              new Date(
+                                                                                  invoice.invoice_date,
+                                                                              ),
+                                                                              'dd/MM/yyyy',
+                                                                              {
+                                                                                  locale: es,
+                                                                              },
+                                                                          )
+                                                                        : '-'}
+                                                                </span>
+                                                                {invoice.invoice_date && (
+                                                                    <span className="font-mono text-[9px] text-muted-foreground/75 before:mr-1 before:content-['•']">
+                                                                        {format(
+                                                                            new Date(
+                                                                                invoice.invoice_date,
+                                                                            ),
+                                                                            'h:mm a',
+                                                                            {
+                                                                                locale: es,
+                                                                            },
+                                                                        )}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <span className="text-xs text-muted-foreground/30">
+                                                            |
                                                         </span>
-                                                        <span className="font-mono text-[9px] text-muted-foreground/80 before:mr-1 before:content-['•']">
-                                                            {invoice.created_at
-                                                                ? format(
-                                                                      new Date(
-                                                                          invoice.created_at,
-                                                                      ),
-                                                                      'h:mm a',
-                                                                      {
-                                                                          locale: es,
-                                                                      },
-                                                                  )
-                                                                : 'N/A'}
-                                                        </span>
+
+                                                        <div className="text-left">
+                                                            <div className="flex items-center gap-1 text-[11px] font-medium text-foreground">
+                                                                <span>
+                                                                    {invoice.created_at
+                                                                        ? format(
+                                                                              new Date(
+                                                                                  invoice.created_at,
+                                                                              ),
+                                                                              'dd/MM/yyyy',
+                                                                              {
+                                                                                  locale: es,
+                                                                              },
+                                                                          )
+                                                                        : '-'}
+                                                                </span>
+                                                                {invoice.created_at && (
+                                                                    <span className="font-mono text-[9px] text-muted-foreground/75 before:mr-1 before:content-['•']">
+                                                                        {format(
+                                                                            new Date(
+                                                                                invoice.created_at,
+                                                                            ),
+                                                                            'h:mm a',
+                                                                            {
+                                                                                locale: es,
+                                                                            },
+                                                                        )}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                     {getSpecimenDateRangeText(
                                                         invoice,
@@ -2257,6 +2381,119 @@ export default function InvoicesIndex({
                                                                         </span>
                                                                     </DropdownMenuItem>
                                                                 )}
+                                                                {canManageCredits &&
+                                                                    invoice.payment_type ===
+                                                                        'credit' &&
+                                                                    invoice.credit_relation && (
+                                                                        <>
+                                                                            <DropdownMenuItem
+                                                                                onClick={() => {
+                                                                                    const remaining =
+                                                                                        parseFloat(
+                                                                                            String(
+                                                                                                invoice
+                                                                                                    .credit_relation
+                                                                                                    .amount_remaining,
+                                                                                            ),
+                                                                                        );
+
+                                                                                    if (
+                                                                                        remaining >
+                                                                                        0
+                                                                                    ) {
+                                                                                        handlePayFinalClick(
+                                                                                            invoice.credit_relation,
+                                                                                        );
+                                                                                    }
+                                                                                }}
+                                                                                disabled={
+                                                                                    parseFloat(
+                                                                                        String(
+                                                                                            invoice
+                                                                                                .credit_relation
+                                                                                                .amount_remaining,
+                                                                                        ),
+                                                                                    ) <=
+                                                                                    0
+                                                                                }
+                                                                                className={
+                                                                                    parseFloat(
+                                                                                        String(
+                                                                                            invoice
+                                                                                                .credit_relation
+                                                                                                .amount_remaining,
+                                                                                        ),
+                                                                                    ) <=
+                                                                                    0
+                                                                                        ? 'opacity-50'
+                                                                                        : ''
+                                                                                }
+                                                                            >
+                                                                                <Coins className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                                <span>
+                                                                                    Pago
+                                                                                    final
+                                                                                </span>
+                                                                            </DropdownMenuItem>
+                                                                            {(() => {
+                                                                                const credit =
+                                                                                    invoice.credit_relation;
+                                                                                const specimensCount =
+                                                                                    credit
+                                                                                        .credit_invoice_specimens
+                                                                                        ?.length ??
+                                                                                    invoice
+                                                                                        .group
+                                                                                        ?.specimens
+                                                                                        ?.length ??
+                                                                                    (invoice.is_group
+                                                                                        ? 2
+                                                                                        : 1);
+                                                                                const remaining =
+                                                                                    parseFloat(
+                                                                                        String(
+                                                                                            credit.amount_remaining ||
+                                                                                                '0',
+                                                                                        ),
+                                                                                    );
+                                                                                const isSingleOrPaid =
+                                                                                    (!invoice.is_group &&
+                                                                                        !credit.is_group) ||
+                                                                                    specimensCount <=
+                                                                                        1 ||
+                                                                                    remaining <=
+                                                                                        0;
+
+                                                                                return (
+                                                                                    <DropdownMenuItem
+                                                                                        onClick={() => {
+                                                                                            if (
+                                                                                                !isSingleOrPaid
+                                                                                            ) {
+                                                                                                handleExtractSpecimenClick(
+                                                                                                    credit,
+                                                                                                );
+                                                                                            }
+                                                                                        }}
+                                                                                        disabled={
+                                                                                            isSingleOrPaid
+                                                                                        }
+                                                                                        className={
+                                                                                            isSingleOrPaid
+                                                                                                ? 'opacity-50'
+                                                                                                : ''
+                                                                                        }
+                                                                                    >
+                                                                                        <FolderMinus className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                                        <span>
+                                                                                            Sacar
+                                                                                            muestra
+                                                                                        </span>
+                                                                                    </DropdownMenuItem>
+                                                                                );
+                                                                            })()}
+                                                                        </>
+                                                                    )}
                                                                 {canEditSpecimen &&
                                                                     invoice.invoice_type !==
                                                                         'cancelled' &&
@@ -2675,6 +2912,19 @@ export default function InvoicesIndex({
                 banks={banks}
                 specimenTypes={specimenTypes}
                 settings={settings}
+            />
+
+            <CreditFinalPaymentSheet
+                credit={selectedCreditForFinalPayment}
+                banks={banks}
+                open={isFinalPaymentSheetOpen}
+                onOpenChange={setIsFinalPaymentSheetOpen}
+            />
+
+            <CreditExtractSpecimenSheet
+                credit={selectedCreditForExtractSpecimen}
+                open={isExtractSpecimenSheetOpen}
+                onOpenChange={setIsExtractSpecimenSheetOpen}
             />
 
             {/* Specimen Sheets */}

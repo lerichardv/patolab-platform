@@ -402,20 +402,25 @@ export default function CuttingsReportIndex({
         cuttings.forEach((cutting) => {
             const specId = cutting.specimen?.id || 0;
             let group = groups.find((g) => g.specimen?.id === specId);
+
             if (!group) {
                 group = { specimen: cutting.specimen, cuttings: [] };
                 groups.push(group);
             }
+
             group.cuttings.push(cutting);
         });
+
         return groups;
     }, [cuttings]);
 
     const formatStatusDate = (dateStr: string | null | undefined) => {
-        if (!dateStr)
+        if (!dateStr) {
             return (
                 <span className="text-xs text-muted-foreground italic">-</span>
             );
+        }
+
         try {
             return (
                 <span className="font-mono text-xs">
@@ -573,6 +578,7 @@ export default function CuttingsReportIndex({
 
     const getStatusBadge = (status: string, count?: number) => {
         const suffix = count && count > 1 ? ` x${count}` : '';
+
         switch (status) {
             case 'macroscopy':
                 return (
@@ -1235,6 +1241,7 @@ export default function CuttingsReportIndex({
                                                                                                 ] ||
                                                                                                     0) +
                                                                                                 1;
+
                                                                                             return acc;
                                                                                         },
                                                                                         {} as Record<
@@ -1260,6 +1267,7 @@ export default function CuttingsReportIndex({
                                                                                             1
                                                                                                 ? ` x${count}`
                                                                                                 : '';
+
                                                                                         return (
                                                                                             <span
                                                                                                 key={
@@ -1381,6 +1389,7 @@ export default function CuttingsReportIndex({
                                                                                             ),
                                                                                     ),
                                                                                 );
+
                                                                             if (
                                                                                 stains.length >
                                                                                 0
@@ -1408,6 +1417,7 @@ export default function CuttingsReportIndex({
                                                                                     </div>
                                                                                 );
                                                                             }
+
                                                                             return (
                                                                                 <span className="text-xs text-muted-foreground italic">
                                                                                     Ninguna
@@ -1436,16 +1446,21 @@ export default function CuttingsReportIndex({
                                                                                             ),
                                                                                     ),
                                                                                 );
+
                                                                             if (
                                                                                 names.length ===
                                                                                 1
-                                                                            )
+                                                                            ) {
                                                                                 return names[0];
+                                                                            }
+
                                                                             if (
                                                                                 names.length >
                                                                                 1
-                                                                            )
+                                                                            ) {
                                                                                 return 'Varios';
+                                                                            }
+
                                                                             return 'No asignado';
                                                                         })()}
                                                                     </TableCell>

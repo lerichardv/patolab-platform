@@ -269,6 +269,7 @@ const getCuttingsSummary = (cuttings?: any[]) => {
         );
 
     let range = 'N/A';
+
     if (codes.length > 0) {
         const start = codes[0];
         const end = codes[codes.length - 1];
@@ -565,11 +566,15 @@ export default function MyAssignmentsIndex({
                     specimen.cuttings.length > 0 &&
                     ((!cuttingsDateRange.from && !cuttingsDateRange.to) ||
                         specimen.cuttings.some((cutting) => {
-                            if (!cutting.created_at) return false;
+                            if (!cutting.created_at) {
+                                return false;
+                            }
+
                             const cuttingDateStr = format(
                                 new Date(cutting.created_at),
                                 'yyyy-MM-dd',
                             );
+
                             return (
                                 (!cuttingsDateRange.from ||
                                     cuttingDateStr >= cuttingsDateRange.from) &&
@@ -1824,14 +1829,17 @@ export default function MyAssignmentsIndex({
                                                                             getCuttingsSummary(
                                                                                 specimen.cuttings,
                                                                             );
+
                                                                         if (
                                                                             !summary
-                                                                        )
+                                                                        ) {
                                                                             return (
                                                                                 <span className="text-xs text-muted-foreground italic">
                                                                                     N/A
                                                                                 </span>
                                                                             );
+                                                                        }
+
                                                                         return (
                                                                             <div className="flex flex-wrap gap-1">
                                                                                 <Badge

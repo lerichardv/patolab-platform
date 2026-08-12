@@ -1020,6 +1020,7 @@ export default function SpecimensIndex({
 
     const handleLoadGroupAndOpenSheet = async (groupId: number) => {
         const toastId = toast.loading('Cargando detalles del grupo...');
+
         try {
             const response = await axios.get(
                 `/specimen-groups/${groupId}/details`,
@@ -2047,7 +2048,7 @@ export default function SpecimensIndex({
                         <button
                             type="button"
                             onClick={scrollLeftFn}
-                            className="absolute left-2 z-[60] flex items-center justify-center rounded-full border border-primary/20 bg-background/80 p-3 text-foreground shadow-lg backdrop-blur-md transition-[transform,background-color,border-color,box-shadow] duration-150 hover:scale-110 hover:border-primary/50 hover:bg-background active:scale-95"
+                            className="absolute left-2 z-[60] flex items-center justify-center rounded-full border border-primary/20 bg-background/80 p-3 text-foreground shadow-lg transition-[transform,background-color,border-color,box-shadow] duration-150 hover:scale-110 hover:border-primary/50 hover:bg-background active:scale-95"
                             style={{
                                 top: `${mouseY}px`,
                                 transform: 'translateY(-50%)',
@@ -2062,7 +2063,7 @@ export default function SpecimensIndex({
                         <button
                             type="button"
                             onClick={scrollRightFn}
-                            className="absolute right-2 z-[60] flex items-center justify-center rounded-full border border-primary/20 bg-background/80 p-3 text-foreground shadow-lg backdrop-blur-md transition-[transform,background-color,border-color,box-shadow] duration-150 hover:scale-110 hover:border-primary/50 hover:bg-background active:scale-95"
+                            className="absolute right-2 z-[60] flex items-center justify-center rounded-full border border-primary/20 bg-background/80 p-3 text-foreground shadow-lg transition-[transform,background-color,border-color,box-shadow] duration-150 hover:scale-110 hover:border-primary/50 hover:bg-background active:scale-95"
                             style={{
                                 top: `${mouseY}px`,
                                 transform: 'translateY(-50%)',

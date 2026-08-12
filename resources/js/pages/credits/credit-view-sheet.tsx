@@ -74,6 +74,7 @@ interface Credit {
     credit_amount: string | number;
     amount_paid: string | number;
     amount_remaining: string | number;
+    status?: string;
     created_at: string;
     is_group?: boolean;
     group_id?: number | null;
@@ -395,7 +396,8 @@ export default function CreditViewSheet({ credit, open, onOpenChange }: Props) {
                             />
                         </div>
                         <div className="mt-1 shrink-0">
-                            {isPaid ? (
+                            {credit.status === 'paid' ||
+                            (credit.status === undefined && isPaid) ? (
                                 <Badge
                                     variant="outline"
                                     className="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
@@ -403,12 +405,28 @@ export default function CreditViewSheet({ credit, open, onOpenChange }: Props) {
                                     <CheckCircle2 className="mr-1 h-3 w-3" />
                                     Pagado
                                 </Badge>
-                            ) : isPartial ? (
+                            ) : credit.status === 'invoice generated' ? (
+                                <Badge
+                                    variant="outline"
+                                    className="border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-400"
+                                >
+                                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                                    Factura Generada
+                                </Badge>
+                            ) : credit.status === 'partial' ||
+                              (credit.status === undefined && isPartial) ? (
                                 <Badge
                                     variant="outline"
                                     className="border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"
                                 >
                                     Pago Parcial
+                                </Badge>
+                            ) : credit.status === 'cancelled' ? (
+                                <Badge
+                                    variant="outline"
+                                    className="border-slate-500/20 bg-slate-500/10 text-slate-700 dark:text-slate-400"
+                                >
+                                    Cancelado
                                 </Badge>
                             ) : (
                                 <Badge

@@ -129,6 +129,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                                 'specimen' => $cis->specimen,
                                 'payment_type' => $invoice->payment_type,
                                 'invoice_id' => $invoice->id,
+                                'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                                'created_at' => $invoice->created_at ? $invoice->created_at->toDateString() : null,
                             ];
                         }
                     } else {
@@ -150,6 +152,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                                 'specimen' => $igs->specimen,
                                 'payment_type' => $invoice->payment_type,
                                 'invoice_id' => $invoice->id,
+                                'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                                'created_at' => $invoice->created_at ? $invoice->created_at->toDateString() : null,
                             ];
                         }
                     }
@@ -163,6 +167,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                         'specimen' => $invoice->specimen,
                         'payment_type' => $invoice->payment_type,
                         'invoice_id' => $invoice->id,
+                        'invoice_date' => $invoice->invoice_date ? $invoice->invoice_date->toDateString() : null,
+                        'created_at' => $invoice->created_at ? $invoice->created_at->toDateString() : null,
                     ];
                 }
             }
@@ -220,6 +226,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'total' => $row['total'],
                     'total_paid' => $row['net_amount'],
                     'payment_type' => $row['payment_type'],
+                    'invoice_date' => $row['invoice_date'] ?? null,
+                    'created_at' => $row['created_at'] ?? null,
                 ]));
                 $todaySpecimens[] = $specimen;
             }
@@ -307,6 +315,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('credits/export', [CreditController::class, 'export'])->name('credits.export');
     Route::resource('credits', CreditController::class)->only(['index', 'update']);
     Route::post('credits/{credit}/pay', [CreditController::class, 'pay'])->name('credits.pay');
+    Route::post('credits/{credit}/pay-final', [CreditController::class, 'payFinal'])->name('credits.pay-final');
+    Route::post('credits/{credit}/mark-as-paid', [CreditController::class, 'markAsPaid'])->name('credits.mark-as-paid');
+    Route::post('credits/{credit}/extract-specimens', [CreditController::class, 'extractSpecimens'])->name('credits.extract-specimens');
 
     Route::resource('rentals', RentalController::class)->only(['index', 'store', 'update']);
     Route::post('rentals/{rental}/pay', [RentalController::class, 'pay'])->name('rentals.pay');

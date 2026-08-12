@@ -531,6 +531,7 @@ class SpecimenController extends Controller
                 'created_by_id' => auth()->id(),
                 'specimen_id' => $specimen->id,
                 'payment_type' => $validated['payment_type'],
+                'invoice_date' => (! $isCredit && $fullInvoiceNumber) ? now() : null,
                 'credit_payment_id' => $creditId,
                 'quantity' => $qty,
                 'amount' => $unitPrice,

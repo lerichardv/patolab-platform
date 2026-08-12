@@ -1,5 +1,5 @@
-import { format } from 'date-fns';
 import { router, usePage } from '@inertiajs/react';
+import { format } from 'date-fns';
 import {
     Check,
     Copy,
@@ -150,7 +150,10 @@ const indexToLetter = (index: number): string => {
 };
 
 const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return '-';
+    if (!dateStr) {
+        return '-';
+    }
+
     try {
         return format(new Date(dateStr), 'dd/MM/yyyy h:mm a');
     } catch (e) {
