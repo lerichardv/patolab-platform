@@ -148,13 +148,22 @@ class InvoiceController extends Controller
                 $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
                     $sub->where('invoices.is_group', true)
                         ->where('payment_type', 'credit')
-                        ->whereHas('creditInvoiceSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
-                            if (! empty($dateFrom)) {
-                                $subQ->whereDate('created_at', '>=', $dateFrom);
-                            }
-                            if (! empty($dateTo)) {
-                                $subQ->whereDate('created_at', '<=', $dateTo);
-                            }
+                        ->where(function ($creditSub) use ($dateFrom, $dateTo) {
+                            $creditSub->whereHas('creditInvoiceSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            })->orWhereHas('groupSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            });
                         });
                 });
 

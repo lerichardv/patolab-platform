@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\Location;
+use App\Models\Setting;
 use App\Models\SpecimenTypeExamination;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Browsershot\Browsershot;
@@ -31,7 +32,10 @@ class InvoicePdfService
 
         $customer = $invoice->customer;
         $caiRange = $invoice->caiRange;
-        $location = Location::find($caiRange->location_id);
+        $defaultLocationId = Setting::where('setting_key', 'default_location_id')->value('setting_value');
+        $location = $caiRange
+            ? Location::find($caiRange->location_id)
+            : ($invoice->specimen?->location_id ? Location::find($invoice->specimen->location_id) : ($defaultLocationId ? Location::find($defaultLocationId) : Location::first()));
         $examination = null;
         if ($invoice->specimen) {
             $examination = SpecimenTypeExamination::find($invoice->specimen->specimen_type_examination);

@@ -14,6 +14,7 @@ use App\Models\Location;
 use App\Models\PrioritySpecimenOrder;
 use App\Models\Product;
 use App\Models\Sequence;
+use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenGroup;
 use App\Models\SpecimenGroupCustomer;
@@ -101,10 +102,14 @@ class SpecimenGroupController extends Controller
         $invoice = null;
 
         DB::transaction(function () use ($request, $validated, &$group, &$invoice) {
+            $isCredit = $validated['payment_type'] === 'credit';
             $caiRange = CaiRange::where('status', 'active')->lockForUpdate()->first();
-            if (! $caiRange) {
+            if (! $caiRange && ! $isCredit) {
                 throw new \Exception('No hay un rango CAI activo configurado en el sistema.');
             }
+
+            $defaultLocationId = Setting::where('setting_key', 'default_location_id')->value('setting_value');
+            $locationId = $caiRange ? $caiRange->location_id : ($defaultLocationId ? (int) $defaultLocationId : (Location::first()?->id ?? 1));
 
             // Calculate overall totals from specimens
             $totalAmount = 0.00;
@@ -163,20 +168,27 @@ class SpecimenGroupController extends Controller
                 ]);
             }
 
-            do {
-                $nextNumber = $caiRange->last_used_number + 1;
-                $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
-                $fullInvoiceNumber = $caiRange->full_prefix.$invoiceNumber;
+            $invoiceNumber = null;
+            $fullInvoiceNumber = null;
+            $caiRangeId = null;
 
-                $exists = Invoice::where('full_invoice_number', $fullInvoiceNumber)->exists();
-                if ($exists) {
-                    $caiRange->increment('last_used_number');
-                    if ($caiRange->last_used_number >= $caiRange->end_number) {
-                        $caiRange->update(['status' => 'exhausted']);
-                        throw new \Exception('El rango CAI activo se ha agotado al buscar un número de factura disponible.');
+            if (! $isCredit && $caiRange) {
+                do {
+                    $nextNumber = $caiRange->last_used_number + 1;
+                    $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+                    $fullInvoiceNumber = $caiRange->full_prefix.$invoiceNumber;
+
+                    $exists = Invoice::where('full_invoice_number', $fullInvoiceNumber)->exists();
+                    if ($exists) {
+                        $caiRange->increment('last_used_number');
+                        if ($caiRange->last_used_number >= $caiRange->end_number) {
+                            $caiRange->update(['status' => 'exhausted']);
+                            throw new \Exception('El rango CAI activo se ha agotado al buscar un número de factura disponible.');
+                        }
                     }
-                }
-            } while ($exists);
+                } while ($exists);
+                $caiRangeId = $caiRange->id;
+            }
 
             // Save proof of payment file
             $proofOfPaymentPath = null;
@@ -220,7 +232,7 @@ class SpecimenGroupController extends Controller
             $invoice = Invoice::create([
                 'full_invoice_number' => $fullInvoiceNumber,
                 'invoice_number' => $invoiceNumber,
-                'cai_range_id' => $caiRange->id,
+                'cai_range_id' => $caiRangeId,
                 'customer_id' => $validated['global_customer_id'],
                 'created_by_id' => auth()->id(),
                 'specimen_id' => null, // Left null since it is linked to a group
@@ -288,7 +300,7 @@ class SpecimenGroupController extends Controller
             foreach ($specimensData as $index => $specData) {
                 $sequenceCode = $specData['reserved_code'] ?? null;
                 if (! $sequenceCode) {
-                    $sequence = Sequence::where('location_id', $caiRange->location_id)
+                    $sequence = Sequence::where('location_id', $locationId)
                         ->where('specimen_type', $specData['specimen_type'])
                         ->where('active', true)
                         ->lockForUpdate()
@@ -339,6 +351,7 @@ class SpecimenGroupController extends Controller
                     'delivery_token' => Str::random(32),
                     'is_group' => true,
                     'group_id' => $group->id,
+                    'location_id' => $locationId,
                     'sample_collection_date' => $specData['sample_collection_date'] ?? null,
                 ]);
 
@@ -493,9 +506,11 @@ class SpecimenGroupController extends Controller
             }
 
             // CAI tracking
-            $caiRange->increment('last_used_number');
-            if ($caiRange->last_used_number >= $caiRange->end_number) {
-                $caiRange->update(['status' => 'exhausted']);
+            if (! $isCredit && $caiRange) {
+                $caiRange->increment('last_used_number');
+                if ($caiRange->last_used_number >= $caiRange->end_number) {
+                    $caiRange->update(['status' => 'exhausted']);
+                }
             }
 
             try {
@@ -503,7 +518,7 @@ class SpecimenGroupController extends Controller
                 $invoice->load(['creditRelation']);
                 $totalWords = $this->numberToSpanishWords($invoice->total);
                 $customer = $globalCustomer;
-                $location = Location::findOrFail($caiRange->location_id);
+                $location = $caiRange ? Location::find($caiRange->location_id) : (Location::find($locationId) ?? Location::first());
 
                 // We pass the explicit specimens array to handle grouping inside layout
                 $htmlContent = view('pdf.invoice', [

@@ -9,7 +9,7 @@ class SettingsSeeder extends Seeder
 {
     public function run(): void
     {
-        Setting::updateOrCreate(
+        Setting::firstOrCreate(
             ['setting_key' => 'third_age_discount'],
             [
                 'setting_value' => '30',
@@ -17,7 +17,7 @@ class SettingsSeeder extends Seeder
             ]
         );
 
-        Setting::updateOrCreate(
+        Setting::firstOrCreate(
             ['setting_key' => 'fourth_age_discount'],
             [
                 'setting_value' => '40',
@@ -25,7 +25,7 @@ class SettingsSeeder extends Seeder
             ]
         );
 
-        Setting::updateOrCreate(
+        Setting::firstOrCreate(
             ['setting_key' => 'pathologist_role_id'],
             [
                 'setting_value' => '2',
@@ -33,12 +33,20 @@ class SettingsSeeder extends Seeder
             ]
         );
 
-        Setting::updateOrCreate(
+        Setting::firstOrCreate(
             ['setting_key' => 'pathologist_technician_role_id'],
             [
                 'has_multiple_values' => '1',
                 'setting_value_multiple' => '[1,2,3,4,5,6,7,8,9,10]',
                 'description' => 'Rol que corresponde al técnico de patología (para gestión interna)',
+            ]
+        );
+
+        Setting::firstOrCreate(
+            ['setting_key' => 'default_location_id'],
+            [
+                'setting_value' => '1',
+                'description' => 'Ubicación o sucursal por defecto en la que opera la plataforma',
             ]
         );
     }

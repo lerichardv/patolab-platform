@@ -115,9 +115,9 @@ import InvoiceViewSheet from './invoice-view-sheet';
 
 interface Invoice {
     id: number;
-    full_invoice_number: string;
-    invoice_number: number;
-    cai_range_id: number;
+    full_invoice_number: string | null;
+    invoice_number: number | string | null;
+    cai_range_id: number | null;
     cai_range: any;
     customer_id: number;
     customer: any;
@@ -1604,9 +1604,8 @@ export default function InvoicesIndex({
                                                 className={`pointer-events-none z-10 w-[150px] min-w-[150px] border-r border-border bg-card transition-colors group-hover:bg-muted after:top-0 after:right-[-8px] after:bottom-0 after:hidden after:w-[8px] after:bg-gradient-to-r after:from-black/[0.06] after:to-transparent after:transition-opacity after:duration-200 md:sticky md:left-0 md:after:absolute dark:after:from-black/[0.2] ${showLeftShadow ? 'after:opacity-100' : 'after:opacity-0'}`}
                                             >
                                                 <span className="font-mono text-sm font-semibold text-foreground">
-                                                    {
-                                                        invoice.full_invoice_number
-                                                    }
+                                                    {invoice.full_invoice_number ||
+                                                        '-'}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="min-w-[150px] pl-5">

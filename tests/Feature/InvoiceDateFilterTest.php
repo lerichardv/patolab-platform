@@ -85,8 +85,8 @@ test('invoice list filters individual invoices by invoice created_at and grouped
         'is_group' => false,
         'invoice_type' => 'specimen',
         'invoice_file' => 'invoice_1.pdf',
-        'created_at' => '2026-08-06 12:00:00',
     ]);
+    $invoice1->forceFill(['created_at' => '2026-08-06 12:00:00'])->save();
 
     // 2. Individual invoice #2: created_at on 2026-08-07 (inside target range 2026-08-07)
     $invoice2 = Invoice::create([
@@ -103,8 +103,8 @@ test('invoice list filters individual invoices by invoice created_at and grouped
         'is_group' => false,
         'invoice_type' => 'specimen',
         'invoice_file' => 'invoice_2.pdf',
-        'created_at' => '2026-08-07 12:00:00',
     ]);
+    $invoice2->forceFill(['created_at' => '2026-08-07 12:00:00'])->save();
 
     // 3. Grouped non-credit invoice #3: created_at on 2026-08-06 (outside range),
     // but its specimen is created on 2026-08-07 (inside range)
@@ -122,14 +122,15 @@ test('invoice list filters individual invoices by invoice created_at and grouped
         'is_group' => true,
         'invoice_type' => 'specimen',
         'invoice_file' => 'invoice_3.pdf',
-        'created_at' => '2026-08-06 12:00:00',
     ]);
+    $invoice3->forceFill(['created_at' => '2026-08-06 12:00:00'])->save();
 
     $group3 = SpecimenGroup::create([
         'name' => 'Group 3',
         'customer_id' => $customer->id,
         'invoice_id' => $invoice3->id,
     ]);
+    $invoice3->update(['group_id' => $group3->id]);
 
     $specimen3 = Specimen::create([
         'sequence_code' => 'BIO-0003-2026',
@@ -141,8 +142,8 @@ test('invoice list filters individual invoices by invoice created_at and grouped
         'priority_id' => $priority->id,
         'status' => 'received',
         'group_id' => $group3->id,
-        'created_at' => '2026-08-07 10:00:00', // Inside range!
     ]);
+    $specimen3->forceFill(['created_at' => '2026-08-07 10:00:00'])->save();
 
     InvoiceGroupSpecimen::create([
         'invoice_id' => $invoice3->id,
@@ -170,14 +171,15 @@ test('invoice list filters individual invoices by invoice created_at and grouped
         'is_group' => true,
         'invoice_type' => 'specimen',
         'invoice_file' => 'invoice_4.pdf',
-        'created_at' => '2026-08-06 12:00:00',
     ]);
+    $invoice4->forceFill(['created_at' => '2026-08-06 12:00:00'])->save();
 
     $group4 = SpecimenGroup::create([
         'name' => 'Group 4',
         'customer_id' => $customer->id,
         'invoice_id' => $invoice4->id,
     ]);
+    $invoice4->update(['group_id' => $group4->id]);
 
     $specimen4 = Specimen::create([
         'sequence_code' => 'BIO-0004-2026',
@@ -189,8 +191,8 @@ test('invoice list filters individual invoices by invoice created_at and grouped
         'priority_id' => $priority->id,
         'status' => 'received',
         'group_id' => $group4->id,
-        'created_at' => '2026-08-07 10:00:00', // Inside range!
     ]);
+    $specimen4->forceFill(['created_at' => '2026-08-07 10:00:00'])->save();
 
     $credit = Credit::create([
         'customer_id' => $customer->id,

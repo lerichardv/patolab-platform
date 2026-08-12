@@ -171,7 +171,7 @@ function InvoiceCard({
             </div>
 
             <div className="font-mono text-sm font-bold text-foreground">
-                {invoice.full_invoice_number}
+                {invoice.full_invoice_number || '-'}
             </div>
 
             <Separator />

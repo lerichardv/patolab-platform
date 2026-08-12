@@ -315,14 +315,18 @@ class SpecimenController extends Controller
         $paymentInvoice = null;
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($request, $validated, &$specimen, &$invoice, &$paymentInvoice) {
+            $isCredit = $validated['payment_type'] === 'credit';
             $caiRange = CaiRange::where('status', 'active')->lockForUpdate()->first();
-            if (! $caiRange) {
+            if (! $caiRange && ! $isCredit) {
                 throw new \Exception('No hay un rango CAI activo configurado en el sistema.');
             }
 
+            $defaultLocationId = Setting::where('setting_key', 'default_location_id')->value('setting_value');
+            $locationId = $caiRange ? $caiRange->location_id : ($defaultLocationId ? (int) $defaultLocationId : (Location::first()?->id ?? 1));
+
             $sequenceCode = $validated['reserved_code'] ?? null;
             if (! $sequenceCode) {
-                $sequence = Sequence::where('location_id', $caiRange->location_id)
+                $sequence = Sequence::where('location_id', $locationId)
                     ->where('specimen_type', $validated['specimen_type'])
                     ->where('active', true)
                     ->lockForUpdate()
@@ -381,7 +385,7 @@ class SpecimenController extends Controller
             }
 
             $specimenData['sequence_code'] = $sequenceCode;
-            $specimenData['location_id'] = $caiRange->location_id;
+            $specimenData['location_id'] = $locationId;
             $specimenData['access_token'] = Str::random(32);
             $specimenData['delivery_token'] = Str::random(32);
 
@@ -439,20 +443,27 @@ class SpecimenController extends Controller
                 'order' => $maxOrder + 1,
             ]);
 
-            do {
-                $nextNumber = $caiRange->last_used_number + 1;
-                $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
-                $fullInvoiceNumber = $caiRange->full_prefix.$invoiceNumber;
+            $invoiceNumber = null;
+            $fullInvoiceNumber = null;
+            $caiRangeId = null;
 
-                $exists = Invoice::where('full_invoice_number', $fullInvoiceNumber)->exists();
-                if ($exists) {
-                    $caiRange->increment('last_used_number');
-                    if ($caiRange->last_used_number >= $caiRange->end_number) {
-                        $caiRange->update(['status' => 'exhausted']);
-                        throw new \Exception('El rango CAI activo se ha agotado al buscar un número de factura disponible.');
+            if (! $isCredit && $caiRange) {
+                do {
+                    $nextNumber = $caiRange->last_used_number + 1;
+                    $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+                    $fullInvoiceNumber = $caiRange->full_prefix.$invoiceNumber;
+
+                    $exists = Invoice::where('full_invoice_number', $fullInvoiceNumber)->exists();
+                    if ($exists) {
+                        $caiRange->increment('last_used_number');
+                        if ($caiRange->last_used_number >= $caiRange->end_number) {
+                            $caiRange->update(['status' => 'exhausted']);
+                            throw new \Exception('El rango CAI activo se ha agotado al buscar un número de factura disponible.');
+                        }
                     }
-                }
-            } while ($exists);
+                } while ($exists);
+                $caiRangeId = $caiRange->id;
+            }
 
             $proofOfPaymentPath = null;
             if ($validated['payment_type'] === 'credit') {
@@ -515,7 +526,7 @@ class SpecimenController extends Controller
             $invoice = Invoice::create([
                 'full_invoice_number' => $fullInvoiceNumber,
                 'invoice_number' => $invoiceNumber,
-                'cai_range_id' => $caiRange->id,
+                'cai_range_id' => $caiRangeId,
                 'customer_id' => $specimen->customer,
                 'created_by_id' => auth()->id(),
                 'specimen_id' => $specimen->id,
@@ -552,9 +563,11 @@ class SpecimenController extends Controller
                 'transfer_authorization_code' => $validated['transfer_authorization_code'] ?? null,
             ]);
 
-            $caiRange->increment('last_used_number');
-            if ($caiRange->last_used_number >= $caiRange->end_number) {
-                $caiRange->update(['status' => 'exhausted']);
+            if (! $isCredit && $caiRange) {
+                $caiRange->increment('last_used_number');
+                if ($caiRange->last_used_number >= $caiRange->end_number) {
+                    $caiRange->update(['status' => 'exhausted']);
+                }
             }
 
             try {

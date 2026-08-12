@@ -1054,23 +1054,83 @@ export default function CreditsIndex({
                                             </TableCell>
                                             <TableCell className="min-w-[180px]">
                                                 <div className="flex flex-col gap-1 text-[11px]">
-                                                    {originalInvoice && (
-                                                        <a
-                                                            href={`/storage/${originalInvoice.invoice_file}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="flex items-center gap-1 font-semibold text-primary hover:underline"
-                                                        >
-                                                            <FileText className="h-3 w-3" />{' '}
-                                                            Original:{' '}
-                                                            {
-                                                                originalInvoice.full_invoice_number
-                                                            }
-                                                        </a>
+                                                    {originalInvoice ? (
+                                                        <div className="flex flex-col gap-0.5">
+                                                            {originalInvoice.invoice_file ? (
+                                                                <a
+                                                                    href={`/storage/${originalInvoice.invoice_file}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="flex items-center gap-1 font-semibold text-primary hover:underline"
+                                                                >
+                                                                    <FileText className="h-3 w-3" />{' '}
+                                                                    {originalInvoice.full_invoice_number ? (
+                                                                        <span>
+                                                                            Original:{' '}
+                                                                            {
+                                                                                originalInvoice.full_invoice_number
+                                                                            }
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span>
+                                                                            Crédito
+                                                                            #
+                                                                            {
+                                                                                credit.id
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                </a>
+                                                            ) : (
+                                                                <span className="flex items-center gap-1 font-semibold text-foreground">
+                                                                    <FileText className="h-3 w-3 text-muted-foreground" />{' '}
+                                                                    {originalInvoice.full_invoice_number ? (
+                                                                        <span>
+                                                                            Original:{' '}
+                                                                            {
+                                                                                originalInvoice.full_invoice_number
+                                                                            }
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span>
+                                                                            Crédito
+                                                                            #
+                                                                            {
+                                                                                credit.id
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                            <span className="pl-4 text-[10px] text-muted-foreground">
+                                                                {format(
+                                                                    new Date(
+                                                                        originalInvoice.created_at ||
+                                                                            credit.created_at,
+                                                                    ),
+                                                                    'dd/MM/yyyy h:mm a',
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="font-semibold text-foreground">
+                                                                Crédito #
+                                                                {credit.id}
+                                                            </span>
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                                {format(
+                                                                    new Date(
+                                                                        credit.created_at,
+                                                                    ),
+                                                                    'dd/MM/yyyy h:mm a',
+                                                                )}
+                                                            </span>
+                                                        </div>
                                                     )}
                                                     {paymentInvoices.length >
                                                         0 && (
-                                                        <div className="flex flex-col gap-0.5 text-muted-foreground">
+                                                        <div className="mt-1 flex flex-col gap-0.5 text-muted-foreground">
                                                             <span className="flex items-center gap-1 text-[10px] font-medium">
                                                                 <History className="h-3 w-3 text-muted-foreground" />{' '}
                                                                 Abonos (
@@ -1085,14 +1145,17 @@ export default function CreditsIndex({
                                                                         key={
                                                                             p.id
                                                                         }
-                                                                        href={`/storage/${p.invoice_file}`}
+                                                                        href={
+                                                                            p.invoice_file
+                                                                                ? `/storage/${p.invoice_file}`
+                                                                                : '#'
+                                                                        }
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
                                                                         className="ml-3 flex items-center gap-0.5 hover:text-primary hover:underline"
                                                                     >
-                                                                        {
-                                                                            p.full_invoice_number
-                                                                        }{' '}
+                                                                        {p.full_invoice_number ||
+                                                                            `Abono (${format(new Date(p.created_at), 'dd/MM/yyyy')})`}{' '}
                                                                         (L.{' '}
                                                                         {parseFloat(
                                                                             String(

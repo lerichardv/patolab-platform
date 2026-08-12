@@ -459,7 +459,8 @@ export default function SpecimenGroupViewSheet({
                                                 Número de Factura
                                             </span>
                                             <span className="font-semibold text-foreground">
-                                                {invoice.full_invoice_number}
+                                                {invoice.full_invoice_number ||
+                                                    '-'}
                                             </span>
                                         </div>
 
