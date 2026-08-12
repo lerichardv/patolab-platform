@@ -76,7 +76,11 @@ export default function InvoiceViewSheet({
                     <div className="flex flex-col gap-4 border-b pr-12 pb-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <HeadingSheet
-                                title={`Factura Fiscal ${invoice.full_invoice_number}`}
+                                title={
+                                    invoice.full_invoice_number
+                                        ? `Factura Fiscal ${invoice.full_invoice_number}`
+                                        : `Factura de Crédito #${invoice.credit_payment_id || invoice.id}`
+                                }
                                 description={`Emitida el ${formattedDate}`}
                             />
                         </div>
@@ -101,7 +105,7 @@ export default function InvoiceViewSheet({
                                             Número de Factura
                                         </span>
                                         <p className="text-sm font-semibold">
-                                            {invoice.full_invoice_number}
+                                            {invoice.full_invoice_number || '-'}
                                         </p>
                                     </div>
                                     <div className="space-y-1">

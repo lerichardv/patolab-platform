@@ -47,6 +47,8 @@ interface BillingReportRow {
     invoice_id: number;
     invoice: any;
     date: string | null;
+    invoice_date: string | null;
+    created_at: string | null;
     customer_id_number: string;
     customer_name: string;
     invoice_number: string;
@@ -565,7 +567,7 @@ export default function BillingSummaryReportIndex({
                                                 }}
                                                 className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground focus:outline-none"
                                             >
-                                                <span>Fecha</span>
+                                                <span>Fecha Factura</span>
                                                 {filters.sort_order ===
                                                 'asc' ? (
                                                     <ArrowUp className="h-3.5 w-3.5" />
@@ -576,6 +578,9 @@ export default function BillingSummaryReportIndex({
                                                     <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
                                                 )}
                                             </button>
+                                        </TableHead>
+                                        <TableHead className="min-w-[145px] text-center whitespace-nowrap">
+                                            Fecha Creación
                                         </TableHead>
                                         <TableHead className="min-w-[120px]">
                                             ID/RTN
@@ -619,7 +624,7 @@ export default function BillingSummaryReportIndex({
                                     {activeInvoices.data.length === 0 ? (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={13}
+                                                colSpan={14}
                                                 className="h-24 text-center text-muted-foreground"
                                             >
                                                 No se encontraron facturas
@@ -630,10 +635,20 @@ export default function BillingSummaryReportIndex({
                                         activeInvoices.data.map((row) => (
                                             <TableRow key={row.id}>
                                                 <TableCell className="text-center whitespace-nowrap">
-                                                    {row.date
+                                                    {row.invoice_date
                                                         ? format(
                                                               new Date(
-                                                                  row.date,
+                                                                  row.invoice_date,
+                                                              ),
+                                                              'd/M/yy h:mm a',
+                                                          )
+                                                        : 'N/A'}
+                                                </TableCell>
+                                                <TableCell className="text-center whitespace-nowrap">
+                                                    {row.created_at
+                                                        ? format(
+                                                              new Date(
+                                                                  row.created_at,
                                                               ),
                                                               'd/M/yy h:mm a',
                                                           )
@@ -823,7 +838,7 @@ export default function BillingSummaryReportIndex({
                                                 }}
                                                 className="inline-flex w-full items-center justify-center gap-1 hover:text-foreground focus:outline-none"
                                             >
-                                                <span>Fecha</span>
+                                                <span>Fecha Factura</span>
                                                 {filters.sort_order ===
                                                 'asc' ? (
                                                     <ArrowUp className="h-3.5 w-3.5" />
@@ -834,6 +849,9 @@ export default function BillingSummaryReportIndex({
                                                     <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
                                                 )}
                                             </button>
+                                        </TableHead>
+                                        <TableHead className="min-w-[145px] text-center whitespace-nowrap">
+                                            Fecha Creación
                                         </TableHead>
                                         <TableHead className="min-w-[120px]">
                                             ID/RTN
@@ -877,7 +895,7 @@ export default function BillingSummaryReportIndex({
                                     {cancelledInvoices.data.length === 0 ? (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={13}
+                                                colSpan={14}
                                                 className="h-20 text-center text-muted-foreground"
                                             >
                                                 No hay facturas anuladas en este
@@ -891,10 +909,20 @@ export default function BillingSummaryReportIndex({
                                                 className="bg-yellow-500/[0.01] hover:bg-yellow-500/[0.04]"
                                             >
                                                 <TableCell className="text-center whitespace-nowrap">
-                                                    {row.date
+                                                    {row.invoice_date
                                                         ? format(
                                                               new Date(
-                                                                  row.date,
+                                                                  row.invoice_date,
+                                                              ),
+                                                              'd/M/yy h:mm a',
+                                                          )
+                                                        : 'N/A'}
+                                                </TableCell>
+                                                <TableCell className="text-center whitespace-nowrap">
+                                                    {row.created_at
+                                                        ? format(
+                                                              new Date(
+                                                                  row.created_at,
                                                               ),
                                                               'd/M/yy h:mm a',
                                                           )

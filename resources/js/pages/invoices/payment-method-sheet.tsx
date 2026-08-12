@@ -1,4 +1,4 @@
-import { Wallet, CreditCard, Landmark, Receipt } from 'lucide-react';
+import { Wallet, CreditCard, Landmark, Receipt, Coins } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -412,16 +412,35 @@ export function PaymentMethodSheet({
                                 <SelectValue placeholder="Seleccione el tipo de pago" />
                             </SelectTrigger>
                             <SelectContent className="z-[110]">
-                                <SelectItem value="cash">Efectivo</SelectItem>
+                                <SelectItem value="cash">
+                                    <div className="flex items-center gap-2">
+                                        <Wallet className="h-4 w-4 text-primary" />
+                                        <span>Efectivo</span>
+                                    </div>
+                                </SelectItem>
                                 <SelectItem value="credit card">
-                                    Tarjeta de Crédito
+                                    <div className="flex items-center gap-2">
+                                        <CreditCard className="h-4 w-4 text-primary" />
+                                        <span>Tarjeta de Crédito</span>
+                                    </div>
                                 </SelectItem>
                                 <SelectItem value="bank transfer">
-                                    Transferencia Bancaria
+                                    <div className="flex items-center gap-2">
+                                        <Landmark className="h-4 w-4 text-primary" />
+                                        <span>Transferencia Bancaria</span>
+                                    </div>
                                 </SelectItem>
-                                <SelectItem value="check">Cheque</SelectItem>
+                                <SelectItem value="check">
+                                    <div className="flex items-center gap-2">
+                                        <Receipt className="h-4 w-4 text-primary" />
+                                        <span>Cheque</span>
+                                    </div>
+                                </SelectItem>
                                 <SelectItem value="credit">
-                                    Al Crédito
+                                    <div className="flex items-center gap-2">
+                                        <Coins className="h-4 w-4 text-primary" />
+                                        <span>Al Crédito</span>
+                                    </div>
                                 </SelectItem>
                             </SelectContent>
                         </Select>
@@ -976,16 +995,32 @@ export function PaymentMethodSheet({
                                                 </SelectTrigger>
                                                 <SelectContent className="z-[110]">
                                                     <SelectItem value="cash">
-                                                        Efectivo
+                                                        <div className="flex items-center gap-2">
+                                                            <Wallet className="h-4 w-4 text-primary" />
+                                                            <span>Efectivo</span>
+                                                        </div>
                                                     </SelectItem>
                                                     <SelectItem value="credit card">
-                                                        Tarjeta de Crédito
+                                                        <div className="flex items-center gap-2">
+                                                            <CreditCard className="h-4 w-4 text-primary" />
+                                                            <span>
+                                                                Tarjeta de Crédito
+                                                            </span>
+                                                        </div>
                                                     </SelectItem>
                                                     <SelectItem value="bank transfer">
-                                                        Transferencia Bancaria
+                                                        <div className="flex items-center gap-2">
+                                                            <Landmark className="h-4 w-4 text-primary" />
+                                                            <span>
+                                                                Transferencia Bancaria
+                                                            </span>
+                                                        </div>
                                                     </SelectItem>
                                                     <SelectItem value="check">
-                                                        Cheque
+                                                        <div className="flex items-center gap-2">
+                                                            <Receipt className="h-4 w-4 text-primary" />
+                                                            <span>Cheque</span>
+                                                        </div>
                                                     </SelectItem>
                                                 </SelectContent>
                                             </Select>

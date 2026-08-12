@@ -42,14 +42,22 @@ interface Role {
     name: string;
 }
 
+interface Location {
+    id: number;
+    name: string;
+    code?: string;
+}
+
 interface Props {
     settings: {
         third_age_discount: string;
         fourth_age_discount: string;
         pathologist_role_id?: string;
         pathologist_technician_role_id?: number[];
+        default_location_id?: string;
     };
     roles: Role[];
+    locations?: Location[];
 }
 
 function FormCombobox({
@@ -214,7 +222,11 @@ function FormCombobox({
     );
 }
 
-export default function SystemSettingsIndex({ settings, roles = [] }: Props) {
+export default function SystemSettingsIndex({
+    settings,
+    roles = [],
+    locations = [],
+}: Props) {
     const { auth } = usePage<any>().props;
     const canEdit = auth.permissions?.includes('settings.edit');
 
@@ -229,6 +241,9 @@ export default function SystemSettingsIndex({ settings, roles = [] }: Props) {
                   typeof id === 'string' ? parseInt(id, 10) : id,
               )
             : [],
+        default_location_id: settings.default_location_id
+            ? parseInt(settings.default_location_id, 10)
+            : '',
     });
 
     const handleSubmit: FormEventHandler = (e) => {
@@ -251,6 +266,11 @@ export default function SystemSettingsIndex({ settings, roles = [] }: Props) {
     const roleOptions = roles.map((role) => ({
         label: role.name,
         value: role.id.toString(),
+    }));
+
+    const locationOptions = locations.map((loc) => ({
+        label: loc.code ? `${loc.name} (${loc.code})` : loc.name,
+        value: loc.id.toString(),
     }));
 
     return (
@@ -442,6 +462,53 @@ export default function SystemSettingsIndex({ settings, roles = [] }: Props) {
                                         message={
                                             errors.pathologist_technician_role_id
                                         }
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Location Configuration */}
+                    <Card className="overflow-hidden border border-muted bg-card/60 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-primary/20 hover:shadow-xl">
+                        <CardHeader className="border-b bg-gradient-to-r from-primary/5 via-transparent to-transparent pb-4">
+                            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                                <span className="flex h-2 w-2 rounded-full bg-primary" />
+                                Ubicación de la Plataforma
+                            </CardTitle>
+                            <CardDescription>
+                                Seleccione la sucursal o ubicación principal por
+                                defecto en la que opera la plataforma.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6 pt-6">
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                <div className="group space-y-2">
+                                    <Label className="text-sm font-semibold transition-colors group-focus-within:text-primary">
+                                        Sucursal por Defecto
+                                    </Label>
+                                    <FormCombobox
+                                        options={locationOptions}
+                                        value={
+                                            data.default_location_id
+                                                ? data.default_location_id.toString()
+                                                : ''
+                                        }
+                                        onChange={(val) =>
+                                            setData(
+                                                'default_location_id',
+                                                val ? parseInt(val, 10) : '',
+                                            )
+                                        }
+                                        placeholder="Seleccione la sucursal principal"
+                                        disabled={!canEdit}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Sucursal utilizada por defecto para
+                                        muestras y facturación cuando no hay un
+                                        rango CAI activo.
+                                    </p>
+                                    <InputError
+                                        message={errors.default_location_id}
                                     />
                                 </div>
                             </div>

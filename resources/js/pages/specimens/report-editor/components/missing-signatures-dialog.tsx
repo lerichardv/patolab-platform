@@ -1,3 +1,4 @@
+import { AlertCircle } from 'lucide-react';
 import React from 'react';
 import {
     AlertDialog,
@@ -8,7 +9,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { AlertCircle } from 'lucide-react';
 
 interface MissingSignaturesDialogProps {
     open: boolean;

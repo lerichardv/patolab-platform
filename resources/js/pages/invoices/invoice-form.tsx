@@ -914,6 +914,39 @@ export default function InvoiceForm({
             localErrors.payment_type = 'El método de pago es requerido.';
         }
 
+        const isSpecimenOrGroup = !!(
+            invoice?.specimen_id ||
+            invoice?.is_group ||
+            invoice?.group_id ||
+            invoice?.invoice_type === 'specimen'
+        );
+        const originalWasCredit =
+            invoice?.payment_type && invoice.payment_type === 'credit';
+        const originalWasNotCredit =
+            invoice?.payment_type && invoice.payment_type !== 'credit';
+        const hasInvoiceNumber = !!(
+            invoice?.invoice_number || invoice?.full_invoice_number
+        );
+
+        if (
+            isSpecimenOrGroup &&
+            originalWasNotCredit &&
+            hasInvoiceNumber &&
+            data.payment_type === 'credit'
+        ) {
+            localErrors.payment_type =
+                'Una factura con número de factura asignado no se puede cambiar a crédito.';
+        }
+
+        if (
+            isSpecimenOrGroup &&
+            originalWasCredit &&
+            data.payment_type !== 'credit'
+        ) {
+            localErrors.payment_type =
+                'Una factura registrada como crédito no se puede cambiar a otro método de pago. Debe procesarse mediante "Pago final" en el módulo de Créditos.';
+        }
+
         if (!data.quantity || parseInt(data.quantity.toString()) < 1) {
             localErrors.quantity = 'La cantidad debe ser mayor o igual a 1.';
         }
@@ -1130,9 +1163,14 @@ export default function InvoiceForm({
             Object.entries(localErrors).forEach(([key, val]) => {
                 setError(key as any, val);
             });
-            toast.error(
-                'Por favor complete los campos obligatorios del formulario.',
-            );
+
+            if (localErrors.payment_type) {
+                toast.error(localErrors.payment_type);
+            } else {
+                toast.error(
+                    'Por favor complete los campos obligatorios del formulario.',
+                );
+            }
 
             return false;
         }
@@ -1155,8 +1193,14 @@ export default function InvoiceForm({
                 toast.success('Factura actualizada correctamente');
                 onSuccess();
             },
-            onError: (err) => {
-                toast.error('Error al guardar cambios.');
+            onError: (err: any) => {
+                if (err && Object.keys(err).length > 0) {
+                    const firstError = Object.values(err)[0] as string;
+                    toast.error(firstError);
+                } else {
+                    toast.error('Error al guardar cambios.');
+                }
+
                 console.error(err);
             },
         });
@@ -1187,46 +1231,6 @@ export default function InvoiceForm({
                                 {errors.customer_id}
                             </p>
                         )}
-                    </div>
-
-                    {/* Método de Pago Trigger and Resume */}
-                    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-xs font-semibold">
-                                        Método de pago:
-                                    </span>
-                                    <span className="ml-2 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary capitalize">
-                                        {getPaymentTypeLabel(data.payment_type)}
-                                    </span>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setIsPaymentSheetOpen(true)}
-                                    className="h-8 font-semibold"
-                                >
-                                    {data.payment_type
-                                        ? 'Cambiar método de Pago'
-                                        : 'Seleccionar método de pago'}
-                                </Button>
-                            </div>
-
-                            {data.payment_type ? (
-                                <PaymentResume data={data} banks={banks} />
-                            ) : (
-                                <div className="mt-2 border-t pt-2.5 text-[11px] text-muted-foreground italic">
-                                    Por favor, configure los detalles del pago.
-                                </div>
-                            )}
-                            {errors.payment_type && (
-                                <p className="mt-1 text-xs text-destructive">
-                                    {errors.payment_type}
-                                </p>
-                            )}
-                        </div>
                     </div>
 
                     {/* Billing configuration inputs based on hasSpecimen */}
@@ -2571,6 +2575,46 @@ export default function InvoiceForm({
                             </div>
                         </div>
                     )}
+
+                    {/* Método de Pago Trigger and Resume */}
+                    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="text-xs font-semibold">
+                                        Método de pago:
+                                    </span>
+                                    <span className="ml-2 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary capitalize">
+                                        {getPaymentTypeLabel(data.payment_type)}
+                                    </span>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsPaymentSheetOpen(true)}
+                                    className="h-8 font-semibold"
+                                >
+                                    {data.payment_type
+                                        ? 'Cambiar método de Pago'
+                                        : 'Seleccionar método de pago'}
+                                </Button>
+                            </div>
+
+                            {data.payment_type ? (
+                                <PaymentResume data={data} banks={banks} />
+                            ) : (
+                                <div className="mt-2 border-t pt-2.5 text-[11px] text-muted-foreground italic">
+                                    Por favor, configure los detalles del pago.
+                                </div>
+                            )}
+                            {errors.payment_type && (
+                                <p className="mt-1 text-xs text-destructive">
+                                    {errors.payment_type}
+                                </p>
+                            )}
+                        </div>
+                    </div>
 
                     {/* Comprobante de Pago Uploader (conditions match specimen-form.tsx) */}
                     {((data.payment_type !== 'cash' &&

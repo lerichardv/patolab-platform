@@ -329,22 +329,26 @@
         <div class="factura-box">
             <div class="factura-box-header">Factura</div>
             <div class="factura-box-body">
+                @if($invoice->full_invoice_number)
                 <div class="factura-row">
                     <span>Nº Factura:</span>
                     <span>{{ $invoice->full_invoice_number }}</span>
                 </div>
                 <div class="factura-row">
                     <span>Fecha:</span>
-                    <span>{{ $invoice->created_at->format('d/m/Y h:i a') }}</span>
+                    <span>{{ ($invoice->invoice_date ?? $invoice->created_at)->format('d/m/Y h:i a') }}</span>
                 </div>
+                @if($caiRange)
                 <div class="factura-row" style="flex-direction: column;">
                     <span style="margin-bottom: 1px;">CAI:</span>
                     <span style="font-size: 7.5px; word-break: break-all; color: #4b5563;">{{ $caiRange->cai }}</span>
                 </div>
+                @endif
                 <div class="factura-row">
                     <span>RTN:</span>
-                    <span>{{ $location->rtn }}</span>
+                    <span>{{ $location->rtn ?? '' }}</span>
                 </div>
+                @if($caiRange)
                 <div class="factura-row" style="flex-direction: column;">
                     <span>Rango Autorizado:</span>
                     <span style="color: #4b5563;">
@@ -360,10 +364,29 @@
                     <span>Fecha Límite:</span>
                     <span>{{ \Carbon\Carbon::parse($caiRange->deadline)->format('Y-m-d') }}</span>
                 </div>
+                @endif
                 <div class="factura-row">
                     <span>Factura:</span>
-                    <span style="text-transform: capitalize;">{{ $invoice->payment_type === 'credit' ? 'Crédito' : ($invoice->payment_type === 'check' ? 'Cheque' : 'Contado') }}</span>
+                    <span style="text-transform: capitalize;">{{ ($invoice->invoice_type === 'social security' || $invoice->payment_type !== 'credit' || (float) $invoice->total_paid >= (float) $invoice->total || ($invoice->creditRelation && (float) $invoice->creditRelation->amount_remaining <= 0)) ? ($invoice->payment_type === 'check' ? 'Cheque' : 'Contado') : 'Crédito' }}</span>
                 </div>
+                @else
+                <div class="factura-row">
+                    <span>Crédito ID:</span>
+                    <span>#{{ $invoice->credit_payment_id ?? ($invoice->creditRelation ? $invoice->creditRelation->id : '') }}</span>
+                </div>
+                <div class="factura-row">
+                    <span>Fecha:</span>
+                    <span>{{ ($invoice->invoice_date ?? $invoice->created_at)->format('d/m/Y h:i a') }}</span>
+                </div>
+                <div class="factura-row">
+                    <span>RTN:</span>
+                    <span>{{ $location->rtn ?? '' }}</span>
+                </div>
+                <div class="factura-row">
+                    <span>Factura:</span>
+                    <span style="text-transform: capitalize;">Crédito</span>
+                </div>
+                @endif
             </div>
         </div>
     </div>
@@ -678,7 +701,7 @@
 
             @if($invoice->invoice_type === 'cancelled')
                 <div class="pagado-stamp" style="border-color: #ef4444; color: #ef4444;">CANCELADO</div>
-            @elseif($invoice->payment_type !== 'credit')
+            @elseif($invoice->payment_type !== 'credit' || $invoice->invoice_type === 'social security' || (float) $invoice->total_paid >= (float) $invoice->total || ($invoice->creditRelation && (float) $invoice->creditRelation->amount_remaining <= 0))
                 <div class="pagado-stamp">PAGADO</div>
             @else
                 <div class="pagado-stamp" style="border-color: #ef4444; color: #ef4444;">AL CRÉDITO</div>

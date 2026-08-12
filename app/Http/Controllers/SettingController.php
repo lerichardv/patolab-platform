@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Location;
 use App\Models\Role;
 use App\Models\Setting;
 use Illuminate\Http\Request;
@@ -23,10 +24,12 @@ class SettingController extends Controller
         });
 
         $roles = Role::orderBy('name')->get();
+        $locations = Location::orderBy('name')->get();
 
         return Inertia::render('system-settings/index', [
             'settings' => $settings,
             'roles' => $roles,
+            'locations' => $locations,
         ]);
     }
 
@@ -40,6 +43,7 @@ class SettingController extends Controller
             'pathologist_role_id' => 'required|integer|exists:roles,id',
             'pathologist_technician_role_id' => 'required|array',
             'pathologist_technician_role_id.*' => 'integer|exists:roles,id',
+            'default_location_id' => 'nullable|integer|exists:locations,id',
         ]);
 
         foreach ($validated as $key => $value) {
@@ -54,6 +58,12 @@ class SettingController extends Controller
                         'setting_value' => (string) $value,
                     ]);
                 }
+            } else {
+                Setting::create([
+                    'setting_key' => $key,
+                    'setting_value' => (string) $value,
+                    'description' => 'Ajuste del sistema '.$key,
+                ]);
             }
         }
 

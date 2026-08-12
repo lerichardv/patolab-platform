@@ -1,17 +1,17 @@
-import React, { useEffect, useState, useRef } from 'react';
+import type { HocuspocusProvider } from '@hocuspocus/provider';
+import Collaboration from '@tiptap/extension-collaboration';
+import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
+import { TableKit } from '@tiptap/extension-table';
 import { useEditor, EditorContent } from '@tiptap/react';
 import type { Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { TableKit } from '@tiptap/extension-table';
-import Collaboration from '@tiptap/extension-collaboration';
-import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
-import type { HocuspocusProvider } from '@hocuspocus/provider';
-import * as Y from 'yjs';
-import { toast } from 'sonner';
 import { Loader2, Check } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { toast } from 'sonner';
+import type * as Y from 'yjs';
 import { cn } from '@/lib/utils';
-import { EditorRegistryContext } from './editor-registry-context';
 import { ImageCropperDialog } from '../image-grid-component';
+import { EditorRegistryContext } from './editor-registry-context';
 import { CustomBulletList, sharedExtensions } from './tiptap-extensions';
 
 interface CollaborativeEditorProps {

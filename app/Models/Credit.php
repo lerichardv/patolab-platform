@@ -29,6 +29,7 @@ class Credit extends Model
         'credit_amount',
         'amount_paid',
         'amount_remaining',
+        'status',
         'specimen_id',
         'is_group',
         'group_id',

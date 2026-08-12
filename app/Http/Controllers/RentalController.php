@@ -325,6 +325,7 @@ class RentalController extends Controller
                 'created_by_id' => auth()->id(),
                 'specimen_id' => null,
                 'payment_type' => $validated['payment_type'],
+                'invoice_date' => ($validated['payment_type'] !== 'credit' && $fullInvoiceNumber) ? now() : null,
                 'credit_payment_id' => $creditId,
                 'quantity' => $qty,
                 'amount' => $unitPrice,

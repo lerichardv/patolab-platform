@@ -291,7 +291,7 @@ export const CompleteMicroscopyDialog: React.FC<
                                 {scrollPercentage}%
                             </span>
                         ) : (
-                            <span className="flex items-center gap-1.5 font-medium text-muted-foreground animate-pulse">
+                            <span className="flex animate-pulse items-center gap-1.5 font-medium text-muted-foreground">
                                 <span className="inline-block h-2 w-2 animate-spin rounded-full border-2 border-fuchsia-600 border-t-transparent dark:border-fuchsia-400" />
                                 Cargando visor...
                             </span>

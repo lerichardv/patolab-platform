@@ -74,7 +74,7 @@ export default function InvoiceSheet({
     return (
         <>
             <Sheet open={open} onOpenChange={handleOpenChange}>
-                <SheetContent className="w-full overflow-y-auto sm:max-w-[90vw] md:max-w-[1000px] lg:max-w-[1100px]">
+                <SheetContent className="w-full overflow-y-auto pb-12 sm:max-w-[90vw] md:max-w-[1000px] lg:max-w-[1100px]">
                     <HeadingSheet
                         title="Editar Factura"
                         description="Realice cambios en la información de la factura aquí. Todos los importes y datos de pago pueden ser ajustados."

@@ -209,18 +209,19 @@ class BillingSummaryReportController extends Controller
 
         // Column widths matching format
         $columnWidths = [
-            'A' => 12,  // Fecha
-            'B' => 16,  // ID/RTN
-            'C' => 30,  // Cliente/Empresa
-            'D' => 24,  // # Factura
-            'E' => 14,  // ISV 15%
-            'F' => 14,  // Descuento
-            'G' => 16,  // Total
-            'H' => 16,  // Total Pagado
-            'I' => 30,  // Servicio
-            'J' => 20,  // # de la Muestra
-            'K' => 24,  // Usuario
-            'L' => 16,  // Tipo de Pago
+            'A' => 14,  // Fecha Factura
+            'B' => 14,  // Fecha Creación
+            'C' => 16,  // ID/RTN
+            'D' => 30,  // Cliente/Empresa
+            'E' => 24,  // # Factura
+            'F' => 14,  // ISV 15%
+            'G' => 14,  // Descuento
+            'H' => 16,  // Total
+            'I' => 16,  // Total Pagado
+            'J' => 30,  // Servicio
+            'K' => 20,  // # de la Muestra
+            'L' => 24,  // Usuario
+            'M' => 16,  // Tipo de Pago
         ];
         foreach ($columnWidths as $col => $width) {
             $sheet->getColumnDimension($col)->setWidth($width);
@@ -267,27 +268,27 @@ class BillingSummaryReportController extends Controller
         }
 
         // Title Block Styling
-        $sheet->mergeCells('A5:L5');
+        $sheet->mergeCells('A5:M5');
         $sheet->setCellValue('A5', 'Reporte de Facturación');
         $sheet->getStyle('A5')->getFont()->setBold(true)->setSize(18)->setName('Calibri');
         $sheet->getStyle('A5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A6:L6');
+        $sheet->mergeCells('A6:M6');
         $sheet->setCellValue('A6', 'Castro Urbina y Asociados S. De R. L.');
         $sheet->getStyle('A6')->getFont()->setBold(true)->setSize(14)->setName('Calibri');
         $sheet->getStyle('A6')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A7:L7');
+        $sheet->mergeCells('A7:M7');
         $sheet->setCellValue('A7', 'RTN: 05019021248785');
         $sheet->getStyle('A7')->getFont()->setBold(true)->setSize(11)->setName('Calibri');
         $sheet->getStyle('A7')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A8:L8');
+        $sheet->mergeCells('A8:M8');
         $sheet->setCellValue('A8', 'Barrio: los Andes: 7, 12-13 Calle Avenida, Sector: N.O., Casa NO.: 105, Departamento: Cortes, Municipio: San Pedro Sula');
         $sheet->getStyle('A8')->getFont()->setItalic(true)->setSize(10)->setName('Calibri');
         $sheet->getStyle('A8')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->mergeCells('A9:L9');
+        $sheet->mergeCells('A9:M9');
         $sheet->setCellValue('A9', $dateSubtitle);
         $sheet->getStyle('A9')->getFont()->setBold(true)->setSize(12)->setName('Calibri');
         $sheet->getStyle('A9')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -303,7 +304,8 @@ class BillingSummaryReportController extends Controller
 
         // Headers
         $headers = [
-            'Fecha',
+            'Fecha Factura',
+            'Fecha Creación',
             'ID/RTN',
             'Cliente/Empresa',
             '# Factura',
@@ -342,33 +344,36 @@ class BillingSummaryReportController extends Controller
                 ],
             ],
         ];
-        $sheet->getStyle('A11:L11')->applyFromArray($headerStyle);
+        $sheet->getStyle('A11:M11')->applyFromArray($headerStyle);
 
         // Active rows
         $rowNum = 12;
         foreach ($activeRows as $row) {
-            $formattedDate = $row['date'] ? Carbon::parse($row['date'])->format('j/n/y') : 'N/A';
+            $formattedInvoiceDate = $row['invoice_date'] ? Carbon::parse($row['invoice_date'])->format('j/n/y') : 'N/A';
+            $formattedCreatedAt = $row['created_at'] ? Carbon::parse($row['created_at'])->format('j/n/y') : 'N/A';
             $paymentLabel = $this->getPaymentLabel($row['payment_type']);
 
-            $sheet->setCellValue('A'.$rowNum, $formattedDate);
-            $sheet->setCellValue('B'.$rowNum, $row['customer_id_number']);
-            $sheet->setCellValue('C'.$rowNum, $row['customer_name']);
-            $sheet->setCellValue('D'.$rowNum, $row['invoice_number']);
-            $sheet->setCellValue('E'.$rowNum, $row['isv_15']);
-            $sheet->setCellValue('F'.$rowNum, $row['discount']);
-            $sheet->setCellValue('G'.$rowNum, $row['gross_amount']);
-            $sheet->setCellValue('H'.$rowNum, $row['net_amount']);
+            $sheet->setCellValue('A'.$rowNum, $formattedInvoiceDate);
+            $sheet->setCellValue('B'.$rowNum, $formattedCreatedAt);
+            $sheet->setCellValue('C'.$rowNum, $row['customer_id_number']);
+            $sheet->setCellValue('D'.$rowNum, $row['customer_name']);
+            $sheet->setCellValue('E'.$rowNum, $row['invoice_number']);
+            $sheet->setCellValue('F'.$rowNum, $row['isv_15']);
+            $sheet->setCellValue('G'.$rowNum, $row['discount']);
+            $sheet->setCellValue('H'.$rowNum, $row['gross_amount']);
+            $sheet->setCellValue('I'.$rowNum, $row['net_amount']);
             $qty = $row['quantity'] ?? 1;
-            $sheet->setCellValue('I'.$rowNum, "({$qty}) ".$row['service']);
-            $sheet->setCellValue('J'.$rowNum, $row['specimen_code']);
-            $sheet->setCellValue('K'.$rowNum, $row['username']);
-            $sheet->setCellValue('L'.$rowNum, $paymentLabel);
+            $sheet->setCellValue('J'.$rowNum, "({$qty}) ".$row['service']);
+            $sheet->setCellValue('K'.$rowNum, $row['specimen_code']);
+            $sheet->setCellValue('L'.$rowNum, $row['username']);
+            $sheet->setCellValue('M'.$rowNum, $paymentLabel);
 
-            $sheet->getStyle('A'.$rowNum.':L'.$rowNum)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('E0E0E0');
+            $sheet->getStyle('A'.$rowNum.':M'.$rowNum)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('E0E0E0');
             $sheet->getStyle('A'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('D'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('J'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('L'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('B'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('E'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('K'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('M'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
             $sheet->getRowDimension($rowNum)->setRowHeight(20);
             $rowNum++;
@@ -377,15 +382,15 @@ class BillingSummaryReportController extends Controller
         // Active Totals row
         $activeTotalRow = $rowNum;
         if ($rowNum > 12) {
-            // Apply Currency Format to E, F, G, H
-            $sheet->getStyle('E12:H'.($rowNum - 1))->getNumberFormat()->setFormatCode('"L. " #,##0.00');
-            $sheet->getStyle('E12:H'.($rowNum - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            // Apply Currency Format to F, G, H, I
+            $sheet->getStyle('F12:I'.($rowNum - 1))->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+            $sheet->getStyle('F12:I'.($rowNum - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            $sheet->setCellValue('D'.$rowNum, 'Total');
-            $sheet->setCellValue('E'.$rowNum, '=SUM(E12:E'.($rowNum - 1).')');
+            $sheet->setCellValue('E'.$rowNum, 'Total');
             $sheet->setCellValue('F'.$rowNum, '=SUM(F12:F'.($rowNum - 1).')');
             $sheet->setCellValue('G'.$rowNum, '=SUM(G12:G'.($rowNum - 1).')');
             $sheet->setCellValue('H'.$rowNum, '=SUM(H12:H'.($rowNum - 1).')');
+            $sheet->setCellValue('I'.$rowNum, '=SUM(I12:I'.($rowNum - 1).')');
 
             $totalRowStyle = [
                 'font' => [
@@ -407,14 +412,14 @@ class BillingSummaryReportController extends Controller
                     ],
                 ],
             ];
-            $sheet->getStyle('D'.$rowNum.':H'.$rowNum)->applyFromArray($totalRowStyle);
-            $sheet->getStyle('E'.$rowNum.':H'.$rowNum)->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+            $sheet->getStyle('E'.$rowNum.':I'.$rowNum)->applyFromArray($totalRowStyle);
+            $sheet->getStyle('F'.$rowNum.':I'.$rowNum)->getNumberFormat()->setFormatCode('"L. " #,##0.00');
             $sheet->getRowDimension($rowNum)->setRowHeight(22);
             $rowNum++;
 
             // Add Pendiente de Pago row
-            $sheet->setCellValue('D'.$rowNum, 'Pendiente de Pago');
-            $sheet->setCellValue('H'.$rowNum, '=G'.($rowNum - 1).'-H'.($rowNum - 1));
+            $sheet->setCellValue('E'.$rowNum, 'Pendiente de Pago');
+            $sheet->setCellValue('I'.$rowNum, '=H'.($rowNum - 1).'-I'.($rowNum - 1));
 
             $pendingRowStyle = [
                 'font' => [
@@ -433,13 +438,13 @@ class BillingSummaryReportController extends Controller
                     ],
                 ],
             ];
-            $sheet->getStyle('D'.$rowNum.':H'.$rowNum)->applyFromArray($pendingRowStyle);
-            $sheet->getStyle('H'.$rowNum)->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+            $sheet->getStyle('E'.$rowNum.':I'.$rowNum)->applyFromArray($pendingRowStyle);
+            $sheet->getStyle('I'.$rowNum)->getNumberFormat()->setFormatCode('"L. " #,##0.00');
             $sheet->getRowDimension($rowNum)->setRowHeight(22);
             $rowNum++;
         } else {
             $sheet->setCellValue('A'.$rowNum, 'No hay facturas registradas.');
-            $sheet->mergeCells("A{$rowNum}:L{$rowNum}");
+            $sheet->mergeCells("A{$rowNum}:M{$rowNum}");
             $sheet->getStyle('A'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getRowDimension($rowNum)->setRowHeight(20);
             $rowNum++;
@@ -512,7 +517,7 @@ class BillingSummaryReportController extends Controller
         $rowNum += 2;
 
         // Facturas Anuladas Section Header (Yellow background)
-        $sheet->mergeCells('A'.$rowNum.':L'.$rowNum);
+        $sheet->mergeCells('A'.$rowNum.':M'.$rowNum);
         $sheet->setCellValue('A'.$rowNum, 'Facturas Anuladas');
         $sheet->getStyle('A'.$rowNum)->applyFromArray([
             'font' => [
@@ -537,35 +542,38 @@ class BillingSummaryReportController extends Controller
         foreach ($headers as $colIndex => $text) {
             $sheet->setCellValue([$colIndex + 1, $rowNum], $text);
         }
-        $sheet->getStyle('A'.$rowNum.':L'.$rowNum)->applyFromArray($headerStyle);
+        $sheet->getStyle('A'.$rowNum.':M'.$rowNum)->applyFromArray($headerStyle);
         $sheet->getRowDimension($rowNum)->setRowHeight(28);
         $rowNum++;
 
         // Cancelled data rows
         $cancelledStartRow = $rowNum;
         foreach ($cancelledRows as $row) {
-            $formattedDate = $row['date'] ? Carbon::parse($row['date'])->format('j/n/y') : 'N/A';
+            $formattedInvoiceDate = $row['invoice_date'] ? Carbon::parse($row['invoice_date'])->format('j/n/y') : 'N/A';
+            $formattedCreatedAt = $row['created_at'] ? Carbon::parse($row['created_at'])->format('j/n/y') : 'N/A';
             $paymentLabel = $this->getPaymentLabel($row['payment_type']);
 
-            $sheet->setCellValue('A'.$rowNum, $formattedDate);
-            $sheet->setCellValue('B'.$rowNum, $row['customer_id_number']);
-            $sheet->setCellValue('C'.$rowNum, $row['customer_name']);
-            $sheet->setCellValue('D'.$rowNum, $row['invoice_number']);
-            $sheet->setCellValue('E'.$rowNum, $row['isv_15']);
-            $sheet->setCellValue('F'.$rowNum, $row['discount']);
-            $sheet->setCellValue('G'.$rowNum, $row['gross_amount']);
-            $sheet->setCellValue('H'.$rowNum, $row['net_amount']);
+            $sheet->setCellValue('A'.$rowNum, $formattedInvoiceDate);
+            $sheet->setCellValue('B'.$rowNum, $formattedCreatedAt);
+            $sheet->setCellValue('C'.$rowNum, $row['customer_id_number']);
+            $sheet->setCellValue('D'.$rowNum, $row['customer_name']);
+            $sheet->setCellValue('E'.$rowNum, $row['invoice_number']);
+            $sheet->setCellValue('F'.$rowNum, $row['isv_15']);
+            $sheet->setCellValue('G'.$rowNum, $row['discount']);
+            $sheet->setCellValue('H'.$rowNum, $row['gross_amount']);
+            $sheet->setCellValue('I'.$rowNum, $row['net_amount']);
             $qty = $row['quantity'] ?? 1;
-            $sheet->setCellValue('I'.$rowNum, "({$qty}) ".$row['service']);
-            $sheet->setCellValue('J'.$rowNum, $row['specimen_code']);
-            $sheet->setCellValue('K'.$rowNum, $row['username']);
-            $sheet->setCellValue('L'.$rowNum, $paymentLabel);
+            $sheet->setCellValue('J'.$rowNum, "({$qty}) ".$row['service']);
+            $sheet->setCellValue('K'.$rowNum, $row['specimen_code']);
+            $sheet->setCellValue('L'.$rowNum, $row['username']);
+            $sheet->setCellValue('M'.$rowNum, $paymentLabel);
 
-            $sheet->getStyle('A'.$rowNum.':L'.$rowNum)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('E0E0E0');
+            $sheet->getStyle('A'.$rowNum.':M'.$rowNum)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('E0E0E0');
             $sheet->getStyle('A'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('D'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('J'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('L'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('B'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('E'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('K'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('M'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
             $sheet->getRowDimension($rowNum)->setRowHeight(20);
             $rowNum++;
@@ -573,23 +581,23 @@ class BillingSummaryReportController extends Controller
 
         // Cancelled Totals row
         if ($rowNum > $cancelledStartRow) {
-            // Apply Currency Format to E, F, G, H
-            $sheet->getStyle('E'.$cancelledStartRow.':H'.($rowNum - 1))->getNumberFormat()->setFormatCode('"L. " #,##0.00');
-            $sheet->getStyle('E'.$cancelledStartRow.':H'.($rowNum - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            // Apply Currency Format to F, G, H, I
+            $sheet->getStyle('F'.$cancelledStartRow.':I'.($rowNum - 1))->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+            $sheet->getStyle('F'.$cancelledStartRow.':I'.($rowNum - 1))->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            $sheet->setCellValue('D'.$rowNum, 'Total');
-            $sheet->setCellValue('E'.$rowNum, '=SUM(E'.$cancelledStartRow.':E'.($rowNum - 1).')');
+            $sheet->setCellValue('E'.$rowNum, 'Total');
             $sheet->setCellValue('F'.$rowNum, '=SUM(F'.$cancelledStartRow.':F'.($rowNum - 1).')');
             $sheet->setCellValue('G'.$rowNum, '=SUM(G'.$cancelledStartRow.':G'.($rowNum - 1).')');
             $sheet->setCellValue('H'.$rowNum, '=SUM(H'.$cancelledStartRow.':H'.($rowNum - 1).')');
+            $sheet->setCellValue('I'.$rowNum, '=SUM(I'.$cancelledStartRow.':I'.($rowNum - 1).')');
 
-            $sheet->getStyle('D'.$rowNum.':H'.$rowNum)->applyFromArray($totalRowStyle);
-            $sheet->getStyle('D'.$rowNum.':H'.$rowNum)->getBorders()->getBottom()->setBorderStyle(Border::BORDER_DOUBLE);
-            $sheet->getStyle('E'.$rowNum.':H'.$rowNum)->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+            $sheet->getStyle('E'.$rowNum.':I'.$rowNum)->applyFromArray($totalRowStyle);
+            $sheet->getStyle('E'.$rowNum.':I'.$rowNum)->getBorders()->getBottom()->setBorderStyle(Border::BORDER_DOUBLE);
+            $sheet->getStyle('F'.$rowNum.':I'.$rowNum)->getNumberFormat()->setFormatCode('"L. " #,##0.00');
             $sheet->getRowDimension($rowNum)->setRowHeight(22);
         } else {
             $sheet->setCellValue('A'.$rowNum, 'No hay facturas anuladas en este período.');
-            $sheet->mergeCells("A{$rowNum}:L{$rowNum}");
+            $sheet->mergeCells("A{$rowNum}:M{$rowNum}");
             $sheet->getStyle('A'.$rowNum)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getRowDimension($rowNum)->setRowHeight(20);
         }
@@ -778,6 +786,8 @@ class BillingSummaryReportController extends Controller
                                 'invoice_id' => $invoice->id,
                                 'invoice' => $invoice,
                                 'date' => $cis->created_at ? $cis->created_at->toIso8601String() : null,
+                                'invoice_date' => $invoice->invoice_date ? Carbon::parse($invoice->invoice_date)->toIso8601String() : null,
+                                'created_at' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
                                 'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
                                 'customer_name' => $invoice->customer?->name ?? 'N/A',
                                 'invoice_number' => $invoice->full_invoice_number,
@@ -811,6 +821,8 @@ class BillingSummaryReportController extends Controller
                                 'invoice_id' => $invoice->id,
                                 'invoice' => $invoice,
                                 'date' => $igs->created_at ? $igs->created_at->toIso8601String() : null,
+                                'invoice_date' => $invoice->invoice_date ? Carbon::parse($invoice->invoice_date)->toIso8601String() : null,
+                                'created_at' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
                                 'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
                                 'customer_name' => $invoice->customer?->name ?? 'N/A',
                                 'invoice_number' => $invoice->full_invoice_number,
@@ -848,6 +860,8 @@ class BillingSummaryReportController extends Controller
                     'invoice_id' => $invoice->id,
                     'invoice' => $invoice,
                     'date' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
+                    'invoice_date' => $invoice->invoice_date ? Carbon::parse($invoice->invoice_date)->toIso8601String() : null,
+                    'created_at' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
                     'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
                     'customer_name' => $invoice->customer?->name ?? 'N/A',
                     'invoice_number' => $invoice->full_invoice_number,

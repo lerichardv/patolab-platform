@@ -29,6 +29,7 @@ use App\Services\InvoicePdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -49,8 +50,12 @@ class InvoiceController extends Controller
             'specimen.category',
             'specimen.referrerRelation',
             'specimen.priority',
-            'specimen.cancelledBy',
-            'creditRelation',
+            'creditRelation.creditInvoiceSpecimens.specimen.customerRelation',
+            'creditRelation.creditInvoiceSpecimens.specimen.type',
+            'creditRelation.creditInvoiceSpecimens.specimen.examination',
+            'creditRelation.specimen.customerRelation',
+            'creditRelation.specimen.type',
+            'creditRelation.specimen.examination',
             'rental',
             'group.specimens.type',
             'group.specimens.customerRelation',
@@ -148,13 +153,22 @@ class InvoiceController extends Controller
                 $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
                     $sub->where('invoices.is_group', true)
                         ->where('payment_type', 'credit')
-                        ->whereHas('creditInvoiceSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
-                            if (! empty($dateFrom)) {
-                                $subQ->whereDate('created_at', '>=', $dateFrom);
-                            }
-                            if (! empty($dateTo)) {
-                                $subQ->whereDate('created_at', '<=', $dateTo);
-                            }
+                        ->where(function ($creditSub) use ($dateFrom, $dateTo) {
+                            $creditSub->whereHas('creditInvoiceSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            })->orWhereHas('groupSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            });
                         });
                 });
 
@@ -200,6 +214,12 @@ class InvoiceController extends Controller
         $query->select('invoices.*');
 
         switch ($sortField) {
+            case 'invoice_number':
+                $query->orderBy('invoices.invoice_number', $sortDirection);
+                break;
+            case 'invoice_date':
+                $query->orderByRaw('COALESCE(invoices.invoice_date, invoices.created_at) '.$sortDirection);
+                break;
             case 'customer':
                 $query->join('customers', 'invoices.customer_id', '=', 'customers.id')
                     ->orderBy('customers.name', $sortDirection);
@@ -316,7 +336,12 @@ class InvoiceController extends Controller
         $query = Invoice::with([
             'customer',
             'specimen.examination.prices',
-            'creditRelation',
+            'creditRelation.creditInvoiceSpecimens.specimen.customerRelation',
+            'creditRelation.creditInvoiceSpecimens.specimen.type',
+            'creditRelation.creditInvoiceSpecimens.specimen.examination',
+            'creditRelation.specimen.customerRelation',
+            'creditRelation.specimen.type',
+            'creditRelation.specimen.examination',
         ]);
 
         // Filter by search query (Invoice number, Customer name or Customer ID/RTN)
@@ -606,6 +631,23 @@ class InvoiceController extends Controller
             'group_specimens.*.additional_discount' => 'nullable|numeric|min:0',
             'pay_isv' => 'nullable|boolean',
         ]);
+
+        $isSpecimenOrGroup = (bool) ($invoice->specimen_id || $invoice->is_group || $invoice->group_id || $invoice->invoice_type === 'specimen');
+        $hasInvoiceNumber = ! empty($invoice->invoice_number) || ! empty($invoice->full_invoice_number);
+        $wasCredit = $invoice->payment_type === 'credit';
+        $wasNotCredit = $invoice->payment_type !== 'credit';
+
+        if ($isSpecimenOrGroup && $wasNotCredit && $hasInvoiceNumber && $validated['payment_type'] === 'credit') {
+            throw ValidationException::withMessages([
+                'payment_type' => 'Una factura con número de factura asignado no se puede cambiar a crédito.',
+            ]);
+        }
+
+        if ($isSpecimenOrGroup && $wasCredit && $validated['payment_type'] !== 'credit') {
+            throw ValidationException::withMessages([
+                'payment_type' => 'Una factura registrada como crédito no se puede cambiar a otro método de pago. Debe procesarse mediante "Pago final" en el módulo de créditos o facturación.',
+            ]);
+        }
 
         if ($request->hasFile('proof_of_payment')) {
             if ($invoice->proof_of_payment && Storage::disk('public')->exists($invoice->proof_of_payment)) {
