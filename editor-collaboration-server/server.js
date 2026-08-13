@@ -316,9 +316,9 @@ const customWebhookExtension = {
 				const binaryState = Buffer.from(savedStateBase64, 'base64');
 				Y.applyUpdate(data.document, binaryState);
 
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
+				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-sample_collection_date') || data.documentName.endsWith('-finalization_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
 					const text = data.document.getText('content').toString();
-
+ 
 					if (text && text.trim() !== '') {
 						isLoaded = true;
 					}
@@ -354,7 +354,7 @@ const customWebhookExtension = {
 				if (htmlContent) {
 					console.log(`[webhook:onLoadDocument] Seeding document with initial content`);
 
-					if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
+					if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-sample_collection_date') || data.documentName.endsWith('-finalization_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
 						// Seed with plain text
 						const ytext = data.document.getText('content');
 						ytext.insert(0, htmlContent);
@@ -387,7 +387,7 @@ const customWebhookExtension = {
 				// 2. Convert Ydoc to ProseMirror JSON, then to HTML (or extract plain text for date/status)
 				let htmlContent = '';
 
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
+				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-sample_collection_date') || data.documentName.endsWith('-finalization_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
 					htmlContent = data.document.getText('content').toString();
 				} else {
 					try {
