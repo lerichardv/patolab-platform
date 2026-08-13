@@ -65,6 +65,58 @@ class ReportEditorController extends Controller
             return response()->json(['error' => 'Specimen report row not found'], 404);
         }
 
+        if ($field === 'sample_collection_date') {
+            if ($event === 'onConnect') {
+                return response()->json([
+                    'document' => null,
+                ]);
+            }
+            if ($event === 'create') {
+                $specimen = DB::table('specimen')->where('report_id', $reportId)->first();
+
+                return response()->json([
+                    'content' => $specimen ? $specimen->sample_collection_date : '',
+                ]);
+            }
+            if ($event === 'onChange') {
+                $htmlValue = $payload['html'] ?? '';
+                if (! empty($htmlValue) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $htmlValue)) {
+                    DB::table('specimen')
+                        ->where('report_id', $reportId)
+                        ->update(['sample_collection_date' => $htmlValue, 'updated_at' => now()]);
+                }
+
+                return response()->json(['status' => 'success']);
+            }
+
+            return response()->json(['status' => 'ignored']);
+        }
+
+        if ($field === 'finalization_date') {
+            if ($event === 'onConnect') {
+                return response()->json([
+                    'document' => null,
+                ]);
+            }
+            if ($event === 'create') {
+                return response()->json([
+                    'content' => $report ? $report->finalization_date : '',
+                ]);
+            }
+            if ($event === 'onChange') {
+                $htmlValue = $payload['html'] ?? '';
+                if (! empty($htmlValue) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $htmlValue)) {
+                    DB::table('specimen_reports')
+                        ->where('id', $reportId)
+                        ->update(['finalization_date' => $htmlValue, 'updated_at' => now()]);
+                }
+
+                return response()->json(['status' => 'success']);
+            }
+
+            return response()->json(['status' => 'ignored']);
+        }
+
         if ($field === 'status') {
             if ($event === 'onConnect') {
                 return response()->json([

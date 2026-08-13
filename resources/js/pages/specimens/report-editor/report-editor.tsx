@@ -4193,6 +4193,14 @@ export default function ReportWorkspace({
 	const [dateProvider, setDateProvider] = useState<HocuspocusProvider | null>(
 		null,
 	);
+	const [sampleCollectionDateDoc, setSampleCollectionDateDoc] = useState<Y.Doc | null>(null);
+	const [sampleCollectionDateProvider, setSampleCollectionDateProvider] = useState<HocuspocusProvider | null>(
+		null,
+	);
+	const [finalizationDateDoc, setFinalizationDateDoc] = useState<Y.Doc | null>(null);
+	const [finalizationDateProvider, setFinalizationDateProvider] = useState<HocuspocusProvider | null>(
+		null,
+	);
 	const [macroscopyDoc, setMacroscopyDoc] = useState<Y.Doc | null>(null);
 	const [macroscopyProvider, setMacroscopyProvider] =
 		useState<HocuspocusProvider | null>(null);
@@ -4451,10 +4459,20 @@ export default function ReportWorkspace({
 	};
 
 	const reportDateRef = useRef(reportDate);
+	const sampleCollectionDateRef = useRef(sampleCollectionDate);
+	const finalizationDateRef = useRef(finalizationDate);
 
 	useEffect(() => {
 		reportDateRef.current = reportDate;
 	}, [reportDate]);
+
+	useEffect(() => {
+		sampleCollectionDateRef.current = sampleCollectionDate;
+	}, [sampleCollectionDate]);
+
+	useEffect(() => {
+		finalizationDateRef.current = finalizationDate;
+	}, [finalizationDate]);
 
 	const handleManualSave = () => {
 		if (saveStatusDoc) {
@@ -4614,6 +4632,60 @@ export default function ReportWorkspace({
 			}
 		};
 		ytext.observe(handleYjsChange);
+
+		// 1.2. Sample Collection Date room
+		const scDoc = new Y.Doc();
+		const scProvider = new HocuspocusProvider({
+			url: WS_COLLABORATION_SERVER_URL,
+			name: `report-${report.id}-sample_collection_date`,
+			document: scDoc,
+			token: 'secure-token-or-session-id',
+		});
+
+		setSampleCollectionDateDoc(scDoc);
+		setSampleCollectionDateProvider(scProvider);
+
+		const ytextSc = scDoc.getText('content');
+		const handleScYjsChange = () => {
+			const val = ytextSc.toString().trim();
+
+			if (val) {
+				const match = val.match(/\d{4}-\d{2}-\d{2}/);
+				const dateVal = match ? match[0] : val.split('T')[0];
+
+				if (dateVal && dateVal !== sampleCollectionDateRef.current) {
+					setSampleCollectionDate(dateVal);
+				}
+			}
+		};
+		ytextSc.observe(handleScYjsChange);
+
+		// 1.3. Finalization Date room
+		const fDoc = new Y.Doc();
+		const fProvider = new HocuspocusProvider({
+			url: WS_COLLABORATION_SERVER_URL,
+			name: `report-${report.id}-finalization_date`,
+			document: fDoc,
+			token: 'secure-token-or-session-id',
+		});
+
+		setFinalizationDateDoc(fDoc);
+		setFinalizationDateProvider(fProvider);
+
+		const ytextF = fDoc.getText('content');
+		const handleFYjsChange = () => {
+			const val = ytextF.toString().trim();
+
+			if (val) {
+				const match = val.match(/\d{4}-\d{2}-\d{2}/);
+				const dateVal = match ? match[0] : val.split('T')[0];
+
+				if (dateVal && dateVal !== finalizationDateRef.current) {
+					setFinalizationDate(dateVal);
+				}
+			}
+		};
+		ytextF.observe(handleFYjsChange);
 
 		// 2. Macroscopy room
 		const macDoc = new Y.Doc();
@@ -4915,6 +4987,8 @@ export default function ReportWorkspace({
 
 		return () => {
 			ytext.unobserve(handleYjsChange);
+			ytextSc.unobserve(handleScYjsChange);
+			ytextF.unobserve(handleFYjsChange);
 			ytextSave.unobserve(handleSaveYjsChange);
 			ytextInsumos.unobserve(handleInsumosYjsChange);
 			ytextOrder.unobserve(handleOrderYjsChange);
@@ -4922,6 +4996,10 @@ export default function ReportWorkspace({
 			ytextToggles.unobserve(handleTogglesYjsChange);
 			dProvider.destroy();
 			dDoc.destroy();
+			scProvider.destroy();
+			scDoc.destroy();
+			fProvider.destroy();
+			fDoc.destroy();
 			macProvider.destroy();
 			macDoc.destroy();
 			micProvider.destroy();
@@ -4952,6 +5030,10 @@ export default function ReportWorkspace({
 			addendumD.destroy();
 			setDateDoc(null);
 			setDateProvider(null);
+			setSampleCollectionDateDoc(null);
+			setSampleCollectionDateProvider(null);
+			setFinalizationDateDoc(null);
+			setFinalizationDateProvider(null);
 			setMacroscopyDoc(null);
 			setMacroscopyProvider(null);
 			setMicroscopyDoc(null);
@@ -5214,6 +5296,17 @@ export default function ReportWorkspace({
 
 		setSampleCollectionDate(sanitized);
 
+		if (sampleCollectionDateDoc) {
+			const ytext = sampleCollectionDateDoc.getText('content');
+
+			if (ytext.toString().trim() !== sanitized) {
+				sampleCollectionDateDoc.transact(() => {
+					ytext.delete(0, ytext.length);
+					ytext.insert(0, sanitized);
+				});
+			}
+		}
+
 		const csrfToken =
 			(
 				document.querySelector(
@@ -5247,6 +5340,17 @@ export default function ReportWorkspace({
 		const sanitized = match ? match[0] : dateVal;
 
 		setFinalizationDate(sanitized);
+
+		if (finalizationDateDoc) {
+			const ytext = finalizationDateDoc.getText('content');
+
+			if (ytext.toString().trim() !== sanitized) {
+				finalizationDateDoc.transact(() => {
+					ytext.delete(0, ytext.length);
+					ytext.insert(0, sanitized);
+				});
+			}
+		}
 
 		const csrfToken =
 			(
