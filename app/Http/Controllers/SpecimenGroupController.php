@@ -688,9 +688,9 @@ class SpecimenGroupController extends Controller
 
         DB::transaction(function () use ($request, $validated, $group, $invoice) {
             $caiRange = $invoice->caiRange;
-            if (! $caiRange) {
-                throw new \Exception('No hay un rango CAI asociado con esta factura.');
-            }
+
+            $defaultLocationId = Setting::where('setting_key', 'default_location_id')->value('setting_value');
+            $locationId = $caiRange ? $caiRange->location_id : ($defaultLocationId ? (int) $defaultLocationId : (Location::first()?->id ?? 1));
 
             // Calculate overall totals from specimens
             $totalAmount = 0.00;
@@ -937,7 +937,7 @@ class SpecimenGroupController extends Controller
                     // NEW specimen!
                     $sequenceCode = $specData['reserved_code'] ?? null;
                     if (! $sequenceCode) {
-                        $sequence = Sequence::where('location_id', $caiRange->location_id)
+                        $sequence = Sequence::where('location_id', $locationId)
                             ->where('specimen_type', $specData['specimen_type'])
                             ->where('active', true)
                             ->lockForUpdate()
@@ -1125,7 +1125,7 @@ class SpecimenGroupController extends Controller
                 $invoice->load(['creditRelation']);
                 $totalWords = $this->numberToSpanishWords($invoice->total);
                 $customer = $globalCustomer;
-                $location = Location::findOrFail($caiRange->location_id);
+                $location = Location::findOrFail($locationId);
 
                 $htmlContent = view('pdf.invoice', [
                     'invoice' => $invoice,

@@ -1514,7 +1514,7 @@ export default function SpecimenGroupSheet({
                             Procesando Grupo de Facturación
                         </h3>
                         <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-                            Estamos creando las muestras, incrementando CAI y
+                            Estamos creando las muestras y
                             compilando la factura grupal en PDF. Espere.
                         </p>
                     </div>
