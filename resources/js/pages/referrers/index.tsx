@@ -210,7 +210,9 @@ export default function ReferrersIndex({
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[80px]">ID</TableHead>
                                 <TableHead>Nombre</TableHead>
+                                <TableHead>Notas/Hospital/Clinica</TableHead>
                                 <TableHead>Tipo</TableHead>
                                 <TableHead>Contacto</TableHead>
                                 <TableHead>Fecha Creación</TableHead>
@@ -224,7 +226,13 @@ export default function ReferrersIndex({
                                 referrers.data.map((referrer) => (
                                     <TableRow key={referrer.id}>
                                         <TableCell className="font-medium">
+                                            {referrer.id}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
                                             {referrer.name}
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            {referrer.notes || '-'}
                                         </TableCell>
                                         <TableCell>
                                             <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
@@ -286,7 +294,7 @@ export default function ReferrersIndex({
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={5}
+                                        colSpan={7}
                                         className="h-24 text-center"
                                     >
                                         No se encontraron resultados.
