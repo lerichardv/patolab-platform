@@ -1160,3 +1160,51 @@ test('when creating a specimen, if the CAI range invoice number is taken, it tri
     $caiRange->refresh();
     expect($caiRange->last_used_number)->toEqual(7);
 });
+
+test('status date columns are automatically assigned when specimen status changes', function () {
+    Carbon::setTestNow('2026-08-14 12:00:00');
+
+    $customer = Customer::factory()->create();
+    $location = Location::create(['name' => 'Principal', 'address' => 'Dirección', 'active' => true]);
+    $type = SpecimenType::create(['name' => 'Biopsia', 'active' => true]);
+    $examination = SpecimenTypeExamination::create([
+        'specimen_type' => $type->id,
+        'name' => 'Examen 1',
+        'code' => 'EX1',
+        'description' => 'Desc 1',
+        'active' => true,
+    ]);
+    $category = SpecimenCategory::create(['name' => 'Categoría', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Tipo de Referente', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Referente', 'referrer_type' => $referrerType->id, 'active' => true]);
+    $priority = Priority::create(['name' => 'Baja', 'color' => '#10b981', 'order' => 3, 'active' => true]);
+
+    // Create specimen with default 'received' status
+    $specimen = Specimen::create([
+        'sequence_code' => 'BIO-0001-08-2026',
+        'customer' => $customer->id,
+        'location_id' => $location->id,
+        'specimen_type' => $type->id,
+        'specimen_type_examination' => $examination->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+        'anatomic_site' => 'Estómago',
+        'diagnosis' => 'Gastritis',
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    expect($specimen->received_at)->not->toBeNull();
+    expect($specimen->received_at->format('Y-m-d H:i:s'))->toBe('2026-08-14 12:00:00');
+    expect($specimen->macroscopic_review_at)->toBeNull();
+
+    // Change status to macroscopic_review
+    Carbon::setTestNow('2026-08-14 13:00:00');
+    $specimen->update(['status' => 'macroscopic_review']);
+
+    expect($specimen->macroscopic_review_at)->not->toBeNull();
+    expect($specimen->macroscopic_review_at->format('Y-m-d H:i:s'))->toBe('2026-08-14 13:00:00');
+
+    Carbon::setTestNow();
+});

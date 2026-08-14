@@ -30,6 +30,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import SpecimenViewSheet from '../../specimens/specimen-view-sheet';
 
 interface SpecimenReportRow {
@@ -51,6 +52,7 @@ interface SpecimenReportRow {
     created_at: string;
     expected_internal_finalization_date: string | null;
     expected_finalization_date: string | null;
+    finalized_at: string | null;
     status: string;
     status_color?: string;
 }
@@ -85,6 +87,8 @@ interface Props {
         examination_id?: string;
         date_from?: string;
         date_to?: string;
+        internal_date_from?: string;
+        internal_date_to?: string;
     };
     selectedCustomer?: {
         id: number;
@@ -96,6 +100,33 @@ interface Props {
     }[];
     examinations: any[];
 }
+
+const statusLabels: Record<string, string> = {
+    received: 'Recibida',
+    macroscopic_review: 'Rev. Macroscópica',
+    processing: 'En Proceso',
+    microscopic_review: 'Rev. Microscópica',
+    finalized: 'Finalizada',
+    delivered: 'Entregada',
+    cancelled: 'Cancelada',
+};
+
+const statusBadgeStyles: Record<string, string> = {
+    received:
+        'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-400',
+    macroscopic_review:
+        'border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-900/50 dark:bg-purple-950/30 dark:text-purple-400',
+    processing:
+        'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400',
+    microscopic_review:
+        'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 dark:border-fuchsia-900/50 dark:bg-fuchsia-950/30 dark:text-fuchsia-400',
+    finalized:
+        'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400',
+    delivered:
+        'border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-400',
+    cancelled:
+        'border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400',
+};
 
 export default function DeliveryReportIndex({
     specimens,
@@ -256,6 +287,11 @@ export default function DeliveryReportIndex({
                                             to: defaultRange.to,
                                         }),
                                     );
+                                    setCookie(
+                                        `internal_date_filter_report_delivery_user_${userId}`,
+                                        '',
+                                        -1,
+                                    );
                                 }
 
                                 router.get(
@@ -280,8 +316,8 @@ export default function DeliveryReportIndex({
 
                 {/* Filters Area */}
                 <div className="flex w-full flex-col gap-4 rounded-lg border bg-card p-4">
-                    {/* Row 1: Search and Date Range */}
-                    <div className="flex flex-col gap-4 md:flex-row md:items-end">
+                    {/* Row 1: Search and Date Ranges */}
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
                         <div className="relative w-full">
                             <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -291,7 +327,44 @@ export default function DeliveryReportIndex({
                                 onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
-                        <div className="flex w-full max-w-xs flex-col gap-1.5">
+                        <div className="flex w-full min-w-[220px] flex-col gap-1.5 lg:w-auto">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                Fecha Estimada Interna
+                            </span>
+                            <DateRangePicker
+                                cookieKey="internal_date_filter_report_delivery"
+                                value={{
+                                    from: filters.internal_date_from || '',
+                                    to: filters.internal_date_to || '',
+                                }}
+                                onChange={(range) => {
+                                    const newFilters = { ...filters };
+
+                                    if (range.from) {
+                                        newFilters.internal_date_from =
+                                            range.from;
+                                    } else {
+                                        delete newFilters.internal_date_from;
+                                    }
+
+                                    if (range.to) {
+                                        newFilters.internal_date_to = range.to;
+                                    } else {
+                                        delete newFilters.internal_date_to;
+                                    }
+
+                                    router.get(
+                                        deliveryReportIndex().url,
+                                        newFilters,
+                                        {
+                                            preserveState: true,
+                                            replace: true,
+                                        },
+                                    );
+                                }}
+                            />
+                        </div>
+                        <div className="flex w-full min-w-[220px] flex-col gap-1.5 lg:w-auto">
                             <span className="text-xs font-semibold text-muted-foreground">
                                 Fecha Estimada de Entrega
                             </span>
@@ -430,6 +503,12 @@ export default function DeliveryReportIndex({
                                     <TableHead className="min-w-[140px] text-center font-mono text-xs">
                                         Código de la Muestra
                                     </TableHead>
+                                    <TableHead className="min-w-[130px] text-center">
+                                        Estado
+                                    </TableHead>
+                                    <TableHead className="min-w-[140px] text-center">
+                                        Fecha de Finalización
+                                    </TableHead>
                                     <TableHead className="min-w-[110px] text-center">
                                         Fecha de Ingreso
                                     </TableHead>
@@ -451,7 +530,7 @@ export default function DeliveryReportIndex({
                                 {specimens.data.length === 0 ? (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={10}
+                                            colSpan={12}
                                             className="h-24 text-center text-muted-foreground"
                                         >
                                             No se encontraron muestras.
@@ -478,6 +557,15 @@ export default function DeliveryReportIndex({
                                                       'd/M/yy',
                                                   )
                                                 : 'N/A';
+                                        const finalizedAtFormatted =
+                                            row.finalized_at
+                                                ? format(
+                                                      new Date(
+                                                          row.finalized_at,
+                                                      ),
+                                                      'd/M/yy',
+                                                  )
+                                                : 'N/A';
 
                                         return (
                                             <TableRow key={row.id}>
@@ -500,6 +588,25 @@ export default function DeliveryReportIndex({
                                                 </TableCell>
                                                 <TableCell className="text-center font-mono text-xs font-semibold">
                                                     {row.sequence_code}
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={cn(
+                                                            'rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition-colors',
+                                                            statusBadgeStyles[
+                                                                row.status
+                                                            ] ||
+                                                                'border-slate-200 bg-slate-50 text-slate-700',
+                                                        )}
+                                                    >
+                                                        {statusLabels[
+                                                            row.status
+                                                        ] || row.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-center text-xs text-muted-foreground">
+                                                    {finalizedAtFormatted}
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     {format(

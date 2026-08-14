@@ -20,11 +20,37 @@ class Specimen extends Model
     use Auditable;
     use HasFactory;
 
+    public const STATUS_DATE_COLUMNS = [
+        'received' => 'received_at',
+        'macroscopic_review' => 'macroscopic_review_at',
+        'processing' => 'processing_at',
+        'microscopic_review' => 'microscopic_review_at',
+        'finalized' => 'finalized_at',
+        'delivered' => 'delivered_at',
+        'cancelled' => 'cancelled_at',
+    ];
+
     protected static function booted()
     {
+        static::creating(function ($specimen) {
+            $column = self::STATUS_DATE_COLUMNS[$specimen->status] ?? null;
+            if ($column && is_null($specimen->{$column})) {
+                $specimen->{$column} = now();
+            }
+        });
+
         static::created(function ($specimen) {
             if (! $specimen->group_id) {
                 SendSpecimenEmailJob::dispatch($specimen, 'created');
+            }
+        });
+
+        static::updating(function ($specimen) {
+            if ($specimen->isDirty('status')) {
+                $column = self::STATUS_DATE_COLUMNS[$specimen->status] ?? null;
+                if ($column && ! $specimen->isDirty($column)) {
+                    $specimen->{$column} = now();
+                }
             }
         });
 
@@ -61,6 +87,12 @@ class Specimen extends Model
         'diagnosis',
         'clinical_notes',
         'status',
+        'received_at',
+        'macroscopic_review_at',
+        'processing_at',
+        'microscopic_review_at',
+        'finalized_at',
+        'delivered_at',
         'medical_order_file',
         'priority_id',
         'active',
@@ -78,6 +110,12 @@ class Specimen extends Model
     protected $casts = [
         'active' => 'boolean',
         'is_group' => 'boolean',
+        'received_at' => 'datetime',
+        'macroscopic_review_at' => 'datetime',
+        'processing_at' => 'datetime',
+        'microscopic_review_at' => 'datetime',
+        'finalized_at' => 'datetime',
+        'delivered_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'sample_collection_date' => 'date',
     ];

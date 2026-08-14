@@ -1,7 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
 import { Edit2, Plus, Search, UserRound, Trash2 } from 'lucide-react';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
     index as referrersIndex,
@@ -91,31 +91,39 @@ export default function ReferrersIndex({
     );
     const [search, setSearch] = useState(filters.search || '');
 
-    const handleFilterChange = (key: string, value: string) => {
-        const newFilters = { ...filters, [key]: value };
+    const handleFilterChange = useCallback(
+        (key: string, value: string) => {
+            const newFilters = { ...filters, [key]: value };
 
-        if (value === 'all' || value === '') {
-            delete newFilters[key as keyof typeof filters];
-        }
+            if (value === 'all' || value === '') {
+                delete newFilters[key as keyof typeof filters];
+            }
 
-        router.get(referrersIndex().url, newFilters, {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            handleFilterChange('search', value);
-        }, 300),
+            router.get(referrersIndex().url, newFilters, {
+                preserveState: true,
+                replace: true,
+            });
+        },
         [filters],
+    );
+
+    const debouncedSearch = useMemo(
+        () =>
+            debounce((value: string) => {
+                handleFilterChange('search', value);
+            }, 300),
+        [handleFilterChange],
     );
 
     useEffect(() => {
         if (search !== filters.search) {
             debouncedSearch(search);
         }
-    }, [search]);
+
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [search, filters.search, debouncedSearch]);
 
     const handleEdit = (referrer: Referrer) => {
         setSelectedReferrer(referrer);
