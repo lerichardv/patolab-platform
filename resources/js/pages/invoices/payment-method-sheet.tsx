@@ -997,14 +997,17 @@ export function PaymentMethodSheet({
                                                     <SelectItem value="cash">
                                                         <div className="flex items-center gap-2">
                                                             <Wallet className="h-4 w-4 text-primary" />
-                                                            <span>Efectivo</span>
+                                                            <span>
+                                                                Efectivo
+                                                            </span>
                                                         </div>
                                                     </SelectItem>
                                                     <SelectItem value="credit card">
                                                         <div className="flex items-center gap-2">
                                                             <CreditCard className="h-4 w-4 text-primary" />
                                                             <span>
-                                                                Tarjeta de Crédito
+                                                                Tarjeta de
+                                                                Crédito
                                                             </span>
                                                         </div>
                                                     </SelectItem>
@@ -1012,7 +1015,8 @@ export function PaymentMethodSheet({
                                                         <div className="flex items-center gap-2">
                                                             <Landmark className="h-4 w-4 text-primary" />
                                                             <span>
-                                                                Transferencia Bancaria
+                                                                Transferencia
+                                                                Bancaria
                                                             </span>
                                                         </div>
                                                     </SelectItem>

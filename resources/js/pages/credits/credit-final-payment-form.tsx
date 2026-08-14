@@ -93,10 +93,7 @@ interface Props {
     onSuccess: () => void;
 }
 
-export default function CreditFinalPaymentForm({
-    credit,
-    onSuccess,
-}: Props) {
+export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
     const remainingVal = parseFloat(String(credit.amount_remaining));
 
     const originalInvoice =
@@ -316,7 +313,9 @@ export default function CreditFinalPaymentForm({
             <div className="space-y-4 pt-2">
                 {/* Amount to invoice */}
                 <div className="space-y-2">
-                    <Label htmlFor="amount_paid">Monto Total a Facturar (L.) *</Label>
+                    <Label htmlFor="amount_paid">
+                        Monto Total a Facturar (L.) *
+                    </Label>
                     <Input
                         id="amount_paid"
                         type="number"
@@ -329,7 +328,8 @@ export default function CreditFinalPaymentForm({
                         className="cursor-not-allowed bg-muted"
                     />
                     <p className="text-[10px] text-muted-foreground">
-                        El monto corresponde al saldo restante total del crédito a liquidar fiscalmente.
+                        El monto corresponde al saldo restante total del crédito
+                        a liquidar fiscalmente.
                     </p>
                     <InputError message={errors.amount_paid} />
                 </div>
@@ -362,12 +362,22 @@ export default function CreditFinalPaymentForm({
                                             originalInvoice?.invoice_number}
                                     </strong>{' '}
                                     para el crédito #{credit.id} por un monto de{' '}
-                                    <strong>L. {remainingVal.toFixed(2)}</strong>. Se conservará el mismo número de factura y el estado del crédito pasará a <strong>Factura Generada</strong>.
+                                    <strong>
+                                        L. {remainingVal.toFixed(2)}
+                                    </strong>
+                                    . Se conservará el mismo número de factura y
+                                    el estado del crédito pasará a{' '}
+                                    <strong>Factura Generada</strong>.
                                 </>
                             ) : (
                                 <>
-                                    Se emitirá la factura fiscal oficial para el crédito #{credit.id} por un monto de{' '}
-                                    <strong>L. {remainingVal.toFixed(2)}</strong>. El estado del crédito pasará a <strong>Factura Generada</strong>.
+                                    Se emitirá la factura fiscal oficial para el
+                                    crédito #{credit.id} por un monto de{' '}
+                                    <strong>
+                                        L. {remainingVal.toFixed(2)}
+                                    </strong>
+                                    . El estado del crédito pasará a{' '}
+                                    <strong>Factura Generada</strong>.
                                 </>
                             )}
                         </AlertDialogDescription>
