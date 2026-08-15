@@ -1,7 +1,8 @@
 /* global process, Buffer */
 import 'dotenv/config';
 import { spawn } from 'node:child_process';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
+import { existsSync, mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -255,8 +256,6 @@ const extensions = [
 
 const webhookUrl = process.env.WEBHOOK_URL || 'http://127.0.0.1:8001/api/collaboration';
 
-const pendingSaves = new Map();
-
 const updateSaveStatus = (instance, reportId, status) => {
 	const docName = `report-${reportId}-save-status`;
 	const doc = instance.documents.get(docName);
@@ -278,6 +277,7 @@ const customWebhookExtension = {
 			const response = await fetch(webhookUrl, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
+				signal: AbortSignal.timeout(5000),
 				body: JSON.stringify({
 					event: 'onConnect',
 					payload: {
@@ -333,6 +333,7 @@ const customWebhookExtension = {
 				const response = await fetch(webhookUrl, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
+					signal: AbortSignal.timeout(5000),
 					body: JSON.stringify({
 						event: 'create',
 						payload: {
@@ -375,146 +376,58 @@ const customWebhookExtension = {
 		}
 	},
 
-	async onChange(data) {
-		const save = async () => {
-			try {
-				console.log(`[webhook:onChange] Saving document: ${data.documentName}`);
+	async onStoreDocument(data) {
+		const match = data.documentName.match(/^report-(\d+)-/);
+		const reportId = match ? match[1] : null;
 
-				// 1. Get binary state and encode to base64
-				const binaryState = Y.encodeStateAsUpdate(data.document);
-				const base64State = Buffer.from(binaryState).toString('base64');
+		if (reportId) updateSaveStatus(data.instance, reportId, 'saving');
 
-				// 2. Convert Ydoc to ProseMirror JSON, then to HTML (or extract plain text for date/status)
-				let htmlContent = '';
+		try {
+			const binaryState = Y.encodeStateAsUpdate(data.document);
+			const base64State = Buffer.from(binaryState).toString('base64');
 
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-sample_collection_date') || data.documentName.endsWith('-finalization_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
-					htmlContent = data.document.getText('content').toString();
-				} else {
-					try {
-						const xmlFragment = data.document.getXmlFragment('content');
-						console.log(`[webhook:onChange] xmlFragment content types:`, xmlFragment.toArray().map(item => item?.constructor?.name || typeof item));
-						const json = TiptapTransformer.fromYdoc(data.document, 'content');
-
-						if (json) {
-							htmlContent = generateHTML(json, extensions);
-						}
-					} catch (err) {
-						console.warn(`[webhook:onChange] Failed to convert doc to HTML:`, err);
-					}
-				}
-
-				// 3. Send to Laravel backend
-				const response = await fetch(webhookUrl, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						event: 'onChange',
-						payload: {
-							documentName: data.documentName,
-							document: base64State,
-							html: htmlContent,
-						}
-					})
-				});
-
-				if (!response.ok) {
-					console.error(`[webhook:onChange] Failed to save document. Laravel status: ${response.status}`);
-				} else {
-					console.log(`[webhook:onChange] Document saved successfully`);
-				}
-			} catch (error) {
-				console.error(`[webhook:onChange] Error:`, error);
-			}
-		};
-
-		// Extract report ID to check if it's one of the report editors or the date
-		const match = data.documentName.match(/^report-(\d+)-(macroscopy|microscopy|diagnosis|report_date|clinical_details|comments_notes|protocols|legend|sections_order|open_text|open_text_label|addendum|headings_toggles)$/);
-
-		if (match) {
-			const reportId = match[1];
-
-			if (!pendingSaves.has(reportId)) {
-				pendingSaves.set(reportId, {
-					timeout: null,
-					documents: new Map()
-				});
+			let rawText = '';
+			if (data.documentName.endsWith('-report_date') || 
+				data.documentName.endsWith('-sample_collection_date') || 
+				data.documentName.endsWith('-finalization_date') || 
+				data.documentName.endsWith('-status') || 
+				data.documentName.endsWith('-save-status') || 
+				data.documentName.endsWith('-sections_order') || 
+				data.documentName.endsWith('-open_text_label') || 
+				data.documentName.endsWith('-headings_toggles')) {
+				rawText = data.document.getText('content').toString();
 			}
 
-			const entry = pendingSaves.get(reportId);
-			entry.documents.set(data.documentName, save);
+			await fetch(webhookUrl, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				signal: AbortSignal.timeout(8000),
+				body: JSON.stringify({
+					event: 'onChange',
+					payload: {
+						documentName: data.documentName,
+						document: base64State,
+						text: rawText,
+					}
+				})
+			});
 
-			if (entry.timeout) {
-				clearTimeout(entry.timeout);
+			if (reportId) {
+				updateSaveStatus(data.instance, reportId, 'saved');
+				setTimeout(() => updateSaveStatus(data.instance, reportId, 'idle'), 1300);
 			}
-
-			entry.timeout = setTimeout(async () => {
-				let docsToSave;
-
-				try {
-					if (pendingSaves.has(reportId)) {
-						const currentEntry = pendingSaves.get(reportId);
-
-						if (currentEntry) {
-							docsToSave = new Map(currentEntry.documents);
-							currentEntry.documents.clear();
-						}
-					}
-				} catch (err) {
-					console.error(`[pendingSaves] Error preparing documents to save for report ${reportId}:`, err);
-				} finally {
-					pendingSaves.delete(reportId);
-				}
-
-				if (!docsToSave || docsToSave.size === 0) {
-					return;
-				}
-
-				updateSaveStatus(data.instance, reportId, 'saving');
-
-				let hasError = false;
-
-				for (const [docName, saveFn] of docsToSave.entries()) {
-					try {
-						await saveFn();
-					} catch (err) {
-						console.error(`Error executing deferred save for ${docName}:`, err);
-						hasError = true;
-					}
-				}
-
-				try {
-					if (hasError) {
-						updateSaveStatus(data.instance, reportId, 'idle');
-					} else {
-						updateSaveStatus(data.instance, reportId, 'saved');
-						setTimeout(() => {
-							try {
-								updateSaveStatus(data.instance, reportId, 'idle');
-							} catch (err) {
-								console.error(`Error resetting save status for report ${reportId}:`, err);
-							}
-						}, 1300);
-					}
-				} catch (err) {
-					console.error(`Error updating save status for report ${reportId}:`, err);
-				}
-			}, 1000);
-		} else {
-			// For non-report editors or date (like status/save-status), use standard debouncer (1s)
-			const debounceTime = 1000;
-			const maxDebounceTime = 10000;
-			await data.instance.debouncer.debounce(
-				`save-${data.documentName}`,
-				save,
-				debounceTime,
-				maxDebounceTime
-			);
+		} catch (error) {
+			console.error(`[webhook:onStoreDocument] Save failed:`, error.message);
+			if (reportId) updateSaveStatus(data.instance, reportId, 'idle');
 		}
 	}
 };
 
 // 1. Initialize Hocuspocus WITH your Custom Webhook Extension
 const hocuspocus = new Hocuspocus({
+	debounce: 1000,
+	maxDebounce: 10000,
+	unloadImmediately: true,
 	extensions: [
 		customWebhookExtension,
 	],
@@ -528,8 +441,8 @@ app.use(cors());
 // Configure short-term upload folder in os temp dir
 const uploadDir = path.join(os.tmpdir(), 'whisper-chunks');
 
-if (!fs.existsSync(uploadDir)) {
-	fs.mkdirSync(uploadDir, { recursive: true });
+if (!existsSync(uploadDir)) {
+	mkdirSync(uploadDir, { recursive: true });
 }
 
 const upload = multer({ dest: uploadDir });
@@ -544,7 +457,7 @@ app.post('/api/dictate-chunk', upload.single('audio'), async (req, res) => {
 	try {
 		console.log('[OpenAI Dictate] Sending audio file to OpenAI Whisper API:', inputPath);
 
-		const fileBuffer = fs.readFileSync(inputPath);
+		const fileBuffer = await fs.readFile(inputPath);
 		const fileBlob = new Blob([fileBuffer]);
 
 		const formData = new FormData();
@@ -558,6 +471,7 @@ app.post('/api/dictate-chunk', upload.single('audio'), async (req, res) => {
 			headers: {
 				Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
 			},
+			signal: AbortSignal.timeout(15000),
 			body: formData,
 		});
 
@@ -573,13 +487,13 @@ app.post('/api/dictate-chunk', upload.single('audio'), async (req, res) => {
 		console.log('[OpenAI Dictate] Transcribed text:', cleanText);
 
 		// Clean up files
-		fs.unlink(inputPath, () => {});
+		fs.unlink(inputPath).catch(() => {});
 
 		return res.json({ success: true, text: cleanText });
 	} catch (error) {
 		console.error('Error en OpenAI Dictado:', error);
 		// Clean up files
-		fs.unlink(inputPath, () => {});
+		fs.unlink(inputPath).catch(() => {});
 
 		return res.status(500).json({
 			error: 'Error procesando la transcripción de audio.',
@@ -608,6 +522,7 @@ app.post('/api/fix-grammar', express.json(), async (req, res) => {
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
 			},
+			signal: AbortSignal.timeout(15000),
 			body: JSON.stringify({
 				model: "gpt-4o",
 				messages: [
@@ -699,6 +614,7 @@ Instrucciones:
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
 			},
+			signal: AbortSignal.timeout(15000),
 			body: JSON.stringify({
 				model: "gpt-4o",
 				messages: apiMessages,
@@ -788,7 +704,6 @@ const ws = crossws({
 			}
 		},
 		message(peer, message) {
-			console.log(`[ws:message] Received message from peer: ${peer.id}`);
 			// Forward incoming data buffers to the Yjs merge processor
 			peer._hocuspocus?.handleMessage(message.uint8Array());
 		},
