@@ -377,6 +377,10 @@ const customWebhookExtension = {
 	},
 
 	async onStoreDocument(data) {
+		if (data.documentName.endsWith('-save-status') || data.documentName.endsWith('-insumos')) {
+			return;
+		}
+
 		const match = data.documentName.match(/^report-(\d+)-/);
 		const reportId = match ? match[1] : null;
 
@@ -391,7 +395,6 @@ const customWebhookExtension = {
 				data.documentName.endsWith('-sample_collection_date') || 
 				data.documentName.endsWith('-finalization_date') || 
 				data.documentName.endsWith('-status') || 
-				data.documentName.endsWith('-save-status') || 
 				data.documentName.endsWith('-sections_order') || 
 				data.documentName.endsWith('-open_text_label') || 
 				data.documentName.endsWith('-headings_toggles')) {
