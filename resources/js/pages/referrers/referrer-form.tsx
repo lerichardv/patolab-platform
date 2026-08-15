@@ -472,18 +472,17 @@ export default function ReferrerForm({
 										Confirmación de Hospital/Clínica:
 									</p>
 									<p className="leading-relaxed">
-										Es adecuado actualizar el
-										hospital/clínica si{' '}
-										<strong>todas</strong> las muestras
+										Si <strong>todas</strong> las muestras
 										asociadas deben pertenecer al nuevo
-										hospital/clínica (
+										hospital/clínica, si es adecuado actualizar el
+										hospital/clínica(
 										<span className="font-bold underline underline-offset-2">
 											{data.notes || 'Sin especificar'}
 										</span>
 										).
 									</p>
 									<p className="leading-relaxed">
-										Si desea que las muestras anteriores conserven el hospital previo, le recomendamos que cree un nuevo remitente para el nuevo hospital/clínica, puede hacerlo desde el botón de abajo "Crear Nuevo Remitente", se le enviará automáticamente al formulario para crearlo con los datos del remitente actual.
+										Si desea que a las muestras anteriores no se les cambie el hospital/clínica le recomendamos que cree un nuevo remitente para el nuevo hospital/clínica, puede hacerlo desde el botón de abajo "Crear Nuevo Remitente", se le enviará automáticamente al formulario para crearlo con los datos del remitente actual.
 									</p>
 								</div>
 							</div>
