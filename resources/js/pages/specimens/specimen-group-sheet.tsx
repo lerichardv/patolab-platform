@@ -4102,7 +4102,9 @@ export default function SpecimenGroupSheet({
                                     setReferrerInitialData(formData);
                                     setEditingReferrer(null);
                                 }}
-                                onSelectExistingReferrer={(existingReferrer) => {
+                                onSelectExistingReferrer={(
+                                    existingReferrer,
+                                ) => {
                                     setNestedReferrer(
                                         existingReferrer.id.toString(),
                                     );
