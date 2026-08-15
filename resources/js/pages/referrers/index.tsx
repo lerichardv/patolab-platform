@@ -86,6 +86,14 @@ export default function ReferrersIndex({
     const [selectedReferrer, setSelectedReferrer] = useState<Referrer | null>(
         null,
     );
+    const [initialCreateData, setInitialCreateData] = useState<{
+        name: string;
+        referrer_type: string;
+        phone: string;
+        email: string;
+        address: string;
+        notes: string;
+    } | null>(null);
     const [referrerToDelete, setReferrerToDelete] = useState<Referrer | null>(
         null,
     );
@@ -127,11 +135,26 @@ export default function ReferrersIndex({
 
     const handleEdit = (referrer: Referrer) => {
         setSelectedReferrer(referrer);
+        setInitialCreateData(null);
         setIsSheetOpen(true);
     };
 
     const handleCreate = () => {
         setSelectedReferrer(null);
+        setInitialCreateData(null);
+        setIsSheetOpen(true);
+    };
+
+    const handleSwitchToCreateNew = (formData: {
+        name: string;
+        referrer_type: string;
+        phone: string;
+        email: string;
+        address: string;
+        notes: string;
+    }) => {
+        setSelectedReferrer(null);
+        setInitialCreateData(formData);
         setIsSheetOpen(true);
     };
 
@@ -328,6 +351,8 @@ export default function ReferrersIndex({
                 referrerTypes={referrerTypes}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
+                initialData={initialCreateData}
+                onSwitchToCreateNew={handleSwitchToCreateNew}
             />
 
             <AlertDialog

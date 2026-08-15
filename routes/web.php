@@ -354,6 +354,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('histotechnologist-work-orders/{work_order}/users', [HistotechnologistWorkOrderController::class, 'assignTechnician'])->name('histotechnologist-work-orders.assign');
     Route::delete('histotechnologist-work-orders/{work_order}/users/{user}', [HistotechnologistWorkOrderController::class, 'unassignTechnician'])->name('histotechnologist-work-orders.unassign');
     Route::put('histotechnologist-work-orders/{work_order}/status', [HistotechnologistWorkOrderController::class, 'updateStatus'])->name('histotechnologist-work-orders.update-status');
+    Route::get('referrers/{referrer}/specimens', [ReferrerController::class, 'specimens'])->name('referrers.specimens');
     Route::resource('referrers', ReferrerController::class);
     Route::resource('referrer-types', ReferrerTypeController::class);
     Route::resource('locations', LocationController::class);

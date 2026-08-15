@@ -34,4 +34,9 @@ class Referrer extends Model
     {
         return $this->belongsTo(ReferrerType::class, 'referrer_type');
     }
+
+    public function specimens()
+    {
+        return $this->hasMany(Specimen::class, 'referrer');
+    }
 }
