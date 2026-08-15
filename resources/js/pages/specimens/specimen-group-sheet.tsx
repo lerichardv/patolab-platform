@@ -305,6 +305,9 @@ export default function SpecimenGroupSheet({
     const prevReferrersRef = useRef<any[]>(referrers);
     const [isReferrerSheetOpen, setIsReferrerSheetOpen] = useState(false);
     const [editingReferrer, setEditingReferrer] = useState<any | null>(null);
+    const [referrerInitialData, setReferrerInitialData] = useState<any | null>(
+        null,
+    );
     const [isSequenceSheetOpen, setIsSequenceSheetOpen] = useState(false);
     const [isSpecimenTypeSheetOpen, setIsSpecimenTypeSheetOpen] =
         useState(false);
@@ -4085,11 +4088,29 @@ export default function SpecimenGroupSheet({
                             />
                             <ReferrerForm
                                 key={
-                                    editingReferrer ? editingReferrer.id : 'new'
+                                    editingReferrer
+                                        ? editingReferrer.id
+                                        : referrerInitialData
+                                          ? 'new-data'
+                                          : 'new'
                                 }
                                 referrer={editingReferrer}
                                 referrerTypes={referrerTypes}
+                                initialData={referrerInitialData}
                                 onSuccess={() => setIsReferrerSheetOpen(false)}
+                                onSwitchToCreateNew={(formData) => {
+                                    setReferrerInitialData(formData);
+                                    setEditingReferrer(null);
+                                }}
+                                onSelectExistingReferrer={(existingReferrer) => {
+                                    setNestedReferrer(
+                                        existingReferrer.id.toString(),
+                                    );
+                                    setIsReferrerSheetOpen(false);
+                                    toast.info(
+                                        `Se seleccionó el remitente existente: ${existingReferrer.name} (${existingReferrer.notes || 'Sin hospital'})`,
+                                    );
+                                }}
                             />
                         </SheetContent>
                     </Sheet>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Referrer;
 use App\Models\ReferrerType;
+use App\Models\Specimen;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -75,5 +76,33 @@ class ReferrerController extends Controller
         $referrer->update(['active' => false]);
 
         return redirect()->back();
+    }
+
+    public function specimens(Request $request, Referrer $referrer)
+    {
+        Gate::authorize('referrers.view');
+
+        $specimens = Specimen::where('referrer', $referrer->id)
+            ->select('id', 'sequence_code', 'status', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $name = trim($request->get('name', $referrer->name));
+        $notes = trim($request->get('notes', $referrer->notes ?? ''));
+
+        $existingDuplicate = null;
+        if (! empty($name) && ! empty($notes)) {
+            $existingDuplicate = Referrer::where('id', '!=', $referrer->id)
+                ->where('active', true)
+                ->whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($name)])
+                ->whereRaw('LOWER(TRIM(notes)) = ?', [mb_strtolower($notes)])
+                ->first();
+        }
+
+        return response()->json([
+            'total' => $specimens->count(),
+            'specimens' => $specimens,
+            'existing_duplicate' => $existingDuplicate,
+        ]);
     }
 }

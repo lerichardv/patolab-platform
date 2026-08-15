@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import HeadingSheet from '@/components/heading-sheet';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import ReferrerForm from './referrer-form';
@@ -23,6 +24,23 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSuccess?: () => void;
+    initialData?: {
+        name?: string;
+        referrer_type?: string;
+        phone?: string;
+        email?: string;
+        address?: string;
+        notes?: string;
+    } | null;
+    onSwitchToCreateNew?: (data: {
+        name: string;
+        referrer_type: string;
+        phone: string;
+        email: string;
+        address: string;
+        notes: string;
+    }) => void;
+    onSelectExistingReferrer?: (existingReferrer: Referrer) => void;
 }
 
 export default function ReferrerSheet({
@@ -31,25 +49,40 @@ export default function ReferrerSheet({
     open,
     onOpenChange,
     onSuccess,
+    initialData,
+    onSwitchToCreateNew,
+    onSelectExistingReferrer,
 }: Props) {
+    const [sheetReferrer, setSheetReferrer] = useState<Referrer | null>(referrer);
+
+    useEffect(() => {
+        setSheetReferrer(referrer);
+    }, [referrer, open]);
+
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="overflow-y-auto sm:max-w-[540px]">
                 <HeadingSheet
-                    title={referrer ? 'Editar Remitente' : 'Nuevo Remitente'}
+                    title={sheetReferrer ? 'Editar Remitente' : 'Nuevo Remitente'}
                     description={
-                        referrer
+                        sheetReferrer
                             ? 'Realice cambios en la información del remitente aquí.'
                             : 'Complete el formulario para registrar un nuevo remitente en el sistema.'
                     }
                 />
                 <ReferrerForm
-                    referrer={referrer}
+                    referrer={sheetReferrer}
                     referrerTypes={referrerTypes}
+                    initialData={initialData}
                     onSuccess={() => {
                         onSuccess?.();
                         onOpenChange(false);
                     }}
+                    onSwitchToCreateNew={(formData) => {
+                        setSheetReferrer(null);
+                        onSwitchToCreateNew?.(formData);
+                    }}
+                    onSelectExistingReferrer={onSelectExistingReferrer}
                 />
             </SheetContent>
         </Sheet>

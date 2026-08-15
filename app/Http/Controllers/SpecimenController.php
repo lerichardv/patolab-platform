@@ -1265,6 +1265,10 @@ class SpecimenController extends Controller
         \Illuminate\Support\Facades\DB::transaction(function () use ($ids, $action, $value, $cancellationReason) {
             if ($action === 'change_status') {
                 $updateData = ['status' => $value];
+                $dateColumn = Specimen::STATUS_DATE_COLUMNS[$value] ?? null;
+                if ($dateColumn) {
+                    $updateData[$dateColumn] = now();
+                }
                 $allIds = $ids;
                 if ($value === 'cancelled') {
                     $updateData['cancellation_reason'] = $cancellationReason;

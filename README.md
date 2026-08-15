@@ -100,6 +100,18 @@ To wipe the database, run all migrations, and seed all data from scratch:
 php artisan migrate:fresh --seed
 ```
 
+### Backfill Specimen Status Change Dates
+To populate missing status change timestamps (`received_at`, `macroscopic_review_at`, `processing_at`, `microscopic_review_at`, `finalized_at`, `delivered_at`, `cancelled_at`) on existing `specimen` records using historical data from the `audit_log` table:
+
+```bash
+php artisan specimens:backfill-status-dates
+```
+
+Options:
+- `--dry-run`: Preview changes without updating the database.
+- `--force`: Overwrite existing status dates even if already populated.
+
+
 ---
 
 ## Test User Credentials

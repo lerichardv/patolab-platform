@@ -247,6 +247,9 @@ export default function SpecimenForm({
     const [editingReferrer, setEditingReferrer] = React.useState<any | null>(
         null,
     );
+    const [referrerInitialData, setReferrerInitialData] = React.useState<any | null>(
+        null,
+    );
     const [isSequenceSheetOpen, setIsSequenceSheetOpen] = React.useState(false);
     const [isSpecimenTypeSheetOpen, setIsSpecimenTypeSheetOpen] =
         React.useState(false);
@@ -1506,6 +1509,9 @@ export default function SpecimenForm({
                                                     if (selected) {
                                                         setEditingReferrer(
                                                             selected,
+                                                        );
+                                                        setReferrerInitialData(
+                                                            null,
                                                         );
                                                         setIsReferrerSheetOpen(
                                                             true,
@@ -3765,10 +3771,28 @@ export default function SpecimenForm({
                     />
                     <div className="-mx-5 mt-4 px-5">
                         <ReferrerForm
-                            key={editingReferrer ? editingReferrer.id : 'new'}
+                            key={
+                                editingReferrer
+                                    ? editingReferrer.id
+                                    : referrerInitialData
+                                      ? 'new-data'
+                                      : 'new'
+                            }
                             referrer={editingReferrer}
                             referrerTypes={referrerTypes}
+                            initialData={referrerInitialData}
                             onSuccess={() => setIsReferrerSheetOpen(false)}
+                            onSwitchToCreateNew={(formData) => {
+                                setReferrerInitialData(formData);
+                                setEditingReferrer(null);
+                            }}
+                            onSelectExistingReferrer={(existingReferrer) => {
+                                setData('referrer', existingReferrer.id.toString());
+                                setIsReferrerSheetOpen(false);
+                                toast.info(
+                                    `Se seleccionó el remitente existente: ${existingReferrer.name} (${existingReferrer.notes || 'Sin hospital'})`,
+                                );
+                            }}
                         />
                     </div>
                 </SheetContent>

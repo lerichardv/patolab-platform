@@ -1,7 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
 import { Edit2, Plus, Search, UserRound, Trash2 } from 'lucide-react';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
     index as referrersIndex,
@@ -86,44 +86,75 @@ export default function ReferrersIndex({
     const [selectedReferrer, setSelectedReferrer] = useState<Referrer | null>(
         null,
     );
+    const [initialCreateData, setInitialCreateData] = useState<{
+        name: string;
+        referrer_type: string;
+        phone: string;
+        email: string;
+        address: string;
+        notes: string;
+    } | null>(null);
     const [referrerToDelete, setReferrerToDelete] = useState<Referrer | null>(
         null,
     );
     const [search, setSearch] = useState(filters.search || '');
 
-    const handleFilterChange = (key: string, value: string) => {
-        const newFilters = { ...filters, [key]: value };
+    const handleFilterChange = useCallback(
+        (key: string, value: string) => {
+            const newFilters = { ...filters, [key]: value };
 
-        if (value === 'all' || value === '') {
-            delete newFilters[key as keyof typeof filters];
-        }
+            if (value === 'all' || value === '') {
+                delete newFilters[key as keyof typeof filters];
+            }
 
-        router.get(referrersIndex().url, newFilters, {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            handleFilterChange('search', value);
-        }, 300),
+            router.get(referrersIndex().url, newFilters, {
+                preserveState: true,
+                replace: true,
+            });
+        },
         [filters],
+    );
+
+    const debouncedSearch = useMemo(
+        () =>
+            debounce((value: string) => {
+                handleFilterChange('search', value);
+            }, 300),
+        [handleFilterChange],
     );
 
     useEffect(() => {
         if (search !== filters.search) {
             debouncedSearch(search);
         }
-    }, [search]);
+
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [search, filters.search, debouncedSearch]);
 
     const handleEdit = (referrer: Referrer) => {
         setSelectedReferrer(referrer);
+        setInitialCreateData(null);
         setIsSheetOpen(true);
     };
 
     const handleCreate = () => {
         setSelectedReferrer(null);
+        setInitialCreateData(null);
+        setIsSheetOpen(true);
+    };
+
+    const handleSwitchToCreateNew = (formData: {
+        name: string;
+        referrer_type: string;
+        phone: string;
+        email: string;
+        address: string;
+        notes: string;
+    }) => {
+        setSelectedReferrer(null);
+        setInitialCreateData(formData);
         setIsSheetOpen(true);
     };
 
@@ -320,6 +351,8 @@ export default function ReferrersIndex({
                 referrerTypes={referrerTypes}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
+                initialData={initialCreateData}
+                onSwitchToCreateNew={handleSwitchToCreateNew}
             />
 
             <AlertDialog

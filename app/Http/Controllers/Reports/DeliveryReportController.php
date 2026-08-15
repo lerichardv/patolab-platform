@@ -39,6 +39,9 @@ class DeliveryReportController extends Controller
         $dateFrom = $resolvedDates['from'];
         $dateTo = $resolvedDates['to'];
 
+        $internalDateFrom = $request->get('internal_date_from');
+        $internalDateTo = $request->get('internal_date_to');
+
         // Build base query
         $query = Specimen::with(['customerRelation', 'type', 'examination', 'category'])
             ->where('status', '!=', 'cancelled');
@@ -67,7 +70,7 @@ class DeliveryReportController extends Controller
             $query->where('specimen_type_examination', $request->get('examination_id'));
         }
 
-        // Performance limit: created_at must be <= dateTo
+        // Performance limit: created_at must be <= dateTo if specified
         if ($dateTo) {
             $query->where('created_at', '<=', Carbon::parse($dateTo)->endOfDay());
         }
@@ -75,23 +78,48 @@ class DeliveryReportController extends Controller
         // Fetch and filter in PHP
         $specimens = $query->get();
 
-        $filteredSpecimens = $specimens->filter(function ($specimen) use ($dateFrom, $dateTo) {
+        $filteredSpecimens = $specimens->filter(function ($specimen) use ($dateFrom, $dateTo, $internalDateFrom, $internalDateTo) {
             $deliveryDate = $specimen->expected_finalization_date;
-            if (! $deliveryDate) {
-                return false;
+            $internalDate = $specimen->expected_internal_finalization_date;
+
+            // Delivery Date Filter
+            if ($dateFrom || $dateTo) {
+                if (! $deliveryDate) {
+                    return false;
+                }
+
+                $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : null;
+                $to = $dateTo ? Carbon::parse($dateTo)->endOfDay() : null;
+
+                if ($from && $to && ! $deliveryDate->between($from, $to)) {
+                    return false;
+                }
+                if ($from && $deliveryDate->lessThan($from)) {
+                    return false;
+                }
+                if ($to && $deliveryDate->greaterThan($to)) {
+                    return false;
+                }
             }
 
-            $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : null;
-            $to = $dateTo ? Carbon::parse($dateTo)->endOfDay() : null;
+            // Internal Estimated Date Filter
+            if ($internalDateFrom || $internalDateTo) {
+                if (! $internalDate) {
+                    return false;
+                }
 
-            if ($from && $to) {
-                return $deliveryDate->between($from, $to);
-            }
-            if ($from) {
-                return $deliveryDate->greaterThanOrEqualTo($from);
-            }
-            if ($to) {
-                return $deliveryDate->lessThanOrEqualTo($to);
+                $intFrom = $internalDateFrom ? Carbon::parse($internalDateFrom)->startOfDay() : null;
+                $intTo = $internalDateTo ? Carbon::parse($internalDateTo)->endOfDay() : null;
+
+                if ($intFrom && $intTo && ! $internalDate->between($intFrom, $intTo)) {
+                    return false;
+                }
+                if ($intFrom && $internalDate->lessThan($intFrom)) {
+                    return false;
+                }
+                if ($intTo && $internalDate->greaterThan($intTo)) {
+                    return false;
+                }
             }
 
             return true;
@@ -144,7 +172,7 @@ class DeliveryReportController extends Controller
             'specimens' => $paginated,
             'summary' => $summary,
             'filters' => array_merge(
-                $request->only(['search', 'customer_id', 'specimen_type_id', 'examination_id']),
+                $request->only(['search', 'customer_id', 'specimen_type_id', 'examination_id', 'internal_date_from', 'internal_date_to']),
                 [
                     'date_from' => $dateFrom,
                     'date_to' => $dateTo,
@@ -172,6 +200,9 @@ class DeliveryReportController extends Controller
 
         $dateFrom = $resolvedDates['from'];
         $dateTo = $resolvedDates['to'];
+
+        $internalDateFrom = $request->get('internal_date_from');
+        $internalDateTo = $request->get('internal_date_to');
 
         // Build query
         $query = Specimen::with(['customerRelation', 'type', 'examination', 'category'])
@@ -206,23 +237,48 @@ class DeliveryReportController extends Controller
 
         $specimens = $query->get();
 
-        $filteredSpecimens = $specimens->filter(function ($specimen) use ($dateFrom, $dateTo) {
+        $filteredSpecimens = $specimens->filter(function ($specimen) use ($dateFrom, $dateTo, $internalDateFrom, $internalDateTo) {
             $deliveryDate = $specimen->expected_finalization_date;
-            if (! $deliveryDate) {
-                return false;
+            $internalDate = $specimen->expected_internal_finalization_date;
+
+            // Delivery Date Filter
+            if ($dateFrom || $dateTo) {
+                if (! $deliveryDate) {
+                    return false;
+                }
+
+                $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : null;
+                $to = $dateTo ? Carbon::parse($dateTo)->endOfDay() : null;
+
+                if ($from && $to && ! $deliveryDate->between($from, $to)) {
+                    return false;
+                }
+                if ($from && $deliveryDate->lessThan($from)) {
+                    return false;
+                }
+                if ($to && $deliveryDate->greaterThan($to)) {
+                    return false;
+                }
             }
 
-            $from = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : null;
-            $to = $dateTo ? Carbon::parse($dateTo)->endOfDay() : null;
+            // Internal Estimated Date Filter
+            if ($internalDateFrom || $internalDateTo) {
+                if (! $internalDate) {
+                    return false;
+                }
 
-            if ($from && $to) {
-                return $deliveryDate->between($from, $to);
-            }
-            if ($from) {
-                return $deliveryDate->greaterThanOrEqualTo($from);
-            }
-            if ($to) {
-                return $deliveryDate->lessThanOrEqualTo($to);
+                $intFrom = $internalDateFrom ? Carbon::parse($internalDateFrom)->startOfDay() : null;
+                $intTo = $internalDateTo ? Carbon::parse($internalDateTo)->endOfDay() : null;
+
+                if ($intFrom && $intTo && ! $internalDate->between($intFrom, $intTo)) {
+                    return false;
+                }
+                if ($intFrom && $internalDate->lessThan($intFrom)) {
+                    return false;
+                }
+                if ($intTo && $internalDate->greaterThan($intTo)) {
+                    return false;
+                }
             }
 
             return true;
@@ -248,9 +304,11 @@ class DeliveryReportController extends Controller
             'D' => 24,
             'E' => 22,
             'F' => 18,
-            'G' => 24,
-            'H' => 26,
-            'I' => 10,
+            'G' => 18,
+            'H' => 24,
+            'I' => 26,
+            'J' => 22,
+            'K' => 10,
         ];
         foreach ($columnWidths as $col => $width) {
             $sheet->getColumnDimension($col)->setWidth($width);
@@ -292,13 +350,13 @@ class DeliveryReportController extends Controller
         }
 
         // Title (Row 5)
-        $sheet->mergeCells('A5:I5');
+        $sheet->mergeCells('A5:K5');
         $sheet->setCellValue('A5', 'PATOLAB - HOJA DE ENTREGA DE MUESTRAS');
         $sheet->getStyle('A5')->getFont()->setBold(true)->setSize(16)->setName('Calibri');
         $sheet->getStyle('A5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
         // Subtitle (Row 6)
-        $sheet->mergeCells('A6:I6');
+        $sheet->mergeCells('A6:K6');
         $sheet->setCellValue('A6', $dateSubtitle);
         $sheet->getStyle('A6')->getFont()->setBold(true)->setSize(14)->setName('Calibri');
         $sheet->getStyle('A6')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -319,6 +377,8 @@ class DeliveryReportController extends Controller
             'Tipo de Muestra-Análisis',
             'Categoría',
             'Código de la Muestra',
+            'Estado',
+            'Fecha de Finalización',
             'Fecha de Ingreso',
             'Fecha Estimada Interna',
             'Fecha Estimada de Entrega',
@@ -343,6 +403,16 @@ class DeliveryReportController extends Controller
             }
         }
 
+        $statusLabels = [
+            'received' => 'Recibida',
+            'macroscopic_review' => 'Rev. Macroscópica',
+            'processing' => 'En Proceso',
+            'microscopic_review' => 'Rev. Microscópica',
+            'finalized' => 'Finalizada',
+            'delivered' => 'Entregada',
+            'cancelled' => 'Cancelada',
+        ];
+
         // Loop rows
         $currentRow = 9;
         foreach ($filteredSpecimens as $specimen) {
@@ -355,44 +425,50 @@ class DeliveryReportController extends Controller
             $expectedDelivery = $specimen->expected_finalization_date
                 ? $specimen->expected_finalization_date->format('d/m/Y')
                 : 'N/A';
+            $finalizedAt = $specimen->finalized_at
+                ? $specimen->finalized_at->format('d/m/Y')
+                : 'N/A';
+            $statusName = $statusLabels[$specimen->status] ?? $specimen->status;
 
             $sheet->setCellValue('A'.$currentRow, $specimen->customerRelation?->name ?? 'N/A');
             $sheet->setCellValue('B'.$currentRow, $specimen->customerRelation?->id_number ?? 'N/A');
             $sheet->setCellValue('C'.$currentRow, $service);
             $sheet->setCellValue('D'.$currentRow, $specimen->category?->name ?? 'N/A');
             $sheet->setCellValue('E'.$currentRow, $specimen->sequence_code ?? 'N/A');
-            $sheet->setCellValue('F'.$currentRow, $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A');
-            $sheet->setCellValue('G'.$currentRow, $expectedInternal);
-            $sheet->setCellValue('H'.$currentRow, $expectedDelivery);
-            $sheet->setCellValue('I'.$currentRow, 1);
+            $sheet->setCellValue('F'.$currentRow, $statusName);
+            $sheet->setCellValue('G'.$currentRow, $finalizedAt);
+            $sheet->setCellValue('H'.$currentRow, $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A');
+            $sheet->setCellValue('I'.$currentRow, $expectedInternal);
+            $sheet->setCellValue('J'.$currentRow, $expectedDelivery);
+            $sheet->setCellValue('K'.$currentRow, 1);
 
             // Styles for details row
             $sheet->getStyle("A{$currentRow}:D{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("E{$currentRow}:H{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("I{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("E{$currentRow}:J{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("K{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            $sheet->getStyle("A{$currentRow}:I{$currentRow}")->getFont()->setSize(10)->setName('Calibri');
+            $sheet->getStyle("A{$currentRow}:K{$currentRow}")->getFont()->setSize(10)->setName('Calibri');
 
-            // Accent yellow highlight on estimated delivery date column cell
-            $sheet->getStyle('H'.$currentRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFE0');
+            // Accent yellow highlight on estimated delivery date column cell (Column J)
+            $sheet->getStyle('J'.$currentRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFE0');
 
             $currentRow++;
         }
 
         // Totals Row (at bottom of details list)
         $sheet->getRowDimension($currentRow)->setRowHeight(24);
-        $sheet->mergeCells("A{$currentRow}:H{$currentRow}");
+        $sheet->mergeCells("A{$currentRow}:J{$currentRow}");
         $sheet->setCellValue("A{$currentRow}", 'Total');
         $sheet->getStyle("A{$currentRow}")->getFont()->setBold(true)->setSize(10)->setName('Calibri');
         $sheet->getStyle("A{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-        $sheet->setCellValue("I{$currentRow}", '=SUM(I9:I'.($currentRow - 1).')');
-        $sheet->getStyle("I{$currentRow}")->getFont()->setBold(true)->setSize(10)->setName('Calibri');
-        $sheet->getStyle("I{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        $sheet->setCellValue("K{$currentRow}", '=SUM(K9:K'.($currentRow - 1).')');
+        $sheet->getStyle("K{$currentRow}")->getFont()->setBold(true)->setSize(10)->setName('Calibri');
+        $sheet->getStyle("K{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
         // Double borders for total row
-        $sheet->getStyle("A{$currentRow}:I{$currentRow}")->getBorders()->getTop()->setBorderStyle(Border::BORDER_THIN);
-        $sheet->getStyle("A{$currentRow}:I{$currentRow}")->getBorders()->getBottom()->setBorderStyle(Border::BORDER_DOUBLE);
+        $sheet->getStyle("A{$currentRow}:K{$currentRow}")->getBorders()->getTop()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle("A{$currentRow}:K{$currentRow}")->getBorders()->getBottom()->setBorderStyle(Border::BORDER_DOUBLE);
 
         // Dynamic Space
         $currentRow += 3;
