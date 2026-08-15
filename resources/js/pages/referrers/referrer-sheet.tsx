@@ -53,7 +53,9 @@ export default function ReferrerSheet({
     onSwitchToCreateNew,
     onSelectExistingReferrer,
 }: Props) {
-    const [sheetReferrer, setSheetReferrer] = useState<Referrer | null>(referrer);
+    const [sheetReferrer, setSheetReferrer] = useState<Referrer | null>(
+        referrer,
+    );
 
     useEffect(() => {
         setSheetReferrer(referrer);
@@ -63,7 +65,9 @@ export default function ReferrerSheet({
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="overflow-y-auto sm:max-w-[540px]">
                 <HeadingSheet
-                    title={sheetReferrer ? 'Editar Remitente' : 'Nuevo Remitente'}
+                    title={
+                        sheetReferrer ? 'Editar Remitente' : 'Nuevo Remitente'
+                    }
                     description={
                         sheetReferrer
                             ? 'Realice cambios en la información del remitente aquí.'

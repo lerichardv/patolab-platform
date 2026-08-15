@@ -247,9 +247,9 @@ export default function SpecimenForm({
     const [editingReferrer, setEditingReferrer] = React.useState<any | null>(
         null,
     );
-    const [referrerInitialData, setReferrerInitialData] = React.useState<any | null>(
-        null,
-    );
+    const [referrerInitialData, setReferrerInitialData] = React.useState<
+        any | null
+    >(null);
     const [isSequenceSheetOpen, setIsSequenceSheetOpen] = React.useState(false);
     const [isSpecimenTypeSheetOpen, setIsSpecimenTypeSheetOpen] =
         React.useState(false);
@@ -3787,7 +3787,10 @@ export default function SpecimenForm({
                                 setEditingReferrer(null);
                             }}
                             onSelectExistingReferrer={(existingReferrer) => {
-                                setData('referrer', existingReferrer.id.toString());
+                                setData(
+                                    'referrer',
+                                    existingReferrer.id.toString(),
+                                );
                                 setIsReferrerSheetOpen(false);
                                 toast.info(
                                     `Se seleccionó el remitente existente: ${existingReferrer.name} (${existingReferrer.notes || 'Sin hospital'})`,

@@ -35,6 +35,7 @@ import {
     RotateCcw,
     ArrowUp,
     ArrowDown,
+    Loader2,
 } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -270,6 +271,61 @@ const deduplicateSpecimens = (prioritiesList: Priority[]): Priority[] => {
     });
 };
 
+const KanbanColumnSentinel = ({
+    priorityId,
+    totalCount,
+    visibleCount,
+    onLoadMore,
+}: {
+    priorityId: number;
+    totalCount: number;
+    visibleCount: number;
+    onLoadMore: (priorityId: number) => void;
+}) => {
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        const node = sentinelRef.current;
+        if (!node || visibleCount >= totalCount) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    onLoadMore(priorityId);
+                }
+            },
+            { rootMargin: '300px' },
+        );
+
+        observer.observe(node);
+
+        return () => {
+            observer.unobserve(node);
+        };
+    }, [priorityId, totalCount, visibleCount, onLoadMore]);
+
+    return (
+        <div
+            ref={sentinelRef}
+            className="my-2 flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/10"
+        >
+            <div className="flex items-center gap-2 font-medium text-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span>
+                    Mostrando {visibleCount} de {totalCount} muestras
+                </span>
+            </div>
+            <button
+                type="button"
+                onClick={() => onLoadMore(priorityId)}
+                className="mt-0.5 text-[11px] font-semibold text-primary hover:underline"
+            >
+                Cargar más muestras
+            </button>
+        </div>
+    );
+};
+
 export default function SpecimensIndex({
     priorities: initialPriorities,
     specimenTypes,
@@ -378,6 +434,20 @@ export default function SpecimensIndex({
     const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
     const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [visibleCounts, setVisibleCounts] = useState<Record<number, number>>(
+        {},
+    );
+
+    const handleLoadMore = (priorityId: number) => {
+        setVisibleCounts((prev) => {
+            const current = prev[priorityId] || 50;
+
+            return {
+                ...prev,
+                [priorityId]: current + 50,
+            };
+        });
+    };
 
     const [showExpiredOnly, setShowExpiredOnly] = useState(false);
     const [dueDateSortOrder, setDueDateSortOrder] = useState<'asc' | 'desc'>(
@@ -592,6 +662,19 @@ export default function SpecimensIndex({
         selectedExaminationId,
         showExpiredOnly,
         dueDateSortOrder,
+    ]);
+
+    useEffect(() => {
+        setVisibleCounts({});
+    }, [
+        searchQuery,
+        selectedStatuses,
+        dateRange,
+        selectedGroupId,
+        selectedSpecimenTypeId,
+        selectedExaminationId,
+        dueDateSortOrder,
+        showExpiredOnly,
     ]);
 
     const visibleSpecimenIds = useMemo(() => {
@@ -912,22 +995,12 @@ export default function SpecimensIndex({
         movedSpecimen.priority_id = destPriorityId;
 
         // Calculate the filtered list of specimens in destination priority to find the target position
-        const destFilteredSpecimens = destPriority.specimens.filter(
-            (specimen) => {
-                const matchesStatus = selectedStatuses.includes(
-                    specimen.status,
-                );
-                const specDateStr = format(
-                    new Date(specimen.created_at),
-                    'yyyy-MM-dd',
-                );
-                const matchesDate =
-                    (!dateRange.from || specDateStr >= dateRange.from) &&
-                    (!dateRange.to || specDateStr <= dateRange.to);
-
-                return matchesStatus && matchesDate;
-            },
+        const destFilteredPriority = filteredPriorities.find(
+            (p) => p.id === destPriorityId,
         );
+        const destFilteredSpecimens = destFilteredPriority
+            ? destFilteredPriority.specimens
+            : destPriority.specimens;
 
         const destFilteredSpecimensWithoutMoved =
             sourcePriorityId === destPriorityId
@@ -2080,298 +2153,336 @@ export default function SpecimensIndex({
                     >
                         <DragDropContext onDragEnd={onDragEnd}>
                             <div className="flex min-h-[calc(100vh-200px)] gap-4">
-                                {filteredPriorities.map((priority) => (
-                                    <div
-                                        key={priority.id}
-                                        className="relative flex w-80 min-w-80 flex-col overflow-hidden rounded-lg p-3"
-                                    >
-                                        {/* Dynamic Background Layer */}
-                                        <div
-                                            className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.06]"
-                                            style={{
-                                                backgroundColor: priority.color,
-                                            }}
-                                        />
+                                {filteredPriorities.map((priority) => {
+                                    const totalSpecimens =
+                                        priority.specimens.length;
+                                    const isPaginated = totalSpecimens > 50;
+                                    const visibleLimit = isPaginated
+                                        ? visibleCounts[priority.id] || 50
+                                        : totalSpecimens;
+                                    const visibleSpecimens = isPaginated
+                                        ? priority.specimens.slice(
+                                              0,
+                                              visibleLimit,
+                                          )
+                                        : priority.specimens;
 
-                                        {/* Content Container */}
-                                        <div className="relative z-10 flex h-full flex-col">
-                                            <div className="mb-4 flex items-center gap-2 px-1 text-sm font-semibold">
-                                                <div
-                                                    className="h-3 w-3 rounded-full shadow-sm"
-                                                    style={{
-                                                        backgroundColor:
-                                                            priority.color,
-                                                    }}
-                                                />
-                                                <span>{priority.name}</span>
-                                                <span className="ml-auto rounded-full bg-background/60 px-2 py-0.5 text-xs text-muted-foreground">
-                                                    {priority.specimens.length}
-                                                </span>
-                                            </div>
-                                            <Droppable
-                                                droppableId={priority.id.toString()}
-                                            >
-                                                {(provided) => (
+                                    return (
+                                        <div
+                                            key={priority.id}
+                                            className="relative flex w-80 min-w-80 flex-col overflow-hidden rounded-lg p-3"
+                                        >
+                                            {/* Dynamic Background Layer */}
+                                            <div
+                                                className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.06]"
+                                                style={{
+                                                    backgroundColor:
+                                                        priority.color,
+                                                }}
+                                            />
+
+                                            {/* Content Container */}
+                                            <div className="relative z-10 flex h-full flex-col">
+                                                <div className="mb-4 flex items-center gap-2 px-1 text-sm font-semibold">
                                                     <div
-                                                        {...provided.droppableProps}
-                                                        ref={provided.innerRef}
-                                                        className="flex min-h-[150px] flex-1 flex-col gap-3"
-                                                    >
-                                                        {priority.specimens.map(
-                                                            (
-                                                                specimen,
-                                                                index,
-                                                            ) => (
-                                                                <Draggable
-                                                                    key={
-                                                                        specimen.id
-                                                                    }
-                                                                    draggableId={specimen.id.toString()}
-                                                                    index={
-                                                                        index
-                                                                    }
-                                                                    isDragDisabled={
-                                                                        !auth.permissions?.includes(
-                                                                            'specimens.edit',
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    {(
-                                                                        provided,
-                                                                        snapshot,
-                                                                    ) => (
-                                                                        <div
-                                                                            ref={
-                                                                                provided.innerRef
-                                                                            }
-                                                                            {...provided.draggableProps}
-                                                                            {...provided.dragHandleProps}
-                                                                            onClick={() => {
-                                                                                if (
-                                                                                    isSelectionMode
-                                                                                ) {
-                                                                                    toggleSelectSpecimen(
-                                                                                        specimen.id,
-                                                                                    );
-                                                                                } else {
-                                                                                    handleView(
-                                                                                        specimen,
-                                                                                    );
+                                                        className="h-3 w-3 rounded-full shadow-sm"
+                                                        style={{
+                                                            backgroundColor:
+                                                                priority.color,
+                                                        }}
+                                                    />
+                                                    <span>{priority.name}</span>
+                                                    <span className="ml-auto rounded-full bg-background/60 px-2 py-0.5 text-xs text-muted-foreground">
+                                                        {totalSpecimens}
+                                                    </span>
+                                                </div>
+                                                <Droppable
+                                                    droppableId={priority.id.toString()}
+                                                >
+                                                    {(provided) => (
+                                                        <div
+                                                            {...provided.droppableProps}
+                                                            ref={
+                                                                provided.innerRef
+                                                            }
+                                                            className="flex min-h-[150px] flex-1 flex-col gap-3"
+                                                        >
+                                                            {visibleSpecimens.map(
+                                                                (
+                                                                    specimen,
+                                                                    index,
+                                                                ) => (
+                                                                    <Draggable
+                                                                        key={
+                                                                            specimen.id
+                                                                        }
+                                                                        draggableId={specimen.id.toString()}
+                                                                        index={
+                                                                            index
+                                                                        }
+                                                                        isDragDisabled={
+                                                                            !auth.permissions?.includes(
+                                                                                'specimens.edit',
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        {(
+                                                                            provided,
+                                                                            snapshot,
+                                                                        ) => (
+                                                                            <div
+                                                                                ref={
+                                                                                    provided.innerRef
                                                                                 }
-                                                                            }}
-                                                                            className={`flex cursor-pointer flex-col gap-2 rounded-md border p-3 shadow-sm transition-all duration-200 hover:border-primary/50 ${
-                                                                                snapshot.isDragging
-                                                                                    ? 'z-50 scale-[1.02] rotate-2 opacity-90 shadow-xl ring-2 ring-primary/20'
-                                                                                    : ''
-                                                                            } ${
-                                                                                selectedIds.includes(
-                                                                                    specimen.id,
-                                                                                )
-                                                                                    ? 'border-primary bg-primary/[0.02] ring-1 ring-primary/30'
-                                                                                    : specimen.users &&
-                                                                                        specimen
-                                                                                            .users
-                                                                                            .length >
-                                                                                            0
-                                                                                      ? 'dark:border-sky-850 border-sky-300/80 bg-sky-50/50 dark:bg-sky-950/20'
-                                                                                      : 'bg-card'
-                                                                            }`}
-                                                                        >
-                                                                            <div className="flex items-start gap-3">
-                                                                                {isSelectionMode && (
-                                                                                    <div
-                                                                                        className="flex-shrink-0 pt-1"
-                                                                                        onClick={(
-                                                                                            e,
-                                                                                        ) =>
-                                                                                            e.stopPropagation()
-                                                                                        }
-                                                                                    >
-                                                                                        <Checkbox
-                                                                                            checked={selectedIds.includes(
-                                                                                                specimen.id,
-                                                                                            )}
-                                                                                            onCheckedChange={() =>
-                                                                                                toggleSelectSpecimen(
-                                                                                                    specimen.id,
-                                                                                                )
-                                                                                            }
-                                                                                        />
-                                                                                    </div>
-                                                                                )}
-                                                                                <div className="flex min-w-0 flex-1 flex-col gap-2">
-                                                                                    <div className="flex items-start justify-between">
-                                                                                        <div>
-                                                                                            {specimen
-                                                                                                .group
-                                                                                                ?.name && (
-                                                                                                <div className="mb-1">
-                                                                                                    <Badge
-                                                                                                        variant="secondary"
-                                                                                                        className="h-4 border-none bg-purple-500/10 px-1.5 py-0 text-[9px] font-semibold text-purple-600 hover:bg-purple-500/10 dark:bg-purple-500/20 dark:text-purple-300"
-                                                                                                    >
-                                                                                                        {
-                                                                                                            specimen
-                                                                                                                .group
-                                                                                                                .name
-                                                                                                        }
-                                                                                                    </Badge>
-                                                                                                </div>
-                                                                                            )}
-                                                                                            <div className="text-sm font-medium">
-                                                                                                {
-                                                                                                    specimen
-                                                                                                        .customer_relation
-                                                                                                        ?.name
-                                                                                                }
-                                                                                            </div>
-                                                                                            {specimen.sequence_code && (
-                                                                                                <div className="mt-0.5 w-fit rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
-                                                                                                    {
-                                                                                                        specimen.sequence_code
-                                                                                                    }
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </div>
+                                                                                {...provided.draggableProps}
+                                                                                {...provided.dragHandleProps}
+                                                                                onClick={() => {
+                                                                                    if (
+                                                                                        isSelectionMode
+                                                                                    ) {
+                                                                                        toggleSelectSpecimen(
+                                                                                            specimen.id,
+                                                                                        );
+                                                                                    } else {
+                                                                                        handleView(
+                                                                                            specimen,
+                                                                                        );
+                                                                                    }
+                                                                                }}
+                                                                                className={`flex cursor-pointer flex-col gap-2 rounded-md border p-3 shadow-sm transition-all duration-200 hover:border-primary/50 ${
+                                                                                    snapshot.isDragging
+                                                                                        ? 'z-50 scale-[1.02] rotate-2 opacity-90 shadow-xl ring-2 ring-primary/20'
+                                                                                        : ''
+                                                                                } ${
+                                                                                    selectedIds.includes(
+                                                                                        specimen.id,
+                                                                                    )
+                                                                                        ? 'border-primary bg-primary/[0.02] ring-1 ring-primary/30'
+                                                                                        : specimen.users &&
+                                                                                            specimen
+                                                                                                .users
+                                                                                                .length >
+                                                                                                0
+                                                                                          ? 'dark:border-sky-850 border-sky-300/80 bg-sky-50/50 dark:bg-sky-950/20'
+                                                                                          : 'bg-card'
+                                                                                }`}
+                                                                            >
+                                                                                <div className="flex items-start gap-3">
+                                                                                    {isSelectionMode && (
                                                                                         <div
-                                                                                            className="ml-1 flex"
+                                                                                            className="flex-shrink-0 pt-1"
                                                                                             onClick={(
                                                                                                 e,
                                                                                             ) =>
                                                                                                 e.stopPropagation()
                                                                                             }
                                                                                         >
-                                                                                            {auth.permissions?.includes(
-                                                                                                'specimens.manage',
-                                                                                            ) && (
-                                                                                                <Button
-                                                                                                    variant="ghost"
-                                                                                                    size="icon"
-                                                                                                    className="relative h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                                                                    onClick={() =>
-                                                                                                        handleAssignClick(
-                                                                                                            specimen,
-                                                                                                        )
+                                                                                            <Checkbox
+                                                                                                checked={selectedIds.includes(
+                                                                                                    specimen.id,
+                                                                                                )}
+                                                                                                onCheckedChange={() =>
+                                                                                                    toggleSelectSpecimen(
+                                                                                                        specimen.id,
+                                                                                                    )
+                                                                                                }
+                                                                                            />
+                                                                                        </div>
+                                                                                    )}
+                                                                                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                                                                                        <div className="flex items-start justify-between">
+                                                                                            <div>
+                                                                                                {specimen
+                                                                                                    .group
+                                                                                                    ?.name && (
+                                                                                                    <div className="mb-1">
+                                                                                                        <Badge
+                                                                                                            variant="secondary"
+                                                                                                            className="h-4 border-none bg-purple-500/10 px-1.5 py-0 text-[9px] font-semibold text-purple-600 hover:bg-purple-500/10 dark:bg-purple-500/20 dark:text-purple-300"
+                                                                                                        >
+                                                                                                            {
+                                                                                                                specimen
+                                                                                                                    .group
+                                                                                                                    .name
+                                                                                                            }
+                                                                                                        </Badge>
+                                                                                                    </div>
+                                                                                                )}
+                                                                                                <div className="text-sm font-medium">
+                                                                                                    {
+                                                                                                        specimen
+                                                                                                            .customer_relation
+                                                                                                            ?.name
                                                                                                     }
-                                                                                                    title="Asignar Patólogo"
-                                                                                                >
-                                                                                                    <UserPlus className="h-4 w-4" />
-                                                                                                    <span
-                                                                                                        className={`absolute right-0 bottom-0 flex h-3 w-3 items-center justify-center rounded-full text-[7px] font-extrabold ring-1 ring-background ${
-                                                                                                            (specimen
+                                                                                                </div>
+                                                                                                {specimen.sequence_code && (
+                                                                                                    <div className="mt-0.5 w-fit rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
+                                                                                                        {
+                                                                                                            specimen.sequence_code
+                                                                                                        }
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                            <div
+                                                                                                className="ml-1 flex"
+                                                                                                onClick={(
+                                                                                                    e,
+                                                                                                ) =>
+                                                                                                    e.stopPropagation()
+                                                                                                }
+                                                                                            >
+                                                                                                {auth.permissions?.includes(
+                                                                                                    'specimens.manage',
+                                                                                                ) && (
+                                                                                                    <Button
+                                                                                                        variant="ghost"
+                                                                                                        size="icon"
+                                                                                                        className="relative h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                                                                        onClick={() =>
+                                                                                                            handleAssignClick(
+                                                                                                                specimen,
+                                                                                                            )
+                                                                                                        }
+                                                                                                        title="Asignar Patólogo"
+                                                                                                    >
+                                                                                                        <UserPlus className="h-4 w-4" />
+                                                                                                        <span
+                                                                                                            className={`absolute right-0 bottom-0 flex h-3 w-3 items-center justify-center rounded-full text-[7px] font-extrabold ring-1 ring-background ${
+                                                                                                                (specimen
+                                                                                                                    .users
+                                                                                                                    ?.length ||
+                                                                                                                    0) >
+                                                                                                                0
+                                                                                                                    ? 'bg-sky-500 text-white'
+                                                                                                                    : 'bg-slate-300 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                                                                                                            }`}
+                                                                                                        >
+                                                                                                            {specimen
                                                                                                                 .users
                                                                                                                 ?.length ||
-                                                                                                                0) >
-                                                                                                            0
-                                                                                                                ? 'bg-sky-500 text-white'
-                                                                                                                : 'bg-slate-300 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                                                                                                        }`}
-                                                                                                    >
-                                                                                                        {specimen
-                                                                                                            .users
-                                                                                                            ?.length ||
-                                                                                                            0}
-                                                                                                    </span>
-                                                                                                </Button>
-                                                                                            )}
-                                                                                            {(auth.permissions?.includes(
-                                                                                                'specimens.edit',
-                                                                                            ) ||
-                                                                                                auth.permissions?.includes(
-                                                                                                    'specimens.delete',
-                                                                                                )) && (
-                                                                                                <DropdownMenu>
-                                                                                                    <DropdownMenuTrigger
-                                                                                                        asChild
-                                                                                                    >
-                                                                                                        <button
-                                                                                                            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                                                                            title="Acciones"
+                                                                                                                0}
+                                                                                                        </span>
+                                                                                                    </Button>
+                                                                                                )}
+                                                                                                {(auth.permissions?.includes(
+                                                                                                    'specimens.edit',
+                                                                                                ) ||
+                                                                                                    auth.permissions?.includes(
+                                                                                                        'specimens.delete',
+                                                                                                    )) && (
+                                                                                                    <DropdownMenu>
+                                                                                                        <DropdownMenuTrigger
+                                                                                                            asChild
                                                                                                         >
-                                                                                                            <MoreVertical className="h-4 w-4" />
-                                                                                                        </button>
-                                                                                                    </DropdownMenuTrigger>
-                                                                                                    <DropdownMenuContent
-                                                                                                        align="end"
-                                                                                                        onClick={(
-                                                                                                            e,
-                                                                                                        ) =>
-                                                                                                            e.stopPropagation()
-                                                                                                        }
-                                                                                                    >
-                                                                                                        {auth.permissions?.includes(
-                                                                                                            'specimens.edit',
-                                                                                                        ) && (
-                                                                                                            <DropdownMenuItem
-                                                                                                                onClick={(
-                                                                                                                    e,
-                                                                                                                ) => {
-                                                                                                                    e.stopPropagation();
-                                                                                                                    handleEdit(
-                                                                                                                        specimen,
-                                                                                                                    );
-                                                                                                                }}
+                                                                                                            <button
+                                                                                                                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                                                                title="Acciones"
                                                                                                             >
-                                                                                                                <Edit2 className="mr-2 h-4 w-4" />
-                                                                                                                <span>
-                                                                                                                    Editar
-                                                                                                                </span>
-                                                                                                            </DropdownMenuItem>
-                                                                                                        )}
-                                                                                                        {auth.permissions?.includes(
-                                                                                                            'report_editor.view',
-                                                                                                        ) && (
-                                                                                                            <DropdownMenuItem
-                                                                                                                onClick={(
-                                                                                                                    e,
-                                                                                                                ) => {
-                                                                                                                    e.stopPropagation();
-                                                                                                                    window.open(
-                                                                                                                        `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
-                                                                                                                        '_blank',
-                                                                                                                    );
-                                                                                                                }}
-                                                                                                            >
-                                                                                                                <FileText className="mr-2 h-4 w-4" />
-                                                                                                                <span>
-                                                                                                                    Abrir
-                                                                                                                    Reporte
-                                                                                                                </span>
-                                                                                                            </DropdownMenuItem>
-                                                                                                        )}
-                                                                                                        {specimen.is_group &&
-                                                                                                            specimen.group && (
+                                                                                                                <MoreVertical className="h-4 w-4" />
+                                                                                                            </button>
+                                                                                                        </DropdownMenuTrigger>
+                                                                                                        <DropdownMenuContent
+                                                                                                            align="end"
+                                                                                                            onClick={(
+                                                                                                                e,
+                                                                                                            ) =>
+                                                                                                                e.stopPropagation()
+                                                                                                            }
+                                                                                                        >
+                                                                                                            {auth.permissions?.includes(
+                                                                                                                'specimens.edit',
+                                                                                                            ) && (
                                                                                                                 <DropdownMenuItem
                                                                                                                     onClick={(
                                                                                                                         e,
                                                                                                                     ) => {
                                                                                                                         e.stopPropagation();
-                                                                                                                        handleLoadGroupAndOpenSheet(
-                                                                                                                            specimen
-                                                                                                                                .group
-                                                                                                                                .id,
+                                                                                                                        handleEdit(
+                                                                                                                            specimen,
                                                                                                                         );
                                                                                                                     }}
                                                                                                                 >
-                                                                                                                    <Plus className="mr-2 h-4 w-4" />
+                                                                                                                    <Edit2 className="mr-2 h-4 w-4" />
                                                                                                                     <span>
-                                                                                                                        Agregar
-                                                                                                                        más
-                                                                                                                        muestras
-                                                                                                                        al
-                                                                                                                        grupo
+                                                                                                                        Editar
                                                                                                                     </span>
                                                                                                                 </DropdownMenuItem>
                                                                                                             )}
-                                                                                                        {auth.permissions?.includes(
-                                                                                                            'specimens.edit',
-                                                                                                        ) &&
-                                                                                                            ![
-                                                                                                                'cancelled',
-                                                                                                                'finalized',
-                                                                                                                'delivered',
-                                                                                                            ].includes(
-                                                                                                                specimen.status,
+                                                                                                            {auth.permissions?.includes(
+                                                                                                                'report_editor.view',
+                                                                                                            ) && (
+                                                                                                                <DropdownMenuItem
+                                                                                                                    onClick={(
+                                                                                                                        e,
+                                                                                                                    ) => {
+                                                                                                                        e.stopPropagation();
+                                                                                                                        window.open(
+                                                                                                                            `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
+                                                                                                                            '_blank',
+                                                                                                                        );
+                                                                                                                    }}
+                                                                                                                >
+                                                                                                                    <FileText className="mr-2 h-4 w-4" />
+                                                                                                                    <span>
+                                                                                                                        Abrir
+                                                                                                                        Reporte
+                                                                                                                    </span>
+                                                                                                                </DropdownMenuItem>
+                                                                                                            )}
+                                                                                                            {specimen.is_group &&
+                                                                                                                specimen.group && (
+                                                                                                                    <DropdownMenuItem
+                                                                                                                        onClick={(
+                                                                                                                            e,
+                                                                                                                        ) => {
+                                                                                                                            e.stopPropagation();
+                                                                                                                            handleLoadGroupAndOpenSheet(
+                                                                                                                                specimen
+                                                                                                                                    .group
+                                                                                                                                    .id,
+                                                                                                                            );
+                                                                                                                        }}
+                                                                                                                    >
+                                                                                                                        <Plus className="mr-2 h-4 w-4" />
+                                                                                                                        <span>
+                                                                                                                            Agregar
+                                                                                                                            más
+                                                                                                                            muestras
+                                                                                                                            al
+                                                                                                                            grupo
+                                                                                                                        </span>
+                                                                                                                    </DropdownMenuItem>
+                                                                                                                )}
+                                                                                                            {auth.permissions?.includes(
+                                                                                                                'specimens.edit',
+                                                                                                            ) &&
+                                                                                                                ![
+                                                                                                                    'cancelled',
+                                                                                                                    'finalized',
+                                                                                                                    'delivered',
+                                                                                                                ].includes(
+                                                                                                                    specimen.status,
+                                                                                                                ) && (
+                                                                                                                    <DropdownMenuItem
+                                                                                                                        variant="destructive"
+                                                                                                                        onClick={(
+                                                                                                                            e,
+                                                                                                                        ) => {
+                                                                                                                            e.stopPropagation();
+                                                                                                                            handleCancelClick(
+                                                                                                                                specimen,
+                                                                                                                            );
+                                                                                                                        }}
+                                                                                                                    >
+                                                                                                                        <Ban className="mr-2 h-4 w-4" />
+                                                                                                                        <span>
+                                                                                                                            Cancelar
+                                                                                                                            muestra
+                                                                                                                        </span>
+                                                                                                                    </DropdownMenuItem>
+                                                                                                                )}
+                                                                                                            {auth.permissions?.includes(
+                                                                                                                'specimens.delete',
                                                                                                             ) && (
                                                                                                                 <DropdownMenuItem
                                                                                                                     variant="destructive"
@@ -2379,166 +2490,166 @@ export default function SpecimensIndex({
                                                                                                                         e,
                                                                                                                     ) => {
                                                                                                                         e.stopPropagation();
-                                                                                                                        handleCancelClick(
+                                                                                                                        handleDeleteClick(
                                                                                                                             specimen,
                                                                                                                         );
                                                                                                                     }}
                                                                                                                 >
-                                                                                                                    <Ban className="mr-2 h-4 w-4" />
+                                                                                                                    <Trash2 className="mr-2 h-4 w-4" />
                                                                                                                     <span>
-                                                                                                                        Cancelar
-                                                                                                                        muestra
+                                                                                                                        Eliminar
                                                                                                                     </span>
                                                                                                                 </DropdownMenuItem>
                                                                                                             )}
-                                                                                                        {auth.permissions?.includes(
-                                                                                                            'specimens.delete',
-                                                                                                        ) && (
-                                                                                                            <DropdownMenuItem
-                                                                                                                variant="destructive"
-                                                                                                                onClick={(
-                                                                                                                    e,
-                                                                                                                ) => {
-                                                                                                                    e.stopPropagation();
-                                                                                                                    handleDeleteClick(
-                                                                                                                        specimen,
-                                                                                                                    );
-                                                                                                                }}
-                                                                                                            >
-                                                                                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                                                                                <span>
-                                                                                                                    Eliminar
-                                                                                                                </span>
-                                                                                                            </DropdownMenuItem>
-                                                                                                        )}
-                                                                                                    </DropdownMenuContent>
-                                                                                                </DropdownMenu>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    <div className="text-xs text-muted-foreground">
-                                                                                        {
-                                                                                            specimen
-                                                                                                .type
-                                                                                                ?.name
-                                                                                        }{' '}
-                                                                                        -{' '}
-                                                                                        {
-                                                                                            specimen
-                                                                                                .examination
-                                                                                                ?.name
-                                                                                        }
-                                                                                    </div>
-                                                                                    {(() => {
-                                                                                        const dueInfo =
-                                                                                            getDueDateInfo(
-                                                                                                specimen,
-                                                                                            );
-
-                                                                                        if (
-                                                                                            !dueInfo
-                                                                                        ) {
-                                                                                            return null;
-                                                                                        }
-
-                                                                                        return (
-                                                                                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                                                                                                <div className="inline-flex w-fit items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                                                                                                    <Tag className="h-3 w-3" />{' '}
-                                                                                                    {
-                                                                                                        specimen
-                                                                                                            .category
-                                                                                                            .name
-                                                                                                    }
-                                                                                                </div>
-                                                                                                {![
-                                                                                                    'finalized',
-                                                                                                    'delivered',
-                                                                                                    'cancelled',
-                                                                                                ].includes(
-                                                                                                    specimen.status,
-                                                                                                ) && (
-                                                                                                    <div
-                                                                                                        className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${dueInfo.colorClass}`}
-                                                                                                        title={`Fecha Estimada: ${dueInfo.fullDueDate}`}
-                                                                                                    >
-                                                                                                        <CalendarClock className="h-3 w-3" />{' '}
-                                                                                                        {dueInfo.isExpired
-                                                                                                            ? 'Vencida:'
-                                                                                                            : 'Est:'}{' '}
-                                                                                                        {
-                                                                                                            dueInfo.dueDateFormatted
-                                                                                                        }
-                                                                                                    </div>
+                                                                                                        </DropdownMenuContent>
+                                                                                                    </DropdownMenu>
                                                                                                 )}
                                                                                             </div>
-                                                                                        );
-                                                                                    })()}
-                                                                                    <div className="mt-1 flex items-center justify-between text-xs">
-                                                                                        <span
-                                                                                            className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
-                                                                                            style={{
-                                                                                                backgroundColor:
-                                                                                                    specimen.status_color ||
-                                                                                                    '#cbd5e1',
-                                                                                            }}
-                                                                                        >
-                                                                                            {specimen.status ===
-                                                                                            'received'
-                                                                                                ? 'Recibida'
-                                                                                                : specimen.status ===
-                                                                                                    'macroscopic_review'
-                                                                                                  ? 'Rev. Macroscópica'
-                                                                                                  : specimen.status ===
-                                                                                                      'processing'
-                                                                                                    ? 'En Proceso'
+                                                                                        </div>
+                                                                                        <div className="text-xs text-muted-foreground">
+                                                                                            {
+                                                                                                specimen
+                                                                                                    .type
+                                                                                                    ?.name
+                                                                                            }{' '}
+                                                                                            -{' '}
+                                                                                            {
+                                                                                                specimen
+                                                                                                    .examination
+                                                                                                    ?.name
+                                                                                            }
+                                                                                        </div>
+                                                                                        {(() => {
+                                                                                            const dueInfo =
+                                                                                                getDueDateInfo(
+                                                                                                    specimen,
+                                                                                                );
+
+                                                                                            if (
+                                                                                                !dueInfo
+                                                                                            ) {
+                                                                                                return null;
+                                                                                            }
+
+                                                                                            return (
+                                                                                                <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                                                                                    <div className="inline-flex w-fit items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                                                                                        <Tag className="h-3 w-3" />{' '}
+                                                                                                        {
+                                                                                                            specimen
+                                                                                                                .category
+                                                                                                                .name
+                                                                                                        }
+                                                                                                    </div>
+                                                                                                    {![
+                                                                                                        'finalized',
+                                                                                                        'delivered',
+                                                                                                        'cancelled',
+                                                                                                    ].includes(
+                                                                                                        specimen.status,
+                                                                                                    ) && (
+                                                                                                        <div
+                                                                                                            className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${dueInfo.colorClass}`}
+                                                                                                            title={`Fecha Estimada: ${dueInfo.fullDueDate}`}
+                                                                                                        >
+                                                                                                            <CalendarClock className="h-3 w-3" />{' '}
+                                                                                                            {dueInfo.isExpired
+                                                                                                                ? 'Vencida:'
+                                                                                                                : 'Est:'}{' '}
+                                                                                                            {
+                                                                                                                dueInfo.dueDateFormatted
+                                                                                                            }
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            );
+                                                                                        })()}
+                                                                                        <div className="mt-1 flex items-center justify-between text-xs">
+                                                                                            <span
+                                                                                                className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
+                                                                                                style={{
+                                                                                                    backgroundColor:
+                                                                                                        specimen.status_color ||
+                                                                                                        '#cbd5e1',
+                                                                                                }}
+                                                                                            >
+                                                                                                {specimen.status ===
+                                                                                                'received'
+                                                                                                    ? 'Recibida'
                                                                                                     : specimen.status ===
-                                                                                                        'microscopic_review'
-                                                                                                      ? 'Rev. Microscópica'
+                                                                                                        'macroscopic_review'
+                                                                                                      ? 'Rev. Macroscópica'
                                                                                                       : specimen.status ===
-                                                                                                          'finalized'
-                                                                                                        ? 'Finalizada'
+                                                                                                          'processing'
+                                                                                                        ? 'En Proceso'
                                                                                                         : specimen.status ===
-                                                                                                            'delivered'
-                                                                                                          ? 'Entregada'
+                                                                                                            'microscopic_review'
+                                                                                                          ? 'Rev. Microscópica'
                                                                                                           : specimen.status ===
-                                                                                                              'cancelled'
-                                                                                                            ? 'Cancelada'
-                                                                                                            : specimen.status}
-                                                                                        </span>
-                                                                                        <span
-                                                                                            className="text-muted-foreground capitalize"
-                                                                                            title={new Date(
-                                                                                                specimen.created_at,
-                                                                                            ).toLocaleString(
-                                                                                                'es-ES',
-                                                                                            )}
-                                                                                        >
-                                                                                            {formatDistanceToNow(
-                                                                                                new Date(
+                                                                                                              'finalized'
+                                                                                                            ? 'Finalizada'
+                                                                                                            : specimen.status ===
+                                                                                                                'delivered'
+                                                                                                              ? 'Entregada'
+                                                                                                              : specimen.status ===
+                                                                                                                  'cancelled'
+                                                                                                                ? 'Cancelada'
+                                                                                                                : specimen.status}
+                                                                                            </span>
+                                                                                            <span
+                                                                                                className="text-muted-foreground capitalize"
+                                                                                                title={new Date(
                                                                                                     specimen.created_at,
-                                                                                                ),
-                                                                                                {
-                                                                                                    addSuffix: true,
-                                                                                                    locale: es,
-                                                                                                },
-                                                                                            )}
-                                                                                        </span>
+                                                                                                ).toLocaleString(
+                                                                                                    'es-ES',
+                                                                                                )}
+                                                                                            >
+                                                                                                {formatDistanceToNow(
+                                                                                                    new Date(
+                                                                                                        specimen.created_at,
+                                                                                                    ),
+                                                                                                    {
+                                                                                                        addSuffix: true,
+                                                                                                        locale: es,
+                                                                                                    },
+                                                                                                )}
+                                                                                            </span>
+                                                                                        </div>
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
-                                                                    )}
-                                                                </Draggable>
-                                                            ),
-                                                        )}
-                                                        {provided.placeholder}
-                                                    </div>
-                                                )}
-                                            </Droppable>
+                                                                        )}
+                                                                    </Draggable>
+                                                                ),
+                                                            )}
+                                                            {isPaginated &&
+                                                                visibleLimit <
+                                                                    totalSpecimens && (
+                                                                    <KanbanColumnSentinel
+                                                                        priorityId={
+                                                                            priority.id
+                                                                        }
+                                                                        totalCount={
+                                                                            totalSpecimens
+                                                                        }
+                                                                        visibleCount={
+                                                                            visibleLimit
+                                                                        }
+                                                                        onLoadMore={
+                                                                            handleLoadMore
+                                                                        }
+                                                                    />
+                                                                )}
+                                                            {
+                                                                provided.placeholder
+                                                            }
+                                                        </div>
+                                                    )}
+                                                </Droppable>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </DragDropContext>
                     </div>
