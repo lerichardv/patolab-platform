@@ -155,6 +155,24 @@ class ReportEditorController extends Controller
             return response()->json(['status' => 'ignored']);
         }
 
+        if ($field === 'insumos') {
+            if ($event === 'onConnect') {
+                return response()->json([
+                    'document' => null,
+                ]);
+            }
+            if ($event === 'create') {
+                return response()->json([
+                    'content' => '',
+                ]);
+            }
+            if ($event === 'onChange') {
+                return response()->json(['status' => 'success']);
+            }
+
+            return response()->json(['status' => 'ignored']);
+        }
+
         if ($field === 'sections_order') {
             if ($event === 'onConnect') {
                 return response()->json([
