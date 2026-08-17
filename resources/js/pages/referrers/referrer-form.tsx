@@ -225,6 +225,7 @@ export default function ReferrerForm({
 
     const handleSelectExistingDuplicate = () => {
         setIsDuplicatePromptOpen(false);
+
         if (existingDuplicateReferrer) {
             onSelectExistingReferrer?.(existingDuplicateReferrer);
             onSuccess();
@@ -233,6 +234,7 @@ export default function ReferrerForm({
 
     const handleIgnoreDuplicateAndProceed = () => {
         setIsDuplicatePromptOpen(false);
+
         if (affectedSpecimensInfo && affectedSpecimensInfo.total > 0) {
             setIsPromptOpen(true);
         } else {

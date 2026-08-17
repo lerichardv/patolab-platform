@@ -1020,7 +1020,9 @@ class ReportEditorController extends Controller
             abort(404, 'No hay reporte asociado a esta muestra.');
         }
 
-        if ($specimen->report->report_file && Storage::disk('public')->exists($specimen->report->report_file)) {
+        $isFinalized = in_array($specimen->status, ['finalized', 'delivered']);
+
+        if ($isFinalized && $specimen->report->report_file && Storage::disk('public')->exists($specimen->report->report_file)) {
             return Storage::disk('public')->download(
                 $specimen->report->report_file,
                 "reporte_{$specimen->sequence_code}.pdf"

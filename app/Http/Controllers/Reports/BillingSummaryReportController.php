@@ -728,27 +728,43 @@ class BillingSummaryReportController extends Controller
         }
 
         // Specimen Type
-        if ($request->filled('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
-            $typeId = $request->get('specimen_type_id');
-            $query->where(function ($q) use ($typeId) {
-                $q->whereHas('specimen', function ($sq) use ($typeId) {
-                    $sq->where('specimen_type', $typeId);
-                })->orWhereHas('groupSpecimens.specimen', function ($gsq) use ($typeId) {
-                    $gsq->where('specimen_type', $typeId);
+        if ($request->has('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
+            $typeIds = $request->get('specimen_type_id');
+            if (! is_array($typeIds)) {
+                $typeIds = [$typeIds];
+            }
+            $typeIds = array_values(array_filter(array_map('strval', $typeIds), fn ($v) => $v !== '' && $v !== 'all'));
+            if (empty($typeIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(function ($q) use ($typeIds) {
+                    $q->whereHas('specimen', function ($sq) use ($typeIds) {
+                        $sq->whereIn('specimen_type', $typeIds);
+                    })->orWhereHas('groupSpecimens.specimen', function ($gsq) use ($typeIds) {
+                        $gsq->whereIn('specimen_type', $typeIds);
+                    });
                 });
-            });
+            }
         }
 
         // Examination
-        if ($request->filled('examination_id') && $request->get('examination_id') !== 'all') {
-            $examId = $request->get('examination_id');
-            $query->where(function ($q) use ($examId) {
-                $q->whereHas('specimen', function ($sq) use ($examId) {
-                    $sq->where('specimen_type_examination', $examId);
-                })->orWhereHas('groupSpecimens.specimen', function ($gsq) use ($examId) {
-                    $gsq->where('specimen_type_examination', $examId);
+        if ($request->has('examination_id') && $request->get('examination_id') !== 'all') {
+            $examIds = $request->get('examination_id');
+            if (! is_array($examIds)) {
+                $examIds = [$examIds];
+            }
+            $examIds = array_values(array_filter(array_map('strval', $examIds), fn ($v) => $v !== '' && $v !== 'all'));
+            if (empty($examIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(function ($q) use ($examIds) {
+                    $q->whereHas('specimen', function ($sq) use ($examIds) {
+                        $sq->whereIn('specimen_type_examination', $examIds);
+                    })->orWhereHas('groupSpecimens.specimen', function ($gsq) use ($examIds) {
+                        $gsq->whereIn('specimen_type_examination', $examIds);
+                    });
                 });
-            });
+            }
         }
 
         // Order by Date Created

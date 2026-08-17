@@ -70,8 +70,17 @@ export const editorStyles = `
   }
 
   /* ── Paragraphs ── */
-  .tiptap p { margin-bottom: 0.5rem; }
-  .preview-content p { margin-bottom: 1.98mm; line-height: 3.97mm; text-align: justify; font-size: 2.51mm; }
+  .tiptap p {
+    margin-bottom: 0.5rem;
+    font-size: 8pt;
+    line-height: 1.25;
+  }
+  .preview-content p {
+    margin-bottom: 1.98mm;
+    line-height: 3.53mm; /* 8pt * 1.25 */
+    text-align: justify;
+    font-size: 2.82mm; /* 8pt */
+  }
 
   /* ── Headings ── */
   .tiptap h1 { font-size: 1.4rem; font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; color: #111827; }
@@ -151,7 +160,7 @@ export const editorStyles = `
   .preview-content ol { list-style-type: decimal; padding-left: 6.35mm; margin-bottom: 1.98mm; }
   
   .tiptap li { margin-bottom: 0.15rem; }
-  .preview-content li { margin-bottom: 0mm; line-height: 3.97mm; }
+  .preview-content li { margin-bottom: 0mm; line-height: 3.53mm; }
 
   /* ── Inline marks ── */
   .tiptap u, .preview-content u { text-decoration: underline; }
@@ -220,7 +229,8 @@ export const editorStyles = `
     max-width: 100%;
     height: auto;
     border-radius: 1.06mm;
-    margin: 0.50mm 0mm;
+    margin-top: 0.50mm;
+    margin-bottom: 0.50mm;
     display: block;
   }
   .tiptap img.ProseMirror-selectednode { outline: 2px solid #6366f1; outline-offset: 2px; }
@@ -307,30 +317,31 @@ export const editorStyles = `
     border-radius: 4px;
   }
 
-  /* Alignment styling for the resizable image wrapper in the editor */
-  .tiptap [data-resize-container]:has(img.align-center),
-  .tiptap [data-resize-container]:has(img[data-align="center"]),
-  .tiptap .image-wrapper:has(img.align-center),
-  .tiptap .image-wrapper:has(img[data-align="center"]) {
-    display: flex;
-    justify-content: center;
-	align-items: flex-start;
+  /* Alignment styling for standalone image wrappers */
+  .tiptap [data-resize-container] {
+    display: block;
+    width: fit-content;
   }
 
-  .tiptap [data-resize-container]:has(img.align-right),
-  .tiptap [data-resize-container]:has(img[data-align="right"]),
-  .tiptap .image-wrapper:has(img.align-right),
-  .tiptap .image-wrapper:has(img[data-align="right"]) {
-    display: flex;
-    justify-content: flex-end;
+  .image-wrapper {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
   }
 
-  .tiptap [data-resize-container]:has(img.align-left),
-  .tiptap [data-resize-container]:has(img[data-align="left"]),
-  .tiptap .image-wrapper:has(img.align-left),
-  .tiptap .image-wrapper:has(img[data-align="left"]) {
-    display: flex;
-    justify-content: flex-start;
+  .image-wrapper.align-center {
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .image-wrapper.align-left {
+    margin-left: 0 !important;
+    margin-right: auto !important;
+  }
+
+  .image-wrapper.align-right {
+    margin-left: auto !important;
+    margin-right: 0 !important;
   }
 
   /* ── Tables ── */
@@ -571,6 +582,28 @@ export const editorStyles = `
   }
   html.dark .tiptap [data-resize-wrapper] .image-crop-btn:hover {
     background-color: #334155;
+  }
+
+  /* ── Image Captions ── */
+  .image-caption-container {
+    margin-top: 0px;
+    width: 100%;
+    text-align: center;
+  }
+  .image-caption-input {
+    transition: border-color 0.15s ease-in-out;
+  }
+  .image-caption-input:focus {
+    border-color: #6366f1 !important;
+    border-style: solid !important;
+  }
+  .image-caption, .gallery-image-caption, figcaption {
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+    margin-top: 4px;
+    font-style: italic;
+    line-height: 1.3;
   }
 
   /* ── Gapcursor ── */

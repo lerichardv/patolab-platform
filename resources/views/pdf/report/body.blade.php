@@ -145,7 +145,7 @@
         /* Footer styling (absolute at the bottom of page box) */
         footer.report-footer {
             position: absolute;
-            bottom: 12mm;
+            bottom: 5mm;
             left: 15mm;
             right: 15mm;
             height: 20.11mm;
@@ -186,7 +186,7 @@
 
         .page-number-box {
             position: absolute;
-            bottom: 0mm;
+            bottom: 4mm;
             left: 0mm;
             font-size: 2.12mm;
             font-weight: 600;
@@ -207,8 +207,8 @@
         .patient-card td {
             padding: 1.32mm 2.12mm;
             vertical-align: top;
-            font-size: 2.51mm;
-            line-height: 3.97mm;
+            font-size: 2.91mm;
+            line-height: 4.23mm;
         }
 
         .patient-card strong {
@@ -230,17 +230,18 @@
 
         /* Content Styling */
         .section-content {
-            font-size: 2.51mm;
+            font-size: 2.82mm;
             color: #1f2937;
             text-align: justify;
             margin-bottom: 1.98mm; /* 0.5 lines */
-            line-height: 3.97mm;
+            line-height: 3.53mm;
         }
 
         .section-content p {
             margin-bottom: 1.98mm;
             text-align: justify;
-            line-height: 3.97mm;
+            line-height: 3.53mm;
+            font-size: 2.82mm;
         }
 
         .section-content ul {
@@ -304,7 +305,7 @@
 
         .section-content li {
             margin-bottom: 0mm;
-            line-height: 3.97mm;
+            line-height: 3.53mm;
         }
 
         .section-content h1 {
@@ -441,6 +442,27 @@
             display: block;
         }
 
+        .image-wrapper {
+            display: block;
+            width: fit-content;
+            max-width: 100%;
+        }
+
+        .image-wrapper.align-center {
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
+
+        .image-wrapper.align-left {
+            margin-left: 0 !important;
+            margin-right: auto !important;
+        }
+
+        .image-wrapper.align-right {
+            margin-left: auto !important;
+            margin-right: 0 !important;
+        }
+
         .section-content div[data-type="image-grid"] {
             display: flex;
             flex-wrap: nowrap;
@@ -474,6 +496,17 @@
             border-radius: 1.06mm;
             margin: 0 auto;
             display: block;
+        }
+
+        .section-content .image-caption,
+        .section-content .gallery-image-caption,
+        .section-content figcaption {
+            font-size: 8.5pt;
+            color: #64748b;
+            text-align: center;
+            margin-top: 1.00mm;
+            font-style: italic;
+            line-height: 1.2;
         }
 
         /* Pathologist Signature Block */

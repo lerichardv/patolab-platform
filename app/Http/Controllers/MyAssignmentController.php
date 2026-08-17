@@ -45,22 +45,40 @@ class MyAssignmentController extends Controller
 
         // 2. Specimen Type Filter
         $typeCookie = $request->cookie("specimen_type_filter_my_assignments_user_{$userId}");
-        $specimenTypeId = $request->get('specimen_type_id', $typeCookie ?: 'all');
-        if ($specimenTypeId !== 'all' && ! is_numeric($specimenTypeId)) {
-            $specimenTypeId = 'all';
+        $specimenTypeId = $request->get('specimen_type_id');
+        if (! $request->has('specimen_type_id') && $typeCookie) {
+            $decoded = json_decode($typeCookie, true);
+            $specimenTypeId = is_array($decoded) ? $decoded : $typeCookie;
+        }
+        if ($specimenTypeId === 'all' || $specimenTypeId === null || $specimenTypeId === '') {
+            $specimenTypeIds = null;
+        } elseif ($specimenTypeId === 'none' || (is_array($specimenTypeId) && empty($specimenTypeId))) {
+            $specimenTypeIds = [];
+        } else {
+            $specimenTypeIds = is_array($specimenTypeId) ? array_map('strval', $specimenTypeId) : [strval($specimenTypeId)];
         }
         if ($request->has('specimen_type_id')) {
-            cookie()->queue(cookie("specimen_type_filter_my_assignments_user_{$userId}", $specimenTypeId, 525600, null, null, null, false));
+            $cookieVal = $specimenTypeIds === null ? 'all' : (empty($specimenTypeIds) ? 'none' : $specimenTypeIds);
+            cookie()->queue(cookie("specimen_type_filter_my_assignments_user_{$userId}", json_encode($cookieVal), 525600, null, null, null, false));
         }
 
         // 3. Examination Filter
         $examCookie = $request->cookie("examination_filter_my_assignments_user_{$userId}");
-        $examinationId = $request->get('examination_id', $examCookie ?: 'all');
-        if ($examinationId !== 'all' && ! is_numeric($examinationId)) {
-            $examinationId = 'all';
+        $examinationId = $request->get('examination_id');
+        if (! $request->has('examination_id') && $examCookie) {
+            $decoded = json_decode($examCookie, true);
+            $examinationId = is_array($decoded) ? $decoded : $examCookie;
+        }
+        if ($examinationId === 'all' || $examinationId === null || $examinationId === '') {
+            $examinationIds = null;
+        } elseif ($examinationId === 'none' || (is_array($examinationId) && empty($examinationId))) {
+            $examinationIds = [];
+        } else {
+            $examinationIds = is_array($examinationId) ? array_map('strval', $examinationId) : [strval($examinationId)];
         }
         if ($request->has('examination_id')) {
-            cookie()->queue(cookie("examination_filter_my_assignments_user_{$userId}", $examinationId, 525600, null, null, null, false));
+            $cookieVal = $examinationIds === null ? 'all' : (empty($examinationIds) ? 'none' : $examinationIds);
+            cookie()->queue(cookie("examination_filter_my_assignments_user_{$userId}", json_encode($cookieVal), 525600, null, null, null, false));
         }
 
         // 4. Date Range Filter
@@ -96,13 +114,21 @@ class MyAssignmentController extends Controller
         }
 
         // Filter by specimen type
-        if ($specimenTypeId && $specimenTypeId !== 'all') {
-            $query->where('specimen.specimen_type', $specimenTypeId);
+        if ($specimenTypeIds !== null) {
+            if (empty($specimenTypeIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('specimen.specimen_type', $specimenTypeIds);
+            }
         }
 
         // Filter by examination
-        if ($examinationId && $examinationId !== 'all') {
-            $query->where('specimen.specimen_type_examination', $examinationId);
+        if ($examinationIds !== null) {
+            if (empty($examinationIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('specimen.specimen_type_examination', $examinationIds);
+            }
         }
 
         // Filter by date range
@@ -143,8 +169,8 @@ class MyAssignmentController extends Controller
             'cuttingSlideTypes' => $cuttingSlideTypes,
             'filters' => [
                 'status' => $statuses,
-                'specimen_type_id' => $specimenTypeId,
-                'examination_id' => $examinationId,
+                'specimen_type_id' => $specimenTypeIds === null ? 'all' : (empty($specimenTypeIds) ? 'none' : $specimenTypeIds),
+                'examination_id' => $examinationIds === null ? 'all' : (empty($examinationIds) ? 'none' : $examinationIds),
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],

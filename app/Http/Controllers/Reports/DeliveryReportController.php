@@ -62,12 +62,30 @@ class DeliveryReportController extends Controller
             $query->where('customer', $request->get('customer_id'));
         }
 
-        if ($request->filled('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
-            $query->where('specimen_type', $request->get('specimen_type_id'));
+        if ($request->has('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
+            $typeIds = $request->get('specimen_type_id');
+            if (! is_array($typeIds)) {
+                $typeIds = [$typeIds];
+            }
+            $typeIds = array_values(array_filter(array_map('strval', $typeIds), fn ($v) => $v !== '' && $v !== 'all'));
+            if (empty($typeIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('specimen_type', $typeIds);
+            }
         }
 
-        if ($request->filled('examination_id') && $request->get('examination_id') !== 'all') {
-            $query->where('specimen_type_examination', $request->get('examination_id'));
+        if ($request->has('examination_id') && $request->get('examination_id') !== 'all') {
+            $examIds = $request->get('examination_id');
+            if (! is_array($examIds)) {
+                $examIds = [$examIds];
+            }
+            $examIds = array_values(array_filter(array_map('strval', $examIds), fn ($v) => $v !== '' && $v !== 'all'));
+            if (empty($examIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('specimen_type_examination', $examIds);
+            }
         }
 
         // Performance limit: created_at must be <= dateTo if specified
@@ -223,12 +241,30 @@ class DeliveryReportController extends Controller
             $query->where('customer', $request->get('customer_id'));
         }
 
-        if ($request->filled('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
-            $query->where('specimen_type', $request->get('specimen_type_id'));
+        if ($request->has('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
+            $typeIds = $request->get('specimen_type_id');
+            if (! is_array($typeIds)) {
+                $typeIds = [$typeIds];
+            }
+            $typeIds = array_values(array_filter(array_map('strval', $typeIds), fn ($v) => $v !== '' && $v !== 'all'));
+            if (empty($typeIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('specimen_type', $typeIds);
+            }
         }
 
-        if ($request->filled('examination_id') && $request->get('examination_id') !== 'all') {
-            $query->where('specimen_type_examination', $request->get('examination_id'));
+        if ($request->has('examination_id') && $request->get('examination_id') !== 'all') {
+            $examIds = $request->get('examination_id');
+            if (! is_array($examIds)) {
+                $examIds = [$examIds];
+            }
+            $examIds = array_values(array_filter(array_map('strval', $examIds), fn ($v) => $v !== '' && $v !== 'all'));
+            if (empty($examIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('specimen_type_examination', $examIds);
+            }
         }
 
         if ($dateTo) {

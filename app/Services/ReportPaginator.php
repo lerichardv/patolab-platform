@@ -7,7 +7,7 @@ class ReportPaginator
     public static function paginate($specimen, $report, $customer, $referrer, $isMicroscopyVisible): array
     {
         $pageContentHeight = 205.00; // mm
-        $lineHeight = 3.97; // mm
+        $lineHeight = 3.53; // mm (8pt * 1.25)
         $maxCharsPerLine = 155;
         $pathologistsCount = $specimen->users ? $specimen->users->count() : 0;
         $rowsCount = (int) ceil($pathologistsCount / 2);
@@ -599,9 +599,73 @@ class ReportPaginator
         if ($tag === 'img' || (str_contains($blockHtml, '<img') && ! str_contains($blockHtml, '<p'))) {
             $height = self::getImageHeight($blockHtml);
 
+            // Parse img details
+            preg_match('/src=["\']([^"\']+)["\']/i', $blockHtml, $srcMatch);
+            $src = $srcMatch ? $srcMatch[1] : '';
+
+            preg_match('/width=["\'](\d+)["\']/i', $blockHtml, $widthMatch);
+            if (! $widthMatch) {
+                preg_match('/width:\s*(\d+)px/i', $blockHtml, $widthMatch);
+            }
+            $width = $widthMatch ? $widthMatch[1].'px' : 'auto';
+
+            preg_match('/height=["\'](\d+)["\']/i', $blockHtml, $heightMatch);
+            if (! $heightMatch) {
+                preg_match('/height:\s*(\d+)px/i', $blockHtml, $heightMatch);
+            }
+            $heightVal = $heightMatch ? $heightMatch[1].'px' : 'auto';
+
+            preg_match('/data-align=["\']([^"\']+)["\']/i', $blockHtml, $alignMatch);
+            if (! $alignMatch) {
+                preg_match('/class=["\']([^"\']*align-[^"\']*)["\']/i', $blockHtml, $alignMatch);
+            }
+            $align = 'center';
+            if ($alignMatch) {
+                $alignVal = $alignMatch[1];
+                if (str_contains($alignVal, 'left')) {
+                    $align = 'left';
+                } elseif (str_contains($alignVal, 'right')) {
+                    $align = 'right';
+                } elseif (str_contains($alignVal, 'justify')) {
+                    $align = 'justify';
+                }
+            }
+
+            preg_match('/data-caption=["\']([^"\']+)["\']/i', $blockHtml, $captionMatch);
+            if (! $captionMatch) {
+                preg_match('/alt=["\']([^"\']+)["\']/i', $blockHtml, $captionMatch);
+            }
+            $caption = $captionMatch ? htmlspecialchars($captionMatch[1]) : '';
+
+            $isLeft = $align === 'left';
+            $isRight = $align === 'right';
+            $marginLeft = $isLeft ? '0' : 'auto';
+            $marginRight = $isRight ? '0' : 'auto';
+
+            $imgStyles = ['display: block', 'max-width: 100%', 'height: '.$heightVal];
+            if ($width !== 'auto') {
+                $imgStyles[] = 'width: '.$width;
+            } else {
+                $imgStyles[] = 'width: auto';
+            }
+
+            $captionHtml = '';
+            if ($caption) {
+                $captionHtml = '<div class="image-caption" style="text-align: center; margin-top: 1.06mm; font-style: italic; font-size: 8.5pt; color: #64748b; line-height: 1.2;">'.$caption.'</div>';
+                $widthPx = $widthMatch ? (int) $widthMatch[1] : 360;
+                $maxCharsForCaption = max(15, (int) floor($widthPx * 0.176));
+                $captionLines = max(1, (int) ceil(mb_strlen($caption) / $maxCharsForCaption));
+                $height += $captionLines * 3.60 + 1.06;
+            }
+
+            $wrappedHtml = '<div class="image-wrapper align-'.$align.'" style="display: block; margin-left: '.$marginLeft.'; margin-right: '.$marginRight.'; width: fit-content; max-width: 100%;">'.
+                '<img src="'.$src.'" class="align-'.$align.'" style="'.implode('; ', $imgStyles).'" />'.
+                $captionHtml.
+                '</div>';
+
             return [
                 'type' => 'image',
-                'html' => $blockHtml,
+                'html' => $wrappedHtml,
                 'height' => $height,
             ];
         }
@@ -619,7 +683,7 @@ class ReportPaginator
             'tag' => $tag,
             'html' => $blockHtml,
             'class' => $class,
-            'height' => $lines * 3.97,
+            'height' => $lines * self::getBlockLineHeight(['html' => $blockHtml], 3.53),
         ];
     }
 
@@ -631,6 +695,80 @@ class ReportPaginator
         }
 
         return $html;
+    }
+
+    public static function getRootElementAttributes(string $htmlStr): array
+    {
+        if (empty($htmlStr)) {
+            return ['style' => '', 'extraAttrs' => ''];
+        }
+
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="utf-8" ?><div>'.$htmlStr.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $root = $dom->getElementsByTagName('div')->item(0);
+        if ($root && $root->firstElementChild) {
+            $elem = $root->firstElementChild;
+            $styleAttr = $elem->getAttribute('style') ?: '';
+
+            $extraAttrs = '';
+            foreach ($elem->attributes as $attr) {
+                if ($attr->name !== 'style' && $attr->name !== 'class' && $attr->name !== 'id') {
+                    $extraAttrs .= ' '.$attr->name.'="'.htmlspecialchars($attr->value, ENT_QUOTES).'"';
+                }
+            }
+
+            return ['style' => $styleAttr, 'extraAttrs' => $extraAttrs];
+        }
+
+        return ['style' => '', 'extraAttrs' => ''];
+    }
+
+    public static function getBlockLineHeight(array $block, float $baseLineHeight): float
+    {
+        if (empty($block['html'])) {
+            return $baseLineHeight;
+        }
+
+        $html = $block['html'];
+        $fontSize = 2.82; // Default 8pt in mm
+
+        $hasPt = false;
+        $hasPx = false;
+        $maxPt = 8.0;
+        $maxPx = 10.66;
+
+        if (preg_match_all('/font-size:\s*([\d\.]+)pt/i', $html, $matches)) {
+            foreach ($matches[1] as $val) {
+                $valFloat = (float) $val;
+                if ($valFloat > $maxPt) {
+                    $maxPt = $valFloat;
+                }
+            }
+            $hasPt = true;
+        }
+
+        if (! $hasPt && preg_match_all('/font-size:\s*([\d\.]+)px/i', $html, $matches)) {
+            foreach ($matches[1] as $val) {
+                $valFloat = (float) $val;
+                if ($valFloat > $maxPx) {
+                    $maxPx = $valFloat;
+                }
+            }
+            $hasPx = true;
+        }
+
+        if ($hasPt) {
+            $fontSize = $maxPt * 0.352777;
+        } elseif ($hasPx) {
+            $fontSize = $maxPx * 0.264583;
+        }
+
+        $multiplier = 1.25; // Default multiplier
+        if (preg_match('/line-height:\s*([\d\.]+)/i', $html, $matches)) {
+            $multiplier = (float) $matches[1];
+        }
+
+        return $fontSize * $multiplier;
     }
 
     public static function splitHtmlIntoLines(string $html, int $maxCharsPerLine = 155): array
@@ -1074,6 +1212,7 @@ class ReportPaginator
 
                 // Pre-calculate height of each row using justified aspect ratios
                 $rowHeights = [];
+                $rowCaptionHeights = [];
                 foreach ($rowsRemaining as $rowIndex => $rowImages) {
                     $aspectSum = 0.0;
                     foreach ($rowImages as $imgTag) {
@@ -1091,6 +1230,27 @@ class ReportPaginator
                     $maxRowHeight = $N === 1 ? min(120.0, $usableWidth) : ($usableWidth * 1.5);
                     $calculatedHeight = ($usableWidth - ($N - 1) * $gap) / $aspectSum;
                     $rowHeights[$rowIndex] = min($calculatedHeight, $maxRowHeight);
+
+                    // Max caption height in this row
+                    $maxCaptionHeight = 0.0;
+                    $colWidthMm = ($usableWidth - ($N - 1) * $gap) / $N;
+                    $maxCharsForCaption = max(12, (int) floor($colWidthMm / 1.5));
+
+                    foreach ($rowImages as $imgTag) {
+                        preg_match('/data-caption=["\']([^"\']*)["\']/i', $imgTag, $captionMatch);
+                        if (! $captionMatch) {
+                            preg_match('/alt=["\']([^"\']*)["\']/i', $imgTag, $captionMatch);
+                        }
+                        $caption = $captionMatch ? htmlspecialchars($captionMatch[1]) : '';
+                        if ($caption) {
+                            $captionLines = max(1, (int) ceil(mb_strlen($caption) / $maxCharsForCaption));
+                            $captionHeight = $captionLines * 3.60 + 1.06;
+                            if ($captionHeight > $maxCaptionHeight) {
+                                $maxCaptionHeight = $captionHeight;
+                            }
+                        }
+                    }
+                    $rowCaptionHeights[$rowIndex] = $maxCaptionHeight;
                 }
 
                 while (! empty($rowsRemaining)) {
@@ -1101,7 +1261,7 @@ class ReportPaginator
                     $totalRows = count($rowHeights);
                     $currentIndex = $totalRows - count($rowsRemaining);
 
-                    $minGridHeight = $rowHeights[$currentIndex] + 2.0;
+                    $minGridHeight = $rowHeights[$currentIndex] + $rowCaptionHeights[$currentIndex] + 2.0;
 
                     if ($remaining < $minGridHeight && count($currentPage) > 0) {
                         $pages[] = $currentPage;
@@ -1116,7 +1276,7 @@ class ReportPaginator
                     for ($tempR = 1; $tempR <= count($rowsRemaining); $tempR++) {
                         $cost = 2.0;
                         for ($i = 0; $i < $tempR; $i++) {
-                            $cost += $rowHeights[$currentIndex + $i];
+                            $cost += $rowHeights[$currentIndex + $i] + $rowCaptionHeights[$currentIndex + $i];
                             if ($i > 0) {
                                 $cost += 1.5;
                             }
@@ -1153,16 +1313,32 @@ class ReportPaginator
                         foreach ($rowImages as $imgTag) {
                             $aspect = self::getImageAspectRatio($imgTag);
                             $widthMm = $aspect > 0.0 ? ($H_j / $aspect) : $H_j;
-                            $styleRule = "height: {$H_j}mm; width: {$widthMm}mm; object-fit: cover;";
+                            $styleRule = "height: {$H_j}mm; width: 100%; object-fit: cover; border-radius: 1.06mm;";
 
                             if (preg_match('/style=["\']([^"\']*)["\']/i', $imgTag, $styleMatch)) {
-                                $existingStyle = rtrim($styleMatch[1], ';');
-                                $newStyle = "{$existingStyle}; {$styleRule}";
-                                $imgTag = preg_replace('/style=["\']([^"\']*)["\']/i', 'style="'.$newStyle.'"', $imgTag);
+                                $imgTag = preg_replace('/style=["\']([^"\']*)["\']/i', 'style="'.$styleRule.'"', $imgTag);
                             } else {
                                 $imgTag = str_replace('<img', '<img style="'.$styleRule.'"', $imgTag);
                             }
-                            $sliceImages[] = $imgTag;
+
+                            $caption = '';
+                            if (preg_match('/data-caption=["\']([^"\']*)["\']/i', $imgTag, $captionMatch)) {
+                                $caption = $captionMatch[1];
+                            } elseif (preg_match('/alt=["\']([^"\']*)["\']/i', $imgTag, $captionMatch)) {
+                                $caption = $captionMatch[1];
+                            }
+
+                            $captionHtml = '';
+                            if ($caption !== '') {
+                                $captionHtml = '<div class="gallery-image-caption" style="text-align: center; margin-top: 1.06mm; font-style: italic; font-size: 8.5pt; color: #64748b; line-height: 1.2; width: 100%; word-break: break-word;">'.htmlspecialchars($caption).'</div>';
+                            }
+
+                            $wrappedImg = '<div class="grid-image-container" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; width: '.$widthMm.'mm; max-width: 100%;">'.
+                                $imgTag.
+                                $captionHtml.
+                                '</div>';
+
+                            $sliceImages[] = $wrappedImg;
                         }
                     }
                     $align = $block['alignment'] ?? 'center';
@@ -1188,7 +1364,7 @@ class ReportPaginator
                     $sliceHtml = "<div data-type=\"image-grid\" class=\"align-{$align}\" data-columns=\"{$columns}\" data-align=\"{$align}\"{$widthAttr} style=\"{$styleStr}\">".implode('', $sliceImages).'</div>';
                     $cost = 2.0;
                     for ($i = 0; $i < $r; $i++) {
-                        $cost += $rowHeights[$currentIndex + $i];
+                        $cost += $rowHeights[$currentIndex + $i] + $rowCaptionHeights[$currentIndex + $i];
                         if ($i > 0) {
                             $cost += 1.5;
                         }
@@ -1241,10 +1417,11 @@ class ReportPaginator
 
                 $i = 0;
                 while ($i < count($lines)) {
+                    $fontLineHeight = self::getBlockLineHeight($block, $lineHeight);
                     $maxHeightForPage = $pageContentHeight;
                     $remaining = $maxHeightForPage - $currentHeight;
 
-                    if ($remaining <= 0.5 * $lineHeight) {
+                    if ($remaining <= 0.5 * $fontLineHeight) {
                         $pages[] = $currentPage;
                         $currentPage = [];
                         $currentHeight = 0.0;
@@ -1253,7 +1430,7 @@ class ReportPaginator
                         continue;
                     }
 
-                    $linesToFit = min((int) floor($remaining / $lineHeight), count($lines) - $i);
+                    $linesToFit = min((int) floor($remaining / $fontLineHeight), count($lines) - $i);
                     if ($linesToFit <= 0) {
                         $pages[] = $currentPage;
                         $currentPage = [];
@@ -1268,10 +1445,19 @@ class ReportPaginator
                     // Is this the last slice of the paragraph?
                     $isLastSlice = ($i + $linesToFit >= count($lines));
                     $classAttr = ! empty($block['class']) ? $block['class'] : 'section-content';
-                    $style = $isLastSlice ? '' : 'style="margin-bottom: 0px;"';
+                    $attrs = self::getRootElementAttributes($block['html']);
+                    $originalStyle = $attrs['style'];
+                    $extraAttrs = $attrs['extraAttrs'];
+                    $mergedStyle = $originalStyle;
+                    if (! $isLastSlice) {
+                        $mergedStyle = ! empty($mergedStyle)
+                            ? (str_ends_with(trim($mergedStyle), ';') ? trim($mergedStyle) : trim($mergedStyle).';').' margin-bottom: 0px;'
+                            : 'margin-bottom: 0px;';
+                    }
+                    $styleAttrStr = ! empty($mergedStyle) ? " style=\"{$mergedStyle}\"" : '';
 
-                    $sliceHtml = "<{$block['tag']} class=\"{$classAttr}\" {$style}>".implode('', $slice)."</{$block['tag']}>";
-                    $blockCost = ($linesToFit * $lineHeight) + ($isLastSlice ? 0.5 * $lineHeight : 0.0);
+                    $sliceHtml = "<{$block['tag']} class=\"{$classAttr}\"{$styleAttrStr}{$extraAttrs}>".implode('', $slice)."</{$block['tag']}>";
+                    $blockCost = ($linesToFit * $fontLineHeight) + ($isLastSlice ? 0.5 * $fontLineHeight : 0.0);
 
                     $currentPage[] = [
                         'type' => 'html',

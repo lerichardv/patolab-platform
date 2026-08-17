@@ -50,6 +50,7 @@ export default function ImageGridComponent({
     // Collect current images reactively
     const currentImages: Array<{
         src: string;
+        caption: string;
         offset: number;
         nodeSize: number;
     }> = [];
@@ -57,13 +58,33 @@ export default function ImageGridComponent({
         if (childNode.type.name === 'image') {
             currentImages.push({
                 src: childNode.attrs.src,
+                caption: childNode.attrs.caption || '',
                 offset,
                 nodeSize: childNode.nodeSize,
             });
         }
     });
 
-    const imagesSrcString = currentImages.map((img) => img.src).join(',');
+    const imagesSrcString = currentImages
+        .map((img) => `${img.src}_${img.caption}`)
+        .join(',');
+
+    const handleUpdateImageCaption = (offset: number, caption: string) => {
+        const pos = getPos();
+
+        if (pos !== undefined) {
+            const targetPos = pos + 1 + offset;
+            const child = editor.state.tr.doc.nodeAt(targetPos);
+            if (child) {
+                editor.view.dispatch(
+                    editor.state.tr.setNodeMarkup(targetPos, undefined, {
+                        ...child.attrs,
+                        caption,
+                    }),
+                );
+            }
+        }
+    };
 
     const [isOpen, setIsOpen] = useState(false);
     const [croppingImage, setCroppingImage] = useState<{
@@ -713,38 +734,54 @@ export default function ImageGridComponent({
                                             {currentImages.map((img, idx) => (
                                                 <div
                                                     key={idx}
-                                                    className="group/img relative aspect-square overflow-hidden rounded-md border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-900"
+                                                    className="group/img relative flex flex-col overflow-hidden rounded-md border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900"
                                                 >
-                                                    <img
-                                                        src={img.src}
-                                                        alt={`Thumbnail ${idx + 1}`}
-                                                        className="h-full w-full object-cover"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setCroppingImage(
-                                                                img,
-                                                            )
+                                                    <div className="relative aspect-square w-full overflow-hidden rounded">
+                                                        <img
+                                                            src={img.src}
+                                                            alt={`Thumbnail ${idx + 1}`}
+                                                            className="h-full w-full object-cover"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setCroppingImage(
+                                                                    img,
+                                                                )
+                                                            }
+                                                            className="absolute top-1 right-8 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-white text-slate-700 opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                                            title="Recortar imagen"
+                                                        >
+                                                            <Crop className="h-3.5 w-3.5 text-indigo-500" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleDeleteImage(
+                                                                    img.offset,
+                                                                    img.nodeSize,
+                                                                )
+                                                            }
+                                                            className="absolute top-1 right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-500 text-white opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-red-600"
+                                                            title="Eliminar de la galería"
+                                                        >
+                                                            <X className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        value={
+                                                            img.caption || ''
                                                         }
-                                                        className="absolute top-1 right-8 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-white text-slate-700 opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                                                        title="Recortar imagen"
-                                                    >
-                                                        <Crop className="h-3.5 w-3.5 text-indigo-500" />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            handleDeleteImage(
+                                                        placeholder="Pie de foto..."
+                                                        onChange={(e) =>
+                                                            handleUpdateImageCaption(
                                                                 img.offset,
-                                                                img.nodeSize,
+                                                                e.target.value,
                                                             )
                                                         }
-                                                        className="absolute top-1 right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-500 text-white opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-red-600"
-                                                        title="Eliminar de la galería"
-                                                    >
-                                                        <X className="h-3.5 w-3.5" />
-                                                    </button>
+                                                        className="mt-1 w-full rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-700 italic focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                                                    />
                                                 </div>
                                             ))}
                                         </div>

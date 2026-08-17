@@ -7,7 +7,9 @@ use App\Models\Referrer;
 use App\Models\ReferrerType;
 use App\Models\Role;
 use App\Models\Specimen;
+use App\Models\SpecimenCategory;
 use App\Models\SpecimenType;
+use App\Models\SpecimenTypeExamination;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -34,13 +36,13 @@ test('can retrieve specimens using a given referrer', function () {
     $customer = Customer::factory()->create();
     $priority = Priority::create(['name' => 'Rutina', 'days' => 3, 'color' => '#000000', 'order' => 1]);
     $specimenType = SpecimenType::create(['name' => 'Biopsia']);
-    $examination = \App\Models\SpecimenTypeExamination::create([
+    $examination = SpecimenTypeExamination::create([
         'specimen_type' => $specimenType->id,
         'name' => 'Biopsia Simple',
         'price' => 100,
     ]);
 
-    $category = \App\Models\SpecimenCategory::create(['name' => 'Patología', 'quantity' => 1]);
+    $category = SpecimenCategory::create(['name' => 'Patología', 'quantity' => 1]);
 
     $specimen1 = Specimen::create([
         'sequence_code' => 'BIO-0001-08-2026',
