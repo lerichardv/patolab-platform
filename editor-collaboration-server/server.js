@@ -1,14 +1,14 @@
 /* global process, Buffer */
 import 'dotenv/config';
 import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
 import { existsSync, mkdirSync } from 'node:fs';
+import fs from 'node:fs/promises';
 import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { Hocuspocus } from '@hocuspocus/server';
 import { TiptapTransformer } from '@hocuspocus/transformer';
-import { mergeAttributes, Node } from '@tiptap/core';
+import { Mark, Extension, mergeAttributes, Node } from '@tiptap/core';
 import BulletList from '@tiptap/extension-bullet-list';
 import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
@@ -22,10 +22,129 @@ import express from 'express';
 import multer from 'multer';
 import * as Y from 'yjs';
 
+const TextStyle = Mark.create({
+	name: 'textStyle',
+	priority: 101,
+	addAttributes() {
+		return {
+			fontSize: {
+				default: null,
+				parseHTML: element =>
+					element.style.fontSize?.replace(/['"]/g, '') || null,
+				renderHTML: attributes => {
+					if (!attributes.fontSize) {
+						return {};
+					}
+
+					return { style: `font-size: ${attributes.fontSize}` };
+				},
+			},
+		};
+	},
+	parseHTML() {
+		return [
+			{
+				tag: 'span',
+				getAttrs: element =>
+					element.style.fontSize ? {} : false,
+			},
+		];
+	},
+	renderHTML({ HTMLAttributes }) {
+		return [
+			'span',
+			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+			0,
+		];
+	},
+});
+
+const FontSize = Extension.create({
+	name: 'fontSize',
+	addOptions() {
+		return {
+			types: ['textStyle'],
+		};
+	},
+	addGlobalAttributes() {
+		return [
+			{
+				types: this.options.types,
+				attributes: {
+					fontSize: {
+						default: null,
+						parseHTML: element =>
+							element.style.fontSize?.replace(/['"]/g, '') || null,
+						renderHTML: attributes => {
+							if (!attributes.fontSize) {
+								return {};
+							}
+
+							return { style: `font-size: ${attributes.fontSize}` };
+						},
+					},
+				},
+			},
+		];
+	},
+});
+
+const LineHeight = Extension.create({
+	name: 'lineHeight',
+	addOptions() {
+		return {
+			types: ['paragraph', 'heading'],
+		};
+	},
+	addGlobalAttributes() {
+		return [
+			{
+				types: this.options.types,
+				attributes: {
+					lineHeight: {
+						default: null,
+						parseHTML: element =>
+							element.style.lineHeight ||
+							element.getAttribute('data-line-height') ||
+							null,
+						renderHTML: attributes => {
+							if (!attributes.lineHeight) {
+								return {};
+							}
+
+							return {
+								style: `line-height: ${attributes.lineHeight}`,
+								'data-line-height': attributes.lineHeight,
+							};
+						},
+					},
+				},
+			},
+		];
+	},
+});
+
 const CustomImage = Image.extend({
 	addAttributes() {
 		return {
 			...this.parent?.(),
+			caption: {
+				default: '',
+				parseHTML: element =>
+					element.getAttribute('data-caption') ||
+					element.getAttribute('alt') ||
+					'',
+				renderHTML: attributes => {
+					if (!attributes.caption) {
+						return {};
+					}
+
+					return {
+						'data-caption': attributes.caption,
+						alt: attributes.caption,
+					};
+				},
+			},
 			alignment: {
 				default: 'center',
 				parseHTML: element => {
@@ -238,6 +357,9 @@ const extensions = [
 		undoRedo: false,
 		bulletList: false,
 	}),
+	TextStyle,
+	FontSize,
+	LineHeight,
 	CustomBulletList,
 	CustomImage.configure({
 		allowBase64: false,
@@ -384,13 +506,17 @@ const customWebhookExtension = {
 		const match = data.documentName.match(/^report-(\d+)-/);
 		const reportId = match ? match[1] : null;
 
-		if (reportId) updateSaveStatus(data.instance, reportId, 'saving');
+		if (reportId) {
+			updateSaveStatus(data.instance, reportId, 'saving');
+		}
 
 		try {
 			const binaryState = Y.encodeStateAsUpdate(data.document);
 			const base64State = Buffer.from(binaryState).toString('base64');
 
 			let rawText = '';
+			let htmlValue = '';
+
 			if (data.documentName.endsWith('-report_date') || 
 				data.documentName.endsWith('-sample_collection_date') || 
 				data.documentName.endsWith('-finalization_date') || 
@@ -399,6 +525,10 @@ const customWebhookExtension = {
 				data.documentName.endsWith('-open_text_label') || 
 				data.documentName.endsWith('-headings_toggles')) {
 				rawText = data.document.getText('content').toString();
+				htmlValue = rawText;
+			} else {
+				const docJson = TiptapTransformer.fromYdoc(data.document, 'content');
+				htmlValue = generateHTML(docJson, extensions);
 			}
 
 			await fetch(webhookUrl, {
@@ -411,6 +541,7 @@ const customWebhookExtension = {
 						documentName: data.documentName,
 						document: base64State,
 						text: rawText,
+						html: htmlValue,
 					}
 				})
 			});
@@ -421,7 +552,10 @@ const customWebhookExtension = {
 			}
 		} catch (error) {
 			console.error(`[webhook:onStoreDocument] Save failed:`, error.message);
-			if (reportId) updateSaveStatus(data.instance, reportId, 'idle');
+
+			if (reportId) {
+				updateSaveStatus(data.instance, reportId, 'idle');
+			}
 		}
 	}
 };

@@ -4,6 +4,7 @@ import {
     Trash2,
     Microscope,
     UserPlus,
+    Share2,
     Tag,
     AlertCircle,
     Clock,
@@ -625,7 +626,7 @@ export default function SpecimenPathologistSheet({
                     <div className="space-y-4">
                         <div className="space-y-1">
                             <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-                                <UserPlus className="h-5 w-5 text-primary" />
+                                <Share2 className="h-5 w-5 text-primary" />
                                 Colaboradores Asignados
                             </h3>
                             <p className="text-xs text-muted-foreground">
@@ -639,7 +640,7 @@ export default function SpecimenPathologistSheet({
                         {/* Collaborator Dropdown & switches */}
                         <div className="space-y-3.5 rounded-lg border border-border/60 bg-muted/20 p-4 shadow-sm">
                             <label className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                                <UserPlus className="h-4 w-4 text-primary" />{' '}
+                                <Share2 className="h-4 w-4 text-primary" />{' '}
                                 Asignar Nuevo Colaborador
                             </label>
                             {availableCollaborators.length > 0 ? (

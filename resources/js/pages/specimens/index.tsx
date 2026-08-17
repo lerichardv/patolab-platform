@@ -1,5 +1,3 @@
-import type { DropResult } from '@hello-pangea/dnd';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Head, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
@@ -21,8 +19,6 @@ import {
     CalendarClock,
     FileText,
     ExternalLink,
-    ChevronLeft,
-    ChevronRight,
     MoreVertical,
     UserPlus,
     ChevronDown,
@@ -39,10 +35,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
-import {
-    updateOrder as updateSpecimenOrder,
-    destroy as destroySpecimen,
-} from '@/actions/App/Http/Controllers/SpecimenController';
+import { destroy as destroySpecimen } from '@/actions/App/Http/Controllers/SpecimenController';
 import CancelSpecimenDialog from '@/components/cancel-specimen-dialog';
 import {
     DateRangePicker,
@@ -96,6 +89,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn, addWithoutWeekends } from '@/lib/utils';
 import InvoiceSheet from '../invoices/invoice-sheet';
+import { KanbanBoard } from './kanban/kanban-board';
 import SpecimenBulkCollaboratorSheet from './specimen-bulk-collaborator-sheet';
 import SpecimenBulkPathologistSheet from './specimen-bulk-pathologist-sheet';
 import SpecimenGroupSheet from './specimen-group-sheet';
@@ -103,7 +97,7 @@ import SpecimenPathologistSheet from './specimen-pathologist-sheet';
 import SpecimenSheet from './specimen-sheet';
 import SpecimenViewSheet from './specimen-view-sheet';
 
-interface Specimen {
+export interface Specimen {
     id: number;
     priority_id: number;
     sample_collection_date?: string;
@@ -123,12 +117,13 @@ interface Specimen {
     created_at: string;
     invoice_relation?: any;
     users?: any[];
+    collaborators?: any[];
     group?: any;
     group_id?: any;
     is_group?: any;
 }
 
-interface Priority {
+export interface Priority {
     id: number;
     name: string;
     color: string;
@@ -158,7 +153,7 @@ interface Props {
     };
 }
 
-const getDueDate = (specimen: Specimen): Date => {
+export const getDueDate = (specimen: Specimen): Date => {
     const createdAt = new Date(specimen.created_at);
 
     const unit = specimen.category?.intern_unit || specimen.category?.unit;
@@ -172,7 +167,7 @@ const getDueDate = (specimen: Specimen): Date => {
     return addWithoutWeekends(createdAt, quantity, unit);
 };
 
-const getDueDateInfo = (specimen: Specimen) => {
+export const getDueDateInfo = (specimen: Specimen) => {
     if (!specimen.category) {
         return null;
     }
@@ -248,7 +243,9 @@ const ALL_STATUSES = [
     { value: 'cancelled', label: 'Cancelada' },
 ];
 
-const deduplicateSpecimens = (prioritiesList: Priority[]): Priority[] => {
+export const deduplicateSpecimens = (
+    prioritiesList: Priority[],
+): Priority[] => {
     const seenIds = new Set<number>();
 
     return prioritiesList.map((priority) => {
@@ -269,61 +266,6 @@ const deduplicateSpecimens = (prioritiesList: Priority[]): Priority[] => {
             specimens: uniqueSpecimens,
         };
     });
-};
-
-const KanbanColumnSentinel = ({
-    priorityId,
-    totalCount,
-    visibleCount,
-    onLoadMore,
-}: {
-    priorityId: number;
-    totalCount: number;
-    visibleCount: number;
-    onLoadMore: (priorityId: number) => void;
-}) => {
-    const sentinelRef = useRef<HTMLDivElement | null>(null);
-
-    useEffect(() => {
-        const node = sentinelRef.current;
-        if (!node || visibleCount >= totalCount) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting) {
-                    onLoadMore(priorityId);
-                }
-            },
-            { rootMargin: '300px' },
-        );
-
-        observer.observe(node);
-
-        return () => {
-            observer.unobserve(node);
-        };
-    }, [priorityId, totalCount, visibleCount, onLoadMore]);
-
-    return (
-        <div
-            ref={sentinelRef}
-            className="my-2 flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/10"
-        >
-            <div className="flex items-center gap-2 font-medium text-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                <span>
-                    Mostrando {visibleCount} de {totalCount} muestras
-                </span>
-            </div>
-            <button
-                type="button"
-                onClick={() => onLoadMore(priorityId)}
-                className="mt-0.5 text-[11px] font-semibold text-primary hover:underline"
-            >
-                Cargar más muestras
-            </button>
-        </div>
-    );
 };
 
 export default function SpecimensIndex({
@@ -454,54 +396,118 @@ export default function SpecimensIndex({
         'desc',
     );
 
-    const [selectedSpecimenTypeId, setSelectedSpecimenTypeId] =
-        useState<string>(() => filters.specimen_type_id || 'all');
-    const [selectedExaminationId, setSelectedExaminationId] = useState<string>(
-        () => filters.examination_id || 'all',
-    );
-    const [isSpecimenTypeFilterOpen, setIsSpecimenTypeFilterOpen] =
-        useState(false);
-    const [isExaminationFilterOpen, setIsExaminationFilterOpen] =
-        useState(false);
+    const parseInitialIds = (rawFilter: any, allItems: any[]): string[] => {
+        if (
+            rawFilter === 'none' ||
+            (Array.isArray(rawFilter) && rawFilter.length === 0)
+        ) {
+            return [];
+        }
+        if (
+            rawFilter === undefined ||
+            rawFilter === null ||
+            rawFilter === 'all'
+        ) {
+            return allItems.map((item) => item.id.toString());
+        }
+        if (Array.isArray(rawFilter)) {
+            return rawFilter.map((id) => id.toString());
+        }
+        return [rawFilter.toString()];
+    };
+
+    const [selectedSpecimenTypeIds, setSelectedSpecimenTypeIds] = useState<
+        string[]
+    >(() => parseInitialIds(filters.specimen_type_id, specimenTypes));
+
+    const [selectedExaminationIds, setSelectedExaminationIds] = useState<
+        string[]
+    >(() => parseInitialIds(filters.examination_id, examinations));
+
+    const getSpecimenTypeId = (exam: any): string | null => {
+        const typeId =
+            exam.specimen_type || exam.specimen_type_id || exam.type?.id;
+        return typeId ? typeId.toString() : null;
+    };
 
     const filteredExaminationsForDropdown = useMemo(() => {
-        if (selectedSpecimenTypeId === 'all') {
+        if (selectedSpecimenTypeIds.length === specimenTypes.length) {
             return examinations;
         }
 
-        return examinations.filter(
-            (exam) => exam.specimen_type?.toString() === selectedSpecimenTypeId,
-        );
-    }, [examinations, selectedSpecimenTypeId]);
+        return examinations.filter((exam) => {
+            const typeId = getSpecimenTypeId(exam);
+            return typeId && selectedSpecimenTypeIds.includes(typeId);
+        });
+    }, [examinations, selectedSpecimenTypeIds, specimenTypes.length]);
 
-    const handleSpecimenTypeChange = (typeId: string) => {
-        setSelectedSpecimenTypeId(typeId);
+    const handleSpecimenTypeSelectionChange = (nextTypeIds: string[]) => {
+        setSelectedSpecimenTypeIds(nextTypeIds);
 
-        let nextExamId = selectedExaminationId;
+        let nextExamIds: string[];
 
-        if (typeId !== 'all') {
-            const hasValidExam = examinations.some(
-                (exam) =>
-                    exam.id.toString() === selectedExaminationId &&
-                    exam.specimen_type?.toString() === typeId,
+        if (nextTypeIds.length === specimenTypes.length) {
+            nextExamIds = examinations.map((e) => e.id.toString());
+        } else if (nextTypeIds.length === 0) {
+            nextExamIds = [];
+        } else {
+            const addedTypeIds = nextTypeIds.filter(
+                (id) => !selectedSpecimenTypeIds.includes(id),
             );
 
-            if (!hasValidExam) {
-                nextExamId = 'all';
-                setSelectedExaminationId('all');
+            const validExamsForNextTypes = examinations.filter((exam) => {
+                const typeId = getSpecimenTypeId(exam);
+                return typeId && nextTypeIds.includes(typeId);
+            });
+            const validExamIdsForNextTypes = validExamsForNextTypes.map((e) =>
+                e.id.toString(),
+            );
+
+            let updatedExamIds = selectedExaminationIds.filter((id) =>
+                validExamIdsForNextTypes.includes(id),
+            );
+
+            if (addedTypeIds.length > 0) {
+                const addedExamIds = examinations
+                    .filter((exam) => {
+                        const typeId = getSpecimenTypeId(exam);
+                        return typeId && addedTypeIds.includes(typeId);
+                    })
+                    .map((e) => e.id.toString());
+
+                updatedExamIds = Array.from(
+                    new Set([...updatedExamIds, ...addedExamIds]),
+                );
             }
-        } else {
-            nextExamId = 'all';
-            setSelectedExaminationId('all');
+
+            nextExamIds = updatedExamIds;
         }
 
-        const userId = props.auth?.user?.id;
+        setSelectedExaminationIds(nextExamIds);
 
+        const typeParam =
+            nextTypeIds.length === specimenTypes.length
+                ? 'all'
+                : nextTypeIds.length === 0
+                  ? 'none'
+                  : nextTypeIds;
+
+        const examParam =
+            nextExamIds.length === examinations.length
+                ? 'all'
+                : nextExamIds.length === 0
+                  ? 'none'
+                  : nextExamIds;
+
+        const userId = props.auth?.user?.id;
         if (userId) {
-            setCookie(`specimen_type_filter_specimens_user_${userId}`, typeId);
+            setCookie(
+                `specimen_type_filter_specimens_user_${userId}`,
+                JSON.stringify(typeParam),
+            );
             setCookie(
                 `examination_filter_specimens_user_${userId}`,
-                nextExamId,
+                JSON.stringify(examParam),
             );
         }
 
@@ -509,8 +515,47 @@ export default function SpecimensIndex({
             '/specimens',
             {
                 ...filters,
-                specimen_type_id: typeId,
-                examination_id: nextExamId,
+                specimen_type_id: typeParam,
+                examination_id: examParam,
+            },
+            {
+                preserveState: true,
+                replace: true,
+            },
+        );
+    };
+
+    const handleExaminationSelectionChange = (nextExamIds: string[]) => {
+        setSelectedExaminationIds(nextExamIds);
+
+        const typeParam =
+            selectedSpecimenTypeIds.length === specimenTypes.length
+                ? 'all'
+                : selectedSpecimenTypeIds.length === 0
+                  ? 'none'
+                  : selectedSpecimenTypeIds;
+
+        const examParam =
+            nextExamIds.length === examinations.length
+                ? 'all'
+                : nextExamIds.length === 0
+                  ? 'none'
+                  : nextExamIds;
+
+        const userId = props.auth?.user?.id;
+        if (userId) {
+            setCookie(
+                `examination_filter_specimens_user_${userId}`,
+                JSON.stringify(examParam),
+            );
+        }
+
+        router.get(
+            '/specimens',
+            {
+                ...filters,
+                specimen_type_id: typeParam,
+                examination_id: examParam,
             },
             {
                 preserveState: true,
@@ -607,15 +652,19 @@ export default function SpecimensIndex({
                 const specimenTypeId =
                     specimen.specimen_type || specimen.type?.id;
                 const matchesSpecimenType =
-                    selectedSpecimenTypeId === 'all' ||
-                    specimenTypeId?.toString() === selectedSpecimenTypeId;
+                    selectedSpecimenTypeIds.length === specimenTypes.length ||
+                    (specimenTypeId &&
+                        selectedSpecimenTypeIds.includes(
+                            specimenTypeId.toString(),
+                        ));
 
                 const examId =
                     specimen.specimen_type_examination ||
                     specimen.examination?.id;
                 const matchesExamination =
-                    selectedExaminationId === 'all' ||
-                    examId?.toString() === selectedExaminationId;
+                    selectedExaminationIds.length === examinations.length ||
+                    (examId &&
+                        selectedExaminationIds.includes(examId.toString()));
 
                 const dueInfo = getDueDateInfo(specimen);
                 const isExpired = !!(
@@ -658,8 +707,10 @@ export default function SpecimensIndex({
         dateRange,
         selectedGroupId,
         searchQuery,
-        selectedSpecimenTypeId,
-        selectedExaminationId,
+        selectedSpecimenTypeIds,
+        selectedExaminationIds,
+        specimenTypes.length,
+        examinations.length,
         showExpiredOnly,
         dueDateSortOrder,
     ]);
@@ -671,8 +722,8 @@ export default function SpecimensIndex({
         selectedStatuses,
         dateRange,
         selectedGroupId,
-        selectedSpecimenTypeId,
-        selectedExaminationId,
+        selectedSpecimenTypeIds,
+        selectedExaminationIds,
         dueDateSortOrder,
         showExpiredOnly,
     ]);
@@ -726,13 +777,17 @@ export default function SpecimensIndex({
         }
 
         if (filters.specimen_type_id !== undefined) {
-            setSelectedSpecimenTypeId(filters.specimen_type_id || 'all');
+            setSelectedSpecimenTypeIds(
+                parseInitialIds(filters.specimen_type_id, specimenTypes),
+            );
         }
 
         if (filters.examination_id !== undefined) {
-            setSelectedExaminationId(filters.examination_id || 'all');
+            setSelectedExaminationIds(
+                parseInitialIds(filters.examination_id, examinations),
+            );
         }
-    }, [filters]);
+    }, [filters, specimenTypes, examinations]);
 
     const findSpecimenById = (id: number): Specimen | null => {
         for (const p of priorities) {
@@ -945,129 +1000,6 @@ export default function SpecimensIndex({
         }
     }, [priorities]);
 
-    const onDragEnd = (result: DropResult) => {
-        const { source, destination, draggableId } = result;
-
-        if (!destination) {
-            return;
-        }
-
-        if (
-            source.droppableId === destination.droppableId &&
-            source.index === destination.index
-        ) {
-            return;
-        }
-
-        const movedSpecimenId = parseInt(draggableId);
-        const sourcePriorityId = parseInt(source.droppableId);
-        const destPriorityId = parseInt(destination.droppableId);
-
-        const sourcePriorityIndex = priorities.findIndex(
-            (p) => p.id === sourcePriorityId,
-        );
-        const destPriorityIndex = priorities.findIndex(
-            (p) => p.id === destPriorityId,
-        );
-
-        const sourcePriority = priorities[sourcePriorityIndex];
-        const destPriority = priorities[destPriorityIndex];
-
-        const sourceSpecimens = [...sourcePriority.specimens];
-        const destSpecimens =
-            sourcePriorityId === destPriorityId
-                ? sourceSpecimens
-                : [...destPriority.specimens];
-
-        // Find the index of the moved specimen in the unfiltered source specimens list
-        const unfilteredSourceIndex = sourceSpecimens.findIndex(
-            (s) => s.id === movedSpecimenId,
-        );
-
-        if (unfilteredSourceIndex === -1) {
-            return;
-        }
-
-        const [movedSpecimen] = sourceSpecimens.splice(
-            unfilteredSourceIndex,
-            1,
-        );
-        movedSpecimen.priority_id = destPriorityId;
-
-        // Calculate the filtered list of specimens in destination priority to find the target position
-        const destFilteredPriority = filteredPriorities.find(
-            (p) => p.id === destPriorityId,
-        );
-        const destFilteredSpecimens = destFilteredPriority
-            ? destFilteredPriority.specimens
-            : destPriority.specimens;
-
-        const destFilteredSpecimensWithoutMoved =
-            sourcePriorityId === destPriorityId
-                ? destFilteredSpecimens.filter((s) => s.id !== movedSpecimenId)
-                : destFilteredSpecimens;
-
-        const targetSpecimen =
-            destFilteredSpecimensWithoutMoved[destination.index];
-        let unfilteredDestIndex = -1;
-
-        if (targetSpecimen) {
-            unfilteredDestIndex = destSpecimens.findIndex(
-                (s) => s.id === targetSpecimen.id,
-            );
-        }
-
-        if (unfilteredDestIndex !== -1) {
-            destSpecimens.splice(unfilteredDestIndex, 0, movedSpecimen);
-        } else {
-            destSpecimens.push(movedSpecimen);
-        }
-
-        const newPriorities = [...priorities];
-        newPriorities[sourcePriorityIndex] = {
-            ...sourcePriority,
-            specimens: sourceSpecimens,
-        };
-
-        if (sourcePriorityId !== destPriorityId) {
-            newPriorities[destPriorityIndex] = {
-                ...destPriority,
-                specimens: destSpecimens,
-            };
-
-            const specimenIdentifier = movedSpecimen.sequence_code
-                ? `${movedSpecimen.sequence_code} - ${movedSpecimen.customer_relation?.name || ''}`
-                : movedSpecimen.customer_relation?.name ||
-                  `Muestra #${movedSpecimen.id}`;
-
-            toast.success('Prioridad de muestra actualizada', {
-                description: `La muestra "${specimenIdentifier}" ha sido trasladada a la prioridad "${destPriority.name}".`,
-            });
-        }
-
-        setPriorities(newPriorities);
-
-        // Prepare the payload for updateOrder
-        const itemsToUpdate = destSpecimens.map((specimen, index) => ({
-            id: specimen.id,
-            priority_id: destPriorityId,
-            order: index + 1,
-        }));
-
-        router.post(
-            updateSpecimenOrder().url,
-            { items: itemsToUpdate },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onError: () => {
-                    toast.error('Error al actualizar el orden');
-                    setPriorities(deduplicateSpecimens(initialPriorities)); // Revert on error
-                },
-            },
-        );
-    };
-
     const handleCreate = () => {
         setSelectedSpecimen(null);
         setIsSheetOpen(true);
@@ -1112,78 +1044,6 @@ export default function SpecimensIndex({
     const handleDeleteClick = (specimen: Specimen) => {
         setSpecimenToDelete(specimen);
         setIsDeleteDialogOpen(true);
-    };
-
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(false);
-    const [mouseY, setMouseY] = useState(0);
-    const [isNearLeft, setIsNearLeft] = useState(false);
-    const [isNearRight, setIsNearRight] = useState(false);
-
-    const updateScrollState = () => {
-        const el = scrollContainerRef.current;
-
-        if (el) {
-            setCanScrollLeft(el.scrollLeft > 5);
-            setCanScrollRight(
-                el.scrollLeft + el.clientWidth < el.scrollWidth - 5,
-            );
-        }
-    };
-
-    useEffect(() => {
-        updateScrollState();
-        window.addEventListener('resize', updateScrollState);
-
-        return () => window.removeEventListener('resize', updateScrollState);
-    }, [priorities]);
-
-    const handleScroll = () => {
-        updateScrollState();
-    };
-
-    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        const el = scrollContainerRef.current;
-
-        if (!el) {
-            return;
-        }
-
-        const rect = el.getBoundingClientRect();
-
-        const relativeY = e.clientY - rect.top;
-        setMouseY(relativeY);
-
-        const relativeX = e.clientX - rect.left;
-        const threshold = 80; // Distance in pixels to activate
-        setIsNearLeft(relativeX >= 0 && relativeX < threshold);
-        setIsNearRight(
-            relativeX > rect.width - threshold && relativeX <= rect.width,
-        );
-    };
-
-    const handleMouseLeave = () => {
-        setIsNearLeft(false);
-        setIsNearRight(false);
-    };
-
-    const scrollLeftFn = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const el = scrollContainerRef.current;
-
-        if (el) {
-            el.scrollBy({ left: -350, behavior: 'smooth' });
-        }
-    };
-
-    const scrollRightFn = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const el = scrollContainerRef.current;
-
-        if (el) {
-            el.scrollBy({ left: 350, behavior: 'smooth' });
-        }
     };
 
     const confirmDelete = () => {
@@ -1566,238 +1426,205 @@ export default function SpecimensIndex({
                         />
                     </div>
 
-                    {/* Filtro de Tipo de Muestra (Combobox con Búsqueda) */}
-                    <Popover
-                        open={isSpecimenTypeFilterOpen}
-                        onOpenChange={setIsSpecimenTypeFilterOpen}
-                    >
+                    {/* Filtro de Tipo de Muestra (Popover Múltiple) */}
+                    <Popover>
                         <PopoverTrigger asChild>
                             <Button
                                 variant="outline"
-                                role="combobox"
-                                aria-expanded={isSpecimenTypeFilterOpen}
-                                className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50 sm:w-[200px]"
+                                className="h-10 gap-2 border bg-card transition-colors hover:bg-accent/50"
                             >
-                                <div className="flex items-center gap-2 truncate">
-                                    <Microscope className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                    <span className="truncate">
-                                        {selectedSpecimenTypeId === 'all'
-                                            ? 'Todos los tipos'
-                                            : (() => {
-                                                  const t = specimenTypes.find(
-                                                      (t) =>
-                                                          t.id.toString() ===
-                                                          selectedSpecimenTypeId,
-                                                  );
-
-                                                  return t
-                                                      ? t.name
-                                                      : 'Tipo seleccionado';
-                                              })()}
-                                    </span>
-                                </div>
-                                <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                                <Microscope className="h-4 w-4 text-muted-foreground" />
+                                <span>
+                                    Tipos ({selectedSpecimenTypeIds.length})
+                                </span>
+                                <ChevronDown className="h-4 w-4 opacity-50" />
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[200px] p-0" align="start">
-                            <Command>
-                                <CommandInput placeholder="Buscar tipo..." />
-                                <CommandList>
-                                    <CommandEmpty>
-                                        No se encontraron tipos.
-                                    </CommandEmpty>
-                                    <CommandGroup>
-                                        <CommandItem
-                                            value="todos"
-                                            onSelect={() => {
-                                                handleSpecimenTypeChange('all');
-                                                setIsSpecimenTypeFilterOpen(
-                                                    false,
+                        <PopoverContent className="w-64 p-2" align="start">
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+                                    <span>Filtrar por tipo</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const areAllTypesSelected =
+                                                specimenTypes.length > 0 &&
+                                                specimenTypes.every((t) =>
+                                                    selectedSpecimenTypeIds.includes(
+                                                        t.id.toString(),
+                                                    ),
                                                 );
-                                            }}
-                                        >
-                                            <Check
-                                                className={cn(
-                                                    'mr-2 h-4 w-4',
-                                                    selectedSpecimenTypeId ===
-                                                        'all'
-                                                        ? 'opacity-100'
-                                                        : 'opacity-0',
-                                                )}
-                                            />
-                                            Todos los tipos
-                                        </CommandItem>
-                                        {specimenTypes.map((type) => (
-                                            <CommandItem
+                                            const nextTypes =
+                                                areAllTypesSelected
+                                                    ? []
+                                                    : specimenTypes.map((t) =>
+                                                          t.id.toString(),
+                                                      );
+
+                                            handleSpecimenTypeSelectionChange(
+                                                nextTypes,
+                                            );
+                                        }}
+                                        className="cursor-pointer font-medium transition-colors hover:text-primary"
+                                    >
+                                        {specimenTypes.length > 0 &&
+                                        specimenTypes.every((t) =>
+                                            selectedSpecimenTypeIds.includes(
+                                                t.id.toString(),
+                                            ),
+                                        )
+                                            ? 'Ninguno'
+                                            : 'Todos'}
+                                    </button>
+                                </div>
+                                <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
+                                    {specimenTypes.map((type) => {
+                                        const isChecked =
+                                            selectedSpecimenTypeIds.includes(
+                                                type.id.toString(),
+                                            );
+
+                                        return (
+                                            <div
                                                 key={type.id}
-                                                value={`${type.name} - ${type.id}`}
-                                                onSelect={() => {
-                                                    handleSpecimenTypeChange(
-                                                        type.id.toString(),
-                                                    );
-                                                    setIsSpecimenTypeFilterOpen(
-                                                        false,
+                                                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+                                                onClick={() => {
+                                                    const typeIdStr =
+                                                        type.id.toString();
+                                                    const nextTypes = isChecked
+                                                        ? selectedSpecimenTypeIds.filter(
+                                                              (id) =>
+                                                                  id !==
+                                                                  typeIdStr,
+                                                          )
+                                                        : [
+                                                              ...selectedSpecimenTypeIds,
+                                                              typeIdStr,
+                                                          ];
+
+                                                    handleSpecimenTypeSelectionChange(
+                                                        nextTypes,
                                                     );
                                                 }}
                                             >
-                                                <Check
-                                                    className={cn(
-                                                        'mr-2 h-4 w-4',
-                                                        selectedSpecimenTypeId ===
-                                                            type.id.toString()
-                                                            ? 'opacity-100'
-                                                            : 'opacity-0',
-                                                    )}
+                                                <Checkbox
+                                                    checked={isChecked}
+                                                    className="pointer-events-none"
+                                                    onCheckedChange={() => {}}
                                                 />
-                                                {type.name}
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
+                                                <span className="truncate">
+                                                    {type.name}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </PopoverContent>
                     </Popover>
 
-                    {/* Filtro de Análisis/Examen (Combobox con Búsqueda) */}
-                    <Popover
-                        open={isExaminationFilterOpen}
-                        onOpenChange={setIsExaminationFilterOpen}
-                    >
+                    {/* Filtro de Análisis/Examen (Popover Múltiple) */}
+                    <Popover>
                         <PopoverTrigger asChild>
                             <Button
                                 variant="outline"
-                                role="combobox"
-                                aria-expanded={isExaminationFilterOpen}
-                                className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50 sm:w-[200px]"
-                                disabled={selectedSpecimenTypeId === 'all'}
+                                className="h-10 gap-2 border bg-card transition-colors hover:bg-accent/50"
                             >
-                                <div className="flex items-center gap-2 truncate">
-                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                    <span className="truncate">
-                                        {selectedSpecimenTypeId === 'all'
-                                            ? 'Seleccione tipo primero'
-                                            : selectedExaminationId === 'all'
-                                              ? 'Todos los análisis'
-                                              : (() => {
-                                                    const e = examinations.find(
-                                                        (e) =>
-                                                            e.id.toString() ===
-                                                            selectedExaminationId,
-                                                    );
-
-                                                    return e
-                                                        ? e.name
-                                                        : 'Análisis seleccionado';
-                                                })()}
-                                    </span>
-                                </div>
-                                <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                <span>
+                                    Análisis ({selectedExaminationIds.length})
+                                </span>
+                                <ChevronDown className="h-4 w-4 opacity-50" />
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[200px] p-0" align="start">
-                            <Command>
-                                <CommandInput placeholder="Buscar análisis..." />
-                                <CommandList>
-                                    <CommandEmpty>
-                                        No se encontraron análisis.
-                                    </CommandEmpty>
-                                    <CommandGroup>
-                                        <CommandItem
-                                            value="todos"
-                                            onSelect={() => {
-                                                setSelectedExaminationId('all');
-                                                setIsExaminationFilterOpen(
-                                                    false,
+                        <PopoverContent className="w-64 p-2" align="start">
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+                                    <span>Filtrar por análisis</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const areAllExamsSelected =
+                                                filteredExaminationsForDropdown.length >
+                                                    0 &&
+                                                filteredExaminationsForDropdown.every(
+                                                    (e) =>
+                                                        selectedExaminationIds.includes(
+                                                            e.id.toString(),
+                                                        ),
                                                 );
-                                                const userId =
-                                                    props.auth?.user?.id;
+                                            const nextExams =
+                                                areAllExamsSelected
+                                                    ? []
+                                                    : filteredExaminationsForDropdown.map(
+                                                          (e) =>
+                                                              e.id.toString(),
+                                                      );
 
-                                                if (userId) {
-                                                    setCookie(
-                                                        `examination_filter_specimens_user_${userId}`,
-                                                        'all',
-                                                    );
-                                                }
-
-                                                router.get(
-                                                    '/specimens',
-                                                    {
-                                                        ...filters,
-                                                        examination_id: 'all',
-                                                    },
-                                                    {
-                                                        preserveState: true,
-                                                        replace: true,
-                                                    },
+                                            handleExaminationSelectionChange(
+                                                nextExams,
+                                            );
+                                        }}
+                                        className="cursor-pointer font-medium transition-colors hover:text-primary"
+                                    >
+                                        {filteredExaminationsForDropdown.length >
+                                            0 &&
+                                        filteredExaminationsForDropdown.every(
+                                            (e) =>
+                                                selectedExaminationIds.includes(
+                                                    e.id.toString(),
+                                                ),
+                                        )
+                                            ? 'Ninguno'
+                                            : 'Todos'}
+                                    </button>
+                                </div>
+                                <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
+                                    {filteredExaminationsForDropdown.map(
+                                        (exam) => {
+                                            const isChecked =
+                                                selectedExaminationIds.includes(
+                                                    exam.id.toString(),
                                                 );
-                                            }}
-                                        >
-                                            <Check
-                                                className={cn(
-                                                    'mr-2 h-4 w-4',
-                                                    selectedExaminationId ===
-                                                        'all'
-                                                        ? 'opacity-100'
-                                                        : 'opacity-0',
-                                                )}
-                                            />
-                                            Todos los análisis
-                                        </CommandItem>
-                                        {filteredExaminationsForDropdown.map(
-                                            (exam) => (
-                                                <CommandItem
+
+                                            return (
+                                                <div
                                                     key={exam.id}
-                                                    value={`${exam.name} - ${exam.id}`}
-                                                    onSelect={() => {
-                                                        const examId =
+                                                    className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+                                                    onClick={() => {
+                                                        const examIdStr =
                                                             exam.id.toString();
-                                                        setSelectedExaminationId(
-                                                            examId,
-                                                        );
-                                                        setIsExaminationFilterOpen(
-                                                            false,
-                                                        );
-                                                        const userId =
-                                                            props.auth?.user
-                                                                ?.id;
+                                                        const nextExams =
+                                                            isChecked
+                                                                ? selectedExaminationIds.filter(
+                                                                      (id) =>
+                                                                          id !==
+                                                                          examIdStr,
+                                                                  )
+                                                                : [
+                                                                      ...selectedExaminationIds,
+                                                                      examIdStr,
+                                                                  ];
 
-                                                        if (userId) {
-                                                            setCookie(
-                                                                `examination_filter_specimens_user_${userId}`,
-                                                                examId,
-                                                            );
-                                                        }
-
-                                                        router.get(
-                                                            '/specimens',
-                                                            {
-                                                                ...filters,
-                                                                examination_id:
-                                                                    examId,
-                                                            },
-                                                            {
-                                                                preserveState: true,
-                                                                replace: true,
-                                                            },
+                                                        handleExaminationSelectionChange(
+                                                            nextExams,
                                                         );
                                                     }}
                                                 >
-                                                    <Check
-                                                        className={cn(
-                                                            'mr-2 h-4 w-4',
-                                                            selectedExaminationId ===
-                                                                exam.id.toString()
-                                                                ? 'opacity-100'
-                                                                : 'opacity-0',
-                                                        )}
+                                                    <Checkbox
+                                                        checked={isChecked}
+                                                        className="pointer-events-none"
+                                                        onCheckedChange={() => {}}
                                                     />
-                                                    {exam.name}
-                                                </CommandItem>
-                                            ),
-                                        )}
-                                    </CommandGroup>
-                                </CommandList>
-                            </Command>
+                                                    <span className="truncate">
+                                                        {exam.name}
+                                                    </span>
+                                                </div>
+                                            );
+                                        },
+                                    )}
+                                </div>
+                            </div>
                         </PopoverContent>
                     </Popover>
 
@@ -2111,549 +1938,25 @@ export default function SpecimensIndex({
                         </div>
                     </div>
                 )}
-                <div
-                    className="group/kanban relative flex-1 overflow-hidden"
-                    onMouseMove={handleMouseMove}
-                    onMouseLeave={handleMouseLeave}
-                >
-                    {/* Left Scroll Button */}
-                    {!isMobile && canScrollLeft && isNearLeft && (
-                        <button
-                            type="button"
-                            onClick={scrollLeftFn}
-                            className="absolute left-2 z-[60] flex items-center justify-center rounded-full border border-primary/20 bg-background/80 p-3 text-foreground shadow-lg transition-[transform,background-color,border-color,box-shadow] duration-150 hover:scale-110 hover:border-primary/50 hover:bg-background active:scale-95"
-                            style={{
-                                top: `${mouseY}px`,
-                                transform: 'translateY(-50%)',
-                            }}
-                        >
-                            <ChevronLeft className="h-5 w-5 text-primary" />
-                        </button>
-                    )}
-
-                    {/* Right Scroll Button */}
-                    {!isMobile && canScrollRight && isNearRight && (
-                        <button
-                            type="button"
-                            onClick={scrollRightFn}
-                            className="absolute right-2 z-[60] flex items-center justify-center rounded-full border border-primary/20 bg-background/80 p-3 text-foreground shadow-lg transition-[transform,background-color,border-color,box-shadow] duration-150 hover:scale-110 hover:border-primary/50 hover:bg-background active:scale-95"
-                            style={{
-                                top: `${mouseY}px`,
-                                transform: 'translateY(-50%)',
-                            }}
-                        >
-                            <ChevronRight className="h-5 w-5 text-primary" />
-                        </button>
-                    )}
-
-                    <div
-                        ref={scrollContainerRef}
-                        className="h-full w-full overflow-x-auto pb-4"
-                        onScroll={handleScroll}
-                    >
-                        <DragDropContext onDragEnd={onDragEnd}>
-                            <div className="flex min-h-[calc(100vh-200px)] gap-4">
-                                {filteredPriorities.map((priority) => {
-                                    const totalSpecimens =
-                                        priority.specimens.length;
-                                    const isPaginated = totalSpecimens > 50;
-                                    const visibleLimit = isPaginated
-                                        ? visibleCounts[priority.id] || 50
-                                        : totalSpecimens;
-                                    const visibleSpecimens = isPaginated
-                                        ? priority.specimens.slice(
-                                              0,
-                                              visibleLimit,
-                                          )
-                                        : priority.specimens;
-
-                                    return (
-                                        <div
-                                            key={priority.id}
-                                            className="relative flex w-80 min-w-80 flex-col overflow-hidden rounded-lg p-3"
-                                        >
-                                            {/* Dynamic Background Layer */}
-                                            <div
-                                                className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.06]"
-                                                style={{
-                                                    backgroundColor:
-                                                        priority.color,
-                                                }}
-                                            />
-
-                                            {/* Content Container */}
-                                            <div className="relative z-10 flex h-full flex-col">
-                                                <div className="mb-4 flex items-center gap-2 px-1 text-sm font-semibold">
-                                                    <div
-                                                        className="h-3 w-3 rounded-full shadow-sm"
-                                                        style={{
-                                                            backgroundColor:
-                                                                priority.color,
-                                                        }}
-                                                    />
-                                                    <span>{priority.name}</span>
-                                                    <span className="ml-auto rounded-full bg-background/60 px-2 py-0.5 text-xs text-muted-foreground">
-                                                        {totalSpecimens}
-                                                    </span>
-                                                </div>
-                                                <Droppable
-                                                    droppableId={priority.id.toString()}
-                                                >
-                                                    {(provided) => (
-                                                        <div
-                                                            {...provided.droppableProps}
-                                                            ref={
-                                                                provided.innerRef
-                                                            }
-                                                            className="flex min-h-[150px] flex-1 flex-col gap-3"
-                                                        >
-                                                            {visibleSpecimens.map(
-                                                                (
-                                                                    specimen,
-                                                                    index,
-                                                                ) => (
-                                                                    <Draggable
-                                                                        key={
-                                                                            specimen.id
-                                                                        }
-                                                                        draggableId={specimen.id.toString()}
-                                                                        index={
-                                                                            index
-                                                                        }
-                                                                        isDragDisabled={
-                                                                            !auth.permissions?.includes(
-                                                                                'specimens.edit',
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        {(
-                                                                            provided,
-                                                                            snapshot,
-                                                                        ) => (
-                                                                            <div
-                                                                                ref={
-                                                                                    provided.innerRef
-                                                                                }
-                                                                                {...provided.draggableProps}
-                                                                                {...provided.dragHandleProps}
-                                                                                onClick={() => {
-                                                                                    if (
-                                                                                        isSelectionMode
-                                                                                    ) {
-                                                                                        toggleSelectSpecimen(
-                                                                                            specimen.id,
-                                                                                        );
-                                                                                    } else {
-                                                                                        handleView(
-                                                                                            specimen,
-                                                                                        );
-                                                                                    }
-                                                                                }}
-                                                                                className={`flex cursor-pointer flex-col gap-2 rounded-md border p-3 shadow-sm transition-all duration-200 hover:border-primary/50 ${
-                                                                                    snapshot.isDragging
-                                                                                        ? 'z-50 scale-[1.02] rotate-2 opacity-90 shadow-xl ring-2 ring-primary/20'
-                                                                                        : ''
-                                                                                } ${
-                                                                                    selectedIds.includes(
-                                                                                        specimen.id,
-                                                                                    )
-                                                                                        ? 'border-primary bg-primary/[0.02] ring-1 ring-primary/30'
-                                                                                        : specimen.users &&
-                                                                                            specimen
-                                                                                                .users
-                                                                                                .length >
-                                                                                                0
-                                                                                          ? 'dark:border-sky-850 border-sky-300/80 bg-sky-50/50 dark:bg-sky-950/20'
-                                                                                          : 'bg-card'
-                                                                                }`}
-                                                                            >
-                                                                                <div className="flex items-start gap-3">
-                                                                                    {isSelectionMode && (
-                                                                                        <div
-                                                                                            className="flex-shrink-0 pt-1"
-                                                                                            onClick={(
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                e.stopPropagation()
-                                                                                            }
-                                                                                        >
-                                                                                            <Checkbox
-                                                                                                checked={selectedIds.includes(
-                                                                                                    specimen.id,
-                                                                                                )}
-                                                                                                onCheckedChange={() =>
-                                                                                                    toggleSelectSpecimen(
-                                                                                                        specimen.id,
-                                                                                                    )
-                                                                                                }
-                                                                                            />
-                                                                                        </div>
-                                                                                    )}
-                                                                                    <div className="flex min-w-0 flex-1 flex-col gap-2">
-                                                                                        <div className="flex items-start justify-between">
-                                                                                            <div>
-                                                                                                {specimen
-                                                                                                    .group
-                                                                                                    ?.name && (
-                                                                                                    <div className="mb-1">
-                                                                                                        <Badge
-                                                                                                            variant="secondary"
-                                                                                                            className="h-4 border-none bg-purple-500/10 px-1.5 py-0 text-[9px] font-semibold text-purple-600 hover:bg-purple-500/10 dark:bg-purple-500/20 dark:text-purple-300"
-                                                                                                        >
-                                                                                                            {
-                                                                                                                specimen
-                                                                                                                    .group
-                                                                                                                    .name
-                                                                                                            }
-                                                                                                        </Badge>
-                                                                                                    </div>
-                                                                                                )}
-                                                                                                <div className="text-sm font-medium">
-                                                                                                    {
-                                                                                                        specimen
-                                                                                                            .customer_relation
-                                                                                                            ?.name
-                                                                                                    }
-                                                                                                </div>
-                                                                                                {specimen.sequence_code && (
-                                                                                                    <div className="mt-0.5 w-fit rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
-                                                                                                        {
-                                                                                                            specimen.sequence_code
-                                                                                                        }
-                                                                                                    </div>
-                                                                                                )}
-                                                                                            </div>
-                                                                                            <div
-                                                                                                className="ml-1 flex"
-                                                                                                onClick={(
-                                                                                                    e,
-                                                                                                ) =>
-                                                                                                    e.stopPropagation()
-                                                                                                }
-                                                                                            >
-                                                                                                {auth.permissions?.includes(
-                                                                                                    'specimens.manage',
-                                                                                                ) && (
-                                                                                                    <Button
-                                                                                                        variant="ghost"
-                                                                                                        size="icon"
-                                                                                                        className="relative h-8 w-8 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                                                                        onClick={() =>
-                                                                                                            handleAssignClick(
-                                                                                                                specimen,
-                                                                                                            )
-                                                                                                        }
-                                                                                                        title="Asignar Patólogo"
-                                                                                                    >
-                                                                                                        <UserPlus className="h-4 w-4" />
-                                                                                                        <span
-                                                                                                            className={`absolute right-0 bottom-0 flex h-3 w-3 items-center justify-center rounded-full text-[7px] font-extrabold ring-1 ring-background ${
-                                                                                                                (specimen
-                                                                                                                    .users
-                                                                                                                    ?.length ||
-                                                                                                                    0) >
-                                                                                                                0
-                                                                                                                    ? 'bg-sky-500 text-white'
-                                                                                                                    : 'bg-slate-300 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                                                                                                            }`}
-                                                                                                        >
-                                                                                                            {specimen
-                                                                                                                .users
-                                                                                                                ?.length ||
-                                                                                                                0}
-                                                                                                        </span>
-                                                                                                    </Button>
-                                                                                                )}
-                                                                                                {(auth.permissions?.includes(
-                                                                                                    'specimens.edit',
-                                                                                                ) ||
-                                                                                                    auth.permissions?.includes(
-                                                                                                        'specimens.delete',
-                                                                                                    )) && (
-                                                                                                    <DropdownMenu>
-                                                                                                        <DropdownMenuTrigger
-                                                                                                            asChild
-                                                                                                        >
-                                                                                                            <button
-                                                                                                                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                                                                                title="Acciones"
-                                                                                                            >
-                                                                                                                <MoreVertical className="h-4 w-4" />
-                                                                                                            </button>
-                                                                                                        </DropdownMenuTrigger>
-                                                                                                        <DropdownMenuContent
-                                                                                                            align="end"
-                                                                                                            onClick={(
-                                                                                                                e,
-                                                                                                            ) =>
-                                                                                                                e.stopPropagation()
-                                                                                                            }
-                                                                                                        >
-                                                                                                            {auth.permissions?.includes(
-                                                                                                                'specimens.edit',
-                                                                                                            ) && (
-                                                                                                                <DropdownMenuItem
-                                                                                                                    onClick={(
-                                                                                                                        e,
-                                                                                                                    ) => {
-                                                                                                                        e.stopPropagation();
-                                                                                                                        handleEdit(
-                                                                                                                            specimen,
-                                                                                                                        );
-                                                                                                                    }}
-                                                                                                                >
-                                                                                                                    <Edit2 className="mr-2 h-4 w-4" />
-                                                                                                                    <span>
-                                                                                                                        Editar
-                                                                                                                    </span>
-                                                                                                                </DropdownMenuItem>
-                                                                                                            )}
-                                                                                                            {auth.permissions?.includes(
-                                                                                                                'report_editor.view',
-                                                                                                            ) && (
-                                                                                                                <DropdownMenuItem
-                                                                                                                    onClick={(
-                                                                                                                        e,
-                                                                                                                    ) => {
-                                                                                                                        e.stopPropagation();
-                                                                                                                        window.open(
-                                                                                                                            `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
-                                                                                                                            '_blank',
-                                                                                                                        );
-                                                                                                                    }}
-                                                                                                                >
-                                                                                                                    <FileText className="mr-2 h-4 w-4" />
-                                                                                                                    <span>
-                                                                                                                        Abrir
-                                                                                                                        Reporte
-                                                                                                                    </span>
-                                                                                                                </DropdownMenuItem>
-                                                                                                            )}
-                                                                                                            {specimen.is_group &&
-                                                                                                                specimen.group && (
-                                                                                                                    <DropdownMenuItem
-                                                                                                                        onClick={(
-                                                                                                                            e,
-                                                                                                                        ) => {
-                                                                                                                            e.stopPropagation();
-                                                                                                                            handleLoadGroupAndOpenSheet(
-                                                                                                                                specimen
-                                                                                                                                    .group
-                                                                                                                                    .id,
-                                                                                                                            );
-                                                                                                                        }}
-                                                                                                                    >
-                                                                                                                        <Plus className="mr-2 h-4 w-4" />
-                                                                                                                        <span>
-                                                                                                                            Agregar
-                                                                                                                            más
-                                                                                                                            muestras
-                                                                                                                            al
-                                                                                                                            grupo
-                                                                                                                        </span>
-                                                                                                                    </DropdownMenuItem>
-                                                                                                                )}
-                                                                                                            {auth.permissions?.includes(
-                                                                                                                'specimens.edit',
-                                                                                                            ) &&
-                                                                                                                ![
-                                                                                                                    'cancelled',
-                                                                                                                    'finalized',
-                                                                                                                    'delivered',
-                                                                                                                ].includes(
-                                                                                                                    specimen.status,
-                                                                                                                ) && (
-                                                                                                                    <DropdownMenuItem
-                                                                                                                        variant="destructive"
-                                                                                                                        onClick={(
-                                                                                                                            e,
-                                                                                                                        ) => {
-                                                                                                                            e.stopPropagation();
-                                                                                                                            handleCancelClick(
-                                                                                                                                specimen,
-                                                                                                                            );
-                                                                                                                        }}
-                                                                                                                    >
-                                                                                                                        <Ban className="mr-2 h-4 w-4" />
-                                                                                                                        <span>
-                                                                                                                            Cancelar
-                                                                                                                            muestra
-                                                                                                                        </span>
-                                                                                                                    </DropdownMenuItem>
-                                                                                                                )}
-                                                                                                            {auth.permissions?.includes(
-                                                                                                                'specimens.delete',
-                                                                                                            ) && (
-                                                                                                                <DropdownMenuItem
-                                                                                                                    variant="destructive"
-                                                                                                                    onClick={(
-                                                                                                                        e,
-                                                                                                                    ) => {
-                                                                                                                        e.stopPropagation();
-                                                                                                                        handleDeleteClick(
-                                                                                                                            specimen,
-                                                                                                                        );
-                                                                                                                    }}
-                                                                                                                >
-                                                                                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                                                                                    <span>
-                                                                                                                        Eliminar
-                                                                                                                    </span>
-                                                                                                                </DropdownMenuItem>
-                                                                                                            )}
-                                                                                                        </DropdownMenuContent>
-                                                                                                    </DropdownMenu>
-                                                                                                )}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                        <div className="text-xs text-muted-foreground">
-                                                                                            {
-                                                                                                specimen
-                                                                                                    .type
-                                                                                                    ?.name
-                                                                                            }{' '}
-                                                                                            -{' '}
-                                                                                            {
-                                                                                                specimen
-                                                                                                    .examination
-                                                                                                    ?.name
-                                                                                            }
-                                                                                        </div>
-                                                                                        {(() => {
-                                                                                            const dueInfo =
-                                                                                                getDueDateInfo(
-                                                                                                    specimen,
-                                                                                                );
-
-                                                                                            if (
-                                                                                                !dueInfo
-                                                                                            ) {
-                                                                                                return null;
-                                                                                            }
-
-                                                                                            return (
-                                                                                                <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                                                                                                    <div className="inline-flex w-fit items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                                                                                                        <Tag className="h-3 w-3" />{' '}
-                                                                                                        {
-                                                                                                            specimen
-                                                                                                                .category
-                                                                                                                .name
-                                                                                                        }
-                                                                                                    </div>
-                                                                                                    {![
-                                                                                                        'finalized',
-                                                                                                        'delivered',
-                                                                                                        'cancelled',
-                                                                                                    ].includes(
-                                                                                                        specimen.status,
-                                                                                                    ) && (
-                                                                                                        <div
-                                                                                                            className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${dueInfo.colorClass}`}
-                                                                                                            title={`Fecha Estimada: ${dueInfo.fullDueDate}`}
-                                                                                                        >
-                                                                                                            <CalendarClock className="h-3 w-3" />{' '}
-                                                                                                            {dueInfo.isExpired
-                                                                                                                ? 'Vencida:'
-                                                                                                                : 'Est:'}{' '}
-                                                                                                            {
-                                                                                                                dueInfo.dueDateFormatted
-                                                                                                            }
-                                                                                                        </div>
-                                                                                                    )}
-                                                                                                </div>
-                                                                                            );
-                                                                                        })()}
-                                                                                        <div className="mt-1 flex items-center justify-between text-xs">
-                                                                                            <span
-                                                                                                className="rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
-                                                                                                style={{
-                                                                                                    backgroundColor:
-                                                                                                        specimen.status_color ||
-                                                                                                        '#cbd5e1',
-                                                                                                }}
-                                                                                            >
-                                                                                                {specimen.status ===
-                                                                                                'received'
-                                                                                                    ? 'Recibida'
-                                                                                                    : specimen.status ===
-                                                                                                        'macroscopic_review'
-                                                                                                      ? 'Rev. Macroscópica'
-                                                                                                      : specimen.status ===
-                                                                                                          'processing'
-                                                                                                        ? 'En Proceso'
-                                                                                                        : specimen.status ===
-                                                                                                            'microscopic_review'
-                                                                                                          ? 'Rev. Microscópica'
-                                                                                                          : specimen.status ===
-                                                                                                              'finalized'
-                                                                                                            ? 'Finalizada'
-                                                                                                            : specimen.status ===
-                                                                                                                'delivered'
-                                                                                                              ? 'Entregada'
-                                                                                                              : specimen.status ===
-                                                                                                                  'cancelled'
-                                                                                                                ? 'Cancelada'
-                                                                                                                : specimen.status}
-                                                                                            </span>
-                                                                                            <span
-                                                                                                className="text-muted-foreground capitalize"
-                                                                                                title={new Date(
-                                                                                                    specimen.created_at,
-                                                                                                ).toLocaleString(
-                                                                                                    'es-ES',
-                                                                                                )}
-                                                                                            >
-                                                                                                {formatDistanceToNow(
-                                                                                                    new Date(
-                                                                                                        specimen.created_at,
-                                                                                                    ),
-                                                                                                    {
-                                                                                                        addSuffix: true,
-                                                                                                        locale: es,
-                                                                                                    },
-                                                                                                )}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                    </Draggable>
-                                                                ),
-                                                            )}
-                                                            {isPaginated &&
-                                                                visibleLimit <
-                                                                    totalSpecimens && (
-                                                                    <KanbanColumnSentinel
-                                                                        priorityId={
-                                                                            priority.id
-                                                                        }
-                                                                        totalCount={
-                                                                            totalSpecimens
-                                                                        }
-                                                                        visibleCount={
-                                                                            visibleLimit
-                                                                        }
-                                                                        onLoadMore={
-                                                                            handleLoadMore
-                                                                        }
-                                                                    />
-                                                                )}
-                                                            {
-                                                                provided.placeholder
-                                                            }
-                                                        </div>
-                                                    )}
-                                                </Droppable>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </DragDropContext>
-                    </div>
-                </div>
+                <KanbanBoard
+                    priorities={priorities}
+                    setPriorities={setPriorities}
+                    filteredPriorities={filteredPriorities}
+                    initialPriorities={initialPriorities}
+                    deduplicateSpecimens={deduplicateSpecimens}
+                    visibleCounts={visibleCounts}
+                    auth={auth}
+                    isSelectionMode={isSelectionMode}
+                    selectedIds={selectedIds}
+                    toggleSelectSpecimen={toggleSelectSpecimen}
+                    handleView={handleView}
+                    handleAssignClick={handleAssignClick}
+                    handleEdit={handleEdit}
+                    handleLoadGroupAndOpenSheet={handleLoadGroupAndOpenSheet}
+                    handleCancelClick={handleCancelClick}
+                    handleDeleteClick={handleDeleteClick}
+                    handleLoadMore={handleLoadMore}
+                />
             </div>
 
             <SpecimenSheet

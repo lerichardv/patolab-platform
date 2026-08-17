@@ -1,4 +1,9 @@
-import { Node as TiptapNode, ResizableNodeView } from '@tiptap/core';
+import {
+    Node as TiptapNode,
+    Extension,
+    Mark,
+    ResizableNodeView,
+} from '@tiptap/core';
 import BulletList from '@tiptap/extension-bullet-list';
 import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
@@ -36,6 +41,7 @@ import {
     Trash2,
     Highlighter,
     CaseSensitive,
+    ChevronDown,
     X,
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
@@ -213,6 +219,8 @@ export const editorStyles = `
   .tiptap .image-wrapper:has(img.align-center),
   .tiptap .image-wrapper:has(img[data-align="center"]) {
     display: flex;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
   }
 
@@ -221,6 +229,8 @@ export const editorStyles = `
   .tiptap .image-wrapper:has(img.align-right),
   .tiptap .image-wrapper:has(img[data-align="right"]) {
     display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     justify-content: flex-end;
   }
 
@@ -229,6 +239,8 @@ export const editorStyles = `
   .tiptap .image-wrapper:has(img.align-left),
   .tiptap .image-wrapper:has(img[data-align="left"]) {
     display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     justify-content: flex-start;
   }
 
@@ -357,32 +369,238 @@ export const editorStyles = `
   .tiptap [data-resize-state='true'] [data-resize-wrapper] {
     outline: 1px solid rgba(0, 0, 0, 0.25);
     border-radius: 0.125rem;
+  /* ── Image Captions ── */
+  .image-caption-container {
+    margin-top: 0px;
+    width: 100%;
+    text-align: center;
   }
-
-  /* ── Gapcursor ── */
-  .tiptap .ProseMirror-gapcursor {
-    display: none;
-    pointer-events: none;
-    position: absolute;
+  .image-caption-input {
+    transition: border-color 0.15s ease-in-out;
   }
-  .tiptap .ProseMirror-gapcursor:after {
-    content: "";
-    display: block;
-    border-top: 2px solid #3b82f6;
-    width: 20px;
-    animation: ProseMirror-cursor-blink 1.1s steps(2, start) infinite;
+  .image-caption-input:focus {
+    border-color: #6366f1 !important;
+    border-style: solid !important;
   }
-  @keyframes ProseMirror-cursor-blink {
-    to {
-      visibility: hidden;
-    }
+  .image-caption, .gallery-image-caption, figcaption {
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+    margin-top: 4px;
+    font-style: italic;
+    line-height: 1.3;
   }
 `;
+
+declare module '@tiptap/core' {
+    interface Commands<ReturnType> {
+        fontSize: {
+            setFontSize: (fontSize: string) => ReturnType;
+            unsetFontSize: () => ReturnType;
+        };
+        lineHeight: {
+            setLineHeight: (lineHeight: string) => ReturnType;
+            unsetLineHeight: () => ReturnType;
+        };
+    }
+}
+
+export const TextStyle = Mark.create({
+    name: 'textStyle',
+    priority: 101,
+    addAttributes() {
+        return {
+            fontSize: {
+                default: null,
+                parseHTML: (element) =>
+                    element.style.fontSize?.replace(/['"]/g, '') || null,
+                renderHTML: (attributes) => {
+                    if (!attributes.fontSize) {
+                        return {};
+                    }
+
+                    return { style: `font-size: ${attributes.fontSize}` };
+                },
+            },
+        };
+    },
+    parseHTML() {
+        return [
+            {
+                tag: 'span',
+                getAttrs: (element) =>
+                    (element as HTMLElement).style.fontSize ? {} : false,
+            },
+        ];
+    },
+    renderHTML({ HTMLAttributes }) {
+        return [
+            'span',
+            mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+            0,
+        ];
+    },
+});
+
+export const FontSize = Extension.create({
+    name: 'fontSize',
+    addOptions() {
+        return {
+            types: ['textStyle'],
+        };
+    },
+    addGlobalAttributes() {
+        return [
+            {
+                types: this.options.types,
+                attributes: {
+                    fontSize: {
+                        default: null,
+                        parseHTML: (element) =>
+                            element.style.fontSize?.replace(/['"]/g, '') ||
+                            null,
+                        renderHTML: (attributes) => {
+                            if (!attributes.fontSize) {
+                                return {};
+                            }
+
+                            return {
+                                style: `font-size: ${attributes.fontSize}`,
+                            };
+                        },
+                    },
+                },
+            },
+        ];
+    },
+    addCommands() {
+        return {
+            setFontSize:
+                (fontSize: string) =>
+                ({ chain }: any) => {
+                    return chain().setMark('textStyle', { fontSize }).run();
+                },
+            unsetFontSize:
+                () =>
+                ({ chain }: any) => {
+                    return chain()
+                        .setMark('textStyle', { fontSize: null })
+                        .run();
+                },
+        };
+    },
+});
+
+export const LineHeight = Extension.create({
+    name: 'lineHeight',
+    addOptions() {
+        return {
+            types: ['paragraph', 'heading'],
+        };
+    },
+    addGlobalAttributes() {
+        return [
+            {
+                types: this.options.types,
+                attributes: {
+                    lineHeight: {
+                        default: null,
+                        parseHTML: (element) =>
+                            element.style.lineHeight ||
+                            element.getAttribute('data-line-height') ||
+                            null,
+                        renderHTML: (attributes) => {
+                            if (!attributes.lineHeight) {
+                                return {};
+                            }
+
+                            return {
+                                style: `line-height: ${attributes.lineHeight}`,
+                                'data-line-height': attributes.lineHeight,
+                            };
+                        },
+                    },
+                },
+            },
+        ];
+    },
+    addCommands() {
+        return {
+            setLineHeight:
+                (lineHeight: string) =>
+                ({ tr, state, dispatch }: any) => {
+                    const { selection } = state;
+                    const { from, to } = selection;
+                    let applied = false;
+
+                    state.doc.nodesBetween(
+                        from,
+                        to,
+                        (node: any, pos: number) => {
+                            if (this.options.types.includes(node.type.name)) {
+                                if (dispatch) {
+                                    tr.setNodeMarkup(pos, undefined, {
+                                        ...node.attrs,
+                                        lineHeight,
+                                    });
+                                }
+                                applied = true;
+                            }
+                        },
+                    );
+
+                    return applied;
+                },
+            unsetLineHeight:
+                () =>
+                ({ tr, state, dispatch }: any) => {
+                    const { selection } = state;
+                    const { from, to } = selection;
+                    let applied = false;
+
+                    state.doc.nodesBetween(
+                        from,
+                        to,
+                        (node: any, pos: number) => {
+                            if (this.options.types.includes(node.type.name)) {
+                                if (dispatch) {
+                                    tr.setNodeMarkup(pos, undefined, {
+                                        ...node.attrs,
+                                        lineHeight: null,
+                                    });
+                                }
+                                applied = true;
+                            }
+                        },
+                    );
+
+                    return applied;
+                },
+        };
+    },
+});
 
 const CustomImage = Image.extend({
     addAttributes() {
         return {
             ...this.parent?.(),
+            caption: {
+                default: '',
+                parseHTML: (element) =>
+                    element.getAttribute('data-caption') ||
+                    element.getAttribute('alt') ||
+                    '',
+                renderHTML: (attributes) => {
+                    if (!attributes.caption) {
+                        return {};
+                    }
+
+                    return {
+                        'data-caption': attributes.caption,
+                        alt: attributes.caption,
+                    };
+                },
+            },
             alignment: {
                 default: 'center',
                 parseHTML: (element) => {
@@ -492,14 +710,22 @@ const CustomImage = Image.extend({
             styles.push(`height: ${height}px`);
         }
 
-        return [
-            'img',
-            mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
+        const mergedAttrs = mergeAttributes(
+            this.options.HTMLAttributes,
+            HTMLAttributes,
+            {
                 'data-align': align,
                 class: `align-${align}`,
                 style: styles.join('; ') + ';',
-            }),
-        ];
+            },
+        );
+
+        if (node?.attrs?.caption) {
+            mergedAttrs['data-caption'] = node.attrs.caption;
+            mergedAttrs['alt'] = node.attrs.caption;
+        }
+
+        return ['img', mergedAttrs];
     },
 
     addNodeView() {
@@ -517,6 +743,21 @@ const CustomImage = Image.extend({
         return ({ node, getPos, HTMLAttributes, editor }) => {
             const el = document.createElement('img');
             el.draggable = false;
+
+            const pos = typeof getPos === 'function' ? getPos() : undefined;
+            let isInsideGrid = false;
+
+            if (pos !== undefined) {
+                try {
+                    const $pos = editor.state.doc.resolve(pos);
+
+                    if ($pos.parent && $pos.parent.type.name === 'imageGrid') {
+                        isInsideGrid = true;
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            }
 
             const mergedAttributes = mergeAttributes(
                 this.options.HTMLAttributes,
@@ -538,6 +779,23 @@ const CustomImage = Image.extend({
 
             if (mergedAttributes.src !== null) {
                 el.src = mergedAttributes.src;
+            }
+
+            if (isInsideGrid) {
+                return {
+                    dom: el,
+                    update: (updatedNode) => {
+                        if (updatedNode.type !== node.type) {
+                            return false;
+                        }
+
+                        if (updatedNode.attrs.src) {
+                            el.src = updatedNode.attrs.src;
+                        }
+
+                        return true;
+                    },
+                };
             }
 
             const pill = document.createElement('div');
@@ -621,6 +879,23 @@ const CustomImage = Image.extend({
                     el.style.marginLeft = isLeft ? '0' : 'auto';
                     el.style.marginRight = isRight ? '0' : 'auto';
 
+                    if (!isInsideGrid) {
+                        dom.style.display = 'block';
+                        if (updatedNode.attrs.width) {
+                            dom.style.width = `${updatedNode.attrs.width}px`;
+                        } else if (el.complete && el.clientWidth > 0) {
+                            dom.style.width = `${el.clientWidth}px`;
+                        } else {
+                            dom.style.width = 'fit-content';
+                        }
+                        dom.style.marginLeft = isLeft ? '0' : 'auto';
+                        dom.style.marginRight = isRight ? '0' : 'auto';
+                    }
+
+                    if (captionInputRef) {
+                        captionInputRef.value = updatedNode.attrs.caption || '';
+                    }
+
                     return true;
                 },
                 options: {
@@ -636,12 +911,114 @@ const CustomImage = Image.extend({
             const dom = nodeView.dom as HTMLElement;
             dom.appendChild(pill);
 
+            // Append standalone caption input under image
+            let captionInputRef: HTMLInputElement | null = null;
+            if (!isInsideGrid) {
+                const align = node.attrs.alignment || 'center';
+                const isLeft = align === 'left';
+                const isRight = align === 'right';
+                dom.style.display = 'block';
+                if (node.attrs.width) {
+                    dom.style.width = `${node.attrs.width}px`;
+                } else if (el.complete && el.clientWidth > 0) {
+                    dom.style.width = `${el.clientWidth}px`;
+                } else {
+                    dom.style.width = 'fit-content';
+                }
+                dom.style.marginLeft = isLeft ? '0' : 'auto';
+                dom.style.marginRight = isRight ? '0' : 'auto';
+                dom.style.verticalAlign = 'middle';
+
+                const captionWrapper = document.createElement('div');
+                captionWrapper.className = 'image-caption-container';
+                captionWrapper.style.marginTop = '0px';
+                captionWrapper.style.width = '100%';
+                captionWrapper.style.textAlign = 'center';
+
+                const captionInput = document.createElement('input');
+                captionInput.type = 'text';
+                captionInput.placeholder = 'Añadir pie de foto...';
+                captionInput.value = node.attrs.caption || '';
+                captionInput.className = 'image-caption-input';
+                captionInput.style.width = '100%';
+                captionInput.style.maxWidth = '360px';
+                captionInput.style.fontSize = '11px';
+                captionInput.style.fontStyle = 'italic';
+                captionInput.style.color = '#475569';
+                captionInput.style.textAlign = 'center';
+                captionInput.style.border = '1px dashed #cbd5e1';
+                captionInput.style.borderRadius = '4px';
+                captionInput.style.padding = '2px 6px';
+                captionInput.style.backgroundColor = 'transparent';
+                captionInput.style.outline = 'none';
+                captionInputRef = captionInput;
+
+                if (!editor.isEditable) {
+                    captionInput.readOnly = true;
+                    captionInput.style.border = 'none';
+                    if (!node.attrs.caption) {
+                        captionInput.style.display = 'none';
+                    }
+                }
+
+                captionInput.oninput = (e) => {
+                    e.stopPropagation();
+                    const val = (e.target as HTMLInputElement).value;
+                    const currentPos =
+                        typeof getPos === 'function' ? getPos() : undefined;
+
+                    if (currentPos !== undefined) {
+                        editor.view.dispatch(
+                            editor.state.tr.setNodeMarkup(
+                                currentPos,
+                                undefined,
+                                {
+                                    ...node.attrs,
+                                    caption: val,
+                                },
+                            ),
+                        );
+                    }
+                };
+
+                captionInput.onkeydown = (e) => {
+                    e.stopPropagation();
+                };
+                captionInput.onkeypress = (e) => {
+                    e.stopPropagation();
+                };
+                captionInput.onkeyup = (e) => {
+                    e.stopPropagation();
+                };
+                captionInput.onmousedown = (e) => {
+                    e.stopPropagation();
+                };
+                captionInput.onmouseup = (e) => {
+                    e.stopPropagation();
+                };
+                captionInput.onclick = (e) => {
+                    e.stopPropagation();
+                };
+                captionInput.addEventListener('beforeinput', (e) => {
+                    e.stopPropagation();
+                });
+                captionInput.addEventListener('selectstart', (e) => {
+                    e.stopPropagation();
+                });
+
+                captionWrapper.appendChild(captionInput);
+                dom.appendChild(captionWrapper);
+            }
+
             dom.style.visibility = 'hidden';
             dom.style.pointerEvents = 'none';
             el.onload = () => {
                 dom.style.visibility = '';
                 dom.style.pointerEvents = '';
                 naturalWidth = el.naturalWidth;
+                if (!node.attrs.width && !isInsideGrid) {
+                    dom.style.width = `${el.clientWidth}px`;
+                }
             };
 
             return nodeView;
@@ -787,6 +1164,9 @@ export const ImageGrid = TiptapNode.create<ImageGridOptions>({
 });
 
 const sharedExtensions = [
+    TextStyle,
+    FontSize,
+    LineHeight,
     CustomImage.configure({
         allowBase64: false,
         resize: {
@@ -799,6 +1179,311 @@ const sharedExtensions = [
     Highlight.configure({ multicolor: true }),
     CustomBulletList,
 ];
+
+function FontSizeDropdown({ editor }: { editor: Editor | null }) {
+    const [customPt, setCustomPt] = useState('');
+    const [open, setOpen] = useState(false);
+
+    const applyFontSize = (size: string | null) => {
+        if (!editor) {
+            return;
+        }
+
+        if (size) {
+            editor
+                .chain()
+                .focus()
+                .setMark('textStyle', { fontSize: size })
+                .run();
+        } else {
+            editor
+                .chain()
+                .focus()
+                .setMark('textStyle', { fontSize: null })
+                .run();
+        }
+
+        setOpen(false);
+    };
+
+    const handleCustomSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const num = parseFloat(customPt.trim());
+
+        if (!isNaN(num) && num > 0) {
+            applyFontSize(`${num}pt`);
+            setCustomPt('');
+        }
+    };
+
+    const currentFontSize = editor?.getAttributes('textStyle').fontSize;
+    const displaySize = currentFontSize
+        ? currentFontSize.replace(/pt|px/g, '')
+        : '8';
+
+    const ptPresets = [
+        '8',
+        '9',
+        '10',
+        '11',
+        '12',
+        '14',
+        '16',
+        '18',
+        '20',
+        '24',
+        '28',
+        '36',
+    ];
+
+    return (
+        <DropdownMenu open={open} onOpenChange={setOpen}>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            type="button"
+                            disabled={!editor}
+                            onMouseDown={(e) => e.preventDefault()}
+                            className={cn(
+                                'inline-flex h-7 items-center gap-1 rounded border border-input bg-background px-2 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:outline-hidden',
+                                'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40',
+                                currentFontSize &&
+                                    'border-blue-300 bg-blue-50 font-bold text-blue-600 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400',
+                            )}
+                        >
+                            <span className="text-[11px] font-bold text-muted-foreground">
+                                Aa
+                            </span>
+                            <span className="w-7 text-center text-xs font-semibold">
+                                {displaySize}pt
+                            </span>
+                            <ChevronDown className="h-3 w-3 opacity-60" />
+                        </button>
+                    </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="py-1 text-xs">
+                    Tamaño de fuente (pt)
+                </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent
+                align="start"
+                onCloseAutoFocus={(e) => e.preventDefault()}
+                className="w-48 bg-popover p-1 text-popover-foreground shadow-md"
+            >
+                <div className="px-2 py-1 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                    Tamaño de Fuente (pt)
+                </div>
+                <div className="grid grid-cols-4 gap-1 p-1">
+                    {ptPresets.map((sz) => {
+                        const val = `${sz}pt`;
+                        const isSelected =
+                            currentFontSize === val || displaySize === sz;
+
+                        return (
+                            <button
+                                key={sz}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => applyFontSize(val)}
+                                className={cn(
+                                    'flex h-7 items-center justify-center rounded text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground',
+                                    isSelected &&
+                                        'bg-primary font-bold text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
+                                )}
+                            >
+                                {sz}pt
+                            </button>
+                        );
+                    })}
+                </div>
+                <form
+                    onSubmit={handleCustomSubmit}
+                    className="mt-1 flex items-center gap-1 border-t px-1 pt-1.5"
+                >
+                    <input
+                        type="number"
+                        step="0.5"
+                        min="5"
+                        max="120"
+                        placeholder="Valor pt"
+                        value={customPt}
+                        onChange={(e) => setCustomPt(e.target.value)}
+                        className="h-6 w-full rounded border border-input bg-background px-1.5 text-xs focus:ring-1 focus:ring-ring focus:outline-hidden"
+                    />
+                    <button
+                        type="submit"
+                        disabled={!customPt.trim()}
+                        onMouseDown={(e) => e.preventDefault()}
+                        className="h-6 shrink-0 cursor-pointer rounded bg-primary px-2 text-[10px] font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                    >
+                        pt
+                    </button>
+                </form>
+                <div className="mt-1 border-t pt-1">
+                    <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => applyFontSize(null)}
+                        className="flex h-6 w-full items-center justify-center gap-1 rounded text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    >
+                        Por defecto
+                    </button>
+                </div>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+function LineHeightDropdown({ editor }: { editor: Editor | null }) {
+    const [customVal, setCustomVal] = useState('');
+    const [open, setOpen] = useState(false);
+
+    const applyLineHeight = (val: string | null) => {
+        if (!editor) {
+            return;
+        }
+
+        if (val) {
+            editor.chain().focus().setLineHeight(val).run();
+        } else {
+            editor.chain().focus().unsetLineHeight().run();
+        }
+
+        setOpen(false);
+    };
+
+    const handleCustomSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const num = parseFloat(customVal.trim());
+
+        if (!isNaN(num) && num > 0) {
+            applyLineHeight(num.toString());
+            setCustomVal('');
+        }
+    };
+
+    const currentLineHeight =
+        editor?.getAttributes('paragraph').lineHeight ||
+        editor?.getAttributes('heading').lineHeight;
+
+    const options = [
+        { label: '0.85 (Muy compacto)', value: '0.85' },
+        { label: '0.95 (Compacto)', value: '0.95' },
+        { label: '1.0 (Sencillo)', value: '1.0' },
+        { label: '1.15 (Estándar 1.15)', value: '1.15' },
+        { label: '1.25 (1.25x)', value: '1.25' },
+        { label: '1.5 (1.5 líneas)', value: '1.5' },
+        { label: '1.75 (1.75x)', value: '1.75' },
+        { label: '2.0 (Doble)', value: '2.0' },
+    ];
+
+    return (
+        <DropdownMenu open={open} onOpenChange={setOpen}>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            type="button"
+                            disabled={!editor}
+                            onMouseDown={(e) => e.preventDefault()}
+                            className={cn(
+                                'inline-flex h-7 items-center gap-1 rounded border border-input bg-background px-2 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:outline-hidden',
+                                'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40',
+                                currentLineHeight &&
+                                    'border-blue-300 bg-blue-50 font-bold text-blue-600 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400',
+                            )}
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="h-3.5 w-3.5 text-muted-foreground"
+                            >
+                                <path d="M21 6H3" />
+                                <path d="M21 12H9" />
+                                <path d="M21 18H3" />
+                                <path d="M3 12v6" />
+                                <path d="M6 15l-3 3-3-3" />
+                            </svg>
+                            <span className="text-xs font-semibold">
+                                {currentLineHeight || '1.25'}
+                            </span>
+                            <ChevronDown className="h-3 w-3 opacity-60" />
+                        </button>
+                    </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="py-1 text-xs">
+                    Interlineado / Espaciado de párrafo (Word / Office)
+                </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent
+                align="start"
+                onCloseAutoFocus={(e) => e.preventDefault()}
+                className="w-52 bg-popover p-1 text-popover-foreground shadow-md"
+            >
+                <div className="px-2 py-1 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                    Interlineado
+                </div>
+                <div className="space-y-0.5">
+                    {options.map((opt) => (
+                        <DropdownMenuItem
+                            key={opt.value}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => applyLineHeight(opt.value)}
+                            className={cn(
+                                'flex cursor-pointer items-center justify-between px-2 py-1 text-xs',
+                                currentLineHeight === opt.value &&
+                                    'bg-primary font-semibold text-primary-foreground',
+                            )}
+                        >
+                            <span>{opt.label}</span>
+                        </DropdownMenuItem>
+                    ))}
+                </div>
+                <form
+                    onSubmit={handleCustomSubmit}
+                    className="mt-1 flex items-center gap-1 border-t px-1 pt-1.5"
+                >
+                    <input
+                        type="number"
+                        step="0.05"
+                        min="0.5"
+                        max="5.0"
+                        placeholder="Personalizado (ej. 1.3)"
+                        value={customVal}
+                        onChange={(e) => setCustomVal(e.target.value)}
+                        className="h-6 w-full rounded border border-input bg-background px-1.5 text-xs focus:ring-1 focus:ring-ring focus:outline-hidden"
+                    />
+                    <button
+                        type="submit"
+                        disabled={!customVal.trim()}
+                        onMouseDown={(e) => e.preventDefault()}
+                        className="h-6 shrink-0 cursor-pointer rounded bg-primary px-2 text-[10px] font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                    >
+                        OK
+                    </button>
+                </form>
+                <div className="mt-1 border-t pt-1">
+                    <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => applyLineHeight(null)}
+                        className="flex h-6 w-full items-center justify-center gap-1 rounded text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    >
+                        Por defecto
+                    </button>
+                </div>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
 
 function ToolbarDivider() {
     return <div className="mx-0.5 h-5 w-px shrink-0 bg-border" />;
@@ -1173,6 +1858,9 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
+
+                <FontSizeDropdown editor={editor} />
+                <LineHeightDropdown editor={editor} />
 
                 <ToolbarDivider />
 

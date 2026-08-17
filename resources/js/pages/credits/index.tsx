@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import { DateRangePicker } from '@/components/date-range-picker';
+import InputError from '@/components/input-error';
 import { Pagination } from '@/components/pagination';
 import {
     AlertDialog,
@@ -57,9 +58,7 @@ import {
     DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import InputError from '@/components/input-error';
 import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
 import {
     Popover,
     PopoverContent,
@@ -72,6 +71,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import {
     Table,
@@ -1712,6 +1712,7 @@ export default function CreditsIndex({
                 onOpenChange={(open) => {
                     if (!isMarkingAsPaid) {
                         setIsMarkAsPaidDialogOpen(open);
+
                         if (!open) {
                             setCreditToMarkAsPaid(null);
                             resetMarkAsPaid();

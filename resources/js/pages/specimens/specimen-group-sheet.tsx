@@ -3154,6 +3154,7 @@ export default function SpecimenGroupSheet({
                                                                     r.id.toString() ===
                                                                     nestedReferrer,
                                                             );
+
                                                         if (selected) {
                                                             setEditingReferrer(
                                                                 selected,

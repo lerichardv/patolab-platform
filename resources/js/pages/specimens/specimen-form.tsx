@@ -1506,6 +1506,7 @@ export default function SpecimenForm({
                                                                 r.id.toString() ===
                                                                 data.referrer,
                                                         );
+
                                                     if (selected) {
                                                         setEditingReferrer(
                                                             selected,
