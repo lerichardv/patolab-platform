@@ -1573,10 +1573,11 @@ class ReportPaginator
 
                 $i = 0;
                 while ($i < count($rows)) {
+                    $fontLineHeight = self::getBlockLineHeight($block, $lineHeight);
                     $maxHeightForPage = $pageContentHeight;
                     $remaining = $maxHeightForPage - $currentHeight;
 
-                    if ($remaining <= 5 * $lineHeight) {
+                    if ($remaining <= 5 * $fontLineHeight) {
                         $pages[] = $currentPage;
                         $currentPage = [];
                         $currentHeight = 0.0;
@@ -1585,7 +1586,7 @@ class ReportPaginator
                         continue;
                     }
 
-                    $headerHeight = empty($headerHtml) ? 0.0 : 2.0 * $lineHeight;
+                    $headerHeight = empty($headerHtml) ? 0.0 : 2.0 * $fontLineHeight;
                     $remainingForRows = $remaining - $headerHeight;
 
                     $rowsToFit = [];
@@ -1595,10 +1596,10 @@ class ReportPaginator
                         $row = $rows[$i];
                         $charsPerCell = (int) floor($maxCharsPerLine / $colCount);
                         $rowLines = max(1, (int) ceil($row['maxCellTextLen'] / $charsPerCell)) + 1;
-                        $rowHeight = $rowLines * $lineHeight;
+                        $rowHeight = $rowLines * $fontLineHeight;
 
                         $isLastRow = ($i === count($rows) - 1);
-                        $tableSpacing = $isLastRow ? 1.0 * $lineHeight : 0.0;
+                        $tableSpacing = $isLastRow ? 1.0 * $fontLineHeight : 0.0;
 
                         if ($accumulatedHeight + $rowHeight + $tableSpacing > $remainingForRows) {
                             if (count($rowsToFit) === 0 && $currentHeight === 0.0) {
@@ -1616,14 +1617,20 @@ class ReportPaginator
 
                     if (count($rowsToFit) > 0) {
                         $isLastRow = ($i >= count($rows));
-                        $cost = $accumulatedHeight + $headerHeight + ($isLastRow ? 1.0 * $lineHeight : 0.0);
+                        $cost = $accumulatedHeight + $headerHeight + ($isLastRow ? 1.0 * $fontLineHeight : 0.0);
 
                         $tableClass = 'section-content';
                         if (preg_match('/<table[^>]+class=["\']([^"\']+)["\']/i', $block['html'], $classMatch)) {
                             $tableClass = $classMatch[1];
                         }
 
-                        $tableWrapperHtml = "<table class=\"{$tableClass}\">";
+                        $tableStyle = '';
+                        if (preg_match('/<table[^>]+style=["\']([^"\']+)["\']/i', $block['html'], $styleMatch)) {
+                            $tableStyle = $styleMatch[1];
+                        }
+
+                        $styleAttr = ! empty($tableStyle) ? " style=\"{$tableStyle}\"" : '';
+                        $tableWrapperHtml = "<table class=\"{$tableClass}\"{$styleAttr}>";
                         if (! empty($headerHtml)) {
                             $tableWrapperHtml .= '<thead>'.$headerHtml.'</thead>';
                         }

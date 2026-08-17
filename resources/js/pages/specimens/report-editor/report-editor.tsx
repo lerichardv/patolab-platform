@@ -4398,7 +4398,10 @@ export default function ReportWorkspace({
 					let i = 0;
 
 					while (i < rows.length) {
-						const fontLineHeight = lineHeight;
+						const fontLineHeight = getBlockLineHeight(
+							block,
+							lineHeight,
+						);
 						const remaining = maxHeightForPage - currentHeightList;
 
 						if (remaining <= 5 * fontLineHeight) {
@@ -4470,7 +4473,18 @@ export default function ReportWorkspace({
 								? classMatch[1]
 								: 'section-content';
 
-							let tableWrapperHtml = `<table class="${tableClass}">`;
+							const styleMatch = block.html.match(
+								/style=["\']([^"\']+)["\']/i,
+							);
+							const tableStyle = styleMatch
+								? styleMatch[1]
+								: '';
+
+							const styleAttr = tableStyle
+								? ` style="${tableStyle}"`
+								: '';
+
+							let tableWrapperHtml = `<table class="${tableClass}"${styleAttr}>`;
 
 							if (headerHtml) {
 								tableWrapperHtml += `<thead>${headerHtml}</thead>`;
