@@ -75,7 +75,7 @@ beforeEach(function () {
     ]);
 });
 
-test('extracting a single specimen creates a single credit and invoice without invoice number and updates original group', function () {
+test('extracting a single specimen creates a new SpecimenGroup with original customer group and updates original group', function () {
     $originalInvoice = Invoice::create([
         'customer_id' => $this->customer->id,
         'created_by_id' => $this->user->id,
@@ -169,30 +169,40 @@ test('extracting a single specimen creates a single credit and invoice without i
     $response->assertRedirect();
     $response->assertSessionHas('success');
 
-    $extractedSpecimen->refresh();
-    expect($extractedSpecimen->is_group)->toBeFalse()
-        ->and($extractedSpecimen->group_id)->toBeNull();
+    $newGroup = SpecimenGroup::where('id', '!=', $group->id)->first();
+    expect($newGroup)->not->toBeNull()
+        ->and($newGroup->name)->toBe('Hospital San Pedro - 1 Muestra')
+        ->and($newGroup->customer_id)->toBe($this->customer->id);
 
-    $newCredit = Credit::where('specimen_id', $extractedSpecimen->id)->first();
+    $extractedSpecimen->refresh();
+    expect($extractedSpecimen->is_group)->toBeTrue()
+        ->and((int) $extractedSpecimen->group_id)->toBe($newGroup->id);
+
+    $newCredit = Credit::where('group_id', $newGroup->id)->first();
     expect($newCredit)->not->toBeNull()
-        ->and($newCredit->is_group)->toBeFalse()
-        ->and($newCredit->group_id)->toBeNull()
+        ->and($newCredit->is_group)->toBeTrue()
+        ->and($newCredit->customer_id)->toBe($this->customer->id)
+        ->and($newCredit->specimen_id)->toBeNull()
         ->and((float) $newCredit->credit_amount)->toBe(300.00)
         ->and((float) $newCredit->amount_remaining)->toBe(300.00)
         ->and((float) $newCredit->amount_paid)->toBe(0.00);
 
-    $newInvoice = Invoice::where('specimen_id', $extractedSpecimen->id)->first();
+    $newInvoice = Invoice::where('group_id', $newGroup->id)->first();
     expect($newInvoice)->not->toBeNull()
-        ->and($newInvoice->is_group)->toBeFalse()
-        ->and($newInvoice->group_id)->toBeNull()
+        ->and($newInvoice->is_group)->toBeTrue()
+        ->and($newInvoice->customer_id)->toBe($this->customer->id)
+        ->and($newInvoice->specimen_id)->toBeNull()
         ->and($newInvoice->credit_payment_id)->toBe($newCredit->id)
         ->and($newInvoice->full_invoice_number)->toBeNull()
         ->and($newInvoice->invoice_number)->toBeNull()
         ->and($newInvoice->cai_range_id)->toBeNull()
-        ->and((float) $newInvoice->total)->toBe(300.00);
+        ->and((float) $newInvoice->total)->toBe(300.00)
+        ->and((int) $newInvoice->quantity)->toBe(1);
 
     expect(InvoiceGroupSpecimen::where('invoice_id', $originalInvoice->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeFalse()
-        ->and(CreditInvoiceSpecimen::where('credit_id', $credit->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeFalse();
+        ->and(CreditInvoiceSpecimen::where('credit_id', $credit->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeFalse()
+        ->and(InvoiceGroupSpecimen::where('group_id', $newGroup->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeTrue()
+        ->and(CreditInvoiceSpecimen::where('credit_id', $newCredit->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeTrue();
 
     $originalInvoice->refresh();
     expect((float) $originalInvoice->amount)->toBe(600.00)
@@ -208,7 +218,7 @@ test('extracting a single specimen creates a single credit and invoice without i
     expect($group->name)->toBe('Hospital San Pedro - 2 Muestras');
 });
 
-test('extracting a single specimen with para seguro assigns CAI invoice number', function () {
+test('extracting a single specimen with para seguro creates a SpecimenGroup with CAI invoice number', function () {
     $originalInvoice = Invoice::create([
         'customer_id' => $this->customer->id,
         'created_by_id' => $this->user->id,
@@ -335,8 +345,14 @@ test('extracting a single specimen with para seguro assigns CAI invoice number',
 
     $response->assertRedirect();
 
-    $newInvoice = Invoice::where('specimen_id', $spec1->id)->first();
+    $newGroup = SpecimenGroup::where('id', '!=', $group->id)->first();
+    expect($newGroup)->not->toBeNull()
+        ->and($newGroup->name)->toBe('Hospital San Pedro - 1 Muestra')
+        ->and($newGroup->customer_id)->toBe($this->customer->id);
+
+    $newInvoice = Invoice::where('group_id', $newGroup->id)->first();
     expect($newInvoice)->not->toBeNull()
+        ->and($newInvoice->is_group)->toBeTrue()
         ->and($newInvoice->full_invoice_number)->toBe('000-001-01-00000001')
         ->and($newInvoice->invoice_number)->toBe('00000001')
         ->and($newInvoice->cai_range_id)->toBe($this->caiRange->id)
@@ -453,20 +469,27 @@ test('extracting multiple specimens creates a new SpecimenGroup with new credit 
 
     $newGroup = SpecimenGroup::where('id', '!=', $group->id)->first();
     expect($newGroup)->not->toBeNull()
-        ->and($newGroup->name)->toBe('Hospital San Pedro - 2 Muestras');
+        ->and($newGroup->name)->toBe('Hospital San Pedro - 2 Muestras')
+        ->and($newGroup->customer_id)->toBe($this->customer->id);
 
     $specimens[0]->refresh();
     $specimens[1]->refresh();
     expect((int) $specimens[0]->group_id)->toBe($newGroup->id)
-        ->and((int) $specimens[1]->group_id)->toBe($newGroup->id);
+        ->and((int) $specimens[1]->group_id)->toBe($newGroup->id)
+        ->and($specimens[0]->is_group)->toBeTrue()
+        ->and($specimens[1]->is_group)->toBeTrue();
 
     $newCredit = Credit::where('group_id', $newGroup->id)->first();
     expect($newCredit)->not->toBeNull()
+        ->and($newCredit->is_group)->toBeTrue()
+        ->and($newCredit->customer_id)->toBe($this->customer->id)
         ->and((float) $newCredit->credit_amount)->toBe(600.00)
         ->and((float) $newCredit->amount_remaining)->toBe(600.00);
 
     $newInvoice = Invoice::where('group_id', $newGroup->id)->first();
     expect($newInvoice)->not->toBeNull()
+        ->and($newInvoice->is_group)->toBeTrue()
+        ->and($newInvoice->customer_id)->toBe($this->customer->id)
         ->and((float) $newInvoice->total)->toBe(600.00)
         ->and((int) $newInvoice->quantity)->toBe(2);
 
@@ -479,6 +502,162 @@ test('extracting multiple specimens creates a new SpecimenGroup with new credit 
     expect((float) $originalInvoice->total)->toBe(600.00)
         ->and((float) $credit->credit_amount)->toBe(600.00)
         ->and($group->name)->toBe('Hospital San Pedro - 2 Muestras');
+});
+
+test('extracting specimens preserves individual specimen patient relation while assigning original group customer to the new SpecimenGroup', function () {
+    $patient1 = Customer::create([
+        'name' => 'Juan Perez (Paciente)',
+        'id_number' => '0801199000001',
+        'gender' => 'masculino',
+        'type' => 'individual',
+    ]);
+    $patient2 = Customer::create([
+        'name' => 'Maria Lopez (Paciente)',
+        'id_number' => '0801199000002',
+        'gender' => 'femenino',
+        'type' => 'individual',
+    ]);
+
+    $originalInvoice = Invoice::create([
+        'customer_id' => $this->customer->id,
+        'created_by_id' => $this->user->id,
+        'payment_type' => 'credit',
+        'amount' => 800.00,
+        'discount' => 0.00,
+        'subtotal' => 800.00,
+        'exempt_amount' => 800.00,
+        'tax_exempt_amount' => 800.00,
+        'total' => 800.00,
+        'total_paid' => 0.00,
+        'invoice_file' => 'invoices/test.pdf',
+        'is_group' => true,
+        'quantity' => 2,
+    ]);
+
+    $group = SpecimenGroup::create([
+        'name' => 'Hospital San Pedro - 2 Muestras',
+        'invoice_id' => $originalInvoice->id,
+        'customer_id' => $this->customer->id,
+        'access_token' => Str::random(32),
+    ]);
+
+    $originalInvoice->update(['group_id' => $group->id]);
+
+    $credit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 800.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 800.00,
+        'is_group' => true,
+        'group_id' => $group->id,
+    ]);
+
+    $originalInvoice->update(['credit_payment_id' => $credit->id]);
+
+    $spec1 = Specimen::create([
+        'sequence_code' => 'BIO-0001-08-2026',
+        'customer' => $patient1->id,
+        'specimen_type' => $this->type->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'status' => 'received',
+        'priority_id' => $this->priority->id,
+        'is_group' => true,
+        'group_id' => $group->id,
+    ]);
+
+    InvoiceGroupSpecimen::create([
+        'invoice_id' => $originalInvoice->id,
+        'group_id' => $group->id,
+        'specimen_id' => $spec1->id,
+        'quantity' => 1,
+        'amount' => 400.00,
+        'discount' => 0.00,
+        'subtotal' => 400.00,
+        'exempt_amount' => 400.00,
+        'total' => 400.00,
+        'selected_price' => '400.00',
+    ]);
+
+    CreditInvoiceSpecimen::create([
+        'credit_id' => $credit->id,
+        'invoice_id' => $originalInvoice->id,
+        'specimen_id' => $spec1->id,
+        'is_paid' => 0,
+        'quantity' => 1,
+        'amount' => 400.00,
+        'discount' => 0.00,
+        'subtotal' => 400.00,
+        'exempt_amount' => 400.00,
+        'total' => 400.00,
+        'selected_price' => '400.00',
+    ]);
+
+    $spec2 = Specimen::create([
+        'sequence_code' => 'BIO-0002-08-2026',
+        'customer' => $patient2->id,
+        'specimen_type' => $this->type->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'status' => 'received',
+        'priority_id' => $this->priority->id,
+        'is_group' => true,
+        'group_id' => $group->id,
+    ]);
+
+    InvoiceGroupSpecimen::create([
+        'invoice_id' => $originalInvoice->id,
+        'group_id' => $group->id,
+        'specimen_id' => $spec2->id,
+        'quantity' => 1,
+        'amount' => 400.00,
+        'discount' => 0.00,
+        'subtotal' => 400.00,
+        'exempt_amount' => 400.00,
+        'total' => 400.00,
+        'selected_price' => '400.00',
+    ]);
+
+    CreditInvoiceSpecimen::create([
+        'credit_id' => $credit->id,
+        'invoice_id' => $originalInvoice->id,
+        'specimen_id' => $spec2->id,
+        'is_paid' => 0,
+        'quantity' => 1,
+        'amount' => 400.00,
+        'discount' => 0.00,
+        'subtotal' => 400.00,
+        'exempt_amount' => 400.00,
+        'total' => 400.00,
+        'selected_price' => '400.00',
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->post(route('credits.extract-specimens', $credit->id), [
+            'specimen_ids' => [$spec1->id],
+            'is_social_security' => false,
+        ]);
+
+    $response->assertRedirect();
+
+    $newGroup = SpecimenGroup::where('id', '!=', $group->id)->first();
+    expect($newGroup)->not->toBeNull()
+        ->and($newGroup->customer_id)->toBe($this->customer->id);
+
+    $spec1->refresh();
+    // Specimen itself preserves its patient customer ID
+    expect($spec1->customer)->toBe($patient1->id)
+        ->and($spec1->is_group)->toBeTrue()
+        ->and((int) $spec1->group_id)->toBe($newGroup->id);
+
+    $newCredit = Credit::where('group_id', $newGroup->id)->first();
+    // Credit and Invoice are assigned to the original group customer (Hospital)
+    expect($newCredit->customer_id)->toBe($this->customer->id);
+
+    $newInvoice = Invoice::where('group_id', $newGroup->id)->first();
+    expect($newInvoice->customer_id)->toBe($this->customer->id);
 });
 
 test('cannot extract all specimens from group', function () {
