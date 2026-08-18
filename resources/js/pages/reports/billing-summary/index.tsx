@@ -273,14 +273,6 @@ export default function BillingSummaryReportIndex({
                   ? 'none'
                   : nextExamIds;
 
-        const userId = auth?.user?.id;
-        if (userId) {
-            setCookie(
-                `specimen_type_filter_report_billing_summary_user_${userId}`,
-                JSON.stringify(typeParam),
-            );
-        }
-
         const newFilters: any = {
             ...filters,
             specimen_type_id: typeParam,

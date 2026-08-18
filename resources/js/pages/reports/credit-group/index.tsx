@@ -13,6 +13,8 @@ import {
     Layers,
     ChevronRight,
     FileSpreadsheet,
+    Microscope,
+    FileText,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
@@ -27,6 +29,7 @@ import InvoicePreviewDialog from '@/components/invoice-preview-dialog';
 import { Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Command,
     CommandEmpty,
@@ -100,8 +103,8 @@ interface Props {
         search?: string;
         payment_type?: string;
         customer_id?: string;
-        specimen_type_id?: string;
-        examination_id?: string;
+        specimen_type_id?: string | string[];
+        examination_id?: string | string[];
         has_credit?: string;
         date_from?: string;
         date_to?: string;
@@ -122,79 +125,6 @@ interface Props {
         id: number;
         name: string;
     }[];
-}
-
-function FormCombobox({
-    options,
-    value,
-    onChange,
-    placeholder,
-    emptyMessage = 'No se encontraron resultados.',
-    disabled = false,
-}: {
-    options: { label: string; value: string }[];
-    value: string;
-    onChange: (value: string) => void;
-    placeholder: string;
-    emptyMessage?: string;
-    disabled?: boolean;
-}) {
-    const [open, setOpen] = React.useState(false);
-    const selectedOption = options.find((opt) => opt.value === value);
-
-    return (
-        <Popover open={open} onOpenChange={setOpen} modal={true}>
-            <PopoverTrigger asChild className="w-full">
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-full justify-between text-left font-normal"
-                    disabled={disabled}
-                >
-                    <span className="truncate">
-                        {selectedOption ? selectedOption.label : placeholder}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                className="w-[--radix-popover-trigger-width] p-0"
-                align="start"
-            >
-                <Command>
-                    <CommandInput placeholder={`Buscar...`} />
-                    <CommandList>
-                        <CommandEmpty>{emptyMessage}</CommandEmpty>
-                        <CommandGroup>
-                            {options.map((option) => (
-                                <CommandItem
-                                    key={option.value}
-                                    value={option.label}
-                                    onSelect={() => {
-                                        onChange(option.value);
-                                        setOpen(false);
-                                    }}
-                                >
-                                    <Check
-                                        className={cn(
-                                            'mr-2 h-4 w-4 shrink-0',
-                                            value === option.value
-                                                ? 'opacity-100'
-                                                : 'opacity-0',
-                                        )}
-                                    />
-                                    <span className="truncate">
-                                        {option.label}
-                                    </span>
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
-    );
 }
 
 export default function CreditGroupReportIndex({
@@ -263,38 +193,173 @@ export default function CreditGroupReportIndex({
         };
     }, [specimens.data]);
 
+    const parseInitialIds = (rawFilter: any, allItems: any[]): string[] => {
+        if (
+            rawFilter === 'none' ||
+            (Array.isArray(rawFilter) && rawFilter.length === 0)
+        ) {
+            return [];
+        }
+        if (
+            rawFilter === undefined ||
+            rawFilter === null ||
+            rawFilter === 'all'
+        ) {
+            return allItems.map((item) => item.id.toString());
+        }
+        if (Array.isArray(rawFilter)) {
+            return rawFilter.map((id) => id.toString());
+        }
+        return [rawFilter.toString()];
+    };
+
+    const [selectedSpecimenTypeIds, setSelectedSpecimenTypeIds] = useState<
+        string[]
+    >(() => parseInitialIds(filters.specimen_type_id, specimenTypes));
+
+    const [selectedExaminationIds, setSelectedExaminationIds] = useState<
+        string[]
+    >(() => parseInitialIds(filters.examination_id, examinations));
+
+    useEffect(() => {
+        if (filters.specimen_type_id !== undefined) {
+            setSelectedSpecimenTypeIds(
+                parseInitialIds(filters.specimen_type_id, specimenTypes),
+            );
+        }
+        if (filters.examination_id !== undefined) {
+            setSelectedExaminationIds(
+                parseInitialIds(filters.examination_id, examinations),
+            );
+        }
+    }, [
+        filters.specimen_type_id,
+        filters.examination_id,
+        specimenTypes,
+        examinations,
+    ]);
+
+    const getSpecimenTypeId = (exam: any): string | null => {
+        const typeId =
+            exam.specimen_type || exam.specimen_type_id || exam.type?.id;
+        return typeId ? typeId.toString() : null;
+    };
+
+    const filteredExaminationsForDropdown = useMemo(() => {
+        if (selectedSpecimenTypeIds.length === specimenTypes.length) {
+            return examinations;
+        }
+
+        return examinations.filter((exam) => {
+            const typeId = getSpecimenTypeId(exam);
+            return typeId && selectedSpecimenTypeIds.includes(typeId);
+        });
+    }, [examinations, selectedSpecimenTypeIds, specimenTypes.length]);
+
+    const handleSpecimenTypeSelectionChange = (nextTypeIds: string[]) => {
+        setSelectedSpecimenTypeIds(nextTypeIds);
+
+        let nextExamIds: string[];
+
+        if (nextTypeIds.length === specimenTypes.length) {
+            nextExamIds = examinations.map((e) => e.id.toString());
+        } else if (nextTypeIds.length === 0) {
+            nextExamIds = [];
+        } else {
+            const addedTypeIds = nextTypeIds.filter(
+                (id) => !selectedSpecimenTypeIds.includes(id),
+            );
+
+            const validExamsForNextTypes = examinations.filter((exam) => {
+                const typeId = getSpecimenTypeId(exam);
+                return typeId && nextTypeIds.includes(typeId);
+            });
+            const validExamIdsForNextTypes = validExamsForNextTypes.map((e) =>
+                e.id.toString(),
+            );
+
+            let updatedExamIds = selectedExaminationIds.filter((id) =>
+                validExamIdsForNextTypes.includes(id),
+            );
+
+            if (addedTypeIds.length > 0) {
+                const addedExamIds = examinations
+                    .filter((exam) => {
+                        const typeId = getSpecimenTypeId(exam);
+                        return typeId && addedTypeIds.includes(typeId);
+                    })
+                    .map((e) => e.id.toString());
+
+                updatedExamIds = Array.from(
+                    new Set([...updatedExamIds, ...addedExamIds]),
+                );
+            }
+
+            nextExamIds = updatedExamIds;
+        }
+
+        setSelectedExaminationIds(nextExamIds);
+
+        const typeParam =
+            nextTypeIds.length === specimenTypes.length
+                ? 'all'
+                : nextTypeIds.length === 0
+                  ? 'none'
+                  : nextTypeIds;
+
+        const examParam =
+            nextExamIds.length === examinations.length
+                ? 'all'
+                : nextExamIds.length === 0
+                  ? 'none'
+                  : nextExamIds;
+
+        const newFilters: any = {
+            ...filters,
+            specimen_type_id: typeParam,
+            examination_id: examParam,
+        };
+
+        router.get(creditGroupReportIndex().url, newFilters, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const handleExaminationSelectionChange = (nextExamIds: string[]) => {
+        setSelectedExaminationIds(nextExamIds);
+
+        const typeParam =
+            selectedSpecimenTypeIds.length === specimenTypes.length
+                ? 'all'
+                : selectedSpecimenTypeIds.length === 0
+                  ? 'none'
+                  : selectedSpecimenTypeIds;
+
+        const examParam =
+            nextExamIds.length === examinations.length
+                ? 'all'
+                : nextExamIds.length === 0
+                  ? 'none'
+                  : nextExamIds;
+
+        const newFilters: any = {
+            ...filters,
+            specimen_type_id: typeParam,
+            examination_id: examParam,
+        };
+
+        router.get(creditGroupReportIndex().url, newFilters, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
 
         if (value === 'all' || value === '') {
             delete newFilters[key as keyof typeof filters];
-        }
-
-        const userId = auth?.user?.id;
-
-        if (userId) {
-            if (key === 'specimen_type_id') {
-                setCookie(
-                    `specimen_type_filter_report_credit_group_user_${userId}`,
-                    value,
-                );
-
-                const examId = filters.examination_id || 'all';
-
-                if (value !== 'all' && examId !== 'all') {
-                    const hasValidExam = examinations.some(
-                        (exam) =>
-                            exam.id.toString() === examId &&
-                            exam.specimen_type?.toString() === value,
-                    );
-
-                    if (!hasValidExam) {
-                        delete newFilters.examination_id;
-                    }
-                } else if (value === 'all') {
-                    delete newFilters.examination_id;
-                }
-            }
         }
 
         router.get(creditGroupReportIndex().url, newFilters, {
@@ -307,7 +372,13 @@ export default function CreditGroupReportIndex({
         const queryParams = new URLSearchParams();
         Object.entries(filters).forEach(([key, value]) => {
             if (value !== undefined && value !== null && value !== '') {
-                queryParams.append(key, String(value));
+                if (Array.isArray(value)) {
+                    value.forEach((v) =>
+                        queryParams.append(`${key}[]`, String(v)),
+                    );
+                } else {
+                    queryParams.append(key, String(value));
+                }
             }
         });
         queryParams.set('format', format);
@@ -438,27 +509,6 @@ export default function CreditGroupReportIndex({
                 );
         }
     };
-
-    const examinationOptions = useMemo(() => {
-        const selectedSpecimenType = filters.specimen_type_id || 'all';
-
-        const filtered =
-            selectedSpecimenType === 'all'
-                ? examinations
-                : examinations.filter(
-                      (exam) =>
-                          exam.specimen_type?.toString() ===
-                          selectedSpecimenType,
-                  );
-
-        return [
-            { label: 'Todos los exámenes', value: 'all' },
-            ...filtered.map((exam) => ({
-                label: exam.name,
-                value: exam.id.toString(),
-            })),
-        ];
-    }, [examinations, filters.specimen_type_id]);
 
     return (
         <>
@@ -655,29 +705,114 @@ export default function CreditGroupReportIndex({
                             <span className="text-xs font-semibold text-muted-foreground">
                                 Tipo de Muestra
                             </span>
-                            <Select
-                                value={filters.specimen_type_id || 'all'}
-                                onValueChange={(val) =>
-                                    handleFilterChange('specimen_type_id', val)
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Tipo de Muestra" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        Todos los tipos
-                                    </SelectItem>
-                                    {specimenTypes.map((type) => (
-                                        <SelectItem
-                                            key={type.id}
-                                            value={type.id.toString()}
-                                        >
-                                            {type.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
+                                    >
+                                        <div className="flex items-center gap-2 truncate">
+                                            <Microscope className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <span>
+                                                Tipos (
+                                                {selectedSpecimenTypeIds.length}
+                                                )
+                                            </span>
+                                        </div>
+                                        <ChevronDown className="h-4 w-4 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    className="w-64 p-2"
+                                    align="start"
+                                >
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+                                            <span>Filtrar por tipo</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const areAllTypesSelected =
+                                                        specimenTypes.length >
+                                                            0 &&
+                                                        specimenTypes.every(
+                                                            (t) =>
+                                                                selectedSpecimenTypeIds.includes(
+                                                                    t.id.toString(),
+                                                                ),
+                                                        );
+                                                    const nextTypes =
+                                                        areAllTypesSelected
+                                                            ? []
+                                                            : specimenTypes.map(
+                                                                  (t) =>
+                                                                      t.id.toString(),
+                                                              );
+
+                                                    handleSpecimenTypeSelectionChange(
+                                                        nextTypes,
+                                                    );
+                                                }}
+                                                className="cursor-pointer font-medium transition-colors hover:text-primary"
+                                            >
+                                                {specimenTypes.length > 0 &&
+                                                specimenTypes.every((t) =>
+                                                    selectedSpecimenTypeIds.includes(
+                                                        t.id.toString(),
+                                                    ),
+                                                )
+                                                    ? 'Ninguno'
+                                                    : 'Todos'}
+                                            </button>
+                                        </div>
+                                        <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
+                                            {specimenTypes.map((type) => {
+                                                const isChecked =
+                                                    selectedSpecimenTypeIds.includes(
+                                                        type.id.toString(),
+                                                    );
+
+                                                return (
+                                                    <div
+                                                        key={type.id}
+                                                        className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+                                                        onClick={() => {
+                                                            const typeIdStr =
+                                                                type.id.toString();
+                                                            const nextTypes =
+                                                                isChecked
+                                                                    ? selectedSpecimenTypeIds.filter(
+                                                                          (
+                                                                              id,
+                                                                          ) =>
+                                                                              id !==
+                                                                              typeIdStr,
+                                                                      )
+                                                                    : [
+                                                                          ...selectedSpecimenTypeIds,
+                                                                          typeIdStr,
+                                                                      ];
+
+                                                            handleSpecimenTypeSelectionChange(
+                                                                nextTypes,
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Checkbox
+                                                            checked={isChecked}
+                                                            className="pointer-events-none"
+                                                            onCheckedChange={() => {}}
+                                                        />
+                                                        <span className="truncate">
+                                                            {type.name}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                         </div>
 
                         {/* Examination */}
@@ -685,14 +820,119 @@ export default function CreditGroupReportIndex({
                             <span className="text-xs font-semibold text-muted-foreground">
                                 Examen / Análisis
                             </span>
-                            <FormCombobox
-                                options={examinationOptions}
-                                value={filters.examination_id || 'all'}
-                                onChange={(val) =>
-                                    handleFilterChange('examination_id', val)
-                                }
-                                placeholder="Todos los exámenes"
-                            />
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
+                                    >
+                                        <div className="flex items-center gap-2 truncate">
+                                            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <span>
+                                                Análisis (
+                                                {selectedExaminationIds.length})
+                                            </span>
+                                        </div>
+                                        <ChevronDown className="h-4 w-4 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    className="w-64 p-2"
+                                    align="start"
+                                >
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+                                            <span>Filtrar por análisis</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const areAllExamsSelected =
+                                                        filteredExaminationsForDropdown.length >
+                                                            0 &&
+                                                        filteredExaminationsForDropdown.every(
+                                                            (e) =>
+                                                                selectedExaminationIds.includes(
+                                                                    e.id.toString(),
+                                                                ),
+                                                        );
+                                                    const nextExams =
+                                                        areAllExamsSelected
+                                                            ? []
+                                                            : filteredExaminationsForDropdown.map(
+                                                                  (e) =>
+                                                                      e.id.toString(),
+                                                              );
+
+                                                    handleExaminationSelectionChange(
+                                                        nextExams,
+                                                    );
+                                                }}
+                                                className="cursor-pointer font-medium transition-colors hover:text-primary"
+                                            >
+                                                {filteredExaminationsForDropdown.length >
+                                                    0 &&
+                                                filteredExaminationsForDropdown.every(
+                                                    (e) =>
+                                                        selectedExaminationIds.includes(
+                                                            e.id.toString(),
+                                                        ),
+                                                )
+                                                    ? 'Ninguno'
+                                                    : 'Todos'}
+                                            </button>
+                                        </div>
+                                        <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
+                                            {filteredExaminationsForDropdown.map(
+                                                (exam) => {
+                                                    const isChecked =
+                                                        selectedExaminationIds.includes(
+                                                            exam.id.toString(),
+                                                        );
+
+                                                    return (
+                                                        <div
+                                                            key={exam.id}
+                                                            className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+                                                            onClick={() => {
+                                                                const examIdStr =
+                                                                    exam.id.toString();
+                                                                const nextExams =
+                                                                    isChecked
+                                                                        ? selectedExaminationIds.filter(
+                                                                              (
+                                                                                  id,
+                                                                              ) =>
+                                                                                  id !==
+                                                                                  examIdStr,
+                                                                          )
+                                                                        : [
+                                                                              ...selectedExaminationIds,
+                                                                              examIdStr,
+                                                                          ];
+
+                                                                handleExaminationSelectionChange(
+                                                                    nextExams,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <Checkbox
+                                                                checked={
+                                                                    isChecked
+                                                                }
+                                                                className="pointer-events-none"
+                                                                onCheckedChange={() => {}}
+                                                            />
+                                                            <span className="truncate">
+                                                                {exam.name}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                },
+                                            )}
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                         </div>
 
                         {/* Group Filter */}

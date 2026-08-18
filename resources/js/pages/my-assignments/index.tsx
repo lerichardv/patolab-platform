@@ -543,18 +543,6 @@ export default function MyAssignmentsIndex({
                   ? 'none'
                   : nextExamIds;
 
-        const userId = props.auth?.user?.id;
-        if (userId) {
-            setCookie(
-                `specimen_type_filter_my_assignments_user_${userId}`,
-                JSON.stringify(typeParam),
-            );
-            setCookie(
-                `examination_filter_my_assignments_user_${userId}`,
-                JSON.stringify(examParam),
-            );
-        }
-
         router.get(
             '/my-assignments',
             {
@@ -585,14 +573,6 @@ export default function MyAssignmentsIndex({
                 : nextExamIds.length === 0
                   ? 'none'
                   : nextExamIds;
-
-        const userId = props.auth?.user?.id;
-        if (userId) {
-            setCookie(
-                `examination_filter_my_assignments_user_${userId}`,
-                JSON.stringify(examParam),
-            );
-        }
 
         router.get(
             '/my-assignments',
@@ -994,14 +974,6 @@ export default function MyAssignmentsIndex({
                                             'processing',
                                             'microscopic_review',
                                         ]),
-                                    );
-                                    setCookie(
-                                        `specimen_type_filter_my_assignments_user_${userId}`,
-                                        'all',
-                                    );
-                                    setCookie(
-                                        `examination_filter_my_assignments_user_${userId}`,
-                                        'all',
                                     );
                                     setCookie(
                                         `date_filter_my_assignments_user_${userId}`,

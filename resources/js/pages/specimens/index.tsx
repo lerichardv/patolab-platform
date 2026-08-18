@@ -499,18 +499,6 @@ export default function SpecimensIndex({
                   ? 'none'
                   : nextExamIds;
 
-        const userId = props.auth?.user?.id;
-        if (userId) {
-            setCookie(
-                `specimen_type_filter_specimens_user_${userId}`,
-                JSON.stringify(typeParam),
-            );
-            setCookie(
-                `examination_filter_specimens_user_${userId}`,
-                JSON.stringify(examParam),
-            );
-        }
-
         router.get(
             '/specimens',
             {
@@ -541,14 +529,6 @@ export default function SpecimensIndex({
                 : nextExamIds.length === 0
                   ? 'none'
                   : nextExamIds;
-
-        const userId = props.auth?.user?.id;
-        if (userId) {
-            setCookie(
-                `examination_filter_specimens_user_${userId}`,
-                JSON.stringify(examParam),
-            );
-        }
 
         router.get(
             '/specimens',
@@ -1339,14 +1319,6 @@ export default function SpecimensIndex({
                                             'processing',
                                             'microscopic_review',
                                         ]),
-                                    );
-                                    setCookie(
-                                        `specimen_type_filter_specimens_user_${userId}`,
-                                        'all',
-                                    );
-                                    setCookie(
-                                        `examination_filter_specimens_user_${userId}`,
-                                        'all',
                                     );
                                     setCookie(
                                         `date_filter_specimens_user_${userId}`,
