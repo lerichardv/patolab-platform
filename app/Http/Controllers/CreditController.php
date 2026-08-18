@@ -992,166 +992,115 @@ class CreditController extends Controller
             }
 
             $extractedCount = count($specimenIdsToExtract);
+            $targetCustomerId = $group->customer_id ?? $credit->customer_id ?? $originalInvoice->customer_id;
+            $targetCustomer = Customer::find($targetCustomerId) ?? $group->customer ?? $credit->customer;
 
-            if ($extractedCount === 1) {
-                $singleSpecimenId = $specimenIdsToExtract[0];
-                $singleSpecimen = Specimen::findOrFail($singleSpecimenId);
+            $newCredit = Credit::create([
+                'customer_id' => $targetCustomerId,
+                'credit_amount' => $extractedTotal,
+                'amount_paid' => 0.00,
+                'amount_remaining' => $extractedTotal,
+                'specimen_id' => null,
+                'is_group' => true,
+                'group_id' => null,
+                'reminder_interval_in_seconds' => $credit->reminder_interval_in_seconds ?? 604800,
+            ]);
 
-                $singleSpecimen->update([
-                    'is_group' => false,
-                    'group_id' => null,
-                ]);
+            $newInvoice = Invoice::create([
+                'full_invoice_number' => $fullInvoiceNumber,
+                'invoice_number' => $invoiceNumber,
+                'cai_range_id' => $caiRangeId,
+                'customer_id' => $targetCustomerId,
+                'specimen_id' => null,
+                'created_by_id' => auth()->id(),
+                'payment_type' => 'credit',
+                'credit_payment_id' => $newCredit->id,
+                'invoice_date' => $invoiceDate,
+                'quantity' => $extractedQty ?: $extractedCount,
+                'amount' => $extractedAmount,
+                'discount' => $extractedDiscount,
+                'subtotal' => $extractedSubtotal,
+                'exempt_amount' => $extractedExempt,
+                'tax_exempt_amount' => $extractedSubtotal,
+                'taxable_amount_15' => $extractedTax15,
+                'taxable_amount_18' => $extractedTax18,
+                'isv_15' => $extractedIsv15,
+                'isv_18' => $extractedIsv18,
+                'total' => $extractedTotal,
+                'total_paid' => 0.00,
+                'invoice_file' => '',
+                'is_group' => true,
+                'group_id' => null,
+                'invoice_type' => $invoiceType,
+            ]);
 
-                $newCredit = Credit::create([
-                    'customer_id' => $singleSpecimen->customer ?? $credit->customer_id,
-                    'credit_amount' => $extractedTotal,
-                    'amount_paid' => 0.00,
-                    'amount_remaining' => $extractedTotal,
-                    'specimen_id' => $singleSpecimen->id,
-                    'is_group' => false,
-                    'group_id' => null,
-                    'reminder_interval_in_seconds' => $credit->reminder_interval_in_seconds ?? 604800,
-                ]);
+            $newGroupName = ($targetCustomer ? $targetCustomer->name : 'Grupo').' - '.$extractedCount.' '.($extractedCount === 1 ? 'Muestra' : 'Muestras');
+            $newGroup = SpecimenGroup::create([
+                'name' => $newGroupName,
+                'invoice_id' => $newInvoice->id,
+                'customer_id' => $targetCustomerId,
+                'access_token' => Str::random(32),
+            ]);
 
-                $newInvoice = Invoice::create([
-                    'full_invoice_number' => $fullInvoiceNumber,
-                    'invoice_number' => $invoiceNumber,
-                    'cai_range_id' => $caiRangeId,
-                    'customer_id' => $singleSpecimen->customer ?? $credit->customer_id,
-                    'specimen_id' => $singleSpecimen->id,
-                    'created_by_id' => auth()->id(),
-                    'payment_type' => 'credit',
-                    'credit_payment_id' => $newCredit->id,
-                    'invoice_date' => $invoiceDate,
-                    'quantity' => $extractedQty ?: 1,
-                    'amount' => $extractedAmount,
-                    'discount' => $extractedDiscount,
-                    'subtotal' => $extractedSubtotal,
-                    'exempt_amount' => $extractedExempt,
-                    'tax_exempt_amount' => $extractedSubtotal,
-                    'taxable_amount_15' => $extractedTax15,
-                    'taxable_amount_18' => $extractedTax18,
-                    'isv_15' => $extractedIsv15,
-                    'isv_18' => $extractedIsv18,
-                    'total' => $extractedTotal,
-                    'total_paid' => 0.00,
-                    'invoice_file' => '',
-                    'is_group' => false,
-                    'group_id' => null,
-                    'invoice_type' => $invoiceType,
-                ]);
-            } else {
-                $firstSpecimen = Specimen::find($specimenIdsToExtract[0]);
-                $targetCustomerId = $firstSpecimen?->customer ?? $credit->customer_id;
-                $targetCustomer = Customer::find($targetCustomerId) ?? $credit->customer;
+            $newInvoice->update(['group_id' => $newGroup->id]);
+            $newCredit->update(['group_id' => $newGroup->id]);
 
-                $newCredit = Credit::create([
-                    'customer_id' => $targetCustomerId,
-                    'credit_amount' => $extractedTotal,
-                    'amount_paid' => 0.00,
-                    'amount_remaining' => $extractedTotal,
-                    'specimen_id' => null,
-                    'is_group' => true,
-                    'group_id' => null,
-                    'reminder_interval_in_seconds' => $credit->reminder_interval_in_seconds ?? 604800,
-                ]);
+            SpecimenGroupCustomer::firstOrCreate([
+                'customer_id' => $targetCustomerId,
+                'specimen_group_id' => $newGroup->id,
+            ]);
 
-                $newInvoice = Invoice::create([
-                    'full_invoice_number' => $fullInvoiceNumber,
-                    'invoice_number' => $invoiceNumber,
-                    'cai_range_id' => $caiRangeId,
-                    'customer_id' => $targetCustomerId,
-                    'specimen_id' => null,
-                    'created_by_id' => auth()->id(),
-                    'payment_type' => 'credit',
-                    'credit_payment_id' => $newCredit->id,
-                    'invoice_date' => $invoiceDate,
-                    'quantity' => $extractedQty ?: $extractedCount,
-                    'amount' => $extractedAmount,
-                    'discount' => $extractedDiscount,
-                    'subtotal' => $extractedSubtotal,
-                    'exempt_amount' => $extractedExempt,
-                    'tax_exempt_amount' => $extractedSubtotal,
-                    'taxable_amount_15' => $extractedTax15,
-                    'taxable_amount_18' => $extractedTax18,
-                    'isv_15' => $extractedIsv15,
-                    'isv_18' => $extractedIsv18,
-                    'total' => $extractedTotal,
-                    'total_paid' => 0.00,
-                    'invoice_file' => '',
-                    'is_group' => true,
-                    'group_id' => null,
-                    'invoice_type' => $invoiceType,
-                ]);
+            Specimen::whereIn('id', $specimenIdsToExtract)->update([
+                'is_group' => true,
+                'group_id' => $newGroup->id,
+            ]);
 
-                $newGroupName = ($targetCustomer ? $targetCustomer->name : 'Grupo').' - '.$extractedCount.' Muestras';
-                $newGroup = SpecimenGroup::create([
-                    'name' => $newGroupName,
+            foreach ($extractedIgs as $oldIgs) {
+                InvoiceGroupSpecimen::create([
                     'invoice_id' => $newInvoice->id,
-                    'customer_id' => $targetCustomerId,
-                    'access_token' => Str::random(32),
-                ]);
-
-                $newInvoice->update(['group_id' => $newGroup->id]);
-                $newCredit->update(['group_id' => $newGroup->id]);
-
-                SpecimenGroupCustomer::firstOrCreate([
-                    'customer_id' => $targetCustomerId,
-                    'specimen_group_id' => $newGroup->id,
-                ]);
-
-                Specimen::whereIn('id', $specimenIdsToExtract)->update([
-                    'is_group' => true,
                     'group_id' => $newGroup->id,
+                    'specimen_id' => $oldIgs->specimen_id,
+                    'quantity' => $oldIgs->quantity,
+                    'amount' => $oldIgs->amount,
+                    'discount' => $oldIgs->discount,
+                    'subtotal' => $oldIgs->subtotal,
+                    'exempt_amount' => $oldIgs->exempt_amount,
+                    'taxable_amount_15' => $oldIgs->taxable_amount_15,
+                    'taxable_amount_18' => $oldIgs->taxable_amount_18,
+                    'isv_15' => $oldIgs->isv_15,
+                    'isv_18' => $oldIgs->isv_18,
+                    'total' => $oldIgs->total,
+                    'selected_price' => $oldIgs->selected_price,
+                    'custom_specimen_price' => $oldIgs->custom_specimen_price,
+                    'additional_discount_enabled' => $oldIgs->additional_discount_enabled,
+                    'additional_discount' => $oldIgs->additional_discount,
+                    'age_discount_type' => $oldIgs->age_discount_type,
+                    'age_discount_amount' => $oldIgs->age_discount_amount,
                 ]);
 
-                foreach ($extractedIgs as $oldIgs) {
-                    InvoiceGroupSpecimen::create([
-                        'invoice_id' => $newInvoice->id,
-                        'group_id' => $newGroup->id,
-                        'specimen_id' => $oldIgs->specimen_id,
-                        'quantity' => $oldIgs->quantity,
-                        'amount' => $oldIgs->amount,
-                        'discount' => $oldIgs->discount,
-                        'subtotal' => $oldIgs->subtotal,
-                        'exempt_amount' => $oldIgs->exempt_amount,
-                        'taxable_amount_15' => $oldIgs->taxable_amount_15,
-                        'taxable_amount_18' => $oldIgs->taxable_amount_18,
-                        'isv_15' => $oldIgs->isv_15,
-                        'isv_18' => $oldIgs->isv_18,
-                        'total' => $oldIgs->total,
-                        'selected_price' => $oldIgs->selected_price,
-                        'custom_specimen_price' => $oldIgs->custom_specimen_price,
-                        'additional_discount_enabled' => $oldIgs->additional_discount_enabled,
-                        'additional_discount' => $oldIgs->additional_discount,
-                        'age_discount_type' => $oldIgs->age_discount_type,
-                        'age_discount_amount' => $oldIgs->age_discount_amount,
-                    ]);
-
-                    CreditInvoiceSpecimen::create([
-                        'credit_id' => $newCredit->id,
-                        'invoice_id' => $newInvoice->id,
-                        'specimen_id' => $oldIgs->specimen_id,
-                        'is_paid' => 0,
-                        'quantity' => $oldIgs->quantity,
-                        'quantity_paid' => 0,
-                        'amount' => $oldIgs->amount,
-                        'discount' => $oldIgs->discount,
-                        'subtotal' => $oldIgs->subtotal,
-                        'exempt_amount' => $oldIgs->exempt_amount,
-                        'taxable_amount_15' => $oldIgs->taxable_amount_15,
-                        'taxable_amount_18' => $oldIgs->taxable_amount_18,
-                        'isv_15' => $oldIgs->isv_15,
-                        'isv_18' => $oldIgs->isv_18,
-                        'total' => $oldIgs->total,
-                        'selected_price' => $oldIgs->selected_price,
-                        'custom_specimen_price' => $oldIgs->custom_specimen_price,
-                        'additional_discount_enabled' => $oldIgs->additional_discount_enabled,
-                        'additional_discount' => $oldIgs->additional_discount,
-                        'age_discount_type' => $oldIgs->age_discount_type,
-                        'age_discount_amount' => $oldIgs->age_discount_amount,
-                    ]);
-                }
+                CreditInvoiceSpecimen::create([
+                    'credit_id' => $newCredit->id,
+                    'invoice_id' => $newInvoice->id,
+                    'specimen_id' => $oldIgs->specimen_id,
+                    'is_paid' => 0,
+                    'quantity' => $oldIgs->quantity,
+                    'quantity_paid' => 0,
+                    'amount' => $oldIgs->amount,
+                    'discount' => $oldIgs->discount,
+                    'subtotal' => $oldIgs->subtotal,
+                    'exempt_amount' => $oldIgs->exempt_amount,
+                    'taxable_amount_15' => $oldIgs->taxable_amount_15,
+                    'taxable_amount_18' => $oldIgs->taxable_amount_18,
+                    'isv_15' => $oldIgs->isv_15,
+                    'isv_18' => $oldIgs->isv_18,
+                    'total' => $oldIgs->total,
+                    'selected_price' => $oldIgs->selected_price,
+                    'custom_specimen_price' => $oldIgs->custom_specimen_price,
+                    'additional_discount_enabled' => $oldIgs->additional_discount_enabled,
+                    'additional_discount' => $oldIgs->additional_discount,
+                    'age_discount_type' => $oldIgs->age_discount_type,
+                    'age_discount_amount' => $oldIgs->age_discount_amount,
+                ]);
             }
 
             InvoiceGroupSpecimen::where('invoice_id', $originalInvoice->id)
@@ -1197,8 +1146,9 @@ class CreditController extends Controller
             ]);
 
             if ($group) {
+                $remainingCount = $remainingIgs->count();
                 $group->update([
-                    'name' => ($group->customer ? $group->customer->name : 'Grupo').' - '.$remainingIgs->count().' Muestras',
+                    'name' => ($group->customer ? $group->customer->name : 'Grupo').' - '.$remainingCount.' '.($remainingCount === 1 ? 'Muestra' : 'Muestras'),
                 ]);
             }
         });

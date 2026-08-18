@@ -1,15 +1,5 @@
 import { useForm } from '@inertiajs/react';
-import {
-    AlertCircle,
-    ArrowRight,
-    Check,
-    FileCheck,
-    FileText,
-    Info,
-    Layers,
-    ShieldCheck,
-    User,
-} from 'lucide-react';
+import { Info } from 'lucide-react';
 import type { FormEventHandler } from 'react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -470,9 +460,7 @@ export default function CreditExtractSpecimenForm({
                                     variant="outline"
                                     className="text-[10px]"
                                 >
-                                    {selectedCalculations.extractedCount === 1
-                                        ? 'Individual'
-                                        : 'Nuevo Grupo'}
+                                    Nuevo Grupo
                                 </Badge>
                             </div>
                             <div className="flex justify-between text-muted-foreground">
@@ -605,9 +593,7 @@ export default function CreditExtractSpecimenForm({
                                 Tipo de destino:
                             </span>
                             <span className="font-semibold text-foreground">
-                                {selectedCalculations.extractedCount === 1
-                                    ? 'Crédito Individual (Desvinculado)'
-                                    : 'Nuevo Grupo con Crédito'}
+                                Nuevo Grupo con Crédito
                             </span>
                         </div>
                         <div className="flex justify-between border-b pb-2">
