@@ -21,6 +21,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { fixGrammarWithAI, suggestImprovementsWithAI } from './actions';
 
 interface AIGrammarSheetProps {
     open: boolean;
@@ -181,32 +182,8 @@ export default function AIGrammarSheet({
         setCorrectionError(null);
 
         try {
-            const serverUrl =
-                import.meta.env.VITE_COLLABORATION_SERVER_URL ||
-                'http://127.0.0.1:1234';
-            const response = await fetch(`${serverUrl}/api/fix-grammar`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    text: textToCorrect,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Error al procesar el texto.');
-            }
-
-            const data = await response.json();
-
-            if (data.success && data.text) {
-                setTempCorrectedText(data.text);
-            } else {
-                throw new Error(
-                    data.error || 'Respuesta inválida del servidor.',
-                );
-            }
+            const corrected = await fixGrammarWithAI(textToCorrect);
+            setTempCorrectedText(corrected);
         } catch (err: any) {
             setCorrectionError(err.message || 'Error de red o del modelo.');
         } finally {
@@ -226,39 +203,15 @@ export default function AIGrammarSheet({
             setChatMessages(nextMessages);
 
             try {
-                const serverUrl =
-                    import.meta.env.VITE_COLLABORATION_SERVER_URL ||
-                    'http://127.0.0.1:1234';
-                const response = await fetch(
-                    `${serverUrl}/api/suggest-improvements`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            text: originalText,
-                            messages: nextMessages,
-                        }),
-                    },
+                const responseText = await suggestImprovementsWithAI(
+                    originalText,
+                    nextMessages,
                 );
 
-                if (!response.ok) {
-                    throw new Error('Error al procesar la sugerencia.');
-                }
-
-                const data = await response.json();
-
-                if (data.success && data.text) {
-                    setChatMessages([
-                        ...nextMessages,
-                        { role: 'assistant', content: data.text },
-                    ]);
-                } else {
-                    throw new Error(
-                        data.error || 'Respuesta inválida del servidor.',
-                    );
-                }
+                setChatMessages([
+                    ...nextMessages,
+                    { role: 'assistant', content: responseText },
+                ]);
             } catch (err: any) {
                 setSuggestionError(err.message || 'Error de red o del modelo.');
             } finally {

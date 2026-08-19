@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 import SpecimenProductsSheet from '../specimen-products-sheet';
+import type { Specimen } from './types';
 
 export function calculateInsumoTotal(
     quantity?: number | string,
@@ -24,7 +25,7 @@ export function calculateInsumosGrandTotal(products: any[] = []): number {
 }
 
 export interface SpecimenInsumosCardProps {
-    specimen: any;
+    specimen: Specimen;
     products?: any[];
     isFinished: boolean;
     sessionEditingEnabled: boolean;

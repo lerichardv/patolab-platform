@@ -1,21 +1,4 @@
-export interface MeasuredBlock {
-    id: string;
-    type:
-        | 'patient-card'
-        | 'section-header'
-        | 'html'
-        | 'page-break'
-        | 'signature'
-        | 'heading'
-        | 'image'
-        | 'cuttings-summary'
-        | 'new-cuttings-summary';
-    height: number;
-    title?: string;
-    html?: string;
-    className?: string;
-    text?: string;
-}
+export type { MeasuredBlock } from '../types';
 
 export interface PreviewUser {
     id: number;

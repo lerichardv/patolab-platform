@@ -20,6 +20,7 @@ import {
     SheetFooter,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import { dictateAudioChunk } from './actions';
 
 interface AIDictationSheetProps {
     open: boolean;
@@ -209,33 +210,12 @@ export default function AIDictationSheet({
         setStatus('sending');
         setError(null);
 
-        const formData = new FormData();
-        formData.append('audio', blob, 'dictation.webm');
-
         try {
-            const serverUrl =
-                import.meta.env.VITE_COLLABORATION_SERVER_URL ||
-                'http://127.0.0.1:1234';
-            const response = await fetch(`${serverUrl}/api/dictate-chunk`, {
-                method: 'POST',
-                body: formData,
-            });
+            const transcribedText = await dictateAudioChunk(blob);
 
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-
-                throw new Error(
-                    errData.error ||
-                        errData.details ||
-                        'Error al transcribir el audio.',
-                );
-            }
-
-            const data = await response.json();
-
-            if (data.success && data.text) {
+            if (transcribedText) {
                 setTranscription((prev) => {
-                    const cleanNew = data.text ? data.text.trim() : '';
+                    const cleanNew = transcribedText.trim();
 
                     if (!prev) {
                         return cleanNew;
@@ -256,9 +236,7 @@ export default function AIDictationSheet({
                 });
                 setStatus('success');
             } else {
-                throw new Error(
-                    data.error || 'Respuesta vacía o inválida del servidor.',
-                );
+                throw new Error('Respuesta vacía o inválida del servidor.');
             }
         } catch (err: any) {
             setError(err.message || 'Error de red o del modelo.');

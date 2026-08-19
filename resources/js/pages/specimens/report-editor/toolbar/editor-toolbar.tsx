@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
+import { uploadReportImage } from '../actions';
 import AIDictationSheet from '../ai-dictation-sheet';
 import AIGrammarSheet from '../ai-grammar-sheet';
 import { HIGHLIGHT_COLORS } from '../components/tiptap-extensions';
@@ -317,38 +318,15 @@ export function EditorToolbar({
                 return;
             }
 
-            const formData = new FormData();
-            formData.append('image', file);
-
             try {
-                const response = await fetch(
-                    `/specimens/${specimenSequenceCode}/report-editor/upload-image`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN':
-                                (
-                                    document.querySelector(
-                                        'meta[name="csrf-token"]',
-                                    ) as HTMLMetaElement
-                                )?.content ?? '',
-                        },
-                        body: formData,
-                    },
+                const data = await uploadReportImage(
+                    specimenSequenceCode,
+                    file,
+                    file.name,
                 );
 
-                if (response.ok) {
-                    const data = await response.json();
-
-                    if (data.url) {
-                        editor
-                            .chain()
-                            .focus()
-                            .setImage({ src: data.url })
-                            .run();
-                    }
-                } else {
-                    toast.error('Error al subir la imagen');
+                if (data.url) {
+                    editor.chain().focus().setImage({ src: data.url }).run();
                 }
             } catch {
                 toast.error('Error al subir la imagen');

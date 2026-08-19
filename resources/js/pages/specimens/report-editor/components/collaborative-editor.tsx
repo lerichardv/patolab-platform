@@ -10,6 +10,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
 import { cn } from '@/lib/utils';
+import { uploadReportImage } from '../actions';
 import { ImageCropperDialog } from '../image-grid-component';
 import { EditorRegistryContext } from './editor-registry-context';
 import { CustomBulletList, sharedExtensions } from './tiptap-extensions';
@@ -286,61 +287,42 @@ function CollaborativeEditorInner({
         }
 
         const uploadToast = toast.loading('Guardando imagen recortada...');
-        const file = new File([croppedBlob], 'cropped.jpg', {
-            type: 'image/jpeg',
-        });
-        const formData = new FormData();
-        formData.append('image', file);
 
         try {
-            const response = await fetch(
-                `/specimens/${specimenSequenceCode}/report-editor/upload-image`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN':
-                            (
-                                document.querySelector(
-                                    'meta[name="csrf-token"]',
-                                ) as HTMLMetaElement
-                            )?.content ?? '',
-                    },
-                    body: formData,
-                },
+            const data = await uploadReportImage(
+                specimenSequenceCode,
+                croppedBlob,
+                'cropped.jpg',
             );
 
-            if (response.ok) {
-                const data = await response.json();
+            if (data.url) {
+                const pos = individualCroppingImage.pos;
 
-                if (data.url) {
-                    const pos = individualCroppingImage.pos;
+                // Update the image src and reset width/height attributes atomically
+                editor
+                    .chain()
+                    .focus()
+                    .command(({ tr }: any) => {
+                        const node = tr.doc.nodeAt(pos);
 
-                    // Update the image src and reset width/height attributes atomically
-                    editor
-                        .chain()
-                        .focus()
-                        .command(({ tr }: any) => {
-                            const node = tr.doc.nodeAt(pos);
+                        if (node && node.type.name === 'image') {
+                            tr.setNodeMarkup(pos, undefined, {
+                                ...node.attrs,
+                                src: data.url,
+                                width: null,
+                                height: null,
+                            });
+                        }
 
-                            if (node && node.type.name === 'image') {
-                                tr.setNodeMarkup(pos, undefined, {
-                                    ...node.attrs,
-                                    src: data.url,
-                                    width: null,
-                                    height: null,
-                                });
-                            }
+                        return true;
+                    })
+                    .run();
 
-                            return true;
-                        })
-                        .run();
+                toast.dismiss(uploadToast);
+                toast.success('Imagen recortada con éxito');
+                setIndividualCroppingImage(null);
 
-                    toast.dismiss(uploadToast);
-                    toast.success('Imagen recortada con éxito');
-                    setIndividualCroppingImage(null);
-
-                    return;
-                }
+                return;
             }
         } catch (err) {
             console.error(err);
