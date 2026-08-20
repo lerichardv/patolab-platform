@@ -5,10 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Bank;
 use App\Models\CaiRange;
 use App\Models\Credit;
-use App\Models\CreditInvoiceSpecimen;
 use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\InvoiceGroupSpecimen;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\Priority;
 use App\Models\Product;
@@ -660,7 +659,7 @@ class InvoiceController extends Controller
             'transfer_authorization_code' => 'nullable|string|max:255',
             'proof_of_payment' => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp,gif|max:30720',
             'group_specimens' => 'nullable|array',
-            'group_specimens.*.id' => 'required|integer|exists:invoice_group_specimens,id',
+            'group_specimens.*.id' => 'required|integer|exists:invoice_specimens,id',
             'group_specimens.*.selected_price' => 'required|string',
             'group_specimens.*.custom_specimen_price' => 'required|numeric|min:0',
             'group_specimens.*.quantity' => 'required|integer|min:1',
@@ -733,7 +732,7 @@ class InvoiceController extends Controller
 
         if ($groupSpecimensData) {
             foreach ($groupSpecimensData as $item) {
-                $igs = InvoiceGroupSpecimen::with('specimen.examination.prices')->findOrFail($item['id']);
+                $igs = InvoiceSpecimen::with('specimen.examination.prices')->findOrFail($item['id']);
 
                 $qty = (int) ($item['quantity'] ?? 1);
                 $priceVal = $item['selected_price'] === 'custom'
@@ -775,31 +774,6 @@ class InvoiceController extends Controller
                     'age_discount_type' => $item['age_discount_type'] ?? null,
                     'age_discount_amount' => $ageDiscountVal,
                 ]);
-
-                // Synchronize credit_invoice_specimens
-                $cis = CreditInvoiceSpecimen::where('invoice_id', $invoice->id)
-                    ->where('specimen_id', $igs->specimen_id)
-                    ->first();
-                if ($cis) {
-                    $cis->update([
-                        'quantity' => $qty,
-                        'amount' => $priceVal,
-                        'discount' => $discountVal,
-                        'subtotal' => $subtotalVal,
-                        'exempt_amount' => $totalVal,
-                        'taxable_amount_15' => 0.00,
-                        'taxable_amount_18' => 0.00,
-                        'isv_15' => 0.00,
-                        'isv_18' => 0.00,
-                        'total' => $totalVal,
-                        'selected_price' => $item['selected_price'],
-                        'custom_specimen_price' => $item['selected_price'] === 'custom' ? $priceVal : 0.00,
-                        'additional_discount_enabled' => ! empty($item['additional_discount_enabled']) ? 1 : 0,
-                        'additional_discount' => (float) ($item['additional_discount'] ?? 0.00),
-                        'age_discount_type' => $item['age_discount_type'] ?? null,
-                        'age_discount_amount' => $ageDiscountVal,
-                    ]);
-                }
             }
         }
 
@@ -807,9 +781,9 @@ class InvoiceController extends Controller
         if ($invoice->credit_payment_id) {
             $credit = Credit::find($invoice->credit_payment_id);
             if ($credit) {
-                // If it's a single specimen credit, synchronize credit_invoice_specimens
+                // If it's a single specimen credit, synchronize invoice_specimens
                 if (! $credit->is_group && $invoice->specimen_id) {
-                    $cis = CreditInvoiceSpecimen::where('credit_id', $credit->id)
+                    $cis = InvoiceSpecimen::where('credit_id', $credit->id)
                         ->where('invoice_id', $invoice->id)
                         ->where('specimen_id', $invoice->specimen_id)
                         ->first();

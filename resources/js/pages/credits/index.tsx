@@ -139,6 +139,7 @@ interface Credit {
     group?: any;
     last_payment_date?: string | null;
     reminder_interval_in_seconds?: number;
+    invoice_specimens?: any[];
     credit_invoice_specimens?: any[];
 }
 
@@ -1498,6 +1499,9 @@ export default function CreditsIndex({
                                                                 )}
                                                                 {(() => {
                                                                     const specimensCount =
+                                                                        credit
+                                                                            .invoice_specimens
+                                                                            ?.length ??
                                                                         credit
                                                                             .credit_invoice_specimens
                                                                             ?.length ??

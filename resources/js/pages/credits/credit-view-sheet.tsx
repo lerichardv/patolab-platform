@@ -81,6 +81,7 @@ interface Credit {
     customer?: Customer;
     invoices?: InvoiceModel[];
     group?: any;
+    invoice_specimens?: CreditInvoiceSpecimen[];
     credit_invoice_specimens?: CreditInvoiceSpecimen[];
 }
 
@@ -379,7 +380,8 @@ export default function CreditViewSheet({ credit, open, onOpenChange }: Props) {
     const paymentInvoices =
         credit.invoices?.filter((inv) => inv.payment_type !== 'credit') || [];
 
-    const creditSpecimens = credit.credit_invoice_specimens || [];
+    const creditSpecimens =
+        credit.invoice_specimens || credit.credit_invoice_specimens || [];
     const paidCount = creditSpecimens.filter((s) => s.is_paid).length;
     const pendingCount = creditSpecimens.filter((s) => !s.is_paid).length;
 

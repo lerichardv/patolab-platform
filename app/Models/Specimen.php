@@ -297,11 +297,19 @@ class Specimen extends Model
     }
 
     /**
-     * Get the group specimen breakdown record for this specimen.
+     * Get the invoice breakdown record for this specimen.
      */
     public function invoiceGroupSpecimen(): HasOne
     {
-        return $this->hasOne(InvoiceGroupSpecimen::class, 'specimen_id');
+        return $this->hasOne(InvoiceSpecimen::class, 'specimen_id');
+    }
+
+    /**
+     * Get the invoice breakdown record for this specimen.
+     */
+    public function invoiceSpecimen(): HasOne
+    {
+        return $this->hasOne(InvoiceSpecimen::class, 'specimen_id');
     }
 
     /**

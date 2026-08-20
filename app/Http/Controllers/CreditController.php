@@ -5,10 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Bank;
 use App\Models\CaiRange;
 use App\Models\Credit;
-use App\Models\CreditInvoiceSpecimen;
 use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\InvoiceGroupSpecimen;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\Specimen;
 use App\Models\SpecimenGroup;
@@ -421,7 +420,7 @@ class CreditController extends Controller
         if ($credit->is_group) {
             $specimens = $validated['specimens'] ?? [];
             $specimenIds = array_column($specimens, 'id');
-            $dbSpecimens = DB::table('credit_invoice_specimens')
+            $dbSpecimens = DB::table('invoice_specimens')
                 ->where('credit_id', $credit->id)
                 ->whereIn('specimen_id', $specimenIds)
                 ->where('is_paid', 0)
@@ -477,7 +476,7 @@ class CreditController extends Controller
             if (! $isSocialSecurity) {
                 if ($credit->is_group) {
                     foreach ($validated['specimens'] as $item) {
-                        $dbRow = DB::table('credit_invoice_specimens')
+                        $dbRow = DB::table('invoice_specimens')
                             ->where('credit_id', $credit->id)
                             ->where('specimen_id', $item['id'])
                             ->first();
@@ -485,7 +484,7 @@ class CreditController extends Controller
                         $newQtyPaid = $dbRow->quantity_paid + (int) $item['quantity'];
                         $isPaid = $newQtyPaid >= $dbRow->quantity ? 1 : 0;
 
-                        DB::table('credit_invoice_specimens')
+                        DB::table('invoice_specimens')
                             ->where('credit_id', $credit->id)
                             ->where('specimen_id', $item['id'])
                             ->update([
@@ -680,13 +679,13 @@ class CreditController extends Controller
             // Update specimen group payments if applicable
             if ($credit->is_group && ! empty($validated['specimens'])) {
                 foreach ($validated['specimens'] as $item) {
-                    $dbRow = DB::table('credit_invoice_specimens')
+                    $dbRow = DB::table('invoice_specimens')
                         ->where('credit_id', $credit->id)
                         ->where('specimen_id', $item['id'])
                         ->first();
 
                     if ($dbRow) {
-                        DB::table('credit_invoice_specimens')
+                        DB::table('invoice_specimens')
                             ->where('credit_id', $credit->id)
                             ->where('specimen_id', $item['id'])
                             ->update([
@@ -910,7 +909,7 @@ class CreditController extends Controller
             throw new \Exception('No se pudo encontrar la factura original del crédito grupal.');
         }
 
-        $allCreditSpecimens = CreditInvoiceSpecimen::where('credit_id', $credit->id)->get();
+        $allCreditSpecimens = InvoiceSpecimen::where('credit_id', $credit->id)->get();
         if ($allCreditSpecimens->isNotEmpty()) {
             $allSpecimenIds = $allCreditSpecimens->pluck('specimen_id')->toArray();
         } else {
@@ -950,9 +949,10 @@ class CreditController extends Controller
             &$newInvoice,
             &$newCredit
         ) {
-            $extractedIgs = InvoiceGroupSpecimen::where('invoice_id', $originalInvoice->id)
+            $extractedIgs = InvoiceSpecimen::where('invoice_id', $originalInvoice->id)
                 ->whereIn('specimen_id', $specimenIdsToExtract)
-                ->get();
+                ->get()
+                ->unique('specimen_id');
 
             $extractedAmount = (float) $extractedIgs->sum('amount');
             $extractedDiscount = (float) $extractedIgs->sum('discount');
@@ -1055,63 +1055,17 @@ class CreditController extends Controller
                 'group_id' => $newGroup->id,
             ]);
 
-            foreach ($extractedIgs as $oldIgs) {
-                InvoiceGroupSpecimen::create([
+            InvoiceSpecimen::where('invoice_id', $originalInvoice->id)
+                ->whereIn('specimen_id', $specimenIdsToExtract)
+                ->update([
                     'invoice_id' => $newInvoice->id,
-                    'group_id' => $newGroup->id,
-                    'specimen_id' => $oldIgs->specimen_id,
-                    'quantity' => $oldIgs->quantity,
-                    'amount' => $oldIgs->amount,
-                    'discount' => $oldIgs->discount,
-                    'subtotal' => $oldIgs->subtotal,
-                    'exempt_amount' => $oldIgs->exempt_amount,
-                    'taxable_amount_15' => $oldIgs->taxable_amount_15,
-                    'taxable_amount_18' => $oldIgs->taxable_amount_18,
-                    'isv_15' => $oldIgs->isv_15,
-                    'isv_18' => $oldIgs->isv_18,
-                    'total' => $oldIgs->total,
-                    'selected_price' => $oldIgs->selected_price,
-                    'custom_specimen_price' => $oldIgs->custom_specimen_price,
-                    'additional_discount_enabled' => $oldIgs->additional_discount_enabled,
-                    'additional_discount' => $oldIgs->additional_discount,
-                    'age_discount_type' => $oldIgs->age_discount_type,
-                    'age_discount_amount' => $oldIgs->age_discount_amount,
-                ]);
-
-                CreditInvoiceSpecimen::create([
                     'credit_id' => $newCredit->id,
-                    'invoice_id' => $newInvoice->id,
-                    'specimen_id' => $oldIgs->specimen_id,
-                    'is_paid' => 0,
-                    'quantity' => $oldIgs->quantity,
-                    'quantity_paid' => 0,
-                    'amount' => $oldIgs->amount,
-                    'discount' => $oldIgs->discount,
-                    'subtotal' => $oldIgs->subtotal,
-                    'exempt_amount' => $oldIgs->exempt_amount,
-                    'taxable_amount_15' => $oldIgs->taxable_amount_15,
-                    'taxable_amount_18' => $oldIgs->taxable_amount_18,
-                    'isv_15' => $oldIgs->isv_15,
-                    'isv_18' => $oldIgs->isv_18,
-                    'total' => $oldIgs->total,
-                    'selected_price' => $oldIgs->selected_price,
-                    'custom_specimen_price' => $oldIgs->custom_specimen_price,
-                    'additional_discount_enabled' => $oldIgs->additional_discount_enabled,
-                    'additional_discount' => $oldIgs->additional_discount,
-                    'age_discount_type' => $oldIgs->age_discount_type,
-                    'age_discount_amount' => $oldIgs->age_discount_amount,
+                    'group_id' => $newGroup->id,
+                    'is_group' => true,
+                    'updated_at' => now(),
                 ]);
-            }
 
-            InvoiceGroupSpecimen::where('invoice_id', $originalInvoice->id)
-                ->whereIn('specimen_id', $specimenIdsToExtract)
-                ->delete();
-
-            CreditInvoiceSpecimen::where('credit_id', $credit->id)
-                ->whereIn('specimen_id', $specimenIdsToExtract)
-                ->delete();
-
-            $remainingIgs = InvoiceGroupSpecimen::where('invoice_id', $originalInvoice->id)->get();
+            $remainingIgs = InvoiceSpecimen::where('invoice_id', $originalInvoice->id)->get()->unique('specimen_id');
 
             $newOriginalAmount = (float) $remainingIgs->sum('amount');
             $newOriginalDiscount = (float) $remainingIgs->sum('discount');
@@ -1255,6 +1209,19 @@ class CreditController extends Controller
                     \Log::warning('Error regenerating invoice PDF on markAsPaid: '.$e->getMessage());
                 }
             }
+
+            InvoiceSpecimen::where('credit_id', $credit->id)
+                ->when($originalInvoice, function ($q) use ($originalInvoice) {
+                    $q->orWhere('invoice_id', $originalInvoice->id);
+                })
+                ->when($credit->specimen_id, function ($q) use ($credit) {
+                    $q->orWhere('specimen_id', $credit->specimen_id);
+                })
+                ->update([
+                    'is_paid' => true,
+                    'quantity_paid' => DB::raw('quantity'),
+                    'updated_at' => now(),
+                ]);
 
             $credit->update([
                 'status' => 'paid',

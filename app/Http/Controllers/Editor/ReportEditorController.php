@@ -8,7 +8,7 @@ use App\Models\CuttingCode;
 use App\Models\CuttingPrefix;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
-use App\Models\InvoiceGroupSpecimen;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\Permission;
 use App\Models\Priority;
@@ -908,7 +908,7 @@ class ReportEditorController extends Controller
         // 4. Calculate base amount for the specimen
         $baseAmount = 0.00;
         if ($specimen->is_group || ! empty($specimen->group_id)) {
-            $groupSpecimen = InvoiceGroupSpecimen::where('specimen_id', $specimen->id)->first();
+            $groupSpecimen = InvoiceSpecimen::where('specimen_id', $specimen->id)->first();
             if ($groupSpecimen) {
                 $baseAmount = (float) $groupSpecimen->total;
             }

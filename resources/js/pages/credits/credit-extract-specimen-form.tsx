@@ -67,6 +67,7 @@ interface Credit {
     customer?: Customer;
     last_payment_date?: string | null;
     reminder_interval_in_seconds?: number;
+    invoice_specimens?: CreditInvoiceSpecimen[];
     credit_invoice_specimens?: CreditInvoiceSpecimen[];
     group?: {
         id: number;
@@ -89,8 +90,10 @@ export default function CreditExtractSpecimenForm({
     const remainingVal = parseFloat(String(credit.amount_remaining || '0'));
 
     const specimensList = useMemo(() => {
-        return credit.credit_invoice_specimens || [];
-    }, [credit.credit_invoice_specimens]);
+        return (
+            credit.invoice_specimens || credit.credit_invoice_specimens || []
+        );
+    }, [credit.invoice_specimens, credit.credit_invoice_specimens]);
 
     const unpaidSpecimens = useMemo(() => {
         return specimensList.filter((item) => !item.is_paid);

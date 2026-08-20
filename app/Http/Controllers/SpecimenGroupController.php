@@ -9,7 +9,7 @@ use App\Models\Customer;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\Invoice;
-use App\Models\InvoiceGroupSpecimen;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\PrioritySpecimenOrder;
 use App\Models\Product;
@@ -379,11 +379,27 @@ class SpecimenGroupController extends Controller
                     $sub = 0.00;
                 }
 
-                // Store split record in invoice_group_specimens
-                InvoiceGroupSpecimen::create([
+                // Determine credit payment status if credit checkout
+                $isPaid = $validated['payment_type'] !== 'credit';
+                $qtyPaid = $isPaid ? $qty : 0;
+                if ($validated['payment_type'] === 'credit') {
+                    $scaledSub = $sub * $qty;
+                    if ($initialPaymentAmount >= $scaledSub) {
+                        $isPaid = true;
+                        $qtyPaid = $qty;
+                        $initialPaymentAmount -= $scaledSub;
+                    }
+                }
+
+                // Store single breakdown record in invoice_specimens
+                InvoiceSpecimen::create([
                     'invoice_id' => $invoice->id,
-                    'group_id' => $group->id,
                     'specimen_id' => $specimen->id,
+                    'is_group' => true,
+                    'group_id' => $group->id,
+                    'credit_id' => $creditId,
+                    'is_paid' => $isPaid,
+                    'quantity_paid' => $qtyPaid,
                     'quantity' => $qty,
                     'amount' => $basePrice,
                     'discount' => $disc,
@@ -401,42 +417,6 @@ class SpecimenGroupController extends Controller
                     'age_discount_type' => $specData['age_discount_type'] ?? null,
                     'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
                 ]);
-
-                // Map specimen to the credit in credit_invoice_specimens if credit checkout
-                if ($validated['payment_type'] === 'credit') {
-                    // Greedily mark specimen as paid if covered by initial payment
-                    $isPaid = false;
-                    $scaledSub = $sub * $qty;
-                    if ($initialPaymentAmount >= $scaledSub) {
-                        $isPaid = true;
-                        $initialPaymentAmount -= $scaledSub;
-                    }
-
-                    DB::table('credit_invoice_specimens')->insert([
-                        'credit_id' => $creditId,
-                        'invoice_id' => $invoice->id,
-                        'specimen_id' => $specimen->id,
-                        'is_paid' => $isPaid ? 1 : 0,
-                        'quantity' => $qty,
-                        'amount' => $basePrice,
-                        'discount' => $disc,
-                        'subtotal' => $sub * $qty,
-                        'exempt_amount' => 0.00,
-                        'taxable_amount_15' => 0.00,
-                        'taxable_amount_18' => 0.00,
-                        'isv_15' => 0.00,
-                        'isv_18' => 0.00,
-                        'total' => $sub * $qty,
-                        'selected_price' => $specData['selected_price'],
-                        'custom_specimen_price' => $specData['selected_price'] === 'custom' ? (float) ($specData['custom_specimen_price'] ?? 0.00) : 0.00,
-                        'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']) ? 1 : 0,
-                        'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
-                        'age_discount_type' => $specData['age_discount_type'] ?? null,
-                        'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
-                }
 
                 // Create Kanban Order record
                 $maxOrder = PrioritySpecimenOrder::where('priority_id', $specData['priority_id'])->max('order') ?? 0;
@@ -797,7 +777,7 @@ class SpecimenGroupController extends Controller
                 if ($creditId) {
                     $credit = Credit::find($creditId);
                     if ($credit) {
-                        DB::table('credit_invoice_specimens')->where('credit_id', $credit->id)->delete();
+                        InvoiceSpecimen::where('credit_id', $credit->id)->update(['credit_id' => null]);
                         $credit->delete();
                     }
                     $creditId = null;
@@ -868,13 +848,27 @@ class SpecimenGroupController extends Controller
                         throw new \Exception("Muestra con ID {$specData['id']} no pertenece a este grupo.");
                     }
 
-                    // Update its InvoiceGroupSpecimen record
-                    $invoiceGroupSpecimen = InvoiceGroupSpecimen::where('invoice_id', $invoice->id)
-                        ->where('specimen_id', $specimen->id)
-                        ->first();
+                    // Update its InvoiceSpecimen record
+                    $isPaid = true;
+                    if ($validated['payment_type'] === 'credit') {
+                        $isPaid = false;
+                        $scaledSub = $sub * $qty;
+                        if ($initialPaymentAmount >= $scaledSub) {
+                            $isPaid = true;
+                            $initialPaymentAmount -= $scaledSub;
+                        }
+                    }
 
-                    if ($invoiceGroupSpecimen) {
-                        $invoiceGroupSpecimen->update([
+                    InvoiceSpecimen::updateOrCreate(
+                        [
+                            'invoice_id' => $invoice->id,
+                            'specimen_id' => $specimen->id,
+                        ],
+                        [
+                            'credit_id' => $creditId,
+                            'group_id' => $group->id,
+                            'is_group' => true,
+                            'is_paid' => $isPaid,
                             'quantity' => $qty,
                             'amount' => $basePrice,
                             'discount' => $disc,
@@ -887,48 +881,8 @@ class SpecimenGroupController extends Controller
                             'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
                             'age_discount_type' => $specData['age_discount_type'] ?? null,
                             'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
-                        ]);
-                    }
-
-                    // Update its CreditInvoiceSpecimen record if needed
-                    if ($validated['payment_type'] === 'credit') {
-                        $isPaid = false;
-                        $scaledSub = $sub * $qty;
-                        if ($initialPaymentAmount >= $scaledSub) {
-                            $isPaid = true;
-                            $initialPaymentAmount -= $scaledSub;
-                        }
-
-                        DB::table('credit_invoice_specimens')
-                            ->updateOrInsert(
-                                [
-                                    'credit_id' => $creditId,
-                                    'invoice_id' => $invoice->id,
-                                    'specimen_id' => $specimen->id,
-                                ],
-                                [
-                                    'is_paid' => $isPaid ? 1 : 0,
-                                    'quantity' => $qty,
-                                    'amount' => $basePrice,
-                                    'discount' => $disc,
-                                    'subtotal' => $sub * $qty,
-                                    'exempt_amount' => 0.00,
-                                    'total' => $sub * $qty,
-                                    'selected_price' => $specData['selected_price'],
-                                    'custom_specimen_price' => $specData['selected_price'] === 'custom' ? (float) ($specData['custom_specimen_price'] ?? 0.00) : 0.00,
-                                    'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']) ? 1 : 0,
-                                    'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
-                                    'age_discount_type' => $specData['age_discount_type'] ?? null,
-                                    'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
-                                    'updated_at' => now(),
-                                ]
-                            );
-                    } else {
-                        DB::table('credit_invoice_specimens')
-                            ->where('invoice_id', $invoice->id)
-                            ->where('specimen_id', $specimen->id)
-                            ->delete();
-                    }
+                        ]
+                    );
 
                     $sequenceCode = $specimen->sequence_code;
                     $activeSpecimenIds[] = $specimen->id;
@@ -989,10 +943,23 @@ class SpecimenGroupController extends Controller
                         'sample_collection_date' => $specData['sample_collection_date'] ?? null,
                     ]);
 
-                    InvoiceGroupSpecimen::create([
+                    $isPaid = true;
+                    if ($validated['payment_type'] === 'credit') {
+                        $isPaid = false;
+                        $scaledSub = $sub * $qty;
+                        if ($initialPaymentAmount >= $scaledSub) {
+                            $isPaid = true;
+                            $initialPaymentAmount -= $scaledSub;
+                        }
+                    }
+
+                    InvoiceSpecimen::create([
+                        'credit_id' => $creditId,
                         'invoice_id' => $invoice->id,
-                        'group_id' => $group->id,
                         'specimen_id' => $specimen->id,
+                        'group_id' => $group->id,
+                        'is_group' => true,
+                        'is_paid' => $isPaid,
                         'quantity' => $qty,
                         'amount' => $basePrice,
                         'discount' => $disc,
@@ -1010,40 +977,6 @@ class SpecimenGroupController extends Controller
                         'age_discount_type' => $specData['age_discount_type'] ?? null,
                         'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
                     ]);
-
-                    if ($validated['payment_type'] === 'credit') {
-                        $isPaid = false;
-                        $scaledSub = $sub * $qty;
-                        if ($initialPaymentAmount >= $scaledSub) {
-                            $isPaid = true;
-                            $initialPaymentAmount -= $scaledSub;
-                        }
-
-                        DB::table('credit_invoice_specimens')->insert([
-                            'credit_id' => $creditId,
-                            'invoice_id' => $invoice->id,
-                            'specimen_id' => $specimen->id,
-                            'is_paid' => $isPaid ? 1 : 0,
-                            'quantity' => $qty,
-                            'amount' => $basePrice,
-                            'discount' => $disc,
-                            'subtotal' => $sub * $qty,
-                            'exempt_amount' => 0.00,
-                            'taxable_amount_15' => 0.00,
-                            'taxable_amount_18' => 0.00,
-                            'isv_15' => 0.00,
-                            'isv_18' => 0.00,
-                            'total' => $sub * $qty,
-                            'selected_price' => $specData['selected_price'],
-                            'custom_specimen_price' => $specData['selected_price'] === 'custom' ? (float) ($specData['custom_specimen_price'] ?? 0.00) : 0.00,
-                            'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']) ? 1 : 0,
-                            'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
-                            'age_discount_type' => $specData['age_discount_type'] ?? null,
-                            'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]);
-                    }
 
                     $maxOrder = PrioritySpecimenOrder::where('priority_id', $specData['priority_id'])->max('order') ?? 0;
                     PrioritySpecimenOrder::create([

@@ -72,6 +72,7 @@ interface Credit {
     customer?: Customer;
     last_payment_date?: string | null;
     reminder_interval_in_seconds?: number;
+    invoice_specimens?: CreditInvoiceSpecimen[];
     credit_invoice_specimens?: CreditInvoiceSpecimen[];
     invoices?: Invoice[];
     invoice?: Invoice;
@@ -108,8 +109,9 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
         originalInvoice?.cai_range_id,
     );
 
-    const unpaidSpecimens =
-        credit.credit_invoice_specimens?.filter((item) => !item.is_paid) || [];
+    const allCreditSpecimens =
+        credit.invoice_specimens || credit.credit_invoice_specimens || [];
+    const unpaidSpecimens = allCreditSpecimens.filter((item) => !item.is_paid);
     const initialSpecimens = unpaidSpecimens.map((item) => ({
         id: item.specimen_id,
         quantity: item.quantity - (item.quantity_paid ?? 0),

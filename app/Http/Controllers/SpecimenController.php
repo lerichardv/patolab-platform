@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\Invoice;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\Priority;
 use App\Models\PrioritySpecimenOrder;
@@ -570,6 +571,32 @@ class SpecimenController extends Controller
                 'transfer_bank_id' => $validated['transfer_bank_id'] ?? null,
                 'transfer_value' => isset($validated['transfer_value']) ? (float) $validated['transfer_value'] : null,
                 'transfer_authorization_code' => $validated['transfer_authorization_code'] ?? null,
+            ]);
+
+            InvoiceSpecimen::create([
+                'invoice_id' => $invoice->id,
+                'specimen_id' => $specimen->id,
+                'is_group' => false,
+                'group_id' => null,
+                'credit_id' => $creditId,
+                'is_paid' => $validated['payment_type'] !== 'credit',
+                'quantity_paid' => $validated['payment_type'] !== 'credit' ? $qty : 0,
+                'quantity' => $qty,
+                'amount' => $unitPrice,
+                'discount' => $discount,
+                'subtotal' => $subtotal,
+                'exempt_amount' => 0.00,
+                'taxable_amount_15' => 0.00,
+                'taxable_amount_18' => 0.00,
+                'isv_15' => 0.00,
+                'isv_18' => 0.00,
+                'total' => $subtotal,
+                'selected_price' => null,
+                'custom_specimen_price' => $customAmountVal,
+                'additional_discount_enabled' => false,
+                'additional_discount' => 0.00,
+                'age_discount_type' => $validated['age_discount_type'] ?? null,
+                'age_discount_amount' => (float) ($validated['age_discount_amount'] ?? 0.00),
             ]);
 
             if (! $isCredit && $caiRange) {
