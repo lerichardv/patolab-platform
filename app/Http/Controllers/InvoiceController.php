@@ -87,6 +87,24 @@ class InvoiceController extends Controller
                     })
                     ->orWhereHas('specimen', function ($sq) use ($search) {
                         $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('group.specimens', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('groupSpecimens.specimen', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('creditRelation.specimen', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('creditRelation.group.specimens', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('creditRelation.creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
                     });
             });
         }
@@ -344,7 +362,7 @@ class InvoiceController extends Controller
             'creditRelation.specimen.examination',
         ]);
 
-        // Filter by search query (Invoice number, Customer name or Customer ID/RTN)
+        // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
         if ($request->filled('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
@@ -352,6 +370,27 @@ class InvoiceController extends Controller
                     ->orWhereHas('customer', function ($cq) use ($search) {
                         $cq->where('name', 'like', "%{$search}%")
                             ->orWhere('id_number', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('specimen', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('group.specimens', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('groupSpecimens.specimen', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('creditRelation.specimen', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('creditRelation.group.specimens', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('creditRelation.creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
+                        $sq->where('sequence_code', 'like', "%{$search}%");
                     });
             });
         }
