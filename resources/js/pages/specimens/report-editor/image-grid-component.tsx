@@ -22,6 +22,7 @@ import {
     DialogClose,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { uploadImageToEndpoint } from './actions';
 
 interface ImageGridProps {
     editor: any;
@@ -427,12 +428,6 @@ export default function ImageGridComponent({
     ) => {
         const uploadToast = toast.loading('Guardando imagen recortada...');
 
-        const file = new File([croppedBlob], 'cropped.jpg', {
-            type: 'image/jpeg',
-        });
-        const formData = new FormData();
-        formData.append('image', file);
-
         try {
             const isMyTemplates = window.location.pathname.includes(
                 '/my-specimen-type-templates',
@@ -442,53 +437,43 @@ export default function ImageGridComponent({
                 : isMyTemplates
                   ? `/my-specimen-type-templates/upload-image`
                   : `/specimen-type-templates/upload-image`;
-            const response = await fetch(uploadUrl, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN':
-                        (
-                            document.querySelector(
-                                'meta[name="csrf-token"]',
-                            ) as HTMLMetaElement
-                        )?.content ?? '',
-                },
-                body: formData,
-            });
 
-            if (response.ok) {
-                const data = await response.json();
+            const data = await uploadImageToEndpoint(
+                uploadUrl,
+                croppedBlob,
+                'cropped.jpg',
+            );
 
-                if (data.url) {
-                    const pos = getPos();
+            if (data.url) {
+                const pos = getPos();
 
-                    if (pos !== undefined) {
-                        const targetPos = pos + 1 + imgOffset;
+                if (pos !== undefined) {
+                    const targetPos = pos + 1 + imgOffset;
 
-                        // Replace the old image attributes with the new cropped ones atomically
-                        editor
-                            .chain()
-                            .focus()
-                            .command(({ tr }: any) => {
-                                const node = tr.doc.nodeAt(targetPos);
+                    // Replace the old image attributes with the new cropped ones atomically
+                    editor
+                        .chain()
+                        .focus()
+                        .command(({ tr }: any) => {
+                            const node = tr.doc.nodeAt(targetPos);
 
-                                if (node) {
-                                    tr.setNodeMarkup(targetPos, undefined, {
-                                        ...node.attrs,
-                                        src: data.url,
-                                        width: null,
-                                        height: null,
-                                    });
-                                }
+                            if (node) {
+                                tr.setNodeMarkup(targetPos, undefined, {
+                                    ...node.attrs,
+                                    src: data.url,
+                                    width: null,
+                                    height: null,
+                                });
+                            }
 
-                                return true;
-                            })
-                            .run();
+                            return true;
+                        })
+                        .run();
 
-                        toast.dismiss(uploadToast);
-                        toast.success('Imagen recortada con éxito');
+                    toast.dismiss(uploadToast);
+                    toast.success('Imagen recortada con éxito');
 
-                        return;
-                    }
+                    return;
                 }
             }
         } catch (err) {
@@ -518,9 +503,6 @@ export default function ImageGridComponent({
             let successCount = 0;
 
             for (const file of files) {
-                const formData = new FormData();
-                formData.append('image', file);
-
                 try {
                     const isMyTemplates = window.location.pathname.includes(
                         '/my-specimen-type-templates',
@@ -530,41 +512,31 @@ export default function ImageGridComponent({
                         : isMyTemplates
                           ? `/my-specimen-type-templates/upload-image`
                           : `/specimen-type-templates/upload-image`;
-                    const response = await fetch(uploadUrl, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN':
-                                (
-                                    document.querySelector(
-                                        'meta[name="csrf-token"]',
-                                    ) as HTMLMetaElement
-                                )?.content ?? '',
-                        },
-                        body: formData,
-                    });
 
-                    if (response.ok) {
-                        const data = await response.json();
+                    const data = await uploadImageToEndpoint(
+                        uploadUrl,
+                        file,
+                        file.name,
+                    );
 
-                        if (data.url) {
-                            const pos = getPos();
+                    if (data.url) {
+                        const pos = getPos();
 
-                            if (pos !== undefined) {
-                                // Insert image at the end of the grid node
-                                const insertPos = pos + node.nodeSize - 1;
-                                editor
-                                    .chain()
-                                    .focus()
-                                    .insertContentAt(insertPos, {
-                                        type: 'image',
-                                        attrs: {
-                                            src: data.url,
-                                            alignment: 'center',
-                                        },
-                                    })
-                                    .run();
-                                successCount++;
-                            }
+                        if (pos !== undefined) {
+                            // Insert image at the end of the grid node
+                            const insertPos = pos + node.nodeSize - 1;
+                            editor
+                                .chain()
+                                .focus()
+                                .insertContentAt(insertPos, {
+                                    type: 'image',
+                                    attrs: {
+                                        src: data.url,
+                                        alignment: 'center',
+                                    },
+                                })
+                                .run();
+                            successCount++;
                         }
                     }
                 } catch (err) {

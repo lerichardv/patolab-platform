@@ -1,0 +1,10 @@
+export { AddendumEditor } from './addendum-editor';
+export { ClinicalDetailsEditor } from './clinical-details-editor';
+export { CommentsNotesEditor } from './comments-notes-editor';
+export { DiagnosisEditor } from './diagnosis-editor';
+export { LegendEditor } from './legend-editor';
+export { MacroscopyEditor } from './macroscopy-editor';
+export { MicroscopyEditor } from './microscopy-editor';
+export { OpenTextEditor } from './open-text-editor';
+export { ProtocolsEditor } from './protocols-editor';
+export * from './types';
