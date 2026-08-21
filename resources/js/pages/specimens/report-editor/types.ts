@@ -137,6 +137,10 @@ export interface MeasuredBlock {
         | 'signature'
         | 'heading'
         | 'image'
+        | 'image-grid'
+        | 'list'
+        | 'table'
+        | 'paragraph'
         | 'cuttings-summary'
         | 'new-cuttings-summary';
     height: number;
@@ -144,4 +148,10 @@ export interface MeasuredBlock {
     html?: string;
     className?: string;
     text?: string;
+    tag?: string;
+    class?: string;
+    columns?: number;
+    alignment?: string;
+    width?: number | null;
+    images?: string[];
 }

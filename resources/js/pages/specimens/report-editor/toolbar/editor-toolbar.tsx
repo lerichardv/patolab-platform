@@ -4,6 +4,8 @@ import {
     AlignJustify,
     AlignLeft,
     AlignRight,
+    BetweenHorizontalEnd,
+    BetweenVerticalEnd,
     Bold,
     CaseSensitive,
     Heading1,
@@ -52,6 +54,7 @@ import { uploadReportImage } from '../actions';
 import AIDictationSheet from '../ai-dictation-sheet';
 import AIGrammarSheet from '../ai-grammar-sheet';
 import { HIGHLIGHT_COLORS } from '../components/tiptap-extensions';
+import { isSelectionInTable } from '../utils';
 import { FontSizeDropdown } from './font-size-dropdown';
 import { LineHeightDropdown } from './line-height-dropdown';
 import { ToolbarBtn, ToolbarDivider } from './toolbar-btn';
@@ -98,9 +101,40 @@ export function EditorToolbar({
         };
 
         editor.on('transaction', handleUpdate);
+        editor.on('selectionUpdate', handleUpdate);
+        editor.on('update', handleUpdate);
+        editor.on('focus', handleUpdate);
+        editor.on('blur', handleUpdate);
+
+        const dom = editor.view?.dom;
+
+        if (dom) {
+            dom.addEventListener('click', handleUpdate);
+            dom.addEventListener('mouseup', handleUpdate);
+            dom.addEventListener('keyup', handleUpdate);
+            dom.addEventListener('pointerup', handleUpdate);
+        }
+
+        document.addEventListener('selectionchange', handleUpdate);
+
+        // Initial sync
+        handleUpdate();
 
         return () => {
             editor.off('transaction', handleUpdate);
+            editor.off('selectionUpdate', handleUpdate);
+            editor.off('update', handleUpdate);
+            editor.off('focus', handleUpdate);
+            editor.off('blur', handleUpdate);
+
+            if (dom) {
+                dom.removeEventListener('click', handleUpdate);
+                dom.removeEventListener('mouseup', handleUpdate);
+                dom.removeEventListener('keyup', handleUpdate);
+                dom.removeEventListener('pointerup', handleUpdate);
+            }
+
+            document.removeEventListener('selectionchange', handleUpdate);
         };
     }, [editor]);
 
@@ -113,13 +147,49 @@ export function EditorToolbar({
     const [selectedText, setSelectedText] = useState('');
     const hasReplacedRef = useRef(false);
 
-    const activeSelectionText = editor
-        ? editor.state.doc.textBetween(
-              editor.state.selection.from,
-              editor.state.selection.to,
-              '\n',
-          )
-        : '';
+    const activeSelectionText = (() => {
+        if (!editor) {
+            return '';
+        }
+
+        try {
+            const { from, to, empty } = editor.state.selection;
+
+            if (!empty && from < to) {
+                const text = editor.state.doc.textBetween(from, to, '\n');
+
+                if (text.trim().length > 0) {
+                    return text;
+                }
+            }
+
+            // Fallback: check active DOM selection within editor
+            if (typeof window !== 'undefined' && editor.view?.dom) {
+                const domSelection = window.getSelection();
+
+                if (
+                    domSelection &&
+                    domSelection.rangeCount > 0 &&
+                    !domSelection.isCollapsed
+                ) {
+                    const anchorNode = domSelection.anchorNode;
+
+                    if (anchorNode && editor.view.dom.contains(anchorNode)) {
+                        const domText = domSelection.toString();
+
+                        if (domText.trim().length > 0) {
+                            return domText;
+                        }
+                    }
+                }
+            }
+        } catch {
+            // Safe fallback
+        }
+
+        return '';
+    })();
+
     const hasSelection = activeSelectionText.trim().length > 0;
 
     const transformTextCase = (
@@ -214,11 +284,15 @@ export function EditorToolbar({
             return;
         }
 
-        const selected = editor.state.doc.textBetween(
-            editor.state.selection.from,
-            editor.state.selection.to,
-            '\n',
-        );
+        let selected = activeSelectionText;
+
+        if (!selected.trim()) {
+            selected = editor.state.doc.textBetween(
+                editor.state.selection.from,
+                editor.state.selection.to,
+                '\n',
+            );
+        }
 
         if (!selected.trim()) {
             return;
@@ -335,7 +409,7 @@ export function EditorToolbar({
         input.click();
     };
 
-    const inTable = editor?.isActive('table');
+    const inTable = isSelectionInTable(editor);
 
     return (
         <ToolbarContext.Provider value={{ isDictating }}>
@@ -1000,11 +1074,10 @@ export function EditorToolbar({
                                             .addColumnAfter()
                                             .run()
                                     }
-                                    title="Añadir columna"
+                                    title="Añadir columna a la derecha"
+                                    disabled={!editor?.can().addColumnAfter()}
                                 >
-                                    <span className="text-[9px] leading-none font-bold">
-                                        +C
-                                    </span>
+                                    <BetweenVerticalEnd className="h-3.5 w-3.5" />
                                 </ToolbarBtn>
                                 <ToolbarBtn
                                     onClick={() =>
@@ -1014,11 +1087,10 @@ export function EditorToolbar({
                                             .addRowAfter()
                                             .run()
                                     }
-                                    title="Añadir fila"
+                                    title="Añadir fila abajo"
+                                    disabled={!editor?.can().addRowAfter()}
                                 >
-                                    <span className="text-[9px] leading-none font-bold">
-                                        +F
-                                    </span>
+                                    <BetweenHorizontalEnd className="h-3.5 w-3.5" />
                                 </ToolbarBtn>
                                 <ToolbarBtn
                                     onClick={() =>
@@ -1028,11 +1100,10 @@ export function EditorToolbar({
                                             .deleteColumn()
                                             .run()
                                     }
-                                    title="Eliminar columna"
+                                    title="Eliminar columna actual"
+                                    disabled={!editor?.can().deleteColumn()}
                                 >
-                                    <span className="text-[9px] leading-none font-bold text-red-500">
-                                        −C
-                                    </span>
+                                    <BetweenVerticalEnd className="h-3.5 w-3.5 text-red-500" />
                                 </ToolbarBtn>
                                 <ToolbarBtn
                                     onClick={() =>
@@ -1042,11 +1113,10 @@ export function EditorToolbar({
                                             .deleteRow()
                                             .run()
                                     }
-                                    title="Eliminar fila"
+                                    title="Eliminar fila actual"
+                                    disabled={!editor?.can().deleteRow()}
                                 >
-                                    <span className="text-[9px] leading-none font-bold text-red-500">
-                                        −F
-                                    </span>
+                                    <BetweenHorizontalEnd className="h-3.5 w-3.5 text-red-500" />
                                 </ToolbarBtn>
                                 <ToolbarBtn
                                     onClick={() =>
@@ -1056,7 +1126,8 @@ export function EditorToolbar({
                                             .deleteTable()
                                             .run()
                                     }
-                                    title="Eliminar tabla"
+                                    title="Eliminar tabla completa"
+                                    disabled={!editor?.can().deleteTable()}
                                 >
                                     <Trash2 className="h-3.5 w-3.5 text-red-500" />
                                 </ToolbarBtn>

@@ -142,8 +142,8 @@ export function getRootElementAttributes(htmlStr: string): {
     extraAttrs: string;
 } {
     if (typeof window === 'undefined') {
-return { style: '', extraAttrs: '' };
-}
+        return { style: '', extraAttrs: '' };
+    }
 
     try {
         const parser = new DOMParser();
@@ -151,8 +151,8 @@ return { style: '', extraAttrs: '' };
         const elem = doc.body.firstElementChild;
 
         if (!elem) {
-return { style: '', extraAttrs: '' };
-}
+            return { style: '', extraAttrs: '' };
+        }
 
         const styleAttr = elem.getAttribute('style') || '';
 

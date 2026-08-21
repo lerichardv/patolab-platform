@@ -406,6 +406,15 @@
             line-height: 3.97mm;
         }
 
+        .section-content table th p,
+        .section-content table td p,
+        .section-content table p {
+            margin: 0 !important;
+            line-height: inherit !important;
+            text-align: inherit !important;
+            font-size: inherit !important;
+        }
+
         .section-content table th {
             background-color: #f3f4f6;
             font-weight: 600;

@@ -269,22 +269,20 @@ export const editorStyles = `
     flex-wrap: nowrap;
     gap: 1.50mm;
     margin: 1.00mm 0mm;
-    width: 100%;
-    border: 0.26mm solid #e2e8f0;
-    border-radius: 2.12mm;
-    padding: 1.00mm;
-    background-color: rgba(248, 250, 252, 0.1);
+    max-width: 100%;
   }
 
-  .dark .preview-content div[data-type="image-grid"],
-  [class*="dark"] .preview-content div[data-type="image-grid"] {
-    border-color: rgba(30, 41, 59, 0.8);
-    background-color: rgba(2, 6, 23, 0.05);
+  .preview-content .grid-image-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    max-width: 100%;
   }
 
   .preview-content div[data-type="image-grid"] img {
     object-fit: cover;
-    margin: 0 auto;
+    margin: 0 !important;
     display: block;
     border-radius: 4px;
   }
@@ -372,6 +370,17 @@ export const editorStyles = `
     vertical-align: top;
     font-size: 2.51mm;
     line-height: 3.97mm;
+  }
+  .preview-content table th p,
+  .preview-content table td p,
+  .preview-content table p,
+  .tiptap table th p,
+  .tiptap table td p,
+  .tiptap table p {
+    margin: 0 !important;
+    line-height: inherit !important;
+    text-align: inherit !important;
+    font-size: inherit !important;
   }
   .tiptap table th {
     background-color: #f3f4f6;
