@@ -19,6 +19,8 @@ import {
     Edit2,
     Loader2,
     Info,
+    Layers,
+    ChevronDown,
 } from 'lucide-react';
 import React from 'react';
 import { createPortal } from 'react-dom';
@@ -40,7 +42,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
     Command,
     CommandEmpty,
@@ -76,6 +86,10 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import {
+    calculateInvoiceItem,
+    calculateConsolidatedTotals,
+} from '@/services/invoice-calculation';
 import CustomerSheet from '../customers/customer-sheet';
 import {
     PaymentMethodSheet,
@@ -383,6 +397,9 @@ export default function SpecimenForm({
         React.useState(false);
     const [showBlockedPaymentAlert, setShowBlockedPaymentAlert] =
         React.useState(false);
+    const [showExamChangePricePrompt, setShowExamChangePricePrompt] =
+        React.useState(false);
+    const [unlockedFullSteps, setUnlockedFullSteps] = React.useState(!specimen);
     const [isFacturating, setIsFacturating] = React.useState(false);
     const [isPaymentSheetOpen, setIsPaymentSheetOpen] = React.useState(false);
     const [isReservingCode, setIsReservingCode] = React.useState(false);
@@ -403,6 +420,15 @@ export default function SpecimenForm({
         setLocalSequences(sequences);
     }, [sequences]);
 
+    const initialInvoice = specimen
+        ? specimen.invoice_relation ||
+          specimen.invoiceRelation ||
+          specimen.group?.invoice ||
+          specimen.group_invoice ||
+          specimen.invoice ||
+          null
+        : null;
+
     const {
         data,
         setData,
@@ -421,6 +447,13 @@ export default function SpecimenForm({
         specimen_type_examination: specimen?.specimen_type_examination
             ? specimen.specimen_type_examination.toString()
             : '',
+        selected_examination_ids:
+            specimen?.examinations && specimen.examinations.length > 0
+                ? specimen.examinations.map((e: any) => e.id.toString())
+                : specimen?.specimen_type_examination
+                  ? [specimen.specimen_type_examination.toString()]
+                  : ([] as string[]),
+        examinations: [] as Array<any>,
         specimen_category: specimen?.specimen_category
             ? specimen.specimen_category.toString()
             : '',
@@ -452,51 +485,55 @@ export default function SpecimenForm({
         additional_discount: '0',
         age_discount_type: null as string | null,
         age_discount_amount: '0',
-        payment_type: specimen?.invoice_relation?.payment_type || '',
+        payment_type: initialInvoice?.payment_type || '',
         regenerate_pdf: true,
         template_id: '',
         proof_of_payment: null as File | null,
-        has_initial_payment: specimen?.invoice_relation?.credit_payment_id
+        has_initial_payment: initialInvoice?.credit_payment_id || initialInvoice?.credit_relation || initialInvoice?.creditRelation
             ? parseFloat(
-                  specimen?.invoice_relation?.credit_relation?.amount_paid ||
+                  initialInvoice?.credit_relation?.amount_paid ||
+                      initialInvoice?.creditRelation?.amount_paid ||
                       '0',
               ) > 0
             : false,
-        initial_payment_amount: specimen?.invoice_relation?.credit_payment_id
-            ? specimen?.invoice_relation?.credit_relation?.amount_paid?.toString() ||
-              ''
+        initial_payment_amount: initialInvoice?.credit_payment_id || initialInvoice?.credit_relation || initialInvoice?.creditRelation
+            ? (
+                  initialInvoice?.credit_relation?.amount_paid ||
+                  initialInvoice?.creditRelation?.amount_paid ||
+                  ''
+              ).toString()
             : '',
-        initial_payment_type: specimen?.invoice_relation?.credit_payment_id
-            ? specimen?.invoice_relation?.cash_value
+        initial_payment_type: initialInvoice?.credit_payment_id || initialInvoice?.credit_relation || initialInvoice?.creditRelation
+            ? initialInvoice?.cash_value && parseFloat(initialInvoice.cash_value) > 0
                 ? 'cash'
-                : specimen?.invoice_relation?.check_value
+                : initialInvoice?.check_value && parseFloat(initialInvoice.check_value) > 0
                   ? 'check'
-                  : specimen?.invoice_relation?.card_value_charged
+                  : initialInvoice?.card_value_charged && parseFloat(initialInvoice.card_value_charged) > 0
                     ? 'credit card'
-                    : specimen?.invoice_relation?.transfer_value
+                    : initialInvoice?.transfer_value && parseFloat(initialInvoice.transfer_value) > 0
                       ? 'bank transfer'
                       : 'cash'
             : 'cash',
 
         // Detailed payment fields
         payment_method_date:
-            specimen?.invoice_relation?.payment_method_date ||
+            initialInvoice?.payment_method_date ||
             new Date().toISOString().split('T')[0],
-        cash_value: specimen?.invoice_relation?.cash_value?.toString() || '',
-        check_number: specimen?.invoice_relation?.check_number || '',
-        check_value: specimen?.invoice_relation?.check_value?.toString() || '',
-        card_last_4: specimen?.invoice_relation?.card_last_4 || '',
+        cash_value: initialInvoice?.cash_value?.toString() || '',
+        check_number: initialInvoice?.check_number || '',
+        check_value: initialInvoice?.check_value?.toString() || '',
+        card_last_4: initialInvoice?.card_last_4 || '',
         card_value_charged:
-            specimen?.invoice_relation?.card_value_charged?.toString() || '',
-        card_expiration: specimen?.invoice_relation?.card_expiration || '',
+            initialInvoice?.card_value_charged?.toString() || '',
+        card_expiration: initialInvoice?.card_expiration || '',
         card_authorization_code:
-            specimen?.invoice_relation?.card_authorization_code || '',
+            initialInvoice?.card_authorization_code || '',
         transfer_bank_id:
-            specimen?.invoice_relation?.transfer_bank_id?.toString() || '',
+            initialInvoice?.transfer_bank_id?.toString() || '',
         transfer_value:
-            specimen?.invoice_relation?.transfer_value?.toString() || '',
+            initialInvoice?.transfer_value?.toString() || '',
         transfer_authorization_code:
-            specimen?.invoice_relation?.transfer_authorization_code || '',
+            initialInvoice?.transfer_authorization_code || '',
 
         // Insumos field (creation only)
         agregar_insumos: false,
@@ -510,6 +547,138 @@ export default function SpecimenForm({
             prices: any[];
         }>,
     });
+
+    const specimenInvoice = React.useMemo(() => {
+        if (!specimen) return null;
+        return (
+            specimen.invoice_relation ||
+            specimen.invoiceRelation ||
+            specimen.group?.invoice ||
+            specimen.group_invoice ||
+            specimen.invoice ||
+            null
+        );
+    }, [specimen]);
+
+    const originalSpecimenType = React.useMemo(() => {
+        return specimen?.specimen_type ? String(specimen.specimen_type) : '';
+    }, [specimen]);
+
+    const originalExaminationIdsStr = React.useMemo(() => {
+        if (!specimen) {
+return '';
+}
+
+        let ids: string[] = [];
+
+        if (specimen.examinations && specimen.examinations.length > 0) {
+            ids = specimen.examinations.map((e: any) => String(e.id));
+        } else if (specimen.specimen_type_examination) {
+            ids = [String(specimen.specimen_type_examination)];
+        }
+
+        return ids.sort().join(',');
+    }, [specimen]);
+
+    const currentExaminationIdsStr = React.useMemo(() => {
+        const ids = (data.selected_examination_ids || []).map((id: any) =>
+            String(id),
+        );
+
+        return ids.sort().join(',');
+    }, [data.selected_examination_ids]);
+
+    const hasTypeOrExamsChanged = React.useMemo(() => {
+        if (!specimen) {
+return false;
+}
+
+        const typeChanged =
+            String(data.specimen_type || '') !== originalSpecimenType;
+        const examsChanged =
+            currentExaminationIdsStr !== originalExaminationIdsStr;
+
+        return typeChanged || examsChanged;
+    }, [
+        specimen,
+        data.specimen_type,
+        originalSpecimenType,
+        currentExaminationIdsStr,
+        originalExaminationIdsStr,
+    ]);
+
+    const handleConfirmExamChangePrompt = () => {
+        setShowExamChangePricePrompt(false);
+        setUnlockedFullSteps(true);
+        setCurrentStep(2);
+
+        const targetInvoice = specimenInvoice;
+        const pType = data.payment_type || targetInvoice?.payment_type || 'cash';
+        const calcTotal =
+            consolidatedTotals?.total ??
+            (targetInvoice?.total ? parseFloat(targetInvoice.total) : 0);
+        const calcTotalStr =
+            calcTotal > 0 ? calcTotal.toFixed(2) : targetInvoice?.total?.toString() || '0';
+
+        const creditRel =
+            targetInvoice?.credit_relation || targetInvoice?.creditRelation;
+
+        setData((d) => {
+            const next = { ...d };
+            next.payment_type = pType;
+            next.payment_method_date =
+                d.payment_method_date ||
+                targetInvoice?.payment_method_date ||
+                new Date().toISOString().split('T')[0];
+
+            if (pType === 'cash') {
+                next.cash_value =
+                    d.cash_value && parseFloat(d.cash_value) > 0
+                        ? d.cash_value
+                        : targetInvoice?.cash_value?.toString() || calcTotalStr;
+            } else if (pType === 'check') {
+                next.check_number = d.check_number || targetInvoice?.check_number || '';
+                next.check_value =
+                    d.check_value && parseFloat(d.check_value) > 0
+                        ? d.check_value
+                        : targetInvoice?.check_value?.toString() || calcTotalStr;
+            } else if (pType === 'credit card') {
+                next.card_last_4 = d.card_last_4 || targetInvoice?.card_last_4 || '';
+                next.card_expiration =
+                    d.card_expiration || targetInvoice?.card_expiration || '';
+                next.card_authorization_code =
+                    d.card_authorization_code ||
+                    targetInvoice?.card_authorization_code ||
+                    '';
+                next.card_value_charged =
+                    d.card_value_charged && parseFloat(d.card_value_charged) > 0
+                        ? d.card_value_charged
+                        : targetInvoice?.card_value_charged?.toString() || calcTotalStr;
+            } else if (pType === 'bank transfer') {
+                next.transfer_bank_id =
+                    d.transfer_bank_id || targetInvoice?.transfer_bank_id?.toString() || '';
+                next.transfer_authorization_code =
+                    d.transfer_authorization_code ||
+                    targetInvoice?.transfer_authorization_code ||
+                    '';
+                next.transfer_value =
+                    d.transfer_value && parseFloat(d.transfer_value) > 0
+                        ? d.transfer_value
+                        : targetInvoice?.transfer_value?.toString() || calcTotalStr;
+            } else if (pType === 'credit') {
+                const hasCredit = targetInvoice?.credit_payment_id || creditRel
+                    ? parseFloat(creditRel?.amount_paid || '0') > 0
+                    : false;
+                next.has_initial_payment = d.has_initial_payment ?? hasCredit;
+                next.initial_payment_amount =
+                    d.initial_payment_amount ||
+                    creditRel?.amount_paid?.toString() ||
+                    '';
+            }
+
+            return next;
+        });
+    };
 
     const filteredProducts = React.useMemo(() => {
         return products.filter(
@@ -657,12 +826,6 @@ export default function SpecimenForm({
         clearErrors();
     }, []);
 
-    React.useEffect(() => {
-        if (setIsDirty) {
-            setIsDirty(isDirty);
-        }
-    }, [isDirty, setIsDirty]);
-
     const matchingSequence = React.useMemo(() => {
         if (!data.specimen_type) {
             return null;
@@ -708,6 +871,14 @@ export default function SpecimenForm({
                 String(specimen.specimen_type_examination)
         );
     }, [specimen, data.specimen_type, data.specimen_type_examination]);
+
+    React.useEffect(() => {
+        if (setIsDirty) {
+            setIsDirty(
+                isDirty || isSpecimenTypeChanged || hasTypeOrExamsChanged,
+            );
+        }
+    }, [isDirty, isSpecimenTypeChanged, hasTypeOrExamsChanged, setIsDirty]);
 
     const isGroupSpecimen = React.useMemo(() => {
         if (!specimen) {
@@ -898,13 +1069,8 @@ export default function SpecimenForm({
                 if (isNaN(addDiscount) || addDiscount < 0) {
                     localErrors.additional_discount =
                         'El descuento adicional debe ser mayor o igual a 0.';
-                } else if (
-                    addDiscount >
-                    maxSpecimenPriceVal * quantityVal +
-                        customAmountVal -
-                        autoDiscountTotal
-                ) {
-                    localErrors.additional_discount = `El descuento adicional no puede superar el subtotal (L. ${(maxSpecimenPriceVal * quantityVal + customAmountVal - autoDiscountTotal).toFixed(2)}).`;
+                } else if (addDiscount > subtotalVal) {
+                    localErrors.additional_discount = `El descuento adicional no puede superar el subtotal (L. ${subtotalVal.toFixed(2)}).`;
                 }
             }
         }
@@ -953,14 +1119,16 @@ export default function SpecimenForm({
                 setError(key as any, val);
             });
 
+            const firstErrKey = Object.keys(localErrors)[0];
+            const firstErrMsg = localErrors[firstErrKey];
+
             toast.error(
                 <div className="flex flex-col gap-1">
                     <span className="flex items-center gap-1.5 text-sm font-bold text-destructive">
                         <AlertCircle className="h-4 w-4" /> Error de Validación
                     </span>
-                    <span className="text-xs text-muted-foreground">
-                        Por favor, complete todos los campos obligatorios del
-                        Paso 3 antes de continuar.
+                    <span className="text-xs font-medium text-foreground">
+                        {firstErrMsg}
                     </span>
                 </div>,
             );
@@ -979,10 +1147,28 @@ export default function SpecimenForm({
             return;
         }
 
-        // Si es edición, se muestra confirmación de regenerar factura PDF
+        // Si es edición:
         if (specimen) {
+            if (hasTypeOrExamsChanged && !unlockedFullSteps) {
+                setShowExamChangePricePrompt(true);
+
+                return;
+            }
+
+            if (unlockedFullSteps && currentStep === 1) {
+                setCurrentStep(2);
+
+                return;
+            }
+
+            if (unlockedFullSteps && currentStep === 2) {
+                if (!validateStep3()) {
+                    return;
+                }
+            }
+
             const originalPaymentType =
-                specimen?.invoice_relation?.payment_type;
+                specimenInvoice?.payment_type;
             const newVal = data.payment_type;
 
             if (
@@ -1092,80 +1278,171 @@ export default function SpecimenForm({
     const thirdAgePercent = parseFloat(settings?.third_age_discount || '30');
     const fourthAgePercent = parseFloat(settings?.fourth_age_discount || '40');
 
-    const quantityVal = data.quantity ?? 1;
+    // Helper to update individual examination billing settings
+    const updateExamConfig = (examId: number, field: string, value: any) => {
+        setData((prev) => {
+            const currentExams = [...(prev.examinations || [])];
+            const idx = currentExams.findIndex(
+                (x) => x.examination_id === examId,
+            );
+            const updatedItem =
+                idx >= 0
+                    ? { ...currentExams[idx] }
+                    : { examination_id: examId };
 
-    // Discounts
-    const specimenDiscountVal = React.useMemo(() => {
-        const selected = parseFloat(data.selected_price) || 0;
+            updatedItem[field] = value;
 
-        return Math.max(0, maxSpecimenPriceVal - selected) * quantityVal;
-    }, [maxSpecimenPriceVal, data.selected_price, quantityVal]);
+            if (field === 'selected_price' && value !== 'custom') {
+                updatedItem.custom_specimen_price = '0';
+            }
 
-    const ageDiscountVal = React.useMemo(() => {
-        const selected = parseFloat(data.selected_price) || 0;
+            if (idx >= 0) {
+                currentExams[idx] = updatedItem;
+            } else {
+                currentExams.push(updatedItem);
+            }
 
-        if (data.age_discount_type === 'third') {
-            return ((selected * thirdAgePercent) / 100) * quantityVal;
-        } else if (data.age_discount_type === 'fourth') {
-            return ((selected * fourthAgePercent) / 100) * quantityVal;
-        }
+            return {
+                ...prev,
+                examinations: currentExams,
+            };
+        });
+    };
 
-        return 0;
+    const calculatedExaminations = React.useMemo(() => {
+        const ids = data.selected_examination_ids || [];
+
+        return ids.map((idStr: string) => {
+            const examId = parseInt(idStr, 10);
+            const examObj = examinations.find((e) => e.id === examId);
+            const config =
+                (data.examinations || []).find(
+                    (x: any) => x.examination_id === examId,
+                ) || {};
+            const prices = examObj?.prices || [];
+
+            const itemCalc = calculateInvoiceItem(
+                {
+                    examination_id: examId,
+                    selected_price: config.selected_price,
+                    custom_specimen_price: config.custom_specimen_price,
+                    quantity: config.quantity,
+                    age_discount_type: config.age_discount_type,
+                    additional_discount_enabled:
+                        config.additional_discount_enabled,
+                    additional_discount: config.additional_discount,
+                    available_prices: prices,
+                },
+                examObj,
+                {
+                    third_age_discount: thirdAgePercent,
+                    fourth_age_discount: fourthAgePercent,
+                },
+            );
+
+            return {
+                ...itemCalc,
+                examObj,
+                prices,
+                totalDiscount: itemCalc.totalLineDiscount,
+                subtotal: itemCalc.lineSubtotal,
+                priceDiscount: itemCalc.priceDiscount,
+                ageDiscount: itemCalc.ageDiscountAmount,
+                additionalDiscount: itemCalc.addDiscountAmount,
+            };
+        });
     }, [
-        data.selected_price,
-        data.age_discount_type,
+        data.selected_examination_ids,
+        data.examinations,
+        examinations,
         thirdAgePercent,
         fourthAgePercent,
-        quantityVal,
     ]);
 
-    const autoDiscountTotal = specimenDiscountVal + ageDiscountVal;
-
+    // Sync data.examinations whenever selected_examination_ids changes to ensure defaults
     React.useEffect(() => {
-        if (data.age_discount_amount !== ageDiscountVal.toString()) {
-            setData('age_discount_amount', ageDiscountVal.toString());
+        const ids = data.selected_examination_ids || [];
+
+        if (ids.length === 0) {
+return;
+}
+
+        const currentExamConfigs = [...(data.examinations || [])];
+        let updated = false;
+
+        ids.forEach((idStr: string) => {
+            const examId = parseInt(idStr, 10);
+            const exists = currentExamConfigs.some(
+                (x: any) => x.examination_id === examId,
+            );
+
+            if (!exists) {
+                const examObj = examinations.find((e) => e.id === examId);
+                const prices = examObj?.prices || [];
+                const defaultPrice =
+                    prices.length > 0 ? prices[0].amount.toString() : '';
+                currentExamConfigs.push({
+                    examination_id: examId,
+                    quantity: 1,
+                    selected_price: defaultPrice,
+                    custom_specimen_price: '0',
+                    additional_discount_enabled: false,
+                    additional_discount: '0',
+                    age_discount_type: null,
+                    age_discount_amount: '0',
+                });
+                updated = true;
+            }
+        });
+
+        if (updated) {
+            setData('examinations', currentExamConfigs);
         }
-    }, [ageDiscountVal]);
+    }, [data.selected_examination_ids]);
 
-    React.useEffect(() => {
-        const extra = data.custom_amount_enabled
-            ? parseFloat(data.custom_amount) || 0
-            : 0;
-        const amountToSet = maxSpecimenPriceVal * quantityVal + extra;
-
-        if (data.amount !== amountToSet.toString()) {
-            setData('amount', amountToSet.toString());
-        }
-    }, [
-        maxSpecimenPriceVal,
-        quantityVal,
-        data.custom_amount_enabled,
-        data.custom_amount,
-    ]);
-
-    React.useEffect(() => {
-        const additionalDiscountVal = data.additional_discount_enabled
-            ? parseFloat(data.additional_discount) || 0
-            : 0;
-        const totalDiscount = autoDiscountTotal + additionalDiscountVal;
-
-        if (data.discount !== totalDiscount.toString()) {
-            setData('discount', totalDiscount.toString());
-        }
-    }, [
-        autoDiscountTotal,
-        data.additional_discount_enabled,
-        data.additional_discount,
-    ]);
-
-    // Cálculos de facturación en tiempo real
+    // Real-time invoice billing totals calculation
     const insumosTotalVal = data.insumos.reduce(
         (sum: number, insumo: any) =>
             sum + parseFloat(insumo.price || 0) * (insumo.quantity || 0),
         0,
     );
 
-    const amountVal = parseFloat(data.amount) || 0;
+    const consolidatedTotals = React.useMemo(() => {
+        const extra = data.custom_amount_enabled
+            ? parseFloat(data.custom_amount) || 0
+            : 0;
+
+        return calculateConsolidatedTotals(
+            calculatedExaminations,
+            insumosTotalVal,
+            extra,
+        );
+    }, [
+        calculatedExaminations,
+        insumosTotalVal,
+        data.custom_amount_enabled,
+        data.custom_amount,
+    ]);
+
+    const amountVal = consolidatedTotals.amount;
+    const discountVal = consolidatedTotals.discount;
+    const subtotalVal = consolidatedTotals.subtotal;
+    const totalVal = consolidatedTotals.total;
+
+    React.useEffect(() => {
+        if (
+            data.amount !== amountVal.toString() ||
+            data.discount !== discountVal.toString() ||
+            data.quantity !== (consolidatedTotals.quantity || 1)
+        ) {
+            setData((d) => ({
+                ...d,
+                amount: amountVal.toString(),
+                discount: discountVal.toString(),
+                quantity: consolidatedTotals.quantity || 1,
+            }));
+        }
+    }, [amountVal, discountVal, consolidatedTotals.quantity]);
     const selectedPriceVal = parseFloat(data.selected_price) || 0;
     const customAmountVal = data.custom_amount_enabled
         ? parseFloat(data.custom_amount) || 0
@@ -1173,14 +1450,6 @@ export default function SpecimenForm({
     const additionalDiscountVal = data.additional_discount_enabled
         ? parseFloat(data.additional_discount) || 0
         : 0;
-    const discountVal = parseFloat(data.discount) || 0;
-    const subtotalVal = Math.max(
-        0,
-        maxSpecimenPriceVal * quantityVal +
-            customAmountVal -
-            (autoDiscountTotal + additionalDiscountVal),
-    );
-    const totalVal = subtotalVal; // taxes are 0
 
     const selectedCustomer = selectedCustomerData;
     const selectedCustomerLabel = selectedCustomer?.name || 'Sin seleccionar';
@@ -1229,7 +1498,7 @@ export default function SpecimenForm({
                 className="flex flex-col gap-6 px-5 py-4 pt-0"
             >
                 <div className="mb-2 flex flex-col gap-4 rounded-lg border border-border/60 bg-muted/40 p-4">
-                    {!specimen && (
+                    {(!specimen || unlockedFullSteps) && (
                         <div className="mx-auto flex w-full max-w-lg flex-nowrap items-center justify-center gap-2 border-b border-border/40 pb-4 sm:gap-4">
                             {/* Paso 1 */}
                             <button
@@ -1447,7 +1716,9 @@ export default function SpecimenForm({
                 </div>
 
                 {/* SECCIÓN 1: DATOS DE LA MUESTRA */}
-                {(!specimen ? currentStep === 1 : true) && (
+                {(!specimen || unlockedFullSteps
+                    ? currentStep === 1
+                    : true) && (
                     <div>
                         <h3 className="mb-4 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
                             Datos de la Muestra
@@ -1573,21 +1844,84 @@ export default function SpecimenForm({
                                         <Plus className="h-3 w-3" /> Nuevo
                                     </button>
                                 </div>
-                                <FormCombobox
-                                    placeholder="Seleccionar tipo"
-                                    value={data.specimen_type}
-                                    onChange={(v) => {
-                                        setData((d) => ({
-                                            ...d,
-                                            specimen_type: v,
-                                            reserved_code: '',
-                                        }));
-                                    }}
-                                    options={sortedSpecimenTypes.map((t) => ({
-                                        label: t.name,
-                                        value: t.id.toString(),
-                                    }))}
-                                />
+                                <Popover modal={true}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
+                                        >
+                                            <div className="flex items-center gap-2 truncate">
+                                                <Microscope className="h-4 w-4 text-muted-foreground" />
+                                                <span className="truncate">
+                                                    {sortedSpecimenTypes.find(
+                                                        (t) =>
+                                                            t.id.toString() ===
+                                                            data.specimen_type,
+                                                    )?.name ||
+                                                        'Seleccionar tipo'}
+                                                </span>
+                                            </div>
+                                            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        className="z-[9999] w-[--radix-popover-trigger-width] p-0"
+                                        align="start"
+                                    >
+                                        <Command>
+                                            <CommandInput placeholder="Buscar tipo de muestra..." />
+                                            <CommandList>
+                                                <CommandEmpty>
+                                                    No se encontraron
+                                                    resultados.
+                                                </CommandEmpty>
+                                                <CommandGroup>
+                                                    {sortedSpecimenTypes.map(
+                                                        (t) => (
+                                                            <CommandItem
+                                                                key={t.id}
+                                                                value={t.name}
+                                                                onSelect={() => {
+                                                                    setData(
+                                                                        (
+                                                                            d,
+                                                                        ) => ({
+                                                                            ...d,
+                                                                            specimen_type:
+                                                                                t.id.toString(),
+                                                                            selected_examination_ids:
+                                                                                [],
+                                                                            specimen_type_examination:
+                                                                                '',
+                                                                            examinations:
+                                                                                [],
+                                                                            reserved_code:
+                                                                                '',
+                                                                        }),
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <Check
+                                                                    className={cn(
+                                                                        'mr-2 h-4 w-4',
+                                                                        data.specimen_type ===
+                                                                            t.id.toString()
+                                                                            ? 'opacity-100'
+                                                                            : 'opacity-0',
+                                                                    )}
+                                                                />
+                                                                <span>
+                                                                    {t.name}
+                                                                </span>
+                                                            </CommandItem>
+                                                        ),
+                                                    )}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
 
                                 {errors.specimen_type && (
                                     <p className="text-sm text-destructive">
@@ -1599,7 +1933,7 @@ export default function SpecimenForm({
                             <div className="grid gap-2">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="specimen_type_examination">
-                                        Examen a Realizar
+                                        Examen(es) a Realizar
                                     </Label>
                                     <button
                                         type="button"
@@ -1617,22 +1951,217 @@ export default function SpecimenForm({
                                         <Plus className="h-3 w-3" /> Nuevo
                                     </button>
                                 </div>
-                                <FormCombobox
-                                    placeholder={
-                                        data.specimen_type
-                                            ? 'Seleccionar examen'
-                                            : 'Seleccione un tipo de muestra primero'
-                                    }
-                                    value={data.specimen_type_examination}
-                                    onChange={(v) =>
-                                        setData('specimen_type_examination', v)
-                                    }
-                                    options={filteredExaminations.map((e) => ({
-                                        label: e.name,
-                                        value: e.id.toString(),
-                                    }))}
-                                    disabled={!data.specimen_type}
-                                />
+                                <Popover modal={true}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            disabled={!data.specimen_type}
+                                            className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50 disabled:opacity-50"
+                                        >
+                                            <div className="flex items-center gap-2 truncate">
+                                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                                <span className="truncate">
+                                                    {data.selected_examination_ids &&
+                                                    data
+                                                        .selected_examination_ids
+                                                        .length > 0
+                                                        ? `Análisis (${data.selected_examination_ids.length} seleccionados)`
+                                                        : data.specimen_type
+                                                          ? 'Seleccionar análisis'
+                                                          : 'Seleccione un tipo primero'}
+                                                </span>
+                                            </div>
+                                            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        className="z-[9999] w-[--radix-popover-trigger-width] p-2"
+                                        align="start"
+                                    >
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+                                                <span>
+                                                    Filtrar por análisis
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const allExamIds =
+                                                            filteredExaminations.map(
+                                                                (e) =>
+                                                                    e.id.toString(),
+                                                            );
+                                                        const areAllSelected =
+                                                            allExamIds.length >
+                                                                0 &&
+                                                            allExamIds.every(
+                                                                (id) =>
+                                                                    (
+                                                                        data.selected_examination_ids ||
+                                                                        []
+                                                                    ).includes(
+                                                                        id,
+                                                                    ),
+                                                            );
+                                                        const nextExams =
+                                                            areAllSelected
+                                                                ? []
+                                                                : allExamIds;
+
+                                                        const examObjs =
+                                                            nextExams.map(
+                                                                (idStr) => {
+                                                                    const examObj =
+                                                                        filteredExaminations.find(
+                                                                            (
+                                                                                e,
+                                                                            ) =>
+                                                                                e.id.toString() ===
+                                                                                idStr,
+                                                                        );
+
+                                                                    return {
+                                                                        examination_id:
+                                                                            parseInt(
+                                                                                idStr,
+                                                                                10,
+                                                                            ),
+                                                                        name: examObj
+                                                                            ? examObj.name
+                                                                            : '',
+                                                                        quantity: 1,
+                                                                        amount: 0,
+                                                                        discount: 0,
+                                                                        subtotal: 0,
+                                                                    };
+                                                                },
+                                                            );
+
+                                                        setData((d) => ({
+                                                            ...d,
+                                                            selected_examination_ids:
+                                                                nextExams,
+                                                            specimen_type_examination:
+                                                                nextExams[0] ||
+                                                                '',
+                                                            examinations:
+                                                                examObjs,
+                                                        }));
+                                                    }}
+                                                    className="cursor-pointer font-medium transition-colors hover:text-primary"
+                                                >
+                                                    {filteredExaminations.length >
+                                                        0 &&
+                                                    filteredExaminations.every(
+                                                        (e) =>
+                                                            (
+                                                                data.selected_examination_ids ||
+                                                                []
+                                                            ).includes(
+                                                                e.id.toString(),
+                                                            ),
+                                                    )
+                                                        ? 'Ninguno'
+                                                        : 'Todos'}
+                                                </button>
+                                            </div>
+                                            <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
+                                                {filteredExaminations.map(
+                                                    (exam) => {
+                                                        const examIdStr =
+                                                            exam.id.toString();
+                                                        const isChecked = (
+                                                            data.selected_examination_ids ||
+                                                            []
+                                                        ).includes(examIdStr);
+
+                                                        return (
+                                                            <div
+                                                                key={exam.id}
+                                                                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+                                                                onClick={() => {
+                                                                    const currentSelected =
+                                                                        data.selected_examination_ids ||
+                                                                        [];
+                                                                    const nextExams =
+                                                                        isChecked
+                                                                            ? currentSelected.filter(
+                                                                                  (
+                                                                                      id: string,
+                                                                                  ) =>
+                                                                                      id !==
+                                                                                      examIdStr,
+                                                                              )
+                                                                            : [
+                                                                                  ...currentSelected,
+                                                                                  examIdStr,
+                                                                              ];
+
+                                                                    const examObjs =
+                                                                        nextExams.map(
+                                                                            (
+                                                                                idStr: string,
+                                                                            ) => {
+                                                                                const examObj =
+                                                                                    filteredExaminations.find(
+                                                                                        (
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            e.id.toString() ===
+                                                                                            idStr,
+                                                                                    );
+
+                                                                                return {
+                                                                                    examination_id:
+                                                                                        parseInt(
+                                                                                            idStr,
+                                                                                            10,
+                                                                                        ),
+                                                                                    name: examObj
+                                                                                        ? examObj.name
+                                                                                        : '',
+                                                                                    quantity: 1,
+                                                                                    amount: 0,
+                                                                                    discount: 0,
+                                                                                    subtotal: 0,
+                                                                                };
+                                                                            },
+                                                                        );
+
+                                                                    setData(
+                                                                        (
+                                                                            d,
+                                                                        ) => ({
+                                                                            ...d,
+                                                                            selected_examination_ids:
+                                                                                nextExams,
+                                                                            specimen_type_examination:
+                                                                                nextExams[0] ||
+                                                                                '',
+                                                                            examinations:
+                                                                                examObjs,
+                                                                        }),
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <Checkbox
+                                                                    checked={
+                                                                        isChecked
+                                                                    }
+                                                                    className="pointer-events-none"
+                                                                    onCheckedChange={() => {}}
+                                                                />
+                                                                <span className="truncate">
+                                                                    {exam.name}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    },
+                                                )}
+                                            </div>
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
                                 {errors.specimen_type_examination && (
                                     <p className="text-sm text-destructive">
                                         {errors.specimen_type_examination}
@@ -2013,7 +2542,7 @@ export default function SpecimenForm({
                             )}
                         </div>
 
-                        {specimen && specimen.invoice_relation && (
+                        {specimen && specimenInvoice && (
                             <div className="mt-6 flex flex-col gap-5 border-t pt-4">
                                 <h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
                                     Información de Facturación
@@ -2081,7 +2610,7 @@ export default function SpecimenForm({
                                         <Label htmlFor="proof_of_payment">
                                             Comprobante de Pago (PDF o Imagen){' '}
                                             {isProofRequired &&
-                                                !specimen?.invoice_relation
+                                                !specimenInvoice
                                                     ?.proof_of_payment && (
                                                     <span className="text-destructive">
                                                         *
@@ -2135,10 +2664,8 @@ export default function SpecimenForm({
 
                                         {/* If no new proof of payment is selected but one already exists in DB */}
                                         {!data.proof_of_payment &&
-                                            specimen?.invoice_relation
-                                                ?.proof_of_payment &&
-                                            specimen.invoice_relation
-                                                .proof_of_payment !==
+                                            specimenInvoice?.proof_of_payment &&
+                                            specimenInvoice.proof_of_payment !==
                                                 'Efectivo' && (
                                                 <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 p-3">
                                                     <div className="flex items-center gap-3">
@@ -2151,7 +2678,7 @@ export default function SpecimenForm({
                                                                 actual guardado
                                                             </span>
                                                             <a
-                                                                href={`/storage/${specimen.invoice_relation.proof_of_payment}`}
+                                                                href={`/storage/${specimenInvoice.proof_of_payment}`}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className="text-[10px] text-primary hover:underline"
@@ -2201,8 +2728,7 @@ export default function SpecimenForm({
                                             >
                                                 <Upload className="h-4 w-4 text-muted-foreground" />
                                                 <span>
-                                                    {specimen?.invoice_relation
-                                                        ?.proof_of_payment
+                                                    {specimenInvoice?.proof_of_payment
                                                         ? 'Reemplazar Comprobante'
                                                         : 'Seleccionar Archivo (Máx 50MB)'}
                                                 </span>
@@ -2702,8 +3228,8 @@ export default function SpecimenForm({
                     </div>
                 )}
 
-                {/* SECCIÓN 2: FACTURACIÓN (CREACIÓN SOLAMENTE) */}
-                {!specimen && currentStep === 2 && (
+                {/* SECCIÓN 2: FACTURACIÓN */}
+                {(!specimen || unlockedFullSteps) && currentStep === 2 && (
                     <>
                         {data.reserved_code && (
                             <div className="mb-4 flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
@@ -2725,213 +3251,412 @@ export default function SpecimenForm({
                             <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
                                 {/* Left Column: Fields */}
                                 <div className="flex flex-col gap-5 lg:col-span-8">
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                        <div className="grid gap-2">
-                                            <div className="flex items-center justify-between">
-                                                <Label
-                                                    htmlFor="selected_price"
-                                                    className="text-xs font-semibold"
-                                                >
-                                                    Importe / Precio Base (L.) *
-                                                </Label>
-                                                {data.specimen_type_examination && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setIsEditPricesSheetOpen(
-                                                                true,
-                                                            )
+                                    {/* Itemized examination billing cards list */}
+                                    <div className="flex flex-col gap-4">
+                                        {calculatedExaminations.map(
+                                            (examCalc: any, idx: number) => {
+                                                const examObj =
+                                                    examCalc.examObj;
+                                                const examName = examObj
+                                                    ? examObj.name
+                                                    : `Análisis #${idx + 1}`;
+                                                const examPrices =
+                                                    examCalc.prices || [];
+
+                                                return (
+                                                    <Card
+                                                        key={
+                                                            examCalc.examination_id
                                                         }
-                                                        className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                                        className="overflow-hidden border border-border/80 pt-6 pb-2 shadow-sm"
                                                     >
-                                                        <Edit2 className="h-3 w-3" />{' '}
-                                                        Precios
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <Select
-                                                value={data.selected_price}
-                                                onValueChange={(val) =>
-                                                    setData(
-                                                        'selected_price',
-                                                        val,
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger
-                                                    id="selected_price"
-                                                    className="w-full"
-                                                >
-                                                    <SelectValue placeholder="Seleccione un precio" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {availablePrices.length >
-                                                    0 ? (
-                                                        availablePrices.map(
-                                                            (price: any) => (
-                                                                <SelectItem
-                                                                    key={
-                                                                        price.id
-                                                                    }
-                                                                    value={price.amount.toString()}
+                                                        <CardHeader className="flex flex-row items-center justify-between px-4">
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <div className="text-xs text-muted-foreground">
+                                                                    Tipo de
+                                                                    muestra:{' '}
+                                                                    <strong className="text-foreground">
+                                                                        {selectedType?.name ||
+                                                                            'Muestra'}
+                                                                    </strong>
+                                                                </div>
+                                                                <div className="text-sm font-bold text-foreground">
+                                                                    {examName}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="border-emerald-500/30 bg-emerald-500/10 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400"
                                                                 >
+                                                                    Descuento:
                                                                     L.{' '}
-                                                                    {parseFloat(
-                                                                        price.amount,
-                                                                    ).toFixed(
+                                                                    {examCalc.totalDiscount.toFixed(
                                                                         2,
                                                                     )}
-                                                                </SelectItem>
-                                                            ),
-                                                        )
-                                                    ) : (
-                                                        <SelectItem
-                                                            value="0"
-                                                            disabled
-                                                        >
-                                                            No hay precios
-                                                            configurados para
-                                                            este análisis
-                                                        </SelectItem>
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
+                                                                </Badge>
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="font-mono text-xs font-semibold text-primary"
+                                                                >
+                                                                    Subtotal: L.{' '}
+                                                                    {examCalc.subtotal.toFixed(
+                                                                        2,
+                                                                    )}
+                                                                </Badge>
+                                                            </div>
+                                                        </CardHeader>
+                                                        <CardContent className="space-y-4 p-4">
+                                                            <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+                                                                {/* Price selector */}
+                                                                <div className="grid gap-2">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <Label className="text-xs font-semibold">
+                                                                            Importe
+                                                                            /
+                                                                            Precio
+                                                                            Base
+                                                                            (L.)
+                                                                            *
+                                                                        </Label>
+                                                                        {examObj && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    if (
+                                                                                        examObj
+                                                                                    ) {
+                                                                                        setIsEditPricesSheetOpen(
+                                                                                            true,
+                                                                                        );
+                                                                                    }
+                                                                                }}
+                                                                                className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                                                            >
+                                                                                <Edit2 className="h-3 w-3" />{' '}
+                                                                                Precios
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    <Select
+                                                                        value={
+                                                                            examCalc.selected_price
+                                                                        }
+                                                                        onValueChange={(
+                                                                            val,
+                                                                        ) =>
+                                                                            updateExamConfig(
+                                                                                examCalc.examination_id,
+                                                                                'selected_price',
+                                                                                val,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <SelectTrigger className="h-9 w-full">
+                                                                            <SelectValue placeholder="Seleccione un precio" />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent>
+                                                                            {examPrices.length >
+                                                                            0 ? (
+                                                                                <>
+                                                                                    {examPrices.map(
+                                                                                        (
+                                                                                            p: any,
+                                                                                        ) => (
+                                                                                            <SelectItem
+                                                                                                key={
+                                                                                                    p.id
+                                                                                                }
+                                                                                                value={p.amount.toString()}
+                                                                                            >
+                                                                                                L.{' '}
+                                                                                                {parseFloat(
+                                                                                                    p.amount,
+                                                                                                ).toFixed(
+                                                                                                    2,
+                                                                                                )}
+                                                                                            </SelectItem>
+                                                                                        ),
+                                                                                    )}
+                                                                                    <SelectItem value="custom">
+                                                                                        Precio
+                                                                                        Personalizado
+                                                                                    </SelectItem>
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <SelectItem
+                                                                                        value="0"
+                                                                                        disabled
+                                                                                    >
+                                                                                        No
+                                                                                        hay
+                                                                                        precios
+                                                                                        configurados
+                                                                                    </SelectItem>
+                                                                                    <SelectItem value="custom">
+                                                                                        Precio
+                                                                                        Personalizado
+                                                                                    </SelectItem>
+                                                                                </>
+                                                                            )}
+                                                                        </SelectContent>
+                                                                    </Select>
 
-                                            <span className="text-[11px] text-muted-foreground">
-                                                <strong className="text-foreground">
-                                                    {selectedType?.name ||
-                                                        'Sin seleccionar'}
-                                                    {selectedExaminationLabel &&
-                                                    selectedExaminationLabel !==
-                                                        'Sin seleccionar'
-                                                        ? ` - ${selectedExaminationLabel}`
-                                                        : ''}
-                                                </strong>
-                                            </span>
-                                            {errors.amount && (
-                                                <p className="text-sm text-destructive">
-                                                    {errors.amount}
-                                                </p>
-                                            )}
-                                        </div>
+                                                                    {examCalc.selected_price ===
+                                                                        'custom' && (
+                                                                        <div className="relative mt-1">
+                                                                            <span className="absolute top-1/2 left-3 -translate-y-1/2 font-mono text-xs text-muted-foreground select-none">
+                                                                                L.
+                                                                            </span>
+                                                                            <Input
+                                                                                type="number"
+                                                                                step="0.01"
+                                                                                min="0"
+                                                                                value={
+                                                                                    examCalc.custom_specimen_price
+                                                                                }
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    updateExamConfig(
+                                                                                        examCalc.examination_id,
+                                                                                        'custom_specimen_price',
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    )
+                                                                                }
+                                                                                placeholder="0.00"
+                                                                                className="h-8 pl-7 font-mono text-xs"
+                                                                                required
+                                                                            />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
 
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="quantity">
-                                                Cantidad{' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <NumberPicker
-                                                value={data.quantity}
-                                                onChange={(val) =>
-                                                    setData('quantity', val)
-                                                }
-                                                min={1}
-                                                className="flex items-start"
-                                            />
-                                            <p className="text-[10px] text-muted-foreground">
-                                                Número de muestras a procesar.
-                                            </p>
-                                        </div>
+                                                                {/* Quantity */}
+                                                                <div className="flex flex-col items-start gap-2">
+                                                                    <Label className="text-xs font-semibold">
+                                                                        Cantidad
+                                                                        *
+                                                                    </Label>
+                                                                    <NumberPicker
+                                                                        value={
+                                                                            examCalc.quantity
+                                                                        }
+                                                                        onChange={(
+                                                                            val,
+                                                                        ) =>
+                                                                            updateExamConfig(
+                                                                                examCalc.examination_id,
+                                                                                'quantity',
+                                                                                val,
+                                                                            )
+                                                                        }
+                                                                        min={1}
+                                                                    />
+                                                                </div>
+                                                            </div>
 
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="discount">
-                                                Descuento Calculado (L.)
-                                            </Label>
-                                            <Input
-                                                id="discount"
-                                                type="number"
-                                                value={parseFloat(
-                                                    data.discount || '0',
-                                                ).toFixed(2)}
-                                                readOnly
-                                                disabled
-                                                className="bg-muted font-mono font-semibold text-emerald-600 disabled:opacity-100 dark:text-emerald-400"
-                                            />
-                                            <p className="text-[10px] text-muted-foreground">
-                                                Calculado automáticamente basado
-                                                en los precios e insumos
-                                                seleccionados.
-                                            </p>
-                                        </div>
-                                    </div>
+                                                            {/* Collapsible Discounts Section */}
+                                                            <Collapsible
+                                                                defaultOpen={
+                                                                    examCalc.totalDiscount >
+                                                                        0 ||
+                                                                    examCalc.additional_discount_enabled ||
+                                                                    !!examCalc.age_discount_type
+                                                                }
+                                                                className="rounded-lg border bg-muted/20 p-3"
+                                                            >
+                                                                <CollapsibleTrigger
+                                                                    asChild
+                                                                >
+                                                                    <button
+                                                                        type="button"
+                                                                        className="group flex w-full cursor-pointer items-center justify-between text-xs font-semibold text-foreground transition-colors hover:text-primary"
+                                                                    >
+                                                                        <div className="flex items-center gap-2">
+                                                                            <Tag className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover:text-primary" />
+                                                                            <span>
+                                                                                Opciones
+                                                                                de
+                                                                                Descuento
+                                                                            </span>
+                                                                            {examCalc.totalDiscount >
+                                                                                0 && (
+                                                                                <Badge
+                                                                                    variant="secondary"
+                                                                                    className="h-5 px-1.5 font-mono text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                                                                                >
+                                                                                    -L.{' '}
+                                                                                    {examCalc.totalDiscount.toFixed(
+                                                                                        2,
+                                                                                    )}
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
+                                                                        <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                                                                    </button>
+                                                                </CollapsibleTrigger>
 
-                                    {/* Descuento Adicional */}
-                                    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex flex-col gap-0.5">
-                                                <Label
-                                                    htmlFor="additional-discount-toggle"
-                                                    className="cursor-pointer text-xs font-semibold"
-                                                >
-                                                    Descuento Adicional
-                                                </Label>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    Permite aplicar un descuento
-                                                    adicional personalizado a la
-                                                    factura.
-                                                </span>
-                                            </div>
-                                            <Switch
-                                                id="additional-discount-toggle"
-                                                checked={
-                                                    data.additional_discount_enabled
-                                                }
-                                                onCheckedChange={(checked) => {
-                                                    setData((d) => ({
-                                                        ...d,
-                                                        additional_discount_enabled:
-                                                            checked,
-                                                        additional_discount:
-                                                            checked
-                                                                ? d.additional_discount ||
-                                                                  '0'
-                                                                : '0',
-                                                    }));
-                                                }}
-                                            />
-                                        </div>
+                                                                <CollapsibleContent className="space-y-3 pt-3">
+                                                                    {/* Additional Discount Switch */}
+                                                                    <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <div className="flex flex-col gap-0.5">
+                                                                                <Label className="cursor-pointer text-xs font-semibold">
+                                                                                    Descuento
+                                                                                    Adicional
+                                                                                </Label>
+                                                                                <span className="text-[10px] text-muted-foreground">
+                                                                                    Permite
+                                                                                    aplicar
+                                                                                    un
+                                                                                    descuento
+                                                                                    adicional
+                                                                                    personalizado
+                                                                                    a
+                                                                                    este
+                                                                                    análisis.
+                                                                                </span>
+                                                                            </div>
+                                                                            <Switch
+                                                                                checked={
+                                                                                    examCalc.additional_discount_enabled
+                                                                                }
+                                                                                onCheckedChange={(
+                                                                                    checked,
+                                                                                ) =>
+                                                                                    updateExamConfig(
+                                                                                        examCalc.examination_id,
+                                                                                        'additional_discount_enabled',
+                                                                                        checked,
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </div>
+                                                                        {examCalc.additional_discount_enabled && (
+                                                                            <div className="border-t border-border/50 pt-2">
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    step="0.01"
+                                                                                    min="0"
+                                                                                    placeholder="0.00"
+                                                                                    value={
+                                                                                        examCalc.additional_discount
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        e,
+                                                                                    ) =>
+                                                                                        updateExamConfig(
+                                                                                            examCalc.examination_id,
+                                                                                            'additional_discount',
+                                                                                            e
+                                                                                                .target
+                                                                                                .value,
+                                                                                        )
+                                                                                    }
+                                                                                    className="h-8 font-mono text-xs"
+                                                                                />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
 
-                                        {data.additional_discount_enabled && (
-                                            <div className="flex flex-col gap-3 border-t border-border/50 pt-2 transition-all duration-300">
-                                                <div className="grid gap-1.5">
-                                                    <Label
-                                                        htmlFor="additional_discount"
-                                                        className="text-xs"
-                                                    >
-                                                        Monto de Descuento
-                                                        Adicional (L.){' '}
-                                                        <span className="text-destructive">
-                                                            *
-                                                        </span>
-                                                    </Label>
-                                                    <Input
-                                                        id="additional_discount"
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={
-                                                            data.additional_discount
-                                                        }
-                                                        onChange={(e) =>
-                                                            setData(
-                                                                'additional_discount',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="0.00"
-                                                        required
-                                                    />
-                                                    {errors.additional_discount && (
-                                                        <span className="text-[10px] text-destructive">
-                                                            {
-                                                                errors.additional_discount
-                                                            }
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
+                                                                    {/* Age Discounts Switches */}
+                                                                    <div className="grid grid-cols-1 gap-3 border-t pt-3 md:grid-cols-2">
+                                                                        <div className="flex items-center justify-between rounded-lg border bg-card p-2.5">
+                                                                            <div className="flex flex-col gap-0.5">
+                                                                                <Label className="text-xs font-semibold">
+                                                                                    Tercera
+                                                                                    Edad
+                                                                                    (
+                                                                                    {
+                                                                                        thirdAgePercent
+                                                                                    }
+                                                                                    %)
+                                                                                </Label>
+                                                                                <span className="text-[10px] text-muted-foreground">
+                                                                                    Aplica{' '}
+                                                                                    {
+                                                                                        thirdAgePercent
+                                                                                    }
+
+                                                                                    %
+                                                                                    sobre
+                                                                                    el
+                                                                                    precio
+                                                                                    base.
+                                                                                </span>
+                                                                            </div>
+                                                                            <Switch
+                                                                                checked={
+                                                                                    examCalc.age_discount_type ===
+                                                                                    'third'
+                                                                                }
+                                                                                onCheckedChange={(
+                                                                                    checked,
+                                                                                ) =>
+                                                                                    updateExamConfig(
+                                                                                        examCalc.examination_id,
+                                                                                        'age_discount_type',
+                                                                                        checked
+                                                                                            ? 'third'
+                                                                                            : null,
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </div>
+
+                                                                        <div className="flex items-center justify-between rounded-lg border bg-card p-2.5">
+                                                                            <div className="flex flex-col gap-0.5">
+                                                                                <Label className="text-xs font-semibold">
+                                                                                    Cuarta
+                                                                                    Edad
+                                                                                    (
+                                                                                    {
+                                                                                        fourthAgePercent
+                                                                                    }
+                                                                                    %)
+                                                                                </Label>
+                                                                                <span className="text-[10px] text-muted-foreground">
+                                                                                    Aplica{' '}
+                                                                                    {
+                                                                                        fourthAgePercent
+                                                                                    }
+
+                                                                                    %
+                                                                                    sobre
+                                                                                    el
+                                                                                    precio
+                                                                                    base.
+                                                                                </span>
+                                                                            </div>
+                                                                            <Switch
+                                                                                checked={
+                                                                                    examCalc.age_discount_type ===
+                                                                                    'fourth'
+                                                                                }
+                                                                                onCheckedChange={(
+                                                                                    checked,
+                                                                                ) =>
+                                                                                    updateExamConfig(
+                                                                                        examCalc.examination_id,
+                                                                                        'age_discount_type',
+                                                                                        checked
+                                                                                            ? 'fourth'
+                                                                                            : null,
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </CollapsibleContent>
+                                                            </Collapsible>
+                                                        </CardContent>
+                                                    </Card>
+                                                );
+                                            },
                                         )}
                                     </div>
 
@@ -3043,85 +3768,6 @@ export default function SpecimenForm({
                                                 </div>
                                             </div>
                                         )}
-                                    </div>
-
-                                    {/* Descuentos por Edad (Tercera y Cuarta Edad) */}
-                                    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-                                        <div className="mb-2 flex flex-col gap-0.5 border-b pb-2">
-                                            <Label className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                                Descuentos por Edad
-                                            </Label>
-                                            <span className="text-[10px] text-muted-foreground">
-                                                Aplique el descuento de la
-                                                tercera o cuarta edad al
-                                                paciente. Solo se puede aplicar
-                                                uno a la vez.
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex flex-col gap-0.5">
-                                                <Label
-                                                    htmlFor="third-age-discount-toggle"
-                                                    className="cursor-pointer text-xs font-semibold"
-                                                >
-                                                    Tercera Edad (
-                                                    {thirdAgePercent}%)
-                                                </Label>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    Aplica {thirdAgePercent}% de
-                                                    descuento sobre el precio
-                                                    base.
-                                                </span>
-                                            </div>
-                                            <Switch
-                                                id="third-age-discount-toggle"
-                                                checked={
-                                                    data.age_discount_type ===
-                                                    'third'
-                                                }
-                                                onCheckedChange={(checked) => {
-                                                    setData(
-                                                        'age_discount_type',
-                                                        checked
-                                                            ? 'third'
-                                                            : null,
-                                                    );
-                                                }}
-                                            />
-                                        </div>
-
-                                        <div className="mt-1 flex items-center justify-between border-t border-border/50 pt-3">
-                                            <div className="flex flex-col gap-0.5">
-                                                <Label
-                                                    htmlFor="fourth-age-discount-toggle"
-                                                    className="cursor-pointer text-xs font-semibold"
-                                                >
-                                                    Cuarta Edad (
-                                                    {fourthAgePercent}%)
-                                                </Label>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    Aplica {fourthAgePercent}%
-                                                    de descuento sobre el precio
-                                                    base.
-                                                </span>
-                                            </div>
-                                            <Switch
-                                                id="fourth-age-discount-toggle"
-                                                checked={
-                                                    data.age_discount_type ===
-                                                    'fourth'
-                                                }
-                                                onCheckedChange={(checked) => {
-                                                    setData(
-                                                        'age_discount_type',
-                                                        checked
-                                                            ? 'fourth'
-                                                            : null,
-                                                    );
-                                                }}
-                                            />
-                                        </div>
                                     </div>
 
                                     {/* Detalle y Tipo de Pago Wrapper */}
@@ -3427,71 +4073,20 @@ export default function SpecimenForm({
                                                     )}
                                                 </div>
                                             )}
-                                            {autoDiscountTotal +
-                                                additionalDiscountVal >
-                                            0 ? (
+                                            {discountVal > 0 ? (
                                                 <div className="flex flex-col gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
                                                     <span className="text-[10px] font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
                                                         Descuentos Aplicados
                                                     </span>
-                                                    {specimenDiscountVal >
-                                                        0 && (
-                                                        <div className="flex justify-between text-xs">
-                                                            <span>
-                                                                Categoría
-                                                                Muestra:
-                                                            </span>
-                                                            <span className="font-semibold">
-                                                                - L.{' '}
-                                                                {specimenDiscountVal.toFixed(
-                                                                    2,
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {ageDiscountVal > 0 && (
-                                                        <div className="flex justify-between text-xs">
-                                                            <span>
-                                                                {data.age_discount_type ===
-                                                                'third'
-                                                                    ? 'Tercera Edad'
-                                                                    : 'Cuarta Edad'}
-                                                                :
-                                                            </span>
-                                                            <span className="font-semibold">
-                                                                - L.{' '}
-                                                                {ageDiscountVal.toFixed(
-                                                                    2,
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {additionalDiscountVal >
-                                                        0 && (
-                                                        <div className="flex justify-between text-xs">
-                                                            <span>
-                                                                Descuento
-                                                                Adicional:
-                                                            </span>
-                                                            <span className="font-semibold">
-                                                                - L.{' '}
-                                                                {additionalDiscountVal.toFixed(
-                                                                    2,
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    <Separator className="my-1 bg-emerald-500/20" />
                                                     <div className="flex justify-between text-xs font-bold">
                                                         <span>
                                                             Descuento Total:
                                                         </span>
                                                         <span>
                                                             - L.{' '}
-                                                            {(
-                                                                autoDiscountTotal +
-                                                                additionalDiscountVal
-                                                            ).toFixed(2)}
+                                                            {discountVal.toFixed(
+                                                                2,
+                                                            )}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -3587,14 +4182,29 @@ export default function SpecimenForm({
                 {/* BOTONES DE ENVÍO */}
                 <div className="mt-4 flex flex-col items-center justify-between gap-3 border-t pt-4 sm:flex-row">
                     {specimen && specimen.created_at ? (
-                        <div className="text-sm text-muted-foreground">
-                            Creada el:{' '}
-                            {new Date(specimen.created_at).toLocaleString(
-                                'es-ES',
-                                {
-                                    dateStyle: 'long',
-                                    timeStyle: 'short',
-                                },
+                        <div className="flex items-center gap-3">
+                            <div className="text-sm text-muted-foreground">
+                                Creada el:{' '}
+                                {new Date(specimen.created_at).toLocaleString(
+                                    'es-ES',
+                                    {
+                                        dateStyle: 'long',
+                                        timeStyle: 'short',
+                                    },
+                                )}
+                            </div>
+                            {unlockedFullSteps && currentStep > 1 && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setCurrentStep((prev) => prev - 1)
+                                    }
+                                    className="w-full sm:w-auto"
+                                    disabled={processing}
+                                >
+                                    Atrás
+                                </Button>
                             )}
                         </div>
                     ) : !specimen && currentStep > 1 ? (
@@ -3618,7 +4228,9 @@ export default function SpecimenForm({
                             className="w-full sm:w-auto"
                         >
                             {processing && <Spinner className="mr-2" />}
-                            Guardar Cambios
+                            {unlockedFullSteps && currentStep === 1
+                                ? 'Siguiente (Facturación)'
+                                : 'Guardar Cambios'}
                         </Button>
                     ) : currentStep < 2 ? (
                         <Button
@@ -3666,9 +4278,10 @@ export default function SpecimenForm({
                 onSave={(paymentData) => {
                     if (specimen) {
                         const originalPaymentType =
-                            specimen?.invoice_relation?.payment_type;
+                            specimenInvoice?.payment_type;
                         const hasPayments =
-                            specimen?.invoice_relation?.credit_relation
+                            (specimenInvoice?.credit_relation ||
+                                specimenInvoice?.creditRelation)
                                 ?.has_payments;
                         const newVal = paymentData.payment_type;
 
@@ -3983,38 +4596,14 @@ export default function SpecimenForm({
                                     </span>
                                 </div>
                             )}
-                        {autoDiscountTotal + additionalDiscountVal > 0 ? (
+                        {discountVal > 0 ? (
                             <div className="flex flex-col gap-1.5 rounded border border-b border-emerald-500/20 bg-emerald-500/5 p-2.5 pb-2 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
                                 <span className="text-[10px] font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
                                     Descuentos Aplicados
                                 </span>
-                                {specimenDiscountVal > 0 && (
-                                    <div className="flex justify-between text-xs">
-                                        <span>Categoría Muestra:</span>
-                                        <span className="font-semibold">
-                                            - L.{' '}
-                                            {specimenDiscountVal.toFixed(2)}
-                                        </span>
-                                    </div>
-                                )}
-                                {additionalDiscountVal > 0 && (
-                                    <div className="flex justify-between text-xs">
-                                        <span>Descuento Adicional:</span>
-                                        <span className="font-semibold">
-                                            - L.{' '}
-                                            {additionalDiscountVal.toFixed(2)}
-                                        </span>
-                                    </div>
-                                )}
                                 <div className="flex justify-between border-t border-emerald-500/20 pt-1 text-xs font-bold">
                                     <span>Total Descuentos:</span>
-                                    <span>
-                                        - L.{' '}
-                                        {(
-                                            autoDiscountTotal +
-                                            additionalDiscountVal
-                                        ).toFixed(2)}
-                                    </span>
+                                    <span>- L. {discountVal.toFixed(2)}</span>
                                 </div>
                             </div>
                         ) : (
@@ -4240,6 +4829,59 @@ export default function SpecimenForm({
                             onClick={() => setShowBlockedPaymentAlert(false)}
                         >
                             Aceptar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={showExamChangePricePrompt}
+                onOpenChange={setShowExamChangePricePrompt}
+            >
+                <AlertDialogContent className="max-w-[480px]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-foreground">
+                            <AlertCircle className="h-5 w-5 shrink-0 text-amber-500" />
+                            Actualización de Precios y Facturación Requerida
+                        </AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-3 pt-1 text-sm text-muted-foreground">
+                                <p>
+                                    Ha modificado el{' '}
+                                    <strong>tipo de muestra</strong> o los{' '}
+                                    <strong>exámenes a realizar</strong> de esta
+                                    muestra.
+                                </p>
+                                <div className="space-y-1 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                                    <span className="block font-semibold text-amber-900 dark:text-amber-200">
+                                        Configuración requerida:
+                                    </span>
+                                    <span>
+                                        Debido a este cambio, debe seleccionar
+                                        los precios y configurar la facturación
+                                        de la muestra. A continuación se
+                                        habilitarán los pasos del formulario y
+                                        avanzará al{' '}
+                                        <strong>Paso 2 (Facturación)</strong>{' '}
+                                        para revisar los precios y valores
+                                        numéricos. La factura y el PDF serán
+                                        regenerados al guardar.
+                                    </span>
+                                </div>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            onClick={() => setShowExamChangePricePrompt(false)}
+                        >
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmExamChangePrompt}
+                            className="bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                            Continuar a Facturación
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

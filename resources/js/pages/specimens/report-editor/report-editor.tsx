@@ -103,10 +103,50 @@ import {
     notifyCollaborationRefreshInsumos,
     saveReportEditor,
 } from './actions';
+import { BlankReportScreen } from './components/blank-report-screen';
+import { CollaboratorsList } from './components/collaborators-list';
+import type { Collaborator } from './components/collaborators-list';
+import { CompleteMicroscopyDialog } from './components/complete-microscopy-dialog';
+import { EditorRegistryContext } from './components/editor-registry-context';
+import { editorStyles } from './components/editor-styles';
+import { EnableEditingDialog } from './components/enable-editing-dialog';
+import { LoadingReportScreen } from './components/loading-report-screen';
+import { MissingSignaturesDialog } from './components/missing-signatures-dialog';
+import TemplateSelector from './components/template-selector';
+import {
+    COLLABORATION_SERVER_URL,
+    WS_COLLABORATION_SERVER_URL,
+    CustomBulletList,
+    sharedExtensions,
+} from './components/tiptap-extensions';
+import ManageCuttingsSheet from './cuttings/manage-cuttings-sheet';
+import {
+    useFinalizeReport,
+    useManageCuttings,
+    useTransitionState,
+} from './hooks';
+import ImageGridComponent, { ImageCropperDialog } from './image-grid-component';
 import LivePdfPreview from './live-pdf-preview';
 import PagePreview from './page-preview/page';
+import {
+    AddendumEditor,
+    ClinicalDetailsEditor,
+    CommentsNotesEditor,
+    DiagnosisEditor,
+    LegendEditor,
+    MacroscopyEditor,
+    MicroscopyEditor,
+    OpenTextEditor,
+    ProtocolsEditor,
+} from './rich-text-editors';
 import SpecimenInsumosCard from './specimen-insumos-card';
 import { EditorToolbar } from './toolbar';
+import type {
+    MeasuredBlock,
+    ReportEditorProps as Props,
+    Specimen,
+    SpecimenReport,
+} from './types';
 import {
     estimatePatientCardHeight,
     splitHtmlIntoLines,
@@ -121,46 +161,6 @@ import {
     parseHtmlToBlocks,
     isEmptyHtml,
 } from './utils';
-import TemplateSelector from './components/template-selector';
-import { BlankReportScreen } from './components/blank-report-screen';
-import { CollaboratorsList } from './components/collaborators-list';
-import type { Collaborator } from './components/collaborators-list';
-import { CompleteMicroscopyDialog } from './components/complete-microscopy-dialog';
-import { EditorRegistryContext } from './components/editor-registry-context';
-import { editorStyles } from './components/editor-styles';
-import { EnableEditingDialog } from './components/enable-editing-dialog';
-import { LoadingReportScreen } from './components/loading-report-screen';
-import { MissingSignaturesDialog } from './components/missing-signatures-dialog';
-import {
-    useFinalizeReport,
-    useManageCuttings,
-    useTransitionState,
-} from './hooks';
-import {
-    AddendumEditor,
-    ClinicalDetailsEditor,
-    CommentsNotesEditor,
-    DiagnosisEditor,
-    LegendEditor,
-    MacroscopyEditor,
-    MicroscopyEditor,
-    OpenTextEditor,
-    ProtocolsEditor,
-} from './rich-text-editors';
-import {
-    COLLABORATION_SERVER_URL,
-    WS_COLLABORATION_SERVER_URL,
-    CustomBulletList,
-    sharedExtensions,
-} from './components/tiptap-extensions';
-import ManageCuttingsSheet from './cuttings/manage-cuttings-sheet';
-import ImageGridComponent, { ImageCropperDialog } from './image-grid-component';
-import type {
-    MeasuredBlock,
-    ReportEditorProps as Props,
-    Specimen,
-    SpecimenReport,
-} from './types';
 
 export default function ReportWorkspace({
     specimen,
@@ -1205,6 +1205,7 @@ export default function ReportWorkspace({
                                     /data-caption=["\']([^"\']*)["\']/i,
                                 ) || imgTag.match(/alt=["\']([^"\']*)["\']/i);
                             const caption = captionMatch ? captionMatch[1] : '';
+
                             if (caption) {
                                 const captionLines = Math.max(
                                     1,
@@ -1213,6 +1214,7 @@ export default function ReportWorkspace({
                                     ),
                                 );
                                 const captionHeight = captionLines * 3.6 + 1.06;
+
                                 if (captionHeight > maxCaptionHeight) {
                                     maxCaptionHeight = captionHeight;
                                 }
@@ -1313,6 +1315,7 @@ export default function ReportWorkspace({
                                     imgTag.match(
                                         /data-caption=["']([^"']*)["']/i,
                                     ) || imgTag.match(/alt=["']([^"']*)["']/i);
+
                                 if (capMatch) {
                                     caption = capMatch[1];
                                 }
@@ -1443,11 +1446,13 @@ export default function ReportWorkspace({
                         const { style: originalStyle, extraAttrs } =
                             getRootElementAttributes(block.html);
                         let mergedStyle = originalStyle;
+
                         if (!isLastSlice) {
                             mergedStyle = mergedStyle
                                 ? `${mergedStyle.trim().endsWith(';') ? mergedStyle : mergedStyle + ';'} margin-bottom: 0px;`
                                 : 'margin-bottom: 0px;';
                         }
+
                         const styleAttrStr = mergedStyle
                             ? ` style="${mergedStyle}"`
                             : '';

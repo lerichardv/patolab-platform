@@ -76,6 +76,7 @@ export default function ImageGridComponent({
         if (pos !== undefined) {
             const targetPos = pos + 1 + offset;
             const child = editor.state.tr.doc.nodeAt(targetPos);
+
             if (child) {
                 editor.view.dispatch(
                     editor.state.tr.setNodeMarkup(targetPos, undefined, {

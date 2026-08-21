@@ -1,7 +1,7 @@
 import { Droppable } from '@hello-pangea/dnd';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import { Priority, Specimen } from '../index';
+import type { Priority, Specimen } from '../index';
 import { KanbanCard } from './kanban-card';
 
 const KanbanColumnSentinel = ({

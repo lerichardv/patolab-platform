@@ -24,6 +24,7 @@ use App\Models\User;
 use App\Models\WorkOrderTask;
 use App\Models\WorkOrderType;
 use App\Services\DateFilterService;
+use App\Services\InvoiceCalculationService;
 use App\Services\InvoicePdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -49,6 +50,9 @@ class InvoiceController extends Controller
             'specimen.category',
             'specimen.referrerRelation',
             'specimen.priority',
+            'invoiceSpecimens.specimen.type',
+            'invoiceSpecimens.examination.prices',
+            'invoiceSpecimens.specimen.products',
             'creditRelation.creditInvoiceSpecimens.specimen.customerRelation',
             'creditRelation.creditInvoiceSpecimens.specimen.type',
             'creditRelation.creditInvoiceSpecimens.specimen.examination',
@@ -66,6 +70,7 @@ class InvoiceController extends Controller
             'group.specimens.invoiceGroupSpecimen',
             'group.specimens.products',
             'groupSpecimens.specimen.type',
+            'groupSpecimens.examination.prices',
             'groupSpecimens.specimen.examination.prices',
             'groupSpecimens.specimen.customerRelation',
             'groupSpecimens.specimen.products',
@@ -731,48 +736,30 @@ class InvoiceController extends Controller
         }
 
         if ($groupSpecimensData) {
+            $settingsMap = Setting::all()->pluck('setting_value', 'setting_key')->toArray();
             foreach ($groupSpecimensData as $item) {
-                $igs = InvoiceSpecimen::with('specimen.examination.prices')->findOrFail($item['id']);
+                $igs = InvoiceSpecimen::with(['examination.prices', 'specimen.examination.prices'])->findOrFail($item['id']);
+                $examination = $igs->examination ?? $igs->specimen?->examination;
 
-                $qty = (int) ($item['quantity'] ?? 1);
-                $priceVal = $item['selected_price'] === 'custom'
-                    ? (float) $item['custom_specimen_price']
-                    : (float) $item['selected_price'];
-
-                $prices = $igs->specimen->examination->prices ?? collect();
-                $priceAmounts = $prices->map(fn ($p) => (float) $p->amount)->toArray();
-                $maxPrice = count($priceAmounts) > 0 ? max($priceAmounts) : 0.0;
-                $maxPrice = max($maxPrice, $priceVal);
-
-                $ageDiscountVal = (float) ($item['age_discount_amount'] ?? 0.0);
-                $addDiscountVal = ! empty($item['additional_discount_enabled']) ? (float) ($item['additional_discount'] ?? 0.0) : 0.0;
-                $diffDiscountVal = max(0.0, $maxPrice - $priceVal);
-
-                $totalDiscountPerUnit = $diffDiscountVal + $ageDiscountVal + $addDiscountVal;
-                $discountVal = $totalDiscountPerUnit * $qty;
-                $subtotalVal = ($maxPrice - $totalDiscountPerUnit) * $qty;
-                if ($subtotalVal < 0) {
-                    $subtotalVal = 0.0;
-                }
-                $totalVal = $subtotalVal;
+                $calc = InvoiceCalculationService::calculateItem($item, $examination, $settingsMap);
 
                 $igs->update([
-                    'quantity' => $qty,
-                    'amount' => $priceVal,
-                    'discount' => $discountVal,
-                    'subtotal' => $subtotalVal,
-                    'exempt_amount' => $totalVal,
+                    'quantity' => $calc['quantity'],
+                    'amount' => $calc['amount'],
+                    'discount' => $calc['discount'],
+                    'subtotal' => $calc['subtotal'],
+                    'exempt_amount' => $calc['exempt_amount'],
                     'taxable_amount_15' => 0.00,
                     'taxable_amount_18' => 0.00,
                     'isv_15' => 0.00,
                     'isv_18' => 0.00,
-                    'total' => $totalVal,
-                    'selected_price' => $item['selected_price'],
-                    'custom_specimen_price' => $item['selected_price'] === 'custom' ? $priceVal : 0.00,
-                    'additional_discount_enabled' => ! empty($item['additional_discount_enabled']),
-                    'additional_discount' => (float) ($item['additional_discount'] ?? 0.00),
-                    'age_discount_type' => $item['age_discount_type'] ?? null,
-                    'age_discount_amount' => $ageDiscountVal,
+                    'total' => $calc['total'],
+                    'selected_price' => $calc['selected_price'],
+                    'custom_specimen_price' => $calc['custom_specimen_price'],
+                    'additional_discount_enabled' => $calc['additional_discount_enabled'],
+                    'additional_discount' => $calc['additional_discount'],
+                    'age_discount_type' => $calc['age_discount_type'],
+                    'age_discount_amount' => $calc['age_discount_amount'],
                 ]);
             }
         }

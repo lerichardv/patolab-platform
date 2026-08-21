@@ -13,6 +13,7 @@ import {
     Coins,
     Hash,
 } from 'lucide-react';
+import { useMemo } from 'react';
 import HeadingSheet from '@/components/heading-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -35,6 +36,85 @@ export default function InvoiceViewSheet({
 
     const specimen = invoice.specimen;
     const credit = invoice.credit_relation;
+
+    const groupedSpecimens = useMemo(() => {
+        if (!invoice) {
+return [];
+}
+
+        const rawItems =
+            invoice.invoice_specimens ||
+            invoice.invoiceSpecimens ||
+            invoice.group_specimens ||
+            invoice.groupSpecimens ||
+            [];
+
+        if (rawItems.length > 0) {
+            const groupsMap = new Map<number | string, any>();
+
+            rawItems.forEach((item: any) => {
+                const spec = item.specimen;
+
+                if (!spec) {
+return;
+}
+
+                const specKey =
+                    spec.id || item.specimen_id || spec.sequence_code;
+
+                if (!groupsMap.has(specKey)) {
+                    groupsMap.set(specKey, {
+                        specimen: spec,
+                        items: [],
+                        totalSubtotal: 0,
+                        totalDiscount: 0,
+                        totalAmount: 0,
+                    });
+                }
+
+                const specGroup = groupsMap.get(specKey);
+                const qty = item.quantity ?? 1;
+                const amount = parseFloat(item.amount || '0');
+                const discount = parseFloat(item.discount || '0');
+                const subtotal = parseFloat(item.subtotal || '0');
+
+                specGroup.items.push({
+                    ...item,
+                    qty,
+                    amount,
+                    discount,
+                    subtotal,
+                });
+                specGroup.totalAmount += amount * qty;
+                specGroup.totalDiscount += discount;
+                specGroup.totalSubtotal += subtotal;
+            });
+
+            return Array.from(groupsMap.values());
+        }
+
+        if (invoice.specimen) {
+            return [
+                {
+                    specimen: invoice.specimen,
+                    items: [
+                        {
+                            examination: invoice.specimen.examination,
+                            quantity: invoice.quantity ?? 1,
+                            amount: parseFloat(invoice.amount || '0'),
+                            discount: parseFloat(invoice.discount || '0'),
+                            subtotal: parseFloat(invoice.subtotal || '0'),
+                        },
+                    ],
+                    totalSubtotal: parseFloat(invoice.subtotal || '0'),
+                    totalDiscount: parseFloat(invoice.discount || '0'),
+                    totalAmount: parseFloat(invoice.amount || '0'),
+                },
+            ];
+        }
+
+        return [];
+    }, [invoice]);
 
     const formattedDate = invoice.created_at
         ? format(new Date(invoice.created_at), "dd 'de' MMMM, yyyy - HH:mm", {
@@ -265,107 +345,259 @@ export default function InvoiceViewSheet({
 
                         {/* Right Column: Specimen details & files */}
                         <div className="space-y-6">
-                            {/* Related Specimen info */}
-                            {specimen ? (
-                                <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                            {/* Related Specimens info */}
+                            <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                <div className="flex items-center justify-between">
                                     <h3 className="flex items-center gap-2 text-lg font-semibold text-primary">
                                         <Microscope className="h-5 w-5" />{' '}
-                                        Muestra Relacionada
+                                        {groupedSpecimens.length > 1
+                                            ? `Muestras Relacionadas (${groupedSpecimens.length})`
+                                            : 'Muestra Relacionada'}
                                     </h3>
-                                    <Separator />
-                                    <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                                        <div className="space-y-1">
-                                            <span className="text-xs text-muted-foreground">
-                                                Categoría
-                                            </span>
-                                            <p className="font-medium">
-                                                {specimen.category?.name ||
-                                                    'N/A'}
-                                            </p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                <Clock className="h-3.5 w-3.5" />{' '}
-                                                Estado de Muestra
-                                            </span>
-                                            <div>
-                                                <span
-                                                    className="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
-                                                    style={{
-                                                        backgroundColor:
-                                                            specimen.status_color ||
-                                                            '#cbd5e1',
-                                                    }}
-                                                >
-                                                    {specimen.status ===
-                                                    'received'
-                                                        ? 'Recibida'
-                                                        : specimen.status ===
-                                                            'macroscopic_review'
-                                                          ? 'Rev. Macroscópica'
-                                                          : specimen.status ===
-                                                              'processing'
-                                                            ? 'En Proceso'
-                                                            : specimen.status ===
-                                                                'microscopic_review'
-                                                              ? 'Rev. Microscópica'
-                                                              : specimen.status ===
-                                                                  'finalized'
-                                                                ? 'Finalizada'
-                                                                : specimen.status ===
-                                                                    'delivered'
-                                                                  ? 'Entregada'
-                                                                  : specimen.status ===
-                                                                      'cancelled'
-                                                                    ? 'Cancelada'
-                                                                    : specimen.status}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1 sm:col-span-2">
-                                            <span className="text-xs text-muted-foreground">
-                                                Examen
-                                            </span>
-                                            <p className="font-medium">
-                                                {specimen.type?.name} -{' '}
-                                                {specimen.examination?.name}
-                                            </p>
-                                        </div>
-                                        {specimen.anatomic_site && (
-                                            <div className="space-y-1 sm:col-span-2">
-                                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                    <MapPin className="h-3.5 w-3.5" />{' '}
-                                                    Sitio Anatómico
-                                                </span>
-                                                <p className="font-medium">
-                                                    {specimen.anatomic_site}
-                                                </p>
-                                            </div>
-                                        )}
-                                        {specimen.referrer_relation && (
-                                            <div className="space-y-1 sm:col-span-2">
-                                                <span className="text-xs text-muted-foreground">
-                                                    Médico Referente
-                                                </span>
-                                                <p className="font-medium">
-                                                    {
-                                                        specimen
-                                                            .referrer_relation
-                                                            .name
-                                                    }
-                                                </p>
-                                            </div>
+                                    {invoice.is_group && (
+                                        <Badge
+                                            variant="secondary"
+                                            className="font-medium"
+                                        >
+                                            Grupo de Muestras
+                                        </Badge>
+                                    )}
+                                </div>
+                                <Separator />
+
+                                {groupedSpecimens.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {groupedSpecimens.map(
+                                            (specGroup: any, idx: number) => {
+                                                const spec = specGroup.specimen;
+                                                const customerName =
+                                                    spec.customer_relation
+                                                        ?.name ||
+                                                    spec.customerRelation
+                                                        ?.name ||
+                                                    spec.customer?.name ||
+                                                    invoice.customer?.name ||
+                                                    'N/A';
+
+                                                return (
+                                                    <div
+                                                        key={spec.id || idx}
+                                                        className="space-y-3 border-b border-gray-200 pb-4 transition-colors"
+                                                    >
+                                                        {/* Specimen Header */}
+                                                        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono text-xs font-bold text-primary">
+                                                                    #{idx + 1}
+                                                                </span>
+                                                                {spec.sequence_code && (
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="border-blue-500/30 bg-blue-500/10 font-mono text-xs font-bold text-blue-700 dark:text-blue-300"
+                                                                    >
+                                                                        {
+                                                                            spec.sequence_code
+                                                                        }
+                                                                    </Badge>
+                                                                )}
+                                                                <span className="text-xs font-semibold text-foreground">
+                                                                    {spec.type
+                                                                        ?.name ||
+                                                                        'Muestra'}
+                                                                </span>
+                                                            </div>
+
+                                                            {/* Status Badge */}
+                                                            {spec.status && (
+                                                                <span
+                                                                    className="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white"
+                                                                    style={{
+                                                                        backgroundColor:
+                                                                            spec.status_color ||
+                                                                            '#cbd5e1',
+                                                                    }}
+                                                                >
+                                                                    {spec.status ===
+                                                                    'received'
+                                                                        ? 'Recibida'
+                                                                        : spec.status ===
+                                                                            'macroscopic_review'
+                                                                          ? 'Rev. Macroscópica'
+                                                                          : spec.status ===
+                                                                              'processing'
+                                                                            ? 'En Proceso'
+                                                                            : spec.status ===
+                                                                                'microscopic_review'
+                                                                              ? 'Rev. Microscópica'
+                                                                              : spec.status ===
+                                                                                  'finalized'
+                                                                                ? 'Finalizada'
+                                                                                : spec.status ===
+                                                                                    'delivered'
+                                                                                  ? 'Entregada'
+                                                                                  : spec.status ===
+                                                                                      'cancelled'
+                                                                                    ? 'Cancelada'
+                                                                                    : spec.status}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Patient & Specimen Info */}
+                                                        <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                                                            <div>
+                                                                <span className="text-muted-foreground">
+                                                                    Paciente:{' '}
+                                                                </span>
+                                                                <strong className="text-foreground">
+                                                                    {
+                                                                        customerName
+                                                                    }
+                                                                </strong>
+                                                            </div>
+
+                                                            {spec.category
+                                                                ?.name && (
+                                                                <div>
+                                                                    <span className="text-muted-foreground">
+                                                                        Categoría:{' '}
+                                                                    </span>
+                                                                    <span className="font-medium text-foreground">
+                                                                        {
+                                                                            spec
+                                                                                .category
+                                                                                .name
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                            {(spec
+                                                                .referrer_relation
+                                                                ?.name ||
+                                                                spec
+                                                                    .referrerRelation
+                                                                    ?.name) && (
+                                                                <div className="sm:col-span-2">
+                                                                    <span className="text-muted-foreground">
+                                                                        Médico
+                                                                        Referente:{' '}
+                                                                    </span>
+                                                                    <span className="font-medium text-foreground">
+                                                                        {spec
+                                                                            .referrer_relation
+                                                                            ?.name ||
+                                                                            spec
+                                                                                .referrerRelation
+                                                                                ?.name}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                            {spec.anatomic_site && (
+                                                                <div className="sm:col-span-2">
+                                                                    <span className="text-muted-foreground">
+                                                                        Sitio
+                                                                        Anatómico:{' '}
+                                                                    </span>
+                                                                    <span className="font-medium text-foreground">
+                                                                        {
+                                                                            spec.anatomic_site
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Itemized Examinations List for this Specimen */}
+                                                        <div className="space-y-1.5 pt-1">
+                                                            <span className="text-[11px] font-semibold text-muted-foreground">
+                                                                Exámenes /
+                                                                Análisis:
+                                                            </span>
+                                                            <div className="space-y-1">
+                                                                {specGroup.items.map(
+                                                                    (
+                                                                        item: any,
+                                                                        itemIdx: number,
+                                                                    ) => {
+                                                                        const examName =
+                                                                            item
+                                                                                .examination
+                                                                                ?.name ||
+                                                                            spec
+                                                                                .examination
+                                                                                ?.name ||
+                                                                            'Análisis';
+
+                                                                        return (
+                                                                            <div
+                                                                                key={
+                                                                                    item.id ||
+                                                                                    itemIdx
+                                                                                }
+                                                                                className="flex flex-wrap items-center justify-between rounded-md border bg-background p-2 text-xs"
+                                                                            >
+                                                                                <div className="flex flex-col">
+                                                                                    <span className="font-medium text-foreground">
+                                                                                        {
+                                                                                            examName
+                                                                                        }
+                                                                                    </span>
+                                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                                        Cant:{' '}
+                                                                                        {
+                                                                                            item.qty
+                                                                                        }{' '}
+                                                                                        &bull;
+                                                                                        Precio
+                                                                                        Base:{' '}
+                                                                                        L.{' '}
+                                                                                        {item.amount.toFixed(
+                                                                                            2,
+                                                                                        )}
+                                                                                    </span>
+                                                                                </div>
+
+                                                                                <div className="flex items-center gap-3 text-right">
+                                                                                    {item.discount >
+                                                                                        0 && (
+                                                                                        <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                                                            Desc:{' '}
+                                                                                            -L.{' '}
+                                                                                            {item.discount.toFixed(
+                                                                                                2,
+                                                                                            )}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    <span className="font-semibold text-foreground">
+                                                                                        Subtotal:{' '}
+                                                                                        L.{' '}
+                                                                                        {item.subtotal.toFixed(
+                                                                                            2,
+                                                                                        )}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    },
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            },
                                         )}
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-2 rounded-lg border border-dashed p-6 text-center">
-                                    <Microscope className="mx-auto h-8 w-8 text-muted-foreground" />
-                                    <h3 className="text-sm font-semibold">
-                                        Sin muestra relacionada
-                                    </h3>
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="space-y-2 rounded-lg border border-dashed p-6 text-center">
+                                        <Microscope className="mx-auto h-8 w-8 text-muted-foreground" />
+                                        <h3 className="text-sm font-semibold">
+                                            Sin muestra relacionada
+                                        </h3>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Credit Account Status */}
                             {(invoice.payment_type === 'credit' ||

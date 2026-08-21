@@ -80,6 +80,7 @@ class Specimen extends Model
         'customer',
         'location_id',
         'specimen_type',
+        // LEGACY: The specimen_type_examination column is legacy. The correct way to store specimen_type_examinations is by creating them on InvoiceSpecimen (or examinations pivot).
         'specimen_type_examination',
         'specimen_category',
         'referrer',
@@ -154,6 +155,16 @@ class Specimen extends Model
     public function examination(): BelongsTo
     {
         return $this->belongsTo(SpecimenTypeExamination::class, 'specimen_type_examination');
+    }
+
+    public function specimenExaminations(): HasMany
+    {
+        return $this->hasMany(SpecimenExamination::class, 'specimen_id');
+    }
+
+    public function examinations(): BelongsToMany
+    {
+        return $this->belongsToMany(SpecimenTypeExamination::class, 'specimen_examinations', 'specimen_id', 'examination_id');
     }
 
     public function category(): BelongsTo

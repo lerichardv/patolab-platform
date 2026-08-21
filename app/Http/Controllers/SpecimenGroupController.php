@@ -20,6 +20,7 @@ use App\Models\SpecimenGroup;
 use App\Models\SpecimenGroupCustomer;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
+use App\Services\InvoiceCalculationService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\File;
 use Illuminate\Http\Request;
@@ -72,7 +73,7 @@ class SpecimenGroupController extends Controller
             'specimens.*.customer' => 'required|exists:customers,id',
             'specimens.*.specimen_type' => 'required|exists:specimen_type,id',
             'specimens.*.reserved_code' => 'nullable|string|unique:specimen,sequence_code',
-            'specimens.*.specimen_type_examination' => 'required|exists:specimen_type_examination,id',
+            'specimens.*.specimen_type_examination' => 'required',
             'specimens.*.specimen_category' => 'required|exists:specimen_category,id',
             'specimens.*.referrer' => 'required|exists:referrers,id',
             'specimens.*.anatomic_site' => 'nullable|string|max:255',
@@ -90,6 +91,17 @@ class SpecimenGroupController extends Controller
             'specimens.*.age_discount_amount' => 'nullable|numeric|min:0',
             'specimens.*.additional_discount_enabled' => 'nullable|boolean',
             'specimens.*.additional_discount' => 'nullable|numeric|min:0',
+
+            // Nested itemized examinations
+            'specimens.*.examinations' => 'nullable|array',
+            'specimens.*.examinations.*.examination_id' => 'required|exists:specimen_type_examination,id',
+            'specimens.*.examinations.*.quantity' => 'required|integer|min:1',
+            'specimens.*.examinations.*.selected_price' => 'required|string',
+            'specimens.*.examinations.*.custom_specimen_price' => 'nullable|numeric|min:0',
+            'specimens.*.examinations.*.additional_discount_enabled' => 'nullable|boolean',
+            'specimens.*.examinations.*.additional_discount' => 'nullable|numeric|min:0',
+            'specimens.*.examinations.*.age_discount_type' => 'nullable|string|in:third,fourth',
+            'specimens.*.examinations.*.age_discount_amount' => 'nullable|numeric|min:0',
 
             // Insumos for each specimen
             'specimens.*.insumos' => 'nullable|array',
@@ -120,35 +132,58 @@ class SpecimenGroupController extends Controller
             $specimensData = $validated['specimens'];
 
             // Preload specimen type examinations with prices to optimize queries
-            $examinationIds = collect($specimensData)->pluck('specimen_type_examination')->unique()->toArray();
-            $examinations = SpecimenTypeExamination::with('prices')->whereIn('id', $examinationIds)->get()->keyBy('id');
-
-            foreach ($specimensData as $specData) {
-                $qty = (int) ($specData['quantity'] ?? 1);
-
-                $exam = $examinations->get($specData['specimen_type_examination']);
-                $maxPrice = 0.00;
-                if ($exam && $exam->prices->isNotEmpty()) {
-                    $maxPrice = (float) $exam->prices->max('amount');
+            $examinationIds = collect($specimensData)->flatMap(function ($s) {
+                $examItems = ! empty($s['examinations']) && is_array($s['examinations']) ? $s['examinations'] : [];
+                if (! empty($examItems)) {
+                    return array_column($examItems, 'examination_id');
                 }
 
-                $chosenPrice = $specData['selected_price'] === 'custom'
-                    ? (float) ($specData['custom_specimen_price'] ?? 0.00)
-                    : (float) $specData['selected_price'];
+                return explode(',', $s['specimen_type_examination'] ?? '');
+            })->filter()->unique()->toArray();
+            $examinations = SpecimenTypeExamination::with('prices')->whereIn('id', $examinationIds)->get()->keyBy('id');
 
-                $basePrice = max($maxPrice, $chosenPrice);
-                $listPriceDiscount = max(0.00, $basePrice - $chosenPrice);
+            $settingsMap = Setting::all()->pluck('setting_value', 'setting_key')->toArray();
 
-                $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
-                $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
+            foreach ($specimensData as $specData) {
+                $examItems = ! empty($specData['examinations']) && is_array($specData['examinations']) ? $specData['examinations'] : [];
+                if (empty($examItems) && ! empty($specData['specimen_type_examination'])) {
+                    $examIds = explode(',', $specData['specimen_type_examination']);
+                    foreach ($examIds as $examId) {
+                        if (is_numeric($examId)) {
+                            $examItems[] = [
+                                'examination_id' => (int) $examId,
+                                'quantity' => (int) ($specData['quantity'] ?? 1),
+                                'selected_price' => $specData['selected_price'] ?? null,
+                                'custom_specimen_price' => $specData['custom_specimen_price'] ?? '0',
+                                'additional_discount_enabled' => $specData['additional_discount_enabled'] ?? false,
+                                'additional_discount' => $specData['additional_discount'] ?? '0',
+                                'age_discount_type' => $specData['age_discount_type'] ?? null,
+                                'age_discount_amount' => $specData['age_discount_amount'] ?? '0',
+                            ];
+                        }
+                    }
+                }
 
-                $totalAmount += $basePrice * $qty;
-                $totalDiscount += ($listPriceDiscount + $ageDiscount + $additionalDiscount) * $qty;
-                $totalQuantity += $qty;
-                $totalAgeDiscount += $ageDiscount * $qty;
+                foreach ($examItems as $item) {
+                    if (empty($item['examination_id'])) {
+                        continue;
+                    }
 
-                if (! empty($specData['age_discount_type']) && ! $firstAgeDiscountType) {
-                    $firstAgeDiscountType = $specData['age_discount_type'];
+                    $calcItem = InvoiceCalculationService::calculateItem($item, null, $settingsMap);
+
+                    $qty = $calcItem['quantity'];
+                    $basePrice = $calcItem['amount'];
+                    $disc = $calcItem['discount'];
+                    $ageDiscount = $calcItem['age_discount_amount'] ?? 0.00;
+
+                    $totalAmount += $basePrice * $qty;
+                    $totalDiscount += $disc;
+                    $totalQuantity += $qty;
+                    $totalAgeDiscount += $ageDiscount * $qty;
+
+                    if (! empty($item['age_discount_type']) && ! $firstAgeDiscountType) {
+                        $firstAgeDiscountType = $item['age_discount_type'];
+                    }
                 }
             }
 
@@ -298,6 +333,7 @@ class SpecimenGroupController extends Controller
 
             // Create each specimen and its supplies
             $createdSpecimensDataForPdf = [];
+            $calculatedItems = [];
             foreach ($specimensData as $index => $specData) {
                 $sequenceCode = $specData['reserved_code'] ?? null;
                 if (! $sequenceCode) {
@@ -335,11 +371,34 @@ class SpecimenGroupController extends Controller
                     $medOrderPath = $this->storeUploadedFile($request->file($fileKey), 'medical_orders');
                 }
 
+                $examItems = ! empty($specData['examinations']) && is_array($specData['examinations']) ? $specData['examinations'] : [];
+                if (empty($examItems) && ! empty($specData['specimen_type_examination'])) {
+                    $examIds = explode(',', $specData['specimen_type_examination']);
+                    foreach ($examIds as $examId) {
+                        if (is_numeric($examId)) {
+                            $examItems[] = [
+                                'examination_id' => (int) $examId,
+                                'quantity' => (int) ($specData['quantity'] ?? 1),
+                                'selected_price' => $specData['selected_price'] ?? null,
+                                'custom_specimen_price' => $specData['custom_specimen_price'] ?? '0',
+                                'additional_discount_enabled' => $specData['additional_discount_enabled'] ?? false,
+                                'additional_discount' => $specData['additional_discount'] ?? '0',
+                                'age_discount_type' => $specData['age_discount_type'] ?? null,
+                                'age_discount_amount' => $specData['age_discount_amount'] ?? '0',
+                            ];
+                        }
+                    }
+                }
+
+                $primaryExamId = ! empty($examItems[0]['examination_id'])
+                    ? (int) $examItems[0]['examination_id']
+                    : (is_numeric($specData['specimen_type_examination'] ?? null) ? (int) $specData['specimen_type_examination'] : null);
+
                 $specimen = Specimen::create([
                     'sequence_code' => $sequenceCode,
                     'customer' => $specData['customer'],
                     'specimen_type' => $specData['specimen_type'],
-                    'specimen_type_examination' => $specData['specimen_type_examination'],
+                    'specimen_type_examination' => $primaryExamId,
                     'specimen_category' => $specData['specimen_category'],
                     'referrer' => $specData['referrer'],
                     'anatomic_site' => $specData['anatomic_site'] ?? '',
@@ -356,67 +415,43 @@ class SpecimenGroupController extends Controller
                     'sample_collection_date' => $specData['sample_collection_date'] ?? null,
                 ]);
 
-                $qty = (int) ($specData['quantity'] ?? 1);
-
-                $exam = $examinations->get($specData['specimen_type_examination']);
-                $maxPrice = 0.00;
-                if ($exam && $exam->prices->isNotEmpty()) {
-                    $maxPrice = (float) $exam->prices->max('amount');
+                // Sync all examinations to specimen_examinations pivot table
+                $examIds = array_filter(array_column($examItems, 'examination_id'));
+                if (! empty($examIds)) {
+                    $specimen->examinations()->sync($examIds);
                 }
 
-                $chosenPrice = $specData['selected_price'] === 'custom'
-                    ? (float) ($specData['custom_specimen_price'] ?? 0.00)
-                    : (float) $specData['selected_price'];
-
-                $basePrice = max($maxPrice, $chosenPrice);
-                $listPriceDiscount = max(0.00, $basePrice - $chosenPrice);
-
-                $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
-                $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
-                $disc = $listPriceDiscount + $ageDiscount + $additionalDiscount;
-                $sub = $basePrice - $disc;
-                if ($sub < 0) {
-                    $sub = 0.00;
-                }
-
-                // Determine credit payment status if credit checkout
-                $isPaid = $validated['payment_type'] !== 'credit';
-                $qtyPaid = $isPaid ? $qty : 0;
-                if ($validated['payment_type'] === 'credit') {
-                    $scaledSub = $sub * $qty;
-                    if ($initialPaymentAmount >= $scaledSub) {
-                        $isPaid = true;
-                        $qtyPaid = $qty;
-                        $initialPaymentAmount -= $scaledSub;
+                // Process each examination item for this specimen into invoice_specimens
+                foreach ($examItems as $item) {
+                    if (empty($item['examination_id'])) {
+                        continue;
                     }
-                }
 
-                // Store single breakdown record in invoice_specimens
-                InvoiceSpecimen::create([
-                    'invoice_id' => $invoice->id,
-                    'specimen_id' => $specimen->id,
-                    'is_group' => true,
-                    'group_id' => $group->id,
-                    'credit_id' => $creditId,
-                    'is_paid' => $isPaid,
-                    'quantity_paid' => $qtyPaid,
-                    'quantity' => $qty,
-                    'amount' => $basePrice,
-                    'discount' => $disc,
-                    'subtotal' => $sub * $qty,
-                    'exempt_amount' => $sub * $qty,
-                    'taxable_amount_15' => 0.00,
-                    'taxable_amount_18' => 0.00,
-                    'isv_15' => 0.00,
-                    'isv_18' => 0.00,
-                    'total' => $sub * $qty,
-                    'selected_price' => $specData['selected_price'],
-                    'custom_specimen_price' => $specData['selected_price'] === 'custom' ? (float) ($specData['custom_specimen_price'] ?? 0.00) : 0.00,
-                    'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']),
-                    'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
-                    'age_discount_type' => $specData['age_discount_type'] ?? null,
-                    'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
-                ]);
+                    $calcItem = InvoiceCalculationService::calculateItem($item, null, $settingsMap);
+                    $calculatedItems[] = $calcItem;
+
+                    $itemQty = $calcItem['quantity'];
+                    $isPaid = $validated['payment_type'] !== 'credit';
+                    $qtyPaid = $isPaid ? $itemQty : 0;
+                    if ($validated['payment_type'] === 'credit') {
+                        $scaledSub = $calcItem['subtotal'];
+                        if ($initialPaymentAmount >= $scaledSub) {
+                            $isPaid = true;
+                            $qtyPaid = $itemQty;
+                            $initialPaymentAmount -= $scaledSub;
+                        }
+                    }
+
+                    InvoiceSpecimen::create(array_merge($calcItem, [
+                        'invoice_id' => $invoice->id,
+                        'specimen_id' => $specimen->id,
+                        'is_group' => true,
+                        'group_id' => $group->id,
+                        'credit_id' => $creditId,
+                        'is_paid' => $isPaid,
+                        'quantity_paid' => $qtyPaid,
+                    ]));
+                }
 
                 // Create Kanban Order record
                 $maxOrder = PrioritySpecimenOrder::where('priority_id', $specData['priority_id'])->max('order') ?? 0;
@@ -471,20 +506,35 @@ class SpecimenGroupController extends Controller
 
                 // Add to temporary list for PDF render
                 $typeName = SpecimenType::find($specData['specimen_type'])->name;
-                $examName = SpecimenTypeExamination::find($specData['specimen_type_examination'])->name;
+                $examName = SpecimenTypeExamination::find($primaryExamId)?->name ?? 'Análisis';
+                $firstSpec = InvoiceSpecimen::where('invoice_id', $invoice->id)
+                    ->where('specimen_id', $specimen->id)
+                    ->first();
+                $firstExamCalc = $firstSpec ? [
+                    'amount' => (float) $firstSpec->amount,
+                    'discount' => (float) $firstSpec->discount,
+                    'quantity' => (int) $firstSpec->quantity,
+                ] : ['amount' => 0, 'discount' => 0, 'quantity' => 1];
+
                 $createdSpecimensDataForPdf[] = [
                     'sequence_code' => $sequenceCode,
                     'exam_name' => $typeName.' - '.$examName,
                     'patient_name' => Customer::find($specData['customer'])->name,
-                    'price' => $basePrice,
-                    'discount' => $disc,
+                    'price' => $firstExamCalc['amount'] ?? 0,
+                    'discount' => $firstExamCalc['discount'] ?? 0,
                     'age_discount_type' => $specData['age_discount_type'] ?? null,
                     'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
                     'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']),
                     'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
-                    'quantity' => $qty,
+                    'quantity' => $firstExamCalc['quantity'] ?? 1,
                 ];
             }
+
+            // Consolidate totals across all calculated items and update Invoice header
+            $consolidated = InvoiceCalculationService::calculateConsolidatedTotals($calculatedItems, 0.0, $customAmountVal);
+            $invoice->update(array_merge($consolidated, [
+                'total_paid' => in_array($validated['payment_type'], ['cash', 'credit card', 'bank transfer', 'check']) ? $consolidated['total'] : $initialPaymentAmount,
+            ]));
 
             // CAI tracking
             if (! $isCredit && $caiRange) {
@@ -622,7 +672,7 @@ class SpecimenGroupController extends Controller
             'specimens.*.customer' => 'required|exists:customers,id',
             'specimens.*.specimen_type' => 'required|exists:specimen_type,id',
             'specimens.*.reserved_code' => 'nullable|string|unique:specimen,sequence_code',
-            'specimens.*.specimen_type_examination' => 'required|exists:specimen_type_examination,id',
+            'specimens.*.specimen_type_examination' => 'required',
             'specimens.*.specimen_category' => 'required|exists:specimen_category,id',
             'specimens.*.referrer' => 'required|exists:referrers,id',
             'specimens.*.anatomic_site' => 'nullable|string|max:255',
@@ -640,6 +690,17 @@ class SpecimenGroupController extends Controller
             'specimens.*.age_discount_amount' => 'nullable|numeric|min:0',
             'specimens.*.additional_discount_enabled' => 'nullable|boolean',
             'specimens.*.additional_discount' => 'nullable|numeric|min:0',
+
+            // Nested itemized examinations
+            'specimens.*.examinations' => 'nullable|array',
+            'specimens.*.examinations.*.examination_id' => 'required|exists:specimen_type_examination,id',
+            'specimens.*.examinations.*.quantity' => 'required|integer|min:1',
+            'specimens.*.examinations.*.selected_price' => 'required|string',
+            'specimens.*.examinations.*.custom_specimen_price' => 'nullable|numeric|min:0',
+            'specimens.*.examinations.*.additional_discount_enabled' => 'nullable|boolean',
+            'specimens.*.examinations.*.additional_discount' => 'nullable|numeric|min:0',
+            'specimens.*.examinations.*.age_discount_type' => 'nullable|string|in:third,fourth',
+            'specimens.*.examinations.*.age_discount_amount' => 'nullable|numeric|min:0',
 
             // Insumos for each specimen
             'specimens.*.insumos' => 'nullable|array',
@@ -814,33 +875,13 @@ class SpecimenGroupController extends Controller
                 'transfer_value' => isset($validated['transfer_value']) ? (float) $validated['transfer_value'] : null,
                 'transfer_authorization_code' => $validated['transfer_authorization_code'] ?? null,
             ]);
-
             $activeSpecimenIds = [];
             $createdSpecimensDataForPdf = [];
+            $specimensData = $validated['specimens'];
+            $calculatedItems = [];
 
-            // Process specimens in the list
+            // Process specimens
             foreach ($specimensData as $index => $specData) {
-                $qty = (int) ($specData['quantity'] ?? 1);
-                $exam = $examinations->get($specData['specimen_type_examination']);
-                $maxPrice = 0.00;
-                if ($exam && $exam->prices->isNotEmpty()) {
-                    $maxPrice = (float) $exam->prices->max('amount');
-                }
-
-                $chosenPrice = $specData['selected_price'] === 'custom'
-                    ? (float) ($specData['custom_specimen_price'] ?? 0.00)
-                    : (float) $specData['selected_price'];
-
-                $basePrice = max($maxPrice, $chosenPrice);
-                $listPriceDiscount = max(0.00, $basePrice - $chosenPrice);
-                $ageDiscount = (float) ($specData['age_discount_amount'] ?? 0.00);
-                $additionalDiscount = ! empty($specData['additional_discount_enabled']) ? (float) ($specData['additional_discount'] ?? 0.00) : 0.00;
-                $disc = $listPriceDiscount + $ageDiscount + $additionalDiscount;
-                $sub = $basePrice - $disc;
-                if ($sub < 0) {
-                    $sub = 0.00;
-                }
-
                 if (! empty($specData['id'])) {
                     // Existing specimen
                     $specimen = Specimen::findOrFail($specData['id']);
@@ -848,41 +889,79 @@ class SpecimenGroupController extends Controller
                         throw new \Exception("Muestra con ID {$specData['id']} no pertenece a este grupo.");
                     }
 
-                    // Update its InvoiceSpecimen record
-                    $isPaid = true;
-                    if ($validated['payment_type'] === 'credit') {
-                        $isPaid = false;
-                        $scaledSub = $sub * $qty;
-                        if ($initialPaymentAmount >= $scaledSub) {
-                            $isPaid = true;
-                            $initialPaymentAmount -= $scaledSub;
+                    $examItems = ! empty($specData['examinations']) && is_array($specData['examinations']) ? $specData['examinations'] : [];
+                    if (empty($examItems) && ! empty($specData['specimen_type_examination'])) {
+                        $examIds = explode(',', $specData['specimen_type_examination']);
+                        foreach ($examIds as $examId) {
+                            if (is_numeric($examId)) {
+                                $examItems[] = [
+                                    'examination_id' => (int) $examId,
+                                    'quantity' => (int) ($specData['quantity'] ?? 1),
+                                    'selected_price' => $specData['selected_price'] ?? null,
+                                    'custom_specimen_price' => $specData['custom_specimen_price'] ?? '0',
+                                    'additional_discount_enabled' => $specData['additional_discount_enabled'] ?? false,
+                                    'additional_discount' => $specData['additional_discount'] ?? '0',
+                                    'age_discount_type' => $specData['age_discount_type'] ?? null,
+                                    'age_discount_amount' => $specData['age_discount_amount'] ?? '0',
+                                ];
+                            }
                         }
                     }
 
-                    InvoiceSpecimen::updateOrCreate(
-                        [
-                            'invoice_id' => $invoice->id,
-                            'specimen_id' => $specimen->id,
-                        ],
-                        [
-                            'credit_id' => $creditId,
-                            'group_id' => $group->id,
-                            'is_group' => true,
-                            'is_paid' => $isPaid,
-                            'quantity' => $qty,
-                            'amount' => $basePrice,
-                            'discount' => $disc,
-                            'subtotal' => $sub * $qty,
-                            'exempt_amount' => $sub * $qty,
-                            'total' => $sub * $qty,
-                            'selected_price' => $specData['selected_price'],
-                            'custom_specimen_price' => $specData['selected_price'] === 'custom' ? (float) ($specData['custom_specimen_price'] ?? 0.00) : 0.00,
-                            'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']),
-                            'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
-                            'age_discount_type' => $specData['age_discount_type'] ?? null,
-                            'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
-                        ]
-                    );
+                    $primaryExamId = ! empty($examItems[0]['examination_id'])
+                        ? (int) $examItems[0]['examination_id']
+                        : (is_numeric($specData['specimen_type_examination'] ?? null) ? (int) $specData['specimen_type_examination'] : null);
+
+                    $specimen->update([
+                        'specimen_type_examination' => $primaryExamId,
+                    ]);
+
+                    $examIds = array_filter(array_column($examItems, 'examination_id'));
+                    if (! empty($examIds)) {
+                        $specimen->examinations()->sync($examIds);
+                    }
+
+                    // Delete obsolete InvoiceSpecimen records for this specimen
+                    InvoiceSpecimen::where('invoice_id', $invoice->id)
+                        ->where('specimen_id', $specimen->id)
+                        ->whereNotIn('examination_id', $examIds)
+                        ->delete();
+
+                    // Update/Create InvoiceSpecimen rows
+                    foreach ($examItems as $item) {
+                        if (empty($item['examination_id'])) {
+                            continue;
+                        }
+
+                        $calcItem = InvoiceCalculationService::calculateItem($item, null, $settingsMap);
+
+                        $itemQty = $calcItem['quantity'];
+                        $isPaid = $validated['payment_type'] !== 'credit';
+                        $qtyPaid = $isPaid ? $itemQty : 0;
+                        if ($validated['payment_type'] === 'credit') {
+                            $scaledSub = $calcItem['subtotal'];
+                            if ($initialPaymentAmount >= $scaledSub) {
+                                $isPaid = true;
+                                $qtyPaid = $itemQty;
+                                $initialPaymentAmount -= $scaledSub;
+                            }
+                        }
+
+                        InvoiceSpecimen::updateOrCreate(
+                            [
+                                'invoice_id' => $invoice->id,
+                                'specimen_id' => $specimen->id,
+                                'examination_id' => $item['examination_id'],
+                            ],
+                            array_merge($calcItem, [
+                                'credit_id' => $creditId,
+                                'group_id' => $group->id,
+                                'is_group' => true,
+                                'is_paid' => $isPaid,
+                                'quantity_paid' => $qtyPaid,
+                            ])
+                        );
+                    }
 
                     $sequenceCode = $specimen->sequence_code;
                     $activeSpecimenIds[] = $specimen->id;
@@ -923,11 +1002,34 @@ class SpecimenGroupController extends Controller
                         $medOrderPath = $this->storeUploadedFile($request->file($fileKey), 'medical_orders');
                     }
 
+                    $examItems = ! empty($specData['examinations']) && is_array($specData['examinations']) ? $specData['examinations'] : [];
+                    if (empty($examItems) && ! empty($specData['specimen_type_examination'])) {
+                        $examIds = explode(',', $specData['specimen_type_examination']);
+                        foreach ($examIds as $examId) {
+                            if (is_numeric($examId)) {
+                                $examItems[] = [
+                                    'examination_id' => (int) $examId,
+                                    'quantity' => (int) ($specData['quantity'] ?? 1),
+                                    'selected_price' => $specData['selected_price'] ?? null,
+                                    'custom_specimen_price' => $specData['custom_specimen_price'] ?? '0',
+                                    'additional_discount_enabled' => $specData['additional_discount_enabled'] ?? false,
+                                    'additional_discount' => $specData['additional_discount'] ?? '0',
+                                    'age_discount_type' => $specData['age_discount_type'] ?? null,
+                                    'age_discount_amount' => $specData['age_discount_amount'] ?? '0',
+                                ];
+                            }
+                        }
+                    }
+
+                    $primaryExamId = ! empty($examItems[0]['examination_id'])
+                        ? (int) $examItems[0]['examination_id']
+                        : (is_numeric($specData['specimen_type_examination'] ?? null) ? (int) $specData['specimen_type_examination'] : null);
+
                     $specimen = Specimen::create([
                         'sequence_code' => $sequenceCode,
                         'customer' => $specData['customer'],
                         'specimen_type' => $specData['specimen_type'],
-                        'specimen_type_examination' => $specData['specimen_type_examination'],
+                        'specimen_type_examination' => $primaryExamId,
                         'specimen_category' => $specData['specimen_category'],
                         'referrer' => $specData['referrer'],
                         'anatomic_site' => $specData['anatomic_site'] ?? '',
@@ -943,40 +1045,40 @@ class SpecimenGroupController extends Controller
                         'sample_collection_date' => $specData['sample_collection_date'] ?? null,
                     ]);
 
-                    $isPaid = true;
-                    if ($validated['payment_type'] === 'credit') {
-                        $isPaid = false;
-                        $scaledSub = $sub * $qty;
-                        if ($initialPaymentAmount >= $scaledSub) {
-                            $isPaid = true;
-                            $initialPaymentAmount -= $scaledSub;
-                        }
+                    $examIds = array_filter(array_column($examItems, 'examination_id'));
+                    if (! empty($examIds)) {
+                        $specimen->examinations()->sync($examIds);
                     }
 
-                    InvoiceSpecimen::create([
-                        'credit_id' => $creditId,
-                        'invoice_id' => $invoice->id,
-                        'specimen_id' => $specimen->id,
-                        'group_id' => $group->id,
-                        'is_group' => true,
-                        'is_paid' => $isPaid,
-                        'quantity' => $qty,
-                        'amount' => $basePrice,
-                        'discount' => $disc,
-                        'subtotal' => $sub * $qty,
-                        'exempt_amount' => $sub * $qty,
-                        'taxable_amount_15' => 0.00,
-                        'taxable_amount_18' => 0.00,
-                        'isv_15' => 0.00,
-                        'isv_18' => 0.00,
-                        'total' => $sub * $qty,
-                        'selected_price' => $specData['selected_price'],
-                        'custom_specimen_price' => $specData['selected_price'] === 'custom' ? (float) ($specData['custom_specimen_price'] ?? 0.00) : 0.00,
-                        'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']),
-                        'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
-                        'age_discount_type' => $specData['age_discount_type'] ?? null,
-                        'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
-                    ]);
+                    foreach ($examItems as $item) {
+                        if (empty($item['examination_id'])) {
+                            continue;
+                        }
+
+                        $calcItem = InvoiceCalculationService::calculateItem($item, null, $settingsMap);
+
+                        $itemQty = $calcItem['quantity'];
+                        $isPaid = $validated['payment_type'] !== 'credit';
+                        $qtyPaid = $isPaid ? $itemQty : 0;
+                        if ($validated['payment_type'] === 'credit') {
+                            $scaledSub = $calcItem['subtotal'];
+                            if ($initialPaymentAmount >= $scaledSub) {
+                                $isPaid = true;
+                                $qtyPaid = $itemQty;
+                                $initialPaymentAmount -= $scaledSub;
+                            }
+                        }
+
+                        InvoiceSpecimen::create(array_merge($calcItem, [
+                            'invoice_id' => $invoice->id,
+                            'specimen_id' => $specimen->id,
+                            'is_group' => true,
+                            'group_id' => $group->id,
+                            'credit_id' => $creditId,
+                            'is_paid' => $isPaid,
+                            'quantity_paid' => $qtyPaid,
+                        ]));
+                    }
 
                     $maxOrder = PrioritySpecimenOrder::where('priority_id', $specData['priority_id'])->max('order') ?? 0;
                     PrioritySpecimenOrder::create([
@@ -1030,20 +1132,59 @@ class SpecimenGroupController extends Controller
                     $activeSpecimenIds[] = $specimen->id;
                 }
 
+                $firstSpec = InvoiceSpecimen::where('invoice_id', $invoice->id)
+                    ->where('specimen_id', $specimen->id)
+                    ->first();
+                $firstExamCalc = $firstSpec ? [
+                    'amount' => (float) $firstSpec->amount,
+                    'discount' => (float) $firstSpec->discount,
+                    'quantity' => (int) $firstSpec->quantity,
+                ] : ['amount' => 0, 'discount' => 0, 'quantity' => 1];
+
                 $typeName = SpecimenType::find($specData['specimen_type'])->name;
-                $examName = SpecimenTypeExamination::find($specData['specimen_type_examination'])->name;
+                $examName = SpecimenTypeExamination::find($primaryExamId)?->name ?? 'Análisis';
                 $createdSpecimensDataForPdf[] = [
                     'sequence_code' => $sequenceCode,
                     'exam_name' => $typeName.' - '.$examName,
                     'patient_name' => Customer::find($specData['customer'])->name,
-                    'price' => $basePrice,
-                    'discount' => $disc,
+                    'price' => $firstExamCalc['amount'],
+                    'discount' => $firstExamCalc['discount'],
                     'age_discount_type' => $specData['age_discount_type'] ?? null,
                     'age_discount_amount' => (float) ($specData['age_discount_amount'] ?? 0.00),
                     'additional_discount_enabled' => ! empty($specData['additional_discount_enabled']),
                     'additional_discount' => (float) ($specData['additional_discount'] ?? 0.00),
-                    'quantity' => $qty,
+                    'quantity' => $firstExamCalc['quantity'],
                 ];
+            }
+
+            // Consolidate totals across all calculated items currently linked to the invoice
+            $allInvoiceSpecimens = InvoiceSpecimen::where('invoice_id', $invoice->id)->get();
+            $calculatedItemsForConsolidation = [];
+            foreach ($allInvoiceSpecimens as $invSpec) {
+                $calculatedItemsForConsolidation[] = [
+                    'amount' => (float) $invSpec->amount,
+                    'discount' => (float) $invSpec->discount,
+                    'quantity' => (int) $invSpec->quantity,
+                    'subtotal' => (float) $invSpec->subtotal,
+                    'exempt_amount' => (float) $invSpec->exempt_amount,
+                    'taxable_amount_15' => (float) $invSpec->taxable_amount_15,
+                    'taxable_amount_18' => (float) $invSpec->taxable_amount_18,
+                    'isv_15' => (float) $invSpec->isv_15,
+                    'isv_18' => (float) $invSpec->isv_18,
+                    'total' => (float) $invSpec->total,
+                ];
+            }
+
+            $consolidated = InvoiceCalculationService::calculateConsolidatedTotals($calculatedItemsForConsolidation, 0.0, $customAmountVal);
+            $invoice->update(array_merge($consolidated, [
+                'total_paid' => in_array($validated['payment_type'], ['cash', 'credit card', 'bank transfer', 'check']) ? $consolidated['total'] : $initialPaymentAmount,
+            ]));
+
+            if ($credit) {
+                $credit->update([
+                    'credit_amount' => $consolidated['total'],
+                    'amount_remaining' => max(0, $consolidated['total'] - (float) $credit->amount_paid),
+                ]);
             }
 
             // Update Group Name with the new count of active specimens

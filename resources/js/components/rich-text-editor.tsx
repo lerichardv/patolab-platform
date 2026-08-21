@@ -544,6 +544,7 @@ export const LineHeight = Extension.create({
                                         lineHeight,
                                     });
                                 }
+
                                 applied = true;
                             }
                         },
@@ -569,6 +570,7 @@ export const LineHeight = Extension.create({
                                         lineHeight: null,
                                     });
                                 }
+
                                 applied = true;
                             }
                         },
@@ -881,6 +883,7 @@ const CustomImage = Image.extend({
 
                     if (!isInsideGrid) {
                         dom.style.display = 'block';
+
                         if (updatedNode.attrs.width) {
                             dom.style.width = `${updatedNode.attrs.width}px`;
                         } else if (el.complete && el.clientWidth > 0) {
@@ -888,6 +891,7 @@ const CustomImage = Image.extend({
                         } else {
                             dom.style.width = 'fit-content';
                         }
+
                         dom.style.marginLeft = isLeft ? '0' : 'auto';
                         dom.style.marginRight = isRight ? '0' : 'auto';
                     }
@@ -913,11 +917,13 @@ const CustomImage = Image.extend({
 
             // Append standalone caption input under image
             let captionInputRef: HTMLInputElement | null = null;
+
             if (!isInsideGrid) {
                 const align = node.attrs.alignment || 'center';
                 const isLeft = align === 'left';
                 const isRight = align === 'right';
                 dom.style.display = 'block';
+
                 if (node.attrs.width) {
                     dom.style.width = `${node.attrs.width}px`;
                 } else if (el.complete && el.clientWidth > 0) {
@@ -925,6 +931,7 @@ const CustomImage = Image.extend({
                 } else {
                     dom.style.width = 'fit-content';
                 }
+
                 dom.style.marginLeft = isLeft ? '0' : 'auto';
                 dom.style.marginRight = isRight ? '0' : 'auto';
                 dom.style.verticalAlign = 'middle';
@@ -956,6 +963,7 @@ const CustomImage = Image.extend({
                 if (!editor.isEditable) {
                     captionInput.readOnly = true;
                     captionInput.style.border = 'none';
+
                     if (!node.attrs.caption) {
                         captionInput.style.display = 'none';
                     }
@@ -1016,6 +1024,7 @@ const CustomImage = Image.extend({
                 dom.style.visibility = '';
                 dom.style.pointerEvents = '';
                 naturalWidth = el.naturalWidth;
+
                 if (!node.attrs.width && !isInsideGrid) {
                     dom.style.width = `${el.clientWidth}px`;
                 }

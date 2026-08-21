@@ -21,6 +21,7 @@ import {
     Info,
     ChevronDown,
     ChevronUp,
+    Layers,
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
@@ -40,6 +41,12 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
     Command,
     CommandEmpty,
@@ -83,6 +90,10 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import {
+    calculateInvoiceItem,
+    calculateConsolidatedTotals,
+} from '@/services/invoice-calculation';
 
 // Reuse on-the-fly creators
 import CustomerSheet from '../customers/customer-sheet';
@@ -430,6 +441,58 @@ export default function SpecimenGroupSheet({
                     (s: any) => {
                         const breakdown = s.invoice_group_specimen || {};
 
+                        let examIdsStr = '';
+                        let examNamesStr = '';
+                        let itemizedExams: any[] = [];
+
+                        if (
+                            s.specimen_examinations &&
+                            s.specimen_examinations.length > 0
+                        ) {
+                            examIdsStr = s.specimen_examinations
+                                .map((x: any) => x.examination_id)
+                                .join(',');
+                            examNamesStr = s.specimen_examinations
+                                .map((x: any) => x.examination?.name || '')
+                                .filter(Boolean)
+                                .join(', ');
+                            itemizedExams = s.specimen_examinations.map(
+                                (x: any) => ({
+                                    examination_id: x.examination_id,
+                                    selected_price:
+                                        x.selected_price?.toString() || '0',
+                                    custom_specimen_price:
+                                        x.custom_specimen_price?.toString() ||
+                                        '0',
+                                    quantity: x.quantity ?? 1,
+                                    additional_discount_enabled:
+                                        !!x.additional_discount_enabled,
+                                    additional_discount:
+                                        x.additional_discount?.toString() ||
+                                        '0',
+                                    age_discount_type:
+                                        x.age_discount_type || null,
+                                    age_discount_amount:
+                                        x.age_discount_amount?.toString() ||
+                                        '0',
+                                }),
+                            );
+                        } else if (
+                            s.examinations &&
+                            s.examinations.length > 0
+                        ) {
+                            examIdsStr = s.examinations
+                                .map((x: any) => x.id)
+                                .join(',');
+                            examNamesStr = s.examinations
+                                .map((x: any) => x.name)
+                                .join(', ');
+                        } else {
+                            examIdsStr =
+                                s.specimen_type_examination?.toString() || '';
+                            examNamesStr = s.examination?.name || '';
+                        }
+
                         return {
                             id: s.id,
                             client_id: s.id.toString(),
@@ -459,10 +522,9 @@ export default function SpecimenGroupSheet({
                                 : null,
                             specimen_type: s.specimen_type,
                             specimen_type_name: s.type?.name || '',
-                            specimen_type_examination:
-                                s.specimen_type_examination,
-                            specimen_type_examination_name:
-                                s.examination?.name || '',
+                            specimen_type_examination: examIdsStr,
+                            specimen_type_examination_name: examNamesStr,
+                            examinations: itemizedExams,
                             specimen_category: s.specimen_category,
                             referrer: s.referrer,
                             anatomic_site: s.anatomic_site || '',
@@ -891,6 +953,41 @@ export default function SpecimenGroupSheet({
             }
         }
 
+        const selectedExamIds = nestedExamination
+            ? nestedExamination.split(',').filter(Boolean)
+            : [];
+        const examConfigs = selectedExamIds.map((idStr) => {
+            const examId = parseInt(idStr, 10);
+            const existingConfig = (existingSpec?.examinations || []).find(
+                (x: any) => (x.examination_id || x.id) === examId,
+            );
+
+            if (existingConfig) {
+return existingConfig;
+}
+
+            const examObj = examinations.find((e) => e.id === examId);
+            const prices = examObj?.prices || [];
+            const sortedPrices = [...prices].sort(
+                (a, b) => parseFloat(b.amount) - parseFloat(a.amount),
+            );
+            const defaultPrice =
+                sortedPrices.length > 0
+                    ? sortedPrices[0].amount.toString()
+                    : '0';
+
+            return {
+                examination_id: examId,
+                selected_price: defaultPrice,
+                custom_specimen_price: '0',
+                quantity: 1,
+                additional_discount_enabled: false,
+                additional_discount: '0',
+                age_discount_type: null,
+                age_discount_amount: '0',
+            };
+        });
+
         const specObject = {
             id: existingSpec ? existingSpec.id : undefined,
             isExisting: existingSpec ? existingSpec.isExisting : undefined,
@@ -906,10 +1003,14 @@ export default function SpecimenGroupSheet({
                 specimenTypes.find(
                     (t) => t.id.toString() === nestedSpecimenType,
                 )?.name || '',
-            specimen_type_examination: parseInt(nestedExamination),
-            specimen_type_examination_name:
-                examinations.find((e) => e.id.toString() === nestedExamination)
-                    ?.name || '',
+            specimen_type_examination: nestedExamination,
+            specimen_type_examination_name: selectedExamIds
+                .map(
+                    (id) =>
+                        examinations.find((e) => e.id.toString() === id)?.name,
+                )
+                .filter(Boolean)
+                .join(', '),
             specimen_category: parseInt(nestedCategory),
             referrer: parseInt(nestedReferrer),
             anatomic_site: nestedAnatomicSite,
@@ -921,6 +1022,7 @@ export default function SpecimenGroupSheet({
             medical_order_file: nestedMedicalOrderFile,
             agregar_insumos: nestedAgregarInsumos,
             insumos: nestedInsumos,
+            examinations: examConfigs,
 
             // Step 2 pricing details (set defaults here)
             selected_price: existingSpec
@@ -1093,64 +1195,158 @@ export default function SpecimenGroupSheet({
             }),
         );
     };
+    const handleSpecimenExamConfigChange = (
+        clientId: string,
+        examId: number,
+        field: string,
+        value: any,
+    ) => {
+        setSpecimens((prev) =>
+            prev.map((s) => {
+                if (s.client_id === clientId) {
+                    const currentExams = [...(s.examinations || [])];
+                    const idx = currentExams.findIndex(
+                        (x: any) => x.examination_id === examId,
+                    );
+                    const updated =
+                        idx >= 0
+                            ? { ...currentExams[idx] }
+                            : { examination_id: examId };
+
+                    updated[field] = value;
+
+                    if (field === 'selected_price' && value !== 'custom') {
+                        updated.custom_specimen_price = '0';
+                    }
+
+                    if (idx >= 0) {
+                        currentExams[idx] = updated;
+                    } else {
+                        currentExams.push(updated);
+                    }
+
+                    return {
+                        ...s,
+                        examinations: currentExams,
+                    };
+                }
+
+                return s;
+            }),
+        );
+        setIsFormDirty(true);
+    };
+
+    const specimensCalculated = useMemo(() => {
+        return specimens.map((spec) => {
+            let rawExamIds: string[] = [];
+
+            if (spec.specimen_type_examination) {
+                rawExamIds = spec.specimen_type_examination
+                    .toString()
+                    .split(',')
+                    .filter(Boolean);
+            } else if (spec.examinations && spec.examinations.length > 0) {
+                rawExamIds = spec.examinations.map((x: any) =>
+                    (x.examination_id || x.id).toString(),
+                );
+            }
+
+            const calculatedExams = rawExamIds.map((idStr: string) => {
+                const examId = parseInt(idStr, 10);
+                const examObj = examinations.find((e) => e.id === examId);
+                const config =
+                    (spec.examinations || []).find(
+                        (x: any) => x.examination_id === examId,
+                    ) || {};
+                const prices = examObj?.prices || [];
+
+                const itemCalc = calculateInvoiceItem(
+                    {
+                        examination_id: examId,
+                        selected_price: config.selected_price,
+                        custom_specimen_price: config.custom_specimen_price,
+                        quantity: config.quantity,
+                        age_discount_type: config.age_discount_type,
+                        additional_discount_enabled:
+                            config.additional_discount_enabled,
+                        additional_discount: config.additional_discount,
+                        available_prices: prices,
+                    },
+                    examObj,
+                    {
+                        third_age_discount: thirdAgePercent,
+                        fourth_age_discount: fourthAgePercent,
+                    },
+                );
+
+                return {
+                    ...itemCalc,
+                    examObj,
+                    prices,
+                    totalDiscount: itemCalc.totalLineDiscount,
+                    subtotal: itemCalc.lineSubtotal,
+                    priceDiscount: itemCalc.priceDiscount,
+                    ageDiscount: itemCalc.ageDiscountAmount,
+                    additionalDiscount: itemCalc.addDiscountAmount,
+                };
+            });
+
+            const specimenSubtotal = calculatedExams.reduce(
+                (sum: number, item: any) => sum + item.subtotal,
+                0,
+            );
+            const specimenDiscount = calculatedExams.reduce(
+                (sum: number, item: any) => sum + item.totalDiscount,
+                0,
+            );
+            const specimenBaseTotal = calculatedExams.reduce(
+                (sum: number, item: any) => sum + item.maxPrice * item.quantity,
+                0,
+            );
+
+            return {
+                ...spec,
+                calculatedExams,
+                specimenSubtotal,
+                specimenDiscount,
+                specimenBaseTotal,
+            };
+        });
+    }, [specimens, examinations, thirdAgePercent, fourthAgePercent]);
+
     // Global Totals calculations
     const specimensBaseTotal = useMemo(() => {
-        return specimens.reduce((sum, s) => {
-            const qty = s.quantity ?? 1;
-            const prices =
-                examinations.find((e) => e.id === s.specimen_type_examination)
-                    ?.prices || [];
-            const maxVal =
-                prices.length > 0
-                    ? Math.max(
-                          ...prices.map((p: any) => parseFloat(p.amount) || 0),
-                      )
-                    : 0;
-
-            const chosen =
-                s.selected_price === 'custom'
-                    ? parseFloat(s.custom_specimen_price) || 0
-                    : parseFloat(s.selected_price) || 0;
-            const basePrice = Math.max(maxVal, chosen);
-
-            return sum + basePrice * qty;
-        }, 0);
-    }, [specimens, examinations]);
+        return specimensCalculated.reduce(
+            (sum, s) => sum + s.specimenBaseTotal,
+            0,
+        );
+    }, [specimensCalculated]);
 
     const specimensAutoDiscount = useMemo(() => {
-        return specimens.reduce((sum, s) => {
-            const qty = s.quantity ?? 1;
-            const prices =
-                examinations.find((e) => e.id === s.specimen_type_examination)
-                    ?.prices || [];
-            const maxVal =
-                prices.length > 0
-                    ? Math.max(
-                          ...prices.map((p: any) => parseFloat(p.amount) || 0),
-                      )
-                    : 0;
-            const chosen =
-                s.selected_price === 'custom'
-                    ? parseFloat(s.custom_specimen_price) || 0
-                    : parseFloat(s.selected_price) || 0;
-            const basePrice = Math.max(maxVal, chosen);
-            const diff = Math.max(0, basePrice - chosen);
-            const ageDisc = parseFloat(s.age_discount_amount) || 0;
-
-            return sum + (diff + ageDisc) * qty;
+        return specimensCalculated.reduce((sum, s) => {
+            return (
+                sum +
+                s.calculatedExams.reduce(
+                    (eSum: number, e: any) =>
+                        eSum + (e.priceDiscount + e.ageDiscount),
+                    0,
+                )
+            );
         }, 0);
-    }, [specimens, examinations]);
+    }, [specimensCalculated]);
 
     const specimensAdditionalDiscount = useMemo(() => {
-        return specimens.reduce((sum, s) => {
-            const qty = s.quantity ?? 1;
-            const addDisc = s.additional_discount_enabled
-                ? parseFloat(s.additional_discount) || 0
-                : 0;
-
-            return sum + addDisc * qty;
+        return specimensCalculated.reduce((sum, s) => {
+            return (
+                sum +
+                s.calculatedExams.reduce(
+                    (eSum: number, e: any) => eSum + e.additionalDiscount,
+                    0,
+                )
+            );
         }, 0);
-    }, [specimens]);
+    }, [specimensCalculated]);
 
     const customAmountVal = useMemo(() => {
         return customAmountEnabled ? parseFloat(customAmount) || 0 : 0;
@@ -1163,9 +1359,12 @@ export default function SpecimenGroupSheet({
     const finalSubtotalVal = useMemo(() => {
         return Math.max(
             0,
-            specimensBaseTotal + customAmountVal - globalDiscountTotal,
+            specimensCalculated.reduce(
+                (sum, s) => sum + s.specimenSubtotal,
+                0,
+            ) + customAmountVal,
         );
-    }, [specimensBaseTotal, customAmountVal, globalDiscountTotal]);
+    }, [specimensCalculated, customAmountVal]);
 
     const estimatedCodes = useMemo(() => {
         const typeOffsets: Record<number, number> = {};
@@ -1460,6 +1659,7 @@ export default function SpecimenGroupSheet({
                 age_discount_amount: s.age_discount_amount,
                 additional_discount_enabled: s.additional_discount_enabled,
                 additional_discount: s.additional_discount,
+                examinations: s.examinations || [],
 
                 // Nest supplies
                 insumos: s.insumos.map((i: any) => ({
@@ -1967,390 +2167,481 @@ export default function SpecimenGroupSheet({
                                 <div className="space-y-6 lg:col-span-8">
                                     {/* Specimens configuration cards */}
                                     <div className="space-y-4">
-                                        <h4 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                            Configuración de Precios e Insumos
-                                            por Muestra
-                                        </h4>
-                                        {specimens.map((spec, specIdx) => {
-                                            const prices =
-                                                examinations.find(
-                                                    (e) =>
-                                                        e.id ===
-                                                        spec.specimen_type_examination,
-                                                )?.prices || [];
-                                            const maxVal =
-                                                prices.length > 0
-                                                    ? Math.max(
-                                                          ...prices.map(
-                                                              (p: any) =>
-                                                                  parseFloat(
-                                                                      p.amount,
-                                                                  ) || 0,
-                                                          ),
-                                                      )
-                                                    : 0;
-                                            const chosen =
-                                                parseFloat(
-                                                    spec.selected_price,
-                                                ) || 0;
-                                            const diffDiscount = Math.max(
-                                                0,
-                                                maxVal - chosen,
-                                            );
-                                            const ageDiscVal =
-                                                parseFloat(
-                                                    spec.age_discount_amount,
-                                                ) || 0;
-                                            const addDiscVal =
-                                                spec.additional_discount_enabled
-                                                    ? parseFloat(
-                                                          spec.additional_discount,
-                                                      ) || 0
-                                                    : 0;
-                                            const qty = spec.quantity ?? 1;
-                                            const specimenSubtotal = Math.max(
-                                                0,
-                                                (maxVal -
-                                                    (diffDiscount +
-                                                        ageDiscVal +
-                                                        addDiscVal)) *
-                                                    qty,
-                                            );
-
-                                            return (
-                                                <Card
-                                                    key={spec.client_id}
-                                                    className="overflow-hidden border border-border/80 shadow-sm"
-                                                >
-                                                    <CardHeader className="flex flex-row items-center justify-between bg-muted/40 px-4 py-3">
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <div className="text-sm font-bold text-foreground">
-                                                                Muestra #
-                                                                {specIdx + 1} -{' '}
-                                                                {
-                                                                    spec.specimen_type_name
-                                                                }{' '}
-                                                                -{' '}
-                                                                {
-                                                                    spec.specimen_type_examination_name
-                                                                }
-                                                            </div>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                Paciente:{' '}
-                                                                <strong className="text-foreground">
+                                        {/* <h4 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+											Configuración de Precios e Insumos
+											por Muestra
+										</h4> */}
+                                        {specimensCalculated.map(
+                                            (
+                                                specCalc: any,
+                                                specIdx: number,
+                                            ) => {
+                                                return (
+                                                    <div
+                                                        key={specCalc.client_id}
+                                                        className="space-y-3 rounded-xl border bg-muted/20 p-4"
+                                                    >
+                                                        <div className="flex items-center justify-between border-b pb-2">
+                                                            <div>
+                                                                <h5 className="text-sm font-bold text-foreground">
+                                                                    Muestra #
+                                                                    {specIdx +
+                                                                        1}{' '}
+                                                                    -{' '}
                                                                     {
-                                                                        spec.customer_name
+                                                                        specCalc.specimen_type_name
                                                                     }
-                                                                </strong>
+                                                                </h5>
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    Paciente:{' '}
+                                                                    <strong className="text-foreground">
+                                                                        {
+                                                                            specCalc.customer_name
+                                                                        }
+                                                                    </strong>
+                                                                </span>
                                                             </div>
-                                                        </div>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="font-mono text-xs"
-                                                        >
-                                                            Subtotal: L.{' '}
-                                                            {specimenSubtotal.toFixed(
-                                                                2,
-                                                            )}
-                                                        </Badge>
-                                                    </CardHeader>
-                                                    <CardContent className="space-y-4 p-4">
-                                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                                            <div className="grid gap-2">
-                                                                <div className="flex items-center justify-between">
-                                                                    <Label className="text-xs font-semibold">
-                                                                        Seleccionar
-                                                                        Precio
-                                                                        (L.)
-                                                                    </Label>
-                                                                    {spec.specimen_type_examination && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                setSelectedExaminationForPrices(
-                                                                                    examinations.find(
-                                                                                        (
-                                                                                            e,
-                                                                                        ) =>
-                                                                                            e.id ===
-                                                                                            spec.specimen_type_examination,
-                                                                                    ) ||
-                                                                                        null,
-                                                                                );
-                                                                                setIsEditPricesSheetOpen(
-                                                                                    true,
-                                                                                );
-                                                                            }}
-                                                                            className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-                                                                        >
-                                                                            <Plus className="h-3 w-3" />{' '}
-                                                                            Gestionar
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                                <Select
-                                                                    value={
-                                                                        spec.selected_price
-                                                                    }
-                                                                    onValueChange={(
-                                                                        val,
-                                                                    ) =>
-                                                                        handleSpecimenPriceChange(
-                                                                            spec.client_id,
-                                                                            val,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <SelectTrigger className="h-9">
-                                                                        <SelectValue placeholder="Seleccione un precio" />
-                                                                    </SelectTrigger>
-                                                                    <SelectContent className="z-[110]">
-                                                                        {prices.length >
-                                                                        0 ? (
-                                                                            <>
-                                                                                {prices.map(
-                                                                                    (
-                                                                                        p: any,
-                                                                                    ) => (
-                                                                                        <SelectItem
-                                                                                            key={
-                                                                                                p.id
-                                                                                            }
-                                                                                            value={p.amount.toString()}
-                                                                                        >
-                                                                                            L.{' '}
-                                                                                            {parseFloat(
-                                                                                                p.amount,
-                                                                                            ).toFixed(
-                                                                                                2,
-                                                                                            )}
-                                                                                        </SelectItem>
-                                                                                    ),
-                                                                                )}
-                                                                                <SelectItem value="custom">
-                                                                                    Precio
-                                                                                    Personalizado
-                                                                                </SelectItem>
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <SelectItem
-                                                                                    value="0"
-                                                                                    disabled
-                                                                                >
-                                                                                    No
-                                                                                    hay
-                                                                                    precios
-                                                                                    configurados
-                                                                                </SelectItem>
-                                                                                <SelectItem value="custom">
-                                                                                    Precio
-                                                                                    Personalizado
-                                                                                </SelectItem>
-                                                                            </>
-                                                                        )}
-                                                                    </SelectContent>
-                                                                </Select>
-                                                                {spec.selected_price ===
-                                                                    'custom' && (
-                                                                    <div className="mt-2 grid gap-1 transition-all duration-300">
-                                                                        <div className="relative">
-                                                                            <span className="absolute top-1/2 left-3 -translate-y-1/2 font-mono text-xs text-muted-foreground select-none">
-                                                                                L.
-                                                                            </span>
-                                                                            <Input
-                                                                                type="number"
-                                                                                step="0.01"
-                                                                                min="0"
-                                                                                value={
-                                                                                    spec.custom_specimen_price ||
-                                                                                    ''
-                                                                                }
-                                                                                onChange={(
-                                                                                    e,
-                                                                                ) =>
-                                                                                    handleSpecimenCustomPriceChange(
-                                                                                        spec.client_id,
-                                                                                        e
-                                                                                            .target
-                                                                                            .value,
-                                                                                    )
-                                                                                }
-                                                                                placeholder="0.00"
-                                                                                className="h-8 pl-7 font-mono text-xs"
-                                                                                required
-                                                                            />
-                                                                        </div>
-                                                                    </div>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="font-mono text-xs font-semibold text-primary"
+                                                            >
+                                                                Subtotal
+                                                                Muestra: L.{' '}
+                                                                {specCalc.specimenSubtotal.toFixed(
+                                                                    2,
                                                                 )}
-                                                            </div>
-
-                                                            <div className="grid gap-2">
-                                                                <Label className="text-xs font-semibold">
-                                                                    Cantidad
-                                                                </Label>
-                                                                <NumberPicker
-                                                                    value={qty}
-                                                                    onChange={(
-                                                                        val,
-                                                                    ) =>
-                                                                        handleSpecimenQuantityChange(
-                                                                            spec.client_id,
-                                                                            val,
-                                                                        )
-                                                                    }
-                                                                    min={1}
-                                                                />
-                                                            </div>
-
-                                                            <div className="grid gap-2">
-                                                                <Label className="text-xs font-semibold">
-                                                                    Descuento
-                                                                    Estimado
-                                                                    (L.)
-                                                                </Label>
-                                                                <Input
-                                                                    type="number"
-                                                                    value={(
-                                                                        (diffDiscount +
-                                                                            ageDiscVal +
-                                                                            addDiscVal) *
-                                                                        qty
-                                                                    ).toFixed(
-                                                                        2,
-                                                                    )}
-                                                                    disabled
-                                                                    readOnly
-                                                                    className="h-9 bg-muted font-mono font-semibold text-emerald-600"
-                                                                />
-                                                            </div>
+                                                            </Badge>
                                                         </div>
 
-                                                        {/* Age discounts switches */}
-                                                        <div className="grid grid-cols-1 gap-4 border-t pt-3 md:grid-cols-2">
-                                                            <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-2.5">
-                                                                <div className="flex flex-col gap-0.5">
-                                                                    <Label className="text-xs font-semibold">
-                                                                        Tercera
-                                                                        Edad (
-                                                                        {
-                                                                            thirdAgePercent
-                                                                        }
-                                                                        %)
-                                                                    </Label>
-                                                                    <span className="text-[10px] text-muted-foreground">
-                                                                        Aplica
-                                                                        descuento
-                                                                        al
-                                                                        precio
-                                                                        base
-                                                                    </span>
-                                                                </div>
-                                                                <Switch
-                                                                    checked={
-                                                                        spec.age_discount_type ===
-                                                                        'third'
-                                                                    }
-                                                                    onCheckedChange={() =>
-                                                                        handleSpecimenAgeDiscountToggle(
-                                                                            spec.client_id,
-                                                                            'third',
-                                                                        )
-                                                                    }
-                                                                />
-                                                            </div>
+                                                        <div className="flex flex-col gap-3">
+                                                            {specCalc.calculatedExams.map(
+                                                                (
+                                                                    examCalc: any,
+                                                                    examIdx: number,
+                                                                ) => {
+                                                                    const examObj =
+                                                                        examCalc.examObj;
+                                                                    const examName =
+                                                                        examObj
+                                                                            ? examObj.name
+                                                                            : `Análisis #${examIdx + 1}`;
+                                                                    const examPrices =
+                                                                        examCalc.prices ||
+                                                                        [];
 
-                                                            <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-2.5">
-                                                                <div className="flex flex-col gap-0.5">
-                                                                    <Label className="text-xs font-semibold">
-                                                                        Cuarta
-                                                                        Edad (
-                                                                        {
-                                                                            fourthAgePercent
-                                                                        }
-                                                                        %)
-                                                                    </Label>
-                                                                    <span className="text-[10px] text-muted-foreground">
-                                                                        Aplica
-                                                                        descuento
-                                                                        al
-                                                                        precio
-                                                                        base
-                                                                    </span>
-                                                                </div>
-                                                                <Switch
-                                                                    checked={
-                                                                        spec.age_discount_type ===
-                                                                        'fourth'
-                                                                    }
-                                                                    onCheckedChange={() =>
-                                                                        handleSpecimenAgeDiscountToggle(
-                                                                            spec.client_id,
-                                                                            'fourth',
-                                                                        )
-                                                                    }
-                                                                />
-                                                            </div>
-                                                        </div>
+                                                                    return (
+                                                                        <Card
+                                                                            key={
+                                                                                examCalc.examination_id
+                                                                            }
+                                                                            className="overflow-hidden border border-border/80 pt-6 pb-2 shadow-sm"
+                                                                        >
+                                                                            <CardHeader className="flex flex-row items-center justify-between px-4 py-3">
+                                                                                <div className="flex flex-col gap-0.5">
+                                                                                    <div className="text-xs text-muted-foreground">
+                                                                                        Tipo
+                                                                                        de
+                                                                                        muestra:{' '}
+                                                                                        <strong className="text-foreground">
+                                                                                            {
+                                                                                                specCalc.specimen_type_name
+                                                                                            }
+                                                                                        </strong>
+                                                                                    </div>
+                                                                                    <div className="text-sm font-bold text-foreground">
+                                                                                        {
+                                                                                            examName
+                                                                                        }
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <Badge
+                                                                                        variant="outline"
+                                                                                        className="border-emerald-500/30 bg-emerald-500/10 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400"
+                                                                                    >
+                                                                                        Descuento:
+                                                                                        L.{' '}
+                                                                                        {examCalc.totalDiscount.toFixed(
+                                                                                            2,
+                                                                                        )}
+                                                                                    </Badge>
+                                                                                    <Badge
+                                                                                        variant="outline"
+                                                                                        className="font-mono text-xs font-semibold text-primary"
+                                                                                    >
+                                                                                        Subtotal:
+                                                                                        L.{' '}
+                                                                                        {examCalc.subtotal.toFixed(
+                                                                                            2,
+                                                                                        )}
+                                                                                    </Badge>
+                                                                                </div>
+                                                                            </CardHeader>
+                                                                            <CardContent className="space-y-4 p-4">
+                                                                                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+                                                                                    {/* Price selector */}
+                                                                                    <div className="grid gap-2">
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <Label className="text-xs font-semibold">
+                                                                                                Importe
+                                                                                                /
+                                                                                                Precio
+                                                                                                Base
+                                                                                                (L.)
+                                                                                                *
+                                                                                            </Label>
+                                                                                            {examObj && (
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    onClick={() => {
+                                                                                                        setSelectedExaminationForPrices(
+                                                                                                            examObj,
+                                                                                                        );
+                                                                                                        setIsEditPricesSheetOpen(
+                                                                                                            true,
+                                                                                                        );
+                                                                                                    }}
+                                                                                                    className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                                                                                                >
+                                                                                                    <Edit2 className="h-3 w-3" />{' '}
+                                                                                                    Precios
+                                                                                                </button>
+                                                                                            )}
+                                                                                        </div>
+                                                                                        <Select
+                                                                                            value={
+                                                                                                examCalc.selected_price
+                                                                                            }
+                                                                                            onValueChange={(
+                                                                                                val,
+                                                                                            ) =>
+                                                                                                handleSpecimenExamConfigChange(
+                                                                                                    specCalc.client_id,
+                                                                                                    examCalc.examination_id,
+                                                                                                    'selected_price',
+                                                                                                    val,
+                                                                                                )
+                                                                                            }
+                                                                                        >
+                                                                                            <SelectTrigger className="h-9 w-full">
+                                                                                                <SelectValue placeholder="Seleccione un precio" />
+                                                                                            </SelectTrigger>
+                                                                                            <SelectContent className="z-[110]">
+                                                                                                {examPrices.length >
+                                                                                                0 ? (
+                                                                                                    <>
+                                                                                                        {examPrices.map(
+                                                                                                            (
+                                                                                                                p: any,
+                                                                                                            ) => (
+                                                                                                                <SelectItem
+                                                                                                                    key={
+                                                                                                                        p.id
+                                                                                                                    }
+                                                                                                                    value={p.amount.toString()}
+                                                                                                                >
+                                                                                                                    L.{' '}
+                                                                                                                    {parseFloat(
+                                                                                                                        p.amount,
+                                                                                                                    ).toFixed(
+                                                                                                                        2,
+                                                                                                                    )}
+                                                                                                                </SelectItem>
+                                                                                                            ),
+                                                                                                        )}
+                                                                                                        <SelectItem value="custom">
+                                                                                                            Precio
+                                                                                                            Personalizado
+                                                                                                        </SelectItem>
+                                                                                                    </>
+                                                                                                ) : (
+                                                                                                    <>
+                                                                                                        <SelectItem
+                                                                                                            value="0"
+                                                                                                            disabled
+                                                                                                        >
+                                                                                                            No
+                                                                                                            hay
+                                                                                                            precios
+                                                                                                            configurados
+                                                                                                        </SelectItem>
+                                                                                                        <SelectItem value="custom">
+                                                                                                            Precio
+                                                                                                            Personalizado
+                                                                                                        </SelectItem>
+                                                                                                    </>
+                                                                                                )}
+                                                                                            </SelectContent>
+                                                                                        </Select>
 
-                                                        {/* Additional discount toggle for specimen */}
-                                                        <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex flex-col gap-0.5">
-                                                                    <Label className="text-xs font-semibold">
-                                                                        Descuento
-                                                                        Adicional
-                                                                        Muestra
-                                                                    </Label>
-                                                                    <span className="text-[10px] text-muted-foreground">
-                                                                        Descuento
-                                                                        extra
-                                                                        personalizado
-                                                                    </span>
-                                                                </div>
-                                                                <Switch
-                                                                    checked={
-                                                                        spec.additional_discount_enabled
-                                                                    }
-                                                                    onCheckedChange={(
-                                                                        checked,
-                                                                    ) =>
-                                                                        handleSpecimenAdditionalDiscountToggle(
-                                                                            spec.client_id,
-                                                                            checked,
-                                                                        )
-                                                                    }
-                                                                />
-                                                            </div>
-                                                            {spec.additional_discount_enabled && (
-                                                                <div className="border-t border-border/50 pt-2">
-                                                                    <Input
-                                                                        type="number"
-                                                                        step="0.01"
-                                                                        min="0"
-                                                                        placeholder="0.00"
-                                                                        value={
-                                                                            spec.additional_discount
-                                                                        }
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) =>
-                                                                            handleSpecimenAdditionalDiscountChange(
-                                                                                spec.client_id,
-                                                                                e
-                                                                                    .target
-                                                                                    .value,
-                                                                            )
-                                                                        }
-                                                                        className="h-8"
-                                                                    />
-                                                                </div>
+                                                                                        {examCalc.selected_price ===
+                                                                                            'custom' && (
+                                                                                            <div className="relative mt-1">
+                                                                                                <span className="absolute top-1/2 left-3 -translate-y-1/2 font-mono text-xs text-muted-foreground select-none">
+                                                                                                    L.
+                                                                                                </span>
+                                                                                                <Input
+                                                                                                    type="number"
+                                                                                                    step="0.01"
+                                                                                                    min="0"
+                                                                                                    value={
+                                                                                                        examCalc.custom_specimen_price
+                                                                                                    }
+                                                                                                    onChange={(
+                                                                                                        e,
+                                                                                                    ) =>
+                                                                                                        handleSpecimenExamConfigChange(
+                                                                                                            specCalc.client_id,
+                                                                                                            examCalc.examination_id,
+                                                                                                            'custom_specimen_price',
+                                                                                                            e
+                                                                                                                .target
+                                                                                                                .value,
+                                                                                                        )
+                                                                                                    }
+                                                                                                    placeholder="0.00"
+                                                                                                    className="h-8 pl-7 font-mono text-xs"
+                                                                                                    required
+                                                                                                />
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+
+                                                                                    {/* Quantity */}
+                                                                                    <div className="flex flex-col items-start gap-2">
+                                                                                        <Label className="text-xs font-semibold">
+                                                                                            Cantidad
+                                                                                            *
+                                                                                        </Label>
+                                                                                        <NumberPicker
+                                                                                            value={
+                                                                                                examCalc.quantity
+                                                                                            }
+                                                                                            onChange={(
+                                                                                                val,
+                                                                                            ) =>
+                                                                                                handleSpecimenExamConfigChange(
+                                                                                                    specCalc.client_id,
+                                                                                                    examCalc.examination_id,
+                                                                                                    'quantity',
+                                                                                                    val,
+                                                                                                )
+                                                                                            }
+                                                                                            min={
+                                                                                                1
+                                                                                            }
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                {/* Collapsible Discounts Section */}
+                                                                                <Collapsible
+                                                                                    defaultOpen={
+                                                                                        examCalc.totalDiscount >
+                                                                                            0 ||
+                                                                                        examCalc.additional_discount_enabled ||
+                                                                                        !!examCalc.age_discount_type
+                                                                                    }
+                                                                                    className="rounded-lg border bg-muted/20 p-3"
+                                                                                >
+                                                                                    <CollapsibleTrigger
+                                                                                        asChild
+                                                                                    >
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="group flex w-full cursor-pointer items-center justify-between text-xs font-semibold text-foreground transition-colors hover:text-primary"
+                                                                                        >
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <Tag className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover:text-primary" />
+                                                                                                <span>
+                                                                                                    Opciones
+                                                                                                    de
+                                                                                                    Descuento
+                                                                                                </span>
+                                                                                                {examCalc.totalDiscount >
+                                                                                                    0 && (
+                                                                                                    <Badge
+                                                                                                        variant="secondary"
+                                                                                                        className="h-5 px-1.5 font-mono text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                                                                                                    >
+                                                                                                        -L.{' '}
+                                                                                                        {examCalc.totalDiscount.toFixed(
+                                                                                                            2,
+                                                                                                        )}
+                                                                                                    </Badge>
+                                                                                                )}
+                                                                                            </div>
+                                                                                            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                                                                                        </button>
+                                                                                    </CollapsibleTrigger>
+
+                                                                                    <CollapsibleContent className="space-y-3 pt-3">
+                                                                                        {/* Additional Discount Switch */}
+                                                                                        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
+                                                                                            <div className="flex items-center justify-between">
+                                                                                                <div className="flex flex-col gap-0.5">
+                                                                                                    <Label className="cursor-pointer text-xs font-semibold">
+                                                                                                        Descuento
+                                                                                                        Adicional
+                                                                                                    </Label>
+                                                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                                                        Permite
+                                                                                                        aplicar
+                                                                                                        un
+                                                                                                        descuento
+                                                                                                        adicional
+                                                                                                        personalizado
+                                                                                                        a
+                                                                                                        este
+                                                                                                        análisis.
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                <Switch
+                                                                                                    checked={
+                                                                                                        examCalc.additional_discount_enabled
+                                                                                                    }
+                                                                                                    onCheckedChange={(
+                                                                                                        checked,
+                                                                                                    ) =>
+                                                                                                        handleSpecimenExamConfigChange(
+                                                                                                            specCalc.client_id,
+                                                                                                            examCalc.examination_id,
+                                                                                                            'additional_discount_enabled',
+                                                                                                            checked,
+                                                                                                        )
+                                                                                                    }
+                                                                                                />
+                                                                                            </div>
+                                                                                            {examCalc.additional_discount_enabled && (
+                                                                                                <div className="border-t border-border/50 pt-2">
+                                                                                                    <Input
+                                                                                                        type="number"
+                                                                                                        step="0.01"
+                                                                                                        min="0"
+                                                                                                        placeholder="0.00"
+                                                                                                        value={
+                                                                                                            examCalc.additional_discount
+                                                                                                        }
+                                                                                                        onChange={(
+                                                                                                            e,
+                                                                                                        ) =>
+                                                                                                            handleSpecimenExamConfigChange(
+                                                                                                                specCalc.client_id,
+                                                                                                                examCalc.examination_id,
+                                                                                                                'additional_discount',
+                                                                                                                e
+                                                                                                                    .target
+                                                                                                                    .value,
+                                                                                                            )
+                                                                                                        }
+                                                                                                        className="h-8 font-mono text-xs"
+                                                                                                    />
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+
+                                                                                        {/* Age Discounts Switches */}
+                                                                                        <div className="grid grid-cols-1 gap-3 border-t pt-3 md:grid-cols-2">
+                                                                                            <div className="flex items-center justify-between rounded-lg border bg-card p-2.5">
+                                                                                                <div className="flex flex-col gap-0.5">
+                                                                                                    <Label className="text-xs font-semibold">
+                                                                                                        Tercera
+                                                                                                        Edad
+                                                                                                        (
+                                                                                                        {
+                                                                                                            thirdAgePercent
+                                                                                                        }
+                                                                                                        %)
+                                                                                                    </Label>
+                                                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                                                        Aplica{' '}
+                                                                                                        {
+                                                                                                            thirdAgePercent
+                                                                                                        }
+
+                                                                                                        %
+                                                                                                        sobre
+                                                                                                        el
+                                                                                                        precio
+                                                                                                        base.
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                <Switch
+                                                                                                    checked={
+                                                                                                        examCalc.age_discount_type ===
+                                                                                                        'third'
+                                                                                                    }
+                                                                                                    onCheckedChange={(
+                                                                                                        checked,
+                                                                                                    ) =>
+                                                                                                        handleSpecimenExamConfigChange(
+                                                                                                            specCalc.client_id,
+                                                                                                            examCalc.examination_id,
+                                                                                                            'age_discount_type',
+                                                                                                            checked
+                                                                                                                ? 'third'
+                                                                                                                : null,
+                                                                                                        )
+                                                                                                    }
+                                                                                                />
+                                                                                            </div>
+
+                                                                                            <div className="flex items-center justify-between rounded-lg border bg-card p-2.5">
+                                                                                                <div className="flex flex-col gap-0.5">
+                                                                                                    <Label className="text-xs font-semibold">
+                                                                                                        Cuarta
+                                                                                                        Edad
+                                                                                                        (
+                                                                                                        {
+                                                                                                            fourthAgePercent
+                                                                                                        }
+                                                                                                        %)
+                                                                                                    </Label>
+                                                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                                                        Aplica{' '}
+                                                                                                        {
+                                                                                                            fourthAgePercent
+                                                                                                        }
+
+                                                                                                        %
+                                                                                                        sobre
+                                                                                                        el
+                                                                                                        precio
+                                                                                                        base.
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                <Switch
+                                                                                                    checked={
+                                                                                                        examCalc.age_discount_type ===
+                                                                                                        'fourth'
+                                                                                                    }
+                                                                                                    onCheckedChange={(
+                                                                                                        checked,
+                                                                                                    ) =>
+                                                                                                        handleSpecimenExamConfigChange(
+                                                                                                            specCalc.client_id,
+                                                                                                            examCalc.examination_id,
+                                                                                                            'age_discount_type',
+                                                                                                            checked
+                                                                                                                ? 'fourth'
+                                                                                                                : null,
+                                                                                                        )
+                                                                                                    }
+                                                                                                />
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </CollapsibleContent>
+                                                                                </Collapsible>
+                                                                            </CardContent>
+                                                                        </Card>
+                                                                    );
+                                                                },
                                                             )}
                                                         </div>
 
                                                         {/* Supply summary for specimen */}
-                                                        {spec.insumos &&
-                                                            spec.insumos
+                                                        {specCalc.insumos &&
+                                                            specCalc.insumos
                                                                 .length > 0 && (
                                                                 <div className="space-y-2 border-t pt-3">
                                                                     <Label className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
@@ -2359,7 +2650,7 @@ export default function SpecimenGroupSheet({
                                                                         Reactivos
                                                                     </Label>
                                                                     <div className="divide-y divide-border/60 overflow-hidden rounded-lg border bg-card/50">
-                                                                        {spec.insumos.map(
+                                                                        {specCalc.insumos.map(
                                                                             (
                                                                                 ins: any,
                                                                             ) => (
@@ -2413,10 +2704,10 @@ export default function SpecimenGroupSheet({
                                                                     </div>
                                                                 </div>
                                                             )}
-                                                    </CardContent>
-                                                </Card>
-                                            );
-                                        })}
+                                                    </div>
+                                                );
+                                            },
+                                        )}
                                     </div>
 
                                     {/* Cobrar otro importe personalizado */}
@@ -3229,23 +3520,91 @@ export default function SpecimenGroupSheet({
                                                 Nuevo
                                             </button>
                                         </div>
-                                        <FormCombobox
-                                            placeholder="Seleccionar tipo"
-                                            value={nestedSpecimenType}
-                                            onChange={(v) => {
-                                                setNestedSpecimenType(v);
-                                                setNestedReservedCode('');
-                                                setNestedExamination(''); // reset exam
-                                                setNestedErrors((prev) => ({
-                                                    ...prev,
-                                                    specimen_type: '',
-                                                }));
-                                            }}
-                                            options={specimenTypes.map((t) => ({
-                                                label: t.name,
-                                                value: t.id.toString(),
-                                            }))}
-                                        />
+                                        <Popover modal={true}>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    role="combobox"
+                                                    className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
+                                                >
+                                                    <div className="flex items-center gap-2 truncate">
+                                                        <Microscope className="h-4 w-4 text-muted-foreground" />
+                                                        <span className="truncate">
+                                                            {specimenTypes.find(
+                                                                (t) =>
+                                                                    t.id.toString() ===
+                                                                    nestedSpecimenType,
+                                                            )?.name ||
+                                                                'Seleccionar tipo'}
+                                                        </span>
+                                                    </div>
+                                                    <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent
+                                                className="z-[9999] w-[--radix-popover-trigger-width] p-0"
+                                                align="start"
+                                            >
+                                                <Command>
+                                                    <CommandInput placeholder="Buscar tipo de muestra..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>
+                                                            No se encontraron
+                                                            resultados.
+                                                        </CommandEmpty>
+                                                        <CommandGroup>
+                                                            {specimenTypes.map(
+                                                                (t) => (
+                                                                    <CommandItem
+                                                                        key={
+                                                                            t.id
+                                                                        }
+                                                                        value={
+                                                                            t.name
+                                                                        }
+                                                                        onSelect={() => {
+                                                                            setNestedSpecimenType(
+                                                                                t.id.toString(),
+                                                                            );
+                                                                            setNestedReservedCode(
+                                                                                '',
+                                                                            );
+                                                                            setNestedExamination(
+                                                                                '',
+                                                                            );
+                                                                            setNestedErrors(
+                                                                                (
+                                                                                    prev,
+                                                                                ) => ({
+                                                                                    ...prev,
+                                                                                    specimen_type:
+                                                                                        '',
+                                                                                }),
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <Check
+                                                                            className={cn(
+                                                                                'mr-2 h-4 w-4',
+                                                                                nestedSpecimenType ===
+                                                                                    t.id.toString()
+                                                                                    ? 'opacity-100'
+                                                                                    : 'opacity-0',
+                                                                            )}
+                                                                        />
+                                                                        <span>
+                                                                            {
+                                                                                t.name
+                                                                            }
+                                                                        </span>
+                                                                    </CommandItem>
+                                                                ),
+                                                            )}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </Popover>
                                         {nestedErrors.specimen_type && (
                                             <p className="text-xs text-destructive">
                                                 {nestedErrors.specimen_type}
@@ -3256,7 +3615,7 @@ export default function SpecimenGroupSheet({
                                     <div className="grid gap-2">
                                         <div className="flex items-center justify-between">
                                             <Label htmlFor="nested_examination">
-                                                Análisis / Examen
+                                                Análisis / Examen(es)
                                             </Label>
                                             <button
                                                 type="button"
@@ -3272,33 +3631,176 @@ export default function SpecimenGroupSheet({
                                                 Nuevo
                                             </button>
                                         </div>
-                                        <FormCombobox
-                                            placeholder={
-                                                nestedSpecimenType
-                                                    ? 'Seleccionar examen'
-                                                    : 'Primero seleccione tipo de muestra'
-                                            }
-                                            value={nestedExamination}
-                                            disabled={!nestedSpecimenType}
-                                            onChange={(v) => {
-                                                setNestedExamination(v);
-                                                setNestedErrors((prev) => ({
-                                                    ...prev,
-                                                    specimen_type_examination:
-                                                        '',
-                                                }));
-                                            }}
-                                            options={examinations
-                                                .filter(
+                                        {(() => {
+                                            const filteredExams =
+                                                examinations.filter(
                                                     (e) =>
                                                         e.specimen_type?.toString() ===
                                                         nestedSpecimenType,
-                                                )
-                                                .map((e) => ({
-                                                    label: e.name,
-                                                    value: e.id.toString(),
-                                                }))}
-                                        />
+                                                );
+                                            const selectedExamIds =
+                                                nestedExamination
+                                                    ? nestedExamination.split(
+                                                          ',',
+                                                      )
+                                                    : [];
+
+                                            return (
+                                                <Popover modal={true}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            disabled={
+                                                                !nestedSpecimenType
+                                                            }
+                                                            className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50 disabled:opacity-50"
+                                                        >
+                                                            <div className="flex items-center gap-2 truncate">
+                                                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                                                <span className="truncate">
+                                                                    {selectedExamIds.length >
+                                                                    0
+                                                                        ? `Análisis (${selectedExamIds.length} seleccionados)`
+                                                                        : nestedSpecimenType
+                                                                          ? 'Seleccionar examen'
+                                                                          : 'Primero seleccione tipo de muestra'}
+                                                                </span>
+                                                            </div>
+                                                            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent
+                                                        className="z-[9999] w-[--radix-popover-trigger-width] p-2"
+                                                        align="start"
+                                                    >
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+                                                                <span>
+                                                                    Filtrar por
+                                                                    análisis
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const allIds =
+                                                                            filteredExams.map(
+                                                                                (
+                                                                                    e,
+                                                                                ) =>
+                                                                                    e.id.toString(),
+                                                                            );
+                                                                        const areAll =
+                                                                            allIds.length >
+                                                                                0 &&
+                                                                            allIds.every(
+                                                                                (
+                                                                                    id,
+                                                                                ) =>
+                                                                                    selectedExamIds.includes(
+                                                                                        id,
+                                                                                    ),
+                                                                            );
+                                                                        const nextVal =
+                                                                            areAll
+                                                                                ? ''
+                                                                                : allIds.join(
+                                                                                      ',',
+                                                                                  );
+                                                                        setNestedExamination(
+                                                                            nextVal,
+                                                                        );
+                                                                        setNestedErrors(
+                                                                            (
+                                                                                prev,
+                                                                            ) => ({
+                                                                                ...prev,
+                                                                                specimen_type_examination:
+                                                                                    '',
+                                                                            }),
+                                                                        );
+                                                                    }}
+                                                                    className="cursor-pointer font-medium transition-colors hover:text-primary"
+                                                                >
+                                                                    {filteredExams.length >
+                                                                        0 &&
+                                                                    filteredExams.every(
+                                                                        (e) =>
+                                                                            selectedExamIds.includes(
+                                                                                e.id.toString(),
+                                                                            ),
+                                                                    )
+                                                                        ? 'Ninguno'
+                                                                        : 'Todos'}
+                                                                </button>
+                                                            </div>
+                                                            <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
+                                                                {filteredExams.map(
+                                                                    (exam) => {
+                                                                        const examIdStr =
+                                                                            exam.id.toString();
+                                                                        const isChecked =
+                                                                            selectedExamIds.includes(
+                                                                                examIdStr,
+                                                                            );
+
+                                                                        return (
+                                                                            <div
+                                                                                key={
+                                                                                    exam.id
+                                                                                }
+                                                                                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+                                                                                onClick={() => {
+                                                                                    const nextIds =
+                                                                                        isChecked
+                                                                                            ? selectedExamIds.filter(
+                                                                                                  (
+                                                                                                      id,
+                                                                                                  ) =>
+                                                                                                      id !==
+                                                                                                      examIdStr,
+                                                                                              )
+                                                                                            : [
+                                                                                                  ...selectedExamIds,
+                                                                                                  examIdStr,
+                                                                                              ];
+                                                                                    setNestedExamination(
+                                                                                        nextIds.join(
+                                                                                            ',',
+                                                                                        ),
+                                                                                    );
+                                                                                    setNestedErrors(
+                                                                                        (
+                                                                                            prev,
+                                                                                        ) => ({
+                                                                                            ...prev,
+                                                                                            specimen_type_examination:
+                                                                                                '',
+                                                                                        }),
+                                                                                    );
+                                                                                }}
+                                                                            >
+                                                                                <Checkbox
+                                                                                    checked={
+                                                                                        isChecked
+                                                                                    }
+                                                                                    className="pointer-events-none"
+                                                                                    onCheckedChange={() => {}}
+                                                                                />
+                                                                                <span className="truncate">
+                                                                                    {
+                                                                                        exam.name
+                                                                                    }
+                                                                                </span>
+                                                                            </div>
+                                                                        );
+                                                                    },
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </PopoverContent>
+                                                </Popover>
+                                            );
+                                        })()}
                                         {nestedErrors.specimen_type_examination && (
                                             <p className="text-xs text-destructive">
                                                 {
@@ -3911,8 +4413,9 @@ export default function SpecimenGroupSheet({
                                     ¿Estás seguro de salir?
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    Todos los datos ingresados en la creación
-                                    grupal se perderán permanentemente.
+                                    {group
+                                        ? 'Se han modificado datos del grupo de muestras. Si sale sin guardar, los cambios realizados se perderán permanentemente.'
+                                        : 'Todos los datos ingresados en la creación grupal se perderán permanentemente.'}
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

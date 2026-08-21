@@ -24,9 +24,16 @@ class InvoiceSpecimen extends Model
     {
         static::creating(function ($model) {
             if ($model->invoice_id && $model->specimen_id) {
-                $existing = static::where('invoice_id', $model->invoice_id)
-                    ->where('specimen_id', $model->specimen_id)
-                    ->first();
+                $query = static::where('invoice_id', $model->invoice_id)
+                    ->where('specimen_id', $model->specimen_id);
+
+                if ($model->examination_id) {
+                    $query->where('examination_id', $model->examination_id);
+                } else {
+                    $query->whereNull('examination_id');
+                }
+
+                $existing = $query->first();
 
                 if ($existing) {
                     $attrs = array_filter($model->getAttributes(), fn ($val) => ! is_null($val));
@@ -41,6 +48,7 @@ class InvoiceSpecimen extends Model
     protected $fillable = [
         'invoice_id',
         'specimen_id',
+        'examination_id',
         'is_group',
         'group_id',
         'credit_id',
@@ -98,6 +106,14 @@ class InvoiceSpecimen extends Model
     public function specimen(): BelongsTo
     {
         return $this->belongsTo(Specimen::class, 'specimen_id');
+    }
+
+    /**
+     * Get the examination associated with this record.
+     */
+    public function examination(): BelongsTo
+    {
+        return $this->belongsTo(SpecimenTypeExamination::class, 'examination_id');
     }
 
     /**

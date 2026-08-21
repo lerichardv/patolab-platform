@@ -173,6 +173,7 @@ export const LineHeight = Extension.create({
                                         lineHeight,
                                     });
                                 }
+
                                 applied = true;
                             }
                         },
@@ -198,6 +199,7 @@ export const LineHeight = Extension.create({
                                         lineHeight: null,
                                     });
                                 }
+
                                 applied = true;
                             }
                         },
@@ -591,6 +593,7 @@ export const CustomImage = Image.extend({
 
             // Append standalone caption input under image
             let captionInputRef: HTMLInputElement | null = null;
+
             if (!isInsideGrid) {
                 const align = node.attrs.alignment || 'center';
                 const isLeft = align === 'left';
@@ -628,6 +631,7 @@ export const CustomImage = Image.extend({
                 if (!editor.isEditable) {
                     captionInput.readOnly = true;
                     captionInput.style.border = 'none';
+
                     if (!node.attrs.caption) {
                         captionInput.style.display = 'none';
                     }
