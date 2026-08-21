@@ -190,7 +190,7 @@ export function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
         };
     }
 
-    if (tag === 'table') {
+    if (tag === 'table' || blockHtml.includes('<table')) {
         return {
             type: 'table',
             html: blockHtml,

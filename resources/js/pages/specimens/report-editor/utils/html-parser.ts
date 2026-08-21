@@ -5,7 +5,18 @@ export function isEmptyHtml(html: string | null | undefined): boolean {
 
     // SSR fallback since DOMParser is not available on server
     if (typeof window === 'undefined') {
-        if (html.includes('<img') || html.includes('<table')) {
+        if (
+            html.includes('<img') ||
+            html.includes('<table') ||
+            html.includes('<tr') ||
+            html.includes('<td')
+        ) {
+            return false;
+        }
+
+        const pCount = (html.match(/<p[^>]*>/gi) || []).length;
+        const brCount = (html.match(/<br\s*\/?>/gi) || []).length;
+        if (brCount > 0 || pCount > 1) {
             return false;
         }
 
@@ -25,9 +36,33 @@ export function isEmptyHtml(html: string | null | undefined): boolean {
             return false;
         }
 
-        const text = (body.textContent || '').replace(/\u00a0/g, ' ').trim();
+        const childNodes = Array.from(body.childNodes);
+        const significantNodes = childNodes.filter((node) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                return (node.textContent || '').trim().length > 0;
+            }
+            return true;
+        });
 
-        return text === '';
+        if (significantNodes.length === 0) {
+            return true;
+        }
+
+        if (significantNodes.length === 1) {
+            const node = significantNodes[0];
+            if (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'P') {
+                const inner = (node as Element).innerHTML.trim();
+                const isBrOnly = /^<br\b[^>]*>$/i.test(inner);
+                return (
+                    inner === '' ||
+                    isBrOnly ||
+                    inner === '&nbsp;' ||
+                    inner === '\u00a0'
+                );
+            }
+        }
+
+        return false;
     } catch {
         if (html.includes('<img') || html.includes('<table')) {
             return false;
@@ -81,15 +116,9 @@ export function splitHtmlIntoLines(
             if (token.startsWith('</')) {
                 activeTagsStack.pop();
                 currentLineHtml += token;
-            } else if (
-                token.endsWith('/>') ||
-                token.toLowerCase() === '<br>' ||
-                token.toLowerCase() === '<br/>'
-            ) {
-                if (
-                    token.toLowerCase() === '<br>' ||
-                    token.toLowerCase() === '<br/>'
-                ) {
+            } else if (token.endsWith('/>') || /^<br\b/i.test(token)) {
+                if (/^<br\b/i.test(token)) {
+                    currentLineHtml += token;
                     currentLineHtml += closeActiveTags();
                     lines.push(currentLineHtml);
                     currentLineHtml = openActiveTags();

@@ -30,10 +30,11 @@ export interface ReportPaginateOptions {
 }
 
 export class ReportPaginator {
-    public static readonly PAGE_CONTENT_HEIGHT = 205.0; // mm
+    public static readonly PAGE_CONTENT_HEIGHT = 212.79; // mm
     public static readonly LINE_HEIGHT = 3.53; // mm (8pt * 1.25)
-    public static readonly MAX_CHARS_PER_LINE = 155;
+    public static readonly MAX_CHARS_PER_LINE = 130;
     public static readonly SECTION_HEADER_HEIGHT = 7.94; // mm
+    public static readonly TABLE_SPLIT_BUFFER = 2.0; // mm
 
     public static readonly DEFAULT_SECTIONS_ORDER: SectionOrderItem[] = [
         { key: 'clinical_details_html', order: 1, active: true },
@@ -276,6 +277,46 @@ export class ReportPaginator {
     }
 
     /**
+     * Estimates the minimum required height for the block following a heading/header
+     */
+    public static getMinNextBlockHeight(
+        nextBlock?: MeasuredBlock,
+        lineHeight: number = ReportPaginator.LINE_HEIGHT,
+    ): number {
+        if (!nextBlock) {
+            return 0;
+        }
+
+        if (nextBlock.type === 'paragraph') {
+            const fontLineHeight = getBlockLineHeight(nextBlock, lineHeight);
+
+            return 2.0 * fontLineHeight + 1.98; // Min 2 lines of text + paragraph spacing
+        }
+
+        if (nextBlock.type === 'heading') {
+            return nextBlock.height;
+        }
+
+        if (nextBlock.type === 'image') {
+            return nextBlock.height;
+        }
+
+        if (nextBlock.type === 'image-grid') {
+            return Math.min(60.0, nextBlock.height || 40.0);
+        }
+
+        if (nextBlock.type === 'table') {
+            return 18.0; // Table header + first row + padding
+        }
+
+        if (nextBlock.type === 'list') {
+            return 2.0 * lineHeight + 1.98;
+        }
+
+        return nextBlock.height || 2.0 * lineHeight;
+    }
+
+    /**
      * Primary entry point to paginate an entire report.
      */
     public static paginate(options: ReportPaginateOptions): MeasuredBlock[][] {
@@ -315,7 +356,7 @@ export class ReportPaginator {
 
         const blocks: MeasuredBlock[] = [];
 
-        // 1. Patient card block
+        // 1. Patient card block (placed first on Page 1)
         blocks.push({
             type: 'patient-card',
             height: patientCardHeight,
@@ -538,6 +579,7 @@ export class ReportPaginator {
 
         const maxHeightForLastPage = pageContentHeight;
 
+        // Pathologist signatures with keep_together: true
         if (signatureHeight > 0) {
             if (lastPageHeight + signatureHeight > maxHeightForLastPage) {
                 computedPages.push([
@@ -567,7 +609,7 @@ export class ReportPaginator {
             if (showAddendumHeading) {
                 addendumBlocks.push({
                     type: 'section-header',
-                    title: 'Addendum',
+                    title: 'ADDENDUM',
                     height: ReportPaginator.SECTION_HEADER_HEIGHT,
                     id: 'addendum-header',
                 });
@@ -595,7 +637,7 @@ export class ReportPaginator {
     }
 
     /**
-     * Slices and paginates an array of MeasuredBlocks into pages.
+     * Slices and paginates an array of MeasuredBlocks into pages using Word-like rules.
      */
     public static paginateBlocks(
         blocksList: MeasuredBlock[],
@@ -606,25 +648,20 @@ export class ReportPaginator {
         const pagesList: MeasuredBlock[][] = [];
         let currentPageList: MeasuredBlock[] = [];
         let currentHeightList = 0.0;
+        let pageIndex = 0;
 
         for (let bIndex = 0; bIndex < blocksList.length; bIndex++) {
             const block = blocksList[bIndex];
-            let maxHeightForPage = pageContentHeight;
+            const maxHeightForPage = pageContentHeight;
+
+            const hasContentOnCurrentPage =
+                pageIndex > 0
+                    ? currentPageList.length > 0
+                    : currentPageList.length > 1 ||
+                      (currentPageList.length === 1 &&
+                          currentPageList[0].type !== 'patient-card');
 
             if (block.type === 'patient-card') {
-                currentPageList.push(block);
-                currentHeightList += block.height;
-                continue;
-            }
-
-            if (block.type === 'section-header') {
-                if (currentHeightList + block.height > maxHeightForPage) {
-                    pagesList.push(currentPageList);
-                    currentPageList = [];
-                    currentHeightList = 0.0;
-                    maxHeightForPage = pageContentHeight;
-                }
-
                 currentPageList.push(block);
                 currentHeightList += block.height;
                 continue;
@@ -635,48 +672,90 @@ export class ReportPaginator {
                     pagesList.push(currentPageList);
                     currentPageList = [];
                     currentHeightList = 0.0;
+                    pageIndex++;
                 }
 
                 continue;
             }
 
-            if (block.type === 'heading') {
-                const headingCost = block.height;
-                let nextBlockStartsNewPage = false;
-
-                // Keep with Next constraint
-                if (bIndex + 1 < blocksList.length) {
-                    const nextBlock = blocksList[bIndex + 1];
-                    let minNextHeight = 2.0 * lineHeight;
-
-                    if (nextBlock.type === 'image') {
-                        minNextHeight = nextBlock.height;
-                    } else if (nextBlock.type === 'heading') {
-                        minNextHeight = nextBlock.height;
-                    }
-
-                    if (
-                        currentHeightList + headingCost + minNextHeight >
-                        maxHeightForPage
-                    ) {
-                        nextBlockStartsNewPage = true;
-                    }
-                }
+            if (block.type === 'section-header') {
+                // Word-like keep_with_next constraint for section headers
+                const minNextHeight = ReportPaginator.getMinNextBlockHeight(
+                    blocksList[bIndex + 1],
+                    lineHeight,
+                );
 
                 if (
-                    currentHeightList + headingCost > maxHeightForPage ||
-                    nextBlockStartsNewPage
+                    currentHeightList + block.height + minNextHeight >
+                        maxHeightForPage &&
+                    hasContentOnCurrentPage
                 ) {
-                    if (currentPageList.length > 0) {
-                        pagesList.push(currentPageList);
-                        currentPageList = [];
-                        currentHeightList = 0.0;
-                        maxHeightForPage = pageContentHeight;
-                    }
+                    pagesList.push(currentPageList);
+                    currentPageList = [];
+                    currentHeightList = 0.0;
+                    pageIndex++;
+                }
+
+                currentPageList.push(block);
+                currentHeightList += block.height;
+                continue;
+            }
+
+            if (block.type === 'heading') {
+                const headingCost = block.height;
+                const minNextHeight = ReportPaginator.getMinNextBlockHeight(
+                    blocksList[bIndex + 1],
+                    lineHeight,
+                );
+
+                if (
+                    currentHeightList + headingCost + minNextHeight >
+                        maxHeightForPage &&
+                    hasContentOnCurrentPage
+                ) {
+                    pagesList.push(currentPageList);
+                    currentPageList = [];
+                    currentHeightList = 0.0;
+                    pageIndex++;
                 }
 
                 currentPageList.push(block);
                 currentHeightList += headingCost;
+                continue;
+            }
+
+            if (block.type === 'image') {
+                if (
+                    currentHeightList + block.height > maxHeightForPage &&
+                    hasContentOnCurrentPage
+                ) {
+                    pagesList.push(currentPageList);
+                    currentPageList = [];
+                    currentHeightList = 0.0;
+                    pageIndex++;
+                }
+
+                currentPageList.push(block);
+                currentHeightList += block.height;
+                continue;
+            }
+
+            if (
+                block.type === 'cuttings-summary' ||
+                block.type === 'new-cuttings-summary'
+            ) {
+                if (
+                    currentHeightList + block.height > maxHeightForPage &&
+                    hasContentOnCurrentPage
+                ) {
+                    pagesList.push(currentPageList);
+                    currentPageList = [];
+                    currentHeightList = 0.0;
+                    pageIndex++;
+                }
+
+                currentPageList.push(block);
+                currentHeightList += block.height;
                 continue;
             }
 
@@ -699,7 +778,7 @@ export class ReportPaginator {
                 const usableWidth = width ? 185.9 * (width / 704) : 185.9;
                 const gap = 1.5; // mm
                 const slicedImages = images.slice(0, 4);
-                const rowsRemaining: string[][] = [slicedImages];
+                let rowsRemaining: string[][] = [slicedImages];
 
                 const rowHeights = rowsRemaining.map((rowImages) => {
                     let aspectSum = 0.0;
@@ -742,12 +821,14 @@ export class ReportPaginator {
                             imgTag.match(/data-caption=["']([^"']*)["']/i) ||
                             imgTag.match(/alt=["']([^"']*)["']/i);
                         const caption = captionMatch ? captionMatch[1] : '';
+
                         if (caption) {
                             const captionLines = Math.max(
                                 1,
                                 Math.ceil(caption.length / maxCharsForCaption),
                             );
                             const captionHeight = captionLines * 3.6 + 1.06;
+
                             if (captionHeight > maxCaptionHeight) {
                                 maxCaptionHeight = captionHeight;
                             }
@@ -757,22 +838,28 @@ export class ReportPaginator {
                     return maxCaptionHeight;
                 });
 
-                let rowIndex = 0;
-
-                while (rowIndex < rowsRemaining.length) {
+                while (rowsRemaining.length > 0) {
                     const remaining = maxHeightForPage - currentHeightList;
+                    const totalRows = rowHeights.length;
+                    const currentIndex = totalRows - rowsRemaining.length;
+
                     const minGridHeight =
-                        rowHeights[rowIndex] +
-                        rowCaptionHeights[rowIndex] +
+                        rowHeights[currentIndex] +
+                        rowCaptionHeights[currentIndex] +
                         2.0;
 
-                    if (
-                        remaining < minGridHeight &&
-                        currentPageList.length > 0
-                    ) {
+                    const canBreakToNextPage =
+                        pageIndex > 0
+                            ? currentPageList.length > 0
+                            : currentPageList.length > 1 ||
+                              (currentPageList.length === 1 &&
+                                  currentPageList[0].type !== 'patient-card');
+
+                    if (remaining < minGridHeight && canBreakToNextPage) {
                         pagesList.push(currentPageList);
                         currentPageList = [];
                         currentHeightList = 0.0;
+                        pageIndex++;
                         continue;
                     }
 
@@ -780,15 +867,15 @@ export class ReportPaginator {
 
                     for (
                         let tempR = 1;
-                        tempR <= rowsRemaining.length - rowIndex;
+                        tempR <= rowsRemaining.length;
                         tempR++
                     ) {
                         let cost = 2.0;
 
                         for (let i = 0; i < tempR; i++) {
                             cost +=
-                                rowHeights[rowIndex + i] +
-                                rowCaptionHeights[rowIndex + i];
+                                rowHeights[currentIndex + i] +
+                                rowCaptionHeights[currentIndex + i];
 
                             if (i > 0) {
                                 cost += 1.5;
@@ -803,10 +890,11 @@ export class ReportPaginator {
                     }
 
                     if (r === 0) {
-                        if (currentPageList.length > 0) {
+                        if (canBreakToNextPage) {
                             pagesList.push(currentPageList);
                             currentPageList = [];
                             currentHeightList = 0.0;
+                            pageIndex++;
                             continue;
                         } else {
                             r = 1;
@@ -816,8 +904,8 @@ export class ReportPaginator {
                     const sliceImages: string[] = [];
 
                     for (let i = 0; i < r; i++) {
-                        const rowIdx = rowIndex + i;
-                        const rowImages = rowsRemaining[rowIdx];
+                        const rowIdx = currentIndex + i;
+                        const rowImages = rowsRemaining[i];
                         const H_j = rowHeights[rowIdx];
 
                         rowImages.forEach((imgTag) => {
@@ -847,6 +935,7 @@ export class ReportPaginator {
                                 imgTag.match(
                                     /data-caption=["']([^"']*)["']/i,
                                 ) || imgTag.match(/alt=["']([^"']*)["']/i);
+
                             if (capMatch) {
                                 caption = capMatch[1];
                             }
@@ -885,8 +974,8 @@ export class ReportPaginator {
 
                     for (let i = 0; i < r; i++) {
                         cost +=
-                            rowHeights[rowIndex + i] +
-                            rowCaptionHeights[rowIndex + i];
+                            rowHeights[currentIndex + i] +
+                            rowCaptionHeights[currentIndex + i];
 
                         if (i > 0) {
                             cost += 1.5;
@@ -894,45 +983,16 @@ export class ReportPaginator {
                     }
 
                     currentPageList.push({
-                        id: `${block.id}-row-${rowIndex}-slice-${r}`,
+                        id: `${block.id}-row-${currentIndex}-slice-${r}`,
                         type: 'html',
                         html: sliceHtml,
                         height: cost,
                     });
 
                     currentHeightList += cost;
-                    rowIndex += r;
+                    rowsRemaining = rowsRemaining.slice(r);
                 }
 
-                continue;
-            }
-
-            if (block.type === 'image') {
-                if (currentHeightList + block.height > maxHeightForPage) {
-                    pagesList.push(currentPageList);
-                    currentPageList = [];
-                    currentHeightList = 0.0;
-                    maxHeightForPage = pageContentHeight;
-                }
-
-                currentPageList.push(block);
-                currentHeightList += block.height;
-                continue;
-            }
-
-            if (
-                block.type === 'cuttings-summary' ||
-                block.type === 'new-cuttings-summary'
-            ) {
-                if (currentHeightList + block.height > maxHeightForPage) {
-                    pagesList.push(currentPageList);
-                    currentPageList = [];
-                    currentHeightList = 0.0;
-                    maxHeightForPage = pageContentHeight;
-                }
-
-                currentPageList.push(block);
-                currentHeightList += block.height;
                 continue;
             }
 
@@ -941,50 +1001,91 @@ export class ReportPaginator {
                     block.html || '',
                     block.tag || 'p',
                 );
-                const lines = splitHtmlIntoLines(
-                    paraInnerHtml,
-                    maxCharsPerLine,
-                );
+                let lines = splitHtmlIntoLines(paraInnerHtml, maxCharsPerLine);
+                if (lines.length === 0) {
+                    lines = ['<br>'];
+                }
 
                 let i = 0;
+                const totalLines = lines.length;
 
-                while (i < lines.length) {
+                while (i < totalLines) {
                     const fontLineHeight = getBlockLineHeight(
                         block,
                         lineHeight,
                     );
                     const remaining = maxHeightForPage - currentHeightList;
+                    const remainingLines = totalLines - i;
 
-                    if (remaining <= 0.5 * fontLineHeight) {
+                    const canBreakToNextPage =
+                        pageIndex > 0
+                            ? currentPageList.length > 0
+                            : currentPageList.length > 1 ||
+                              (currentPageList.length === 1 &&
+                                  currentPageList[0].type !== 'patient-card');
+
+                    if (remaining < fontLineHeight && canBreakToNextPage) {
                         pagesList.push(currentPageList);
                         currentPageList = [];
                         currentHeightList = 0.0;
+                        pageIndex++;
                         continue;
                     }
 
-                    const linesToFit = Math.min(
-                        Math.floor(remaining / fontLineHeight),
-                        lines.length - i,
-                    );
+                    const maxLinesFit = Math.floor(remaining / fontLineHeight);
+
+                    let linesToFit: number;
+
+                    if (maxLinesFit >= remainingLines) {
+                        linesToFit = remainingLines;
+                    } else {
+                        // Orphan prevention: at least 2 lines must fit on current page
+                        if (
+                            maxLinesFit < 2 &&
+                            remainingLines >= 2 &&
+                            canBreakToNextPage
+                        ) {
+                            pagesList.push(currentPageList);
+                            currentPageList = [];
+                            currentHeightList = 0.0;
+                            pageIndex++;
+                            continue;
+                        }
+
+                        linesToFit = Math.max(1, maxLinesFit);
+                        const leftoverLines = remainingLines - linesToFit;
+
+                        // Widow prevention: at least 2 lines must carry over to next page
+                        if (leftoverLines === 1 && linesToFit > 1) {
+                            linesToFit -= 1;
+                        }
+                    }
 
                     if (linesToFit <= 0) {
-                        pagesList.push(currentPageList);
-                        currentPageList = [];
-                        currentHeightList = 0.0;
-                        continue;
+                        if (canBreakToNextPage) {
+                            pagesList.push(currentPageList);
+                            currentPageList = [];
+                            currentHeightList = 0.0;
+                            pageIndex++;
+                            continue;
+                        } else {
+                            linesToFit = 1;
+                        }
                     }
 
                     const slice = lines.slice(i, i + linesToFit);
-                    const isLastSlice = i + linesToFit >= lines.length;
+                    const isLastSlice = i + linesToFit >= totalLines;
                     const classAttr = block.class || 'section-content';
                     const { style: originalStyle, extraAttrs } =
                         getRootElementAttributes(block.html || '');
                     let mergedStyle = originalStyle;
+
                     if (!isLastSlice) {
                         mergedStyle = mergedStyle
                             ? `${mergedStyle.trim().endsWith(';') ? mergedStyle : mergedStyle + ';'} margin-bottom: 0px;`
                             : 'margin-bottom: 0px;';
                     }
+
                     const styleAttrStr = mergedStyle
                         ? ` style="${mergedStyle}"`
                         : '';
@@ -1023,11 +1124,21 @@ export class ReportPaginator {
 
                 while (i < listItems.length) {
                     const remaining = maxHeightForPage - currentHeightList;
+                    const canBreakToNextPage =
+                        pageIndex > 0
+                            ? currentPageList.length > 0
+                            : currentPageList.length > 1 ||
+                              (currentPageList.length === 1 &&
+                                  currentPageList[0].type !== 'patient-card');
 
-                    if (remaining <= 1.0 * fontLineHeight) {
+                    if (
+                        remaining <= 1.0 * fontLineHeight &&
+                        canBreakToNextPage
+                    ) {
                         pagesList.push(currentPageList);
                         currentPageList = [];
                         currentHeightList = 0.0;
+                        pageIndex++;
                         continue;
                     }
 
@@ -1036,7 +1147,7 @@ export class ReportPaginator {
                     const itemHeight = item.height;
 
                     if (itemHeight > remaining) {
-                        if (currentHeightList === 0.0) {
+                        if (!canBreakToNextPage) {
                             const startAttr =
                                 tag === 'ol' && olStartIndex > 1
                                     ? ` start="${olStartIndex}"`
@@ -1060,6 +1171,7 @@ export class ReportPaginator {
                             pagesList.push(currentPageList);
                             currentPageList = [];
                             currentHeightList = 0.0;
+                            pageIndex++;
                         }
                     } else {
                         const itemsToFit: string[] = [];
@@ -1116,6 +1228,7 @@ export class ReportPaginator {
                             pagesList.push(currentPageList);
                             currentPageList = [];
                             currentHeightList = 0.0;
+                            pageIndex++;
                         }
                     }
                 }
@@ -1138,6 +1251,13 @@ export class ReportPaginator {
 
                 while (i < rows.length) {
                     const remaining = maxHeightForPage - currentHeightList;
+                    const canBreakToNextPage =
+                        pageIndex > 0
+                            ? currentPageList.length > 0
+                            : currentPageList.length > 1 ||
+                              (currentPageList.length === 1 &&
+                                  currentPageList[0].type !== 'patient-card');
+
                     const minNeededForFirstRow =
                         headerHeight +
                         (rows[i]?.height || 6.0) +
@@ -1145,11 +1265,12 @@ export class ReportPaginator {
 
                     if (
                         remaining < minNeededForFirstRow &&
-                        currentPageList.length > 0
+                        canBreakToNextPage
                     ) {
                         pagesList.push(currentPageList);
                         currentPageList = [];
                         currentHeightList = 0.0;
+                        pageIndex++;
                         continue;
                     }
 
@@ -1167,15 +1288,18 @@ export class ReportPaginator {
 
                         const isLastRow = i === rows.length - 1;
                         const tableBottomMargin = isLastRow ? 2.65 : 0.0;
+                        const splitBuffer = !isLastRow
+                            ? ReportPaginator.TABLE_SPLIT_BUFFER
+                            : 0.0;
 
                         if (
-                            accumulatedHeight + rowHeight + tableBottomMargin >
+                            accumulatedHeight +
+                                rowHeight +
+                                tableBottomMargin +
+                                splitBuffer >
                             remainingForRows
                         ) {
-                            if (
-                                rowsToFit.length === 0 &&
-                                currentHeightList === 0.0
-                            ) {
+                            if (rowsToFit.length === 0 && !canBreakToNextPage) {
                                 rowsToFit.push(row.html);
                                 accumulatedHeight += rowHeight;
                                 i++;
@@ -1198,14 +1322,14 @@ export class ReportPaginator {
                             (isLastRow ? 2.65 : 0.0);
 
                         const classMatch = block.html?.match(
-                            /class=["']([^"']+)["']/i,
+                            /<table[^>]+class=["']([^"']+)["']/i,
                         );
                         const tableClass = classMatch
                             ? classMatch[1]
                             : 'section-content';
 
                         const styleMatch = block.html?.match(
-                            /style=["']([^"']+)["']/i,
+                            /<table[^>]+style=["']([^"']+)["']/i,
                         );
                         const tableStyle = styleMatch ? styleMatch[1] : '';
 
@@ -1213,7 +1337,18 @@ export class ReportPaginator {
                             ? ` style="${tableStyle}"`
                             : '';
 
+                        const colgroupMatch = block.html?.match(
+                            /<colgroup[^>]*>.*?<\/colgroup>/is,
+                        );
+                        const colgroupHtml = colgroupMatch
+                            ? colgroupMatch[0]
+                            : '';
+
                         let tableWrapperHtml = `<table class="${tableClass}"${styleAttr}>`;
+
+                        if (colgroupHtml) {
+                            tableWrapperHtml += colgroupHtml;
+                        }
 
                         if (headerHtml) {
                             tableWrapperHtml += `<thead>${headerHtml}</thead>`;
@@ -1234,6 +1369,7 @@ export class ReportPaginator {
                         pagesList.push(currentPageList);
                         currentPageList = [];
                         currentHeightList = 0.0;
+                        pageIndex++;
                     }
                 }
 

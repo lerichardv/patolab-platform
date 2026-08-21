@@ -122,12 +122,13 @@ export default function Page({
 }: PageProps) {
     return (
         <ShadowRoot
-            className="relative mb-6 flex shrink-0 origin-top-left flex-col overflow-hidden border bg-white text-left font-sans text-slate-800 shadow-2xl select-none"
+            className="relative mb-6 flex shrink-0 origin-top-left flex-col overflow-hidden border bg-white text-left text-slate-800 shadow-2xl select-none"
             style={{
                 width: '215.9mm',
                 height: '279.4mm',
                 padding: '12mm 15mm 12mm 15mm',
                 aspectRatio: '8.5/11',
+                fontFamily: 'Arial, Helvetica, sans-serif',
             }}
         >
             <style

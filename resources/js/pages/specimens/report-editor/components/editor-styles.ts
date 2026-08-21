@@ -1,4 +1,22 @@
 export const editorStyles = `
+  /* Reset default spacing on elements to ensure exact metric calculations */
+  .preview-content, .preview-content *, .tiptap, .tiptap * {
+    box-sizing: border-box;
+  }
+  .preview-content p, .preview-content h1, .preview-content h2, .preview-content h3, .preview-content h4, .preview-content h5, .preview-content h6, .preview-content ul, .preview-content ol, .preview-content li, .preview-content table, .preview-content tr, .preview-content th, .preview-content td {
+    margin: 0;
+    padding: 0;
+  }
+  .preview-content > *:first-child {
+    margin-top: 0 !important;
+  }
+  .preview-content > *:last-child {
+    margin-bottom: 0 !important;
+  }
+	.preview-content {
+		margin-bottom: 1mm;
+	}
+
   /* ── Base ── */
   .tiptap { outline: none; min-height: 160px; }
 
@@ -80,6 +98,7 @@ export const editorStyles = `
     line-height: 3.53mm; /* 8pt * 1.25 */
     text-align: justify;
     font-size: 2.82mm; /* 8pt */
+    min-height: 3.53mm;
   }
 
   /* ── Headings ── */

@@ -13,8 +13,8 @@
             @if(!empty($logoBase64))
                 <img class="header-logo-img" src="{{ $logoBase64 }}" alt="Logo PatoLab">
             @else
-                <div style="font-size: 8.5mm; font-weight: 800; color: #1e3a8a; font-family: 'Outfit', sans-serif; text-align: center;">PatoLab</div>
-                <div style="font-size: 2.12mm; color: #6b7280; font-family: 'Outfit', sans-serif; letter-spacing: 0.13mm; text-align: center;">LABORATORIO DE PATOLOGÍA & CITOLOGÍA</div>
+                <div style="font-size: 8.5mm; font-weight: 800; color: #1e3a8a; font-family: Arial, Helvetica, sans-serif; text-align: center;">PatoLab</div>
+                <div style="font-size: 2.12mm; color: #6b7280; font-family: Arial, Helvetica, sans-serif; letter-spacing: 0.13mm; text-align: center;">LABORATORIO DE PATOLOGÍA & CITOLOGÍA</div>
             @endif
         </div>
         <div class="header-code-cell">

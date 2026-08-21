@@ -55,6 +55,7 @@ import AIDictationSheet from '../ai-dictation-sheet';
 import AIGrammarSheet from '../ai-grammar-sheet';
 import { HIGHLIGHT_COLORS } from '../components/tiptap-extensions';
 import { isSelectionInTable } from '../utils';
+import { TextCaseTransformer, type TextTransformType } from '../services';
 import { FontSizeDropdown } from './font-size-dropdown';
 import { LineHeightDropdown } from './line-height-dropdown';
 import { ToolbarBtn, ToolbarDivider } from './toolbar-btn';
@@ -192,46 +193,13 @@ export function EditorToolbar({
 
     const hasSelection = activeSelectionText.trim().length > 0;
 
-    const transformTextCase = (
-        type: 'uppercase' | 'lowercase' | 'capitalize' | 'sentence',
-    ) => {
+    const transformTextCase = (type: TextTransformType) => {
         if (!editor) {
             return;
         }
 
-        editor
-            .chain()
-            .focus()
-            .command(({ tr, state }) => {
-                const { from, to } = state.selection;
-
-                if (from === to) {
-                    return false;
-                }
-
-                const text = state.doc.textBetween(from, to, '\n');
-                let newText = '';
-
-                if (type === 'uppercase') {
-                    newText = text.toUpperCase();
-                } else if (type === 'lowercase') {
-                    newText = text.toLowerCase();
-                } else if (type === 'capitalize') {
-                    newText = text.replace(/\b\w/g, (c) => c.toUpperCase());
-                } else if (type === 'sentence') {
-                    newText = text
-                        .toLowerCase()
-                        .replace(
-                            /(^\s*|[.!?]\s+)([a-z])/g,
-                            (m, p1, p2) => p1 + p2.toUpperCase(),
-                        );
-                }
-
-                tr.insertText(newText, from, to);
-
-                return true;
-            })
-            .run();
+        editor.chain().focus().run();
+        TextCaseTransformer.transform(editor, type);
     };
 
     const applyBulletListStyle = (

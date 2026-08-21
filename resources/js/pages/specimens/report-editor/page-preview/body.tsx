@@ -292,8 +292,8 @@ export default function Body({
         <div
             style={{
                 width: '100%',
-                height: '205.00mm',
-                maxHeight: '205.00mm',
+                height: '212.79mm',
+                maxHeight: '212.79mm',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'flex-start',
