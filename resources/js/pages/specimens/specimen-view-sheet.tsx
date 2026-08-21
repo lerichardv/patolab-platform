@@ -116,62 +116,10 @@ export default function SpecimenViewSheet({
 	const [copiedGroup, setCopiedGroup] = useState(false);
 	const [generating, setGenerating] = useState(false);
 
-	const handleGenerateReport = () => {
-		if (!specimen) {
-			return;
-		}
-
-		setGenerating(true);
-		toast.promise(
-			new Promise((resolve, reject) => {
-				router.post(
-					`/specimens/${specimen.sequence_code}/generate-report`,
-					{},
-					{
-						onSuccess: () => resolve(true),
-						onError: (err) => reject(err),
-						onFinish: () => setGenerating(false),
-					},
-				);
-			}),
-			{
-				loading: 'Generando reporte...',
-				success: 'Reporte generado con éxito',
-				error: 'Error al generar el reporte',
-			},
-		);
-	};
-
-	if (!specimen) {
-		return null;
-	}
-
-	const copyPublicLink = () => {
-		if (!specimen.access_token) {
-			return;
-		}
-
-		const url = `${window.location.origin}/specimen/${specimen.sequence_code}?token=${specimen.access_token}`;
-		navigator.clipboard.writeText(url);
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
-	};
-
-	const copyGroupPublicLink = () => {
-		if (!specimen.group || !specimen.group.access_token) {
-			return;
-		}
-
-		const url = `${window.location.origin}/specimen-group/${specimen.group.id}?token=${specimen.group.access_token}`;
-		navigator.clipboard.writeText(url);
-		setCopiedGroup(true);
-		setTimeout(() => setCopiedGroup(false), 2000);
-	};
-
 	const invoice =
-		specimen.is_group && specimen.group && specimen.group.invoice
+		specimen?.is_group && specimen?.group && specimen?.group?.invoice
 			? specimen.group.invoice
-			: specimen.invoice_relation || specimen.invoiceRelation;
+			: specimen?.invoice_relation || specimen?.invoiceRelation;
 	const credit = invoice?.credit_relation || invoice?.creditRelation;
 
 	const specimenExaminations = useMemo(() => {
@@ -250,6 +198,58 @@ export default function SpecimenViewSheet({
 
 		return examList;
 	}, [specimen, invoice]);
+
+	const handleGenerateReport = () => {
+		if (!specimen) {
+			return;
+		}
+
+		setGenerating(true);
+		toast.promise(
+			new Promise((resolve, reject) => {
+				router.post(
+					`/specimens/${specimen.sequence_code}/generate-report`,
+					{},
+					{
+						onSuccess: () => resolve(true),
+						onError: (err) => reject(err),
+						onFinish: () => setGenerating(false),
+					},
+				);
+			}),
+			{
+				loading: 'Generando reporte...',
+				success: 'Reporte generado con éxito',
+				error: 'Error al generar el reporte',
+			},
+		);
+	};
+
+	if (!specimen) {
+		return null;
+	}
+
+	const copyPublicLink = () => {
+		if (!specimen.access_token) {
+			return;
+		}
+
+		const url = `${window.location.origin}/specimen/${specimen.sequence_code}?token=${specimen.access_token}`;
+		navigator.clipboard.writeText(url);
+		setCopied(true);
+		setTimeout(() => setCopied(false), 2000);
+	};
+
+	const copyGroupPublicLink = () => {
+		if (!specimen.group || !specimen.group.access_token) {
+			return;
+		}
+
+		const url = `${window.location.origin}/specimen-group/${specimen.group.id}?token=${specimen.group.access_token}`;
+		navigator.clipboard.writeText(url);
+		setCopiedGroup(true);
+		setTimeout(() => setCopiedGroup(false), 2000);
+	};
 
 	const customerRelation =
 		specimen.customer_relation || specimen.customerRelation;

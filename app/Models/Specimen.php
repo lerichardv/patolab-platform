@@ -127,6 +127,13 @@ class Specimen extends Model
         'expected_internal_finalization_date',
     ];
 
+    public function resolveRouteBinding($value, $field = null)
+    {
+        return $this->where('id', $value)
+            ->orWhere('sequence_code', $value)
+            ->firstOrFail();
+    }
+
     public function cancelledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cancelled_by_id');
