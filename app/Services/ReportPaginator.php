@@ -6,9 +6,9 @@ class ReportPaginator
 {
     public static function paginate($specimen, $report, $customer, $referrer, $isMicroscopyVisible): array
     {
-        $pageContentHeight = 205.00; // mm
+        $pageContentHeight = 212.79; // mm
         $lineHeight = 3.53; // mm (8pt * 1.25)
-        $maxCharsPerLine = 155;
+        $maxCharsPerLine = 144;
         $pathologistsCount = $specimen->users ? $specimen->users->count() : 0;
         $rowsCount = (int) ceil($pathologistsCount / 2);
         $signatureHeight = $rowsCount * 25.0; // 25mm per row
@@ -419,15 +419,43 @@ class ReportPaginator
             return true;
         }
 
-        if (str_contains($html, '<img') || str_contains($html, '<table') || str_contains($html, '<tr') || str_contains($html, '<td')) {
-            return false;
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="utf-8" ?><div>'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $root = $dom->getElementsByTagName('div')->item(0);
+        if (! $root) {
+            return true;
         }
 
-        $text = html_entity_decode(strip_tags($html));
-        $text = str_replace("\xc2\xa0", ' ', $text);
-        $text = preg_replace('/\s+/', '', $text);
+        $significantNodes = [];
+        foreach ($root->childNodes as $child) {
+            if ($child->nodeType === XML_TEXT_NODE) {
+                if (trim($child->textContent) !== '') {
+                    $significantNodes[] = $child;
+                }
+            } else {
+                $significantNodes[] = $child;
+            }
+        }
 
-        return $text === '';
+        if (empty($significantNodes)) {
+            return true;
+        }
+
+        if (count($significantNodes) === 1) {
+            $node = $significantNodes[0];
+            if (strtolower($node->nodeName) === 'p') {
+                $innerHtml = '';
+                foreach ($node->childNodes as $c) {
+                    $innerHtml .= $dom->saveHTML($c);
+                }
+                $innerTrimmed = trim($innerHtml);
+                $isBrOnly = (bool) preg_match('/^<br\b[^>]*>$/i', $innerTrimmed);
+
+                return $innerTrimmed === '' || $isBrOnly || $innerTrimmed === '&nbsp;' || $innerTrimmed === "\xc2\xa0";
+            }
+        }
+
+        return false;
     }
 
     public static function estimatePatientCardHeight($specimen, $customer, $referrer): float
@@ -588,7 +616,7 @@ class ReportPaginator
             ];
         }
 
-        if ($tag === 'table') {
+        if ($tag === 'table' || str_contains($blockHtml, '<table')) {
             return [
                 'type' => 'table',
                 'html' => $blockHtml,
@@ -675,8 +703,12 @@ class ReportPaginator
             $class = $classMatch[1];
         }
 
-        $plainText = trim(strip_tags($blockHtml));
-        $lines = max(1, (int) ceil(mb_strlen($plainText) / $maxCharsPerLine));
+        $plainText = html_entity_decode(trim(strip_tags($blockHtml)), ENT_QUOTES, 'UTF-8');
+        $fontLh = self::getBlockLineHeight(['html' => $blockHtml], 3.53);
+        $fontSize = $fontLh / 1.25;
+        $baseFontSize = 2.82;
+        $dynamicMaxChars = (int) floor($maxCharsPerLine * ($baseFontSize / $fontSize));
+        $lines = max(1, (int) ceil(mb_strlen($plainText) / $dynamicMaxChars));
 
         return [
             'type' => 'paragraph',
@@ -807,8 +839,9 @@ class ReportPaginator
                 if (str_starts_with($token, '</')) {
                     array_pop($activeTagsStack);
                     $currentLineHtml .= $token;
-                } elseif (str_ends_with($token, '/>') || strtolower($token) === '<br>' || strtolower($token) === '<br/>') {
-                    if (strtolower($token) === '<br>' || strtolower($token) === '<br/>') {
+                } elseif (str_ends_with($token, '/>') || preg_match('/^<br\b/i', $token)) {
+                    if (preg_match('/^<br\b/i', $token)) {
+                        $currentLineHtml .= $token;
                         $currentLineHtml .= $closeActiveTags();
                         $lines[] = $currentLineHtml;
                         $currentLineHtml = $openActiveTags();
@@ -978,7 +1011,7 @@ class ReportPaginator
         return 1.0;
     }
 
-    public static function paginateList(string $listHtml): array
+    public static function paginateList(string $listHtml, int $maxCharsPerLine = 155, float $fontLineHeight = 3.53, float $itemSpacing = 0.8): array
     {
         $dom = new \DOMDocument;
         @$dom->loadHTML('<?xml encoding="utf-8" ?>'.$listHtml, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
@@ -998,8 +1031,47 @@ class ReportPaginator
 
         $items = [];
         $liElements = $list->getElementsByTagName('li');
+        $liList = [];
         foreach ($liElements as $li) {
-            $items[] = $dom->saveHTML($li);
+            $liList[] = $li;
+        }
+        $totalItems = count($liList);
+
+        $listCharsPerLine = max(20, $maxCharsPerLine - 15);
+
+        foreach ($liList as $idx => $li) {
+            $isLast = ($idx === $totalItems - 1);
+            $liFull = $dom->saveHTML($li);
+            $liInner = '';
+            foreach ($li->childNodes as $child) {
+                $liInner .= $dom->saveHTML($child);
+            }
+
+            $rawSegments = preg_split('/<p[^>]*>|<\/p>|<br\s*\/?>|<div[^>]*>|<\/div>/i', $liInner);
+            $segments = [];
+            if ($rawSegments) {
+                foreach ($rawSegments as $s) {
+                    $cleaned = html_entity_decode(trim(strip_tags($s)), ENT_QUOTES, 'UTF-8');
+                    if (mb_strlen($cleaned) > 0) {
+                        $segments[] = $cleaned;
+                    }
+                }
+            }
+
+            $itemLines = 0;
+            if (empty($segments)) {
+                $itemLines = 1;
+            } else {
+                foreach ($segments as $seg) {
+                    $itemLines += max(1, (int) ceil(mb_strlen($seg) / $listCharsPerLine));
+                }
+            }
+
+            $itemHeight = $itemLines * $fontLineHeight + ($isLast ? 0.0 : $itemSpacing);
+            $items[] = [
+                'html' => $liFull,
+                'height' => $itemHeight,
+            ];
         }
 
         return [
@@ -1010,48 +1082,173 @@ class ReportPaginator
         ];
     }
 
-    public static function paginateTable(string $tableHtml, int $maxCharsPerLine): array
+    public static function parseColumnPercentages(string $tableHtml, int $colCount): array
+    {
+        $colWidths = [];
+        if (preg_match('/<colgroup[^>]*>(.*?)<\/colgroup>/is', $tableHtml, $colgroupMatch)) {
+            $colgroupHtml = $colgroupMatch[1];
+            if (preg_match_all('/<col[^>]*>/i', $colgroupHtml, $colMatches)) {
+                foreach ($colMatches[0] as $colHtml) {
+                    $width = null;
+                    if (preg_match('/style=["\'][^"\']*width:\s*([\d.]+)(px|%)?[^"\']*["\']/i', $colHtml, $styleWidthMatch)) {
+                        $width = (float) $styleWidthMatch[1];
+                    } else if (preg_match('/width=["\']([\d.]+)%?["\']/i', $colHtml, $widthAttrMatch)) {
+                        $width = (float) $widthAttrMatch[1];
+                    }
+                    $colWidths[] = $width;
+                }
+            }
+        }
+
+        while (count($colWidths) < $colCount) {
+            $colWidths[] = null;
+        }
+        $finalColWidths = array_slice($colWidths, 0, $colCount);
+
+        $hasExplicitWidth = false;
+        foreach ($finalColWidths as $w) {
+            if ($w !== null && $w > 0) {
+                $hasExplicitWidth = true;
+                break;
+            }
+        }
+
+        if (! $hasExplicitWidth) {
+            return array_fill(0, $colCount, 100.0 / $colCount);
+        }
+
+        $sum = 0.0;
+        $explicitCount = 0;
+        foreach ($finalColWidths as $w) {
+            if ($w !== null && $w > 0) {
+                $sum += $w;
+                $explicitCount++;
+            }
+        }
+        $avgWidth = $explicitCount > 0 ? ($sum / $explicitCount) : 0.0;
+        $filledWidths = [];
+        $totalWidth = 0.0;
+        foreach ($finalColWidths as $w) {
+            $val = ($w !== null && $w > 0) ? $w : $avgWidth;
+            $filledWidths[] = $val;
+            $totalWidth += $val;
+        }
+
+        $pcts = [];
+        foreach ($filledWidths as $w) {
+            $pcts[] = $totalWidth > 0 ? ($w / $totalWidth) * 100.0 : (100.0 / $colCount);
+        }
+
+        return $pcts;
+    }
+
+    public static function paginateTable(string $tableHtml, int $maxCharsPerLine = 155, float $fontLineHeight = 3.97): array
     {
         $dom = new \DOMDocument;
         @$dom->loadHTML('<?xml encoding="utf-8" ?>'.$tableHtml, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         $table = $dom->getElementsByTagName('table')->item(0);
 
         if (! $table) {
-            return ['headerHtml' => '', 'rows' => [], 'colCount' => 1];
+            return ['headerHtml' => '', 'headerHeight' => 0.0, 'rows' => [], 'colCount' => 1];
         }
 
         $headerHtml = '';
+        $headerHeight = 0.0;
         $rows = [];
         $colCount = 1;
 
         $trElements = $table->getElementsByTagName('tr');
+        $trList = [];
         foreach ($trElements as $tr) {
-            $isHeader = false;
-            if ($tr->parentNode->nodeName === 'thead' || $tr->getElementsByTagName('th')->length > 0) {
-                $isHeader = true;
+            $trList[] = $tr;
+            $thCount = $tr->getElementsByTagName('th')->length;
+            $tdCount = $tr->getElementsByTagName('td')->length;
+            $colCount = max($colCount, $thCount, $tdCount);
+        }
+
+        $cellPaddingVertical = 2.64; // 1.06mm top + 1.06mm bottom + 0.52mm borders
+        
+        $colPcts = self::parseColumnPercentages($tableHtml, $colCount);
+
+        foreach ($trList as $tr) {
+            $isHeader = ($tr->parentNode->nodeName === 'thead' || $tr->getElementsByTagName('th')->length > 0);
+            $trHtml = $dom->saveHTML($tr);
+
+            $cells = $isHeader ? $tr->getElementsByTagName('th') : $tr->getElementsByTagName('td');
+            if ($cells->length === 0) {
+                $cells = $tr->getElementsByTagName('th');
+            }
+            if ($cells->length === 0) {
+                $cells = $tr->getElementsByTagName('td');
             }
 
-            $trHtml = $dom->saveHTML($tr);
+            $maxCellHeight = $fontLineHeight + $cellPaddingVertical;
+            $maxCellTextLen = 0;
+
+            $cellIndex = 0;
+            foreach ($cells as $cell) {
+                $colSpan = 1;
+                if ($cell->hasAttribute('colspan')) {
+                    $colSpan = (int) $cell->getAttribute('colspan');
+                }
+                
+                $colPct = 0.0;
+                for ($c = 0; $c < $colSpan; $c++) {
+                    $colPct += $colPcts[$cellIndex + $c] ?? 0.0;
+                }
+                if ($colPct <= 0.0) {
+                    $colPct = 100.0 / max(1, $colCount);
+                }
+                
+                $colWidthMm = (185.9 * $colPct) / 100.0;
+                $usableCellWidthMm = max(10.0, $colWidthMm - 3.18);
+                $dynamicCharsPerCell = max(8, (int) floor($usableCellWidthMm / 1.33));
+
+                $cellInner = '';
+                foreach ($cell->childNodes as $child) {
+                    $cellInner .= $dom->saveHTML($child);
+                }
+
+                $decodedInner = html_entity_decode($cellInner, ENT_QUOTES, 'UTF-8');
+                $decodedInner = str_replace("\xc2\xa0", ' ', $decodedInner);
+                $decodedInner = str_replace("\xa0", ' ', $decodedInner);
+
+                $isListCell = (bool) preg_match('/<(?:ul|ol|li)[^>]*>/i', $decodedInner) || (bool) preg_match('/[–-]\s{2,}/u', $decodedInner);
+                $cellChars = $isListCell ? max(8, $dynamicCharsPerCell - 15) : $dynamicCharsPerCell;
+
+                $rawSegments = preg_split('/<p[^>]*>|<\/p>|<br\s*\/?>|<div[^>]*>|<\/div>|<li[^>]*>|<\/li>/i', $cellInner);
+                $segments = [];
+                if ($rawSegments) {
+                    foreach ($rawSegments as $s) {
+                        $cleaned = html_entity_decode(trim(strip_tags($s)), ENT_QUOTES, 'UTF-8');
+                        if (mb_strlen($cleaned) > 0) {
+                            $segments[] = $cleaned;
+                        }
+                    }
+                }
+
+                $cellLines = 0;
+                if (empty($segments)) {
+                    $cellLines = 1;
+                } else {
+                    foreach ($segments as $seg) {
+                        $maxCellTextLen = max($maxCellTextLen, mb_strlen($seg));
+                        $cellLines += max(1, (int) ceil(mb_strlen($seg) / $cellChars));
+                    }
+                }
+
+                $cellHeight = ($cellLines * $fontLineHeight) + $cellPaddingVertical;
+                $maxCellHeight = max($maxCellHeight, $cellHeight);
+                $cellIndex++;
+            }
 
             if ($isHeader) {
                 $headerHtml .= $trHtml;
-                $cells = $tr->getElementsByTagName('th');
-                if ($cells->length > 0) {
-                    $colCount = max($colCount, $cells->length);
-                }
+                $headerHeight += $maxCellHeight;
             } else {
-                $cells = $tr->getElementsByTagName('td');
-                if ($cells->length > 0) {
-                    $colCount = max($colCount, $cells->length);
-                }
-
-                $maxCellTextLen = 0;
-                foreach ($cells as $cell) {
-                    $maxCellTextLen = max($maxCellTextLen, mb_strlen(trim($cell->textContent)));
-                }
-
                 $rows[] = [
                     'html' => $trHtml,
+                    'height' => $maxCellHeight,
                     'maxCellTextLen' => $maxCellTextLen,
                 ];
             }
@@ -1059,6 +1256,7 @@ class ReportPaginator
 
         return [
             'headerHtml' => $headerHtml,
+            'headerHeight' => $headerHeight,
             'rows' => $rows,
             'colCount' => $colCount,
         ];
@@ -1109,6 +1307,43 @@ class ReportPaginator
         return $lastChar2 === $lastChar1 + 1;
     }
 
+    public static function getMinNextBlockHeight(?array $nextBlock, float $lineHeight = 3.53): float
+    {
+        if (! $nextBlock) {
+            return 0.0;
+        }
+
+        $type = $nextBlock['type'] ?? '';
+
+        if ($type === 'paragraph') {
+            $fontLineHeight = self::getBlockLineHeight($nextBlock, $lineHeight);
+
+            return 2.0 * $fontLineHeight + 1.98; // Min 2 lines of text + paragraph spacing
+        }
+
+        if ($type === 'heading') {
+            return (float) ($nextBlock['height'] ?? 7.94);
+        }
+
+        if ($type === 'image') {
+            return (float) ($nextBlock['height'] ?? 30.0);
+        }
+
+        if ($type === 'image-grid') {
+            return min(60.0, (float) ($nextBlock['height'] ?? 40.0));
+        }
+
+        if ($type === 'table') {
+            return 18.0; // Table header + first row + padding
+        }
+
+        if ($type === 'list') {
+            return 2.0 * $lineHeight + 1.98;
+        }
+
+        return (float) ($nextBlock['height'] ?? (2.0 * $lineHeight));
+    }
+
     public static function paginateBlocks(array $blocks, float $pageContentHeight, float $lineHeight, int $maxCharsPerLine): array
     {
         $pages = [];
@@ -1120,22 +1355,11 @@ class ReportPaginator
             $block = $blocks[$bIndex];
             $maxHeightForPage = $pageContentHeight;
 
+            $hasContentOnCurrentPage = $pageIndex > 0
+                ? count($currentPage) > 0
+                : count($currentPage) > 1 || (count($currentPage) === 1 && ($currentPage[0]['type'] ?? '') !== 'patient-card');
+
             if ($block['type'] === 'patient-card') {
-                $currentPage[] = $block;
-                $currentHeight += $block['height'];
-
-                continue;
-            }
-
-            if ($block['type'] === 'section-header') {
-                // If section header doesn't fit on this page, push to next
-                if ($currentHeight + $block['height'] > $maxHeightForPage) {
-                    $pages[] = $currentPage;
-                    $currentPage = [];
-                    $currentHeight = 0.0;
-                    $pageIndex++;
-                    $maxHeightForPage = $pageContentHeight;
-                }
                 $currentPage[] = $block;
                 $currentHeight += $block['height'];
 
@@ -1153,38 +1377,66 @@ class ReportPaginator
                 continue;
             }
 
-            if ($block['type'] === 'heading') {
-                $headingCost = $block['height'];
-                $nextBlockStartsNewPage = false;
+            if ($block['type'] === 'section-header') {
+                // Word-like keep_with_next constraint for section headers
+                $nextBlock = $blocks[$bIndex + 1] ?? null;
+                $minNextHeight = self::getMinNextBlockHeight($nextBlock, $lineHeight);
 
-                // Keep with Next constraint
-                if ($bIndex + 1 < count($blocks)) {
-                    $nextBlock = $blocks[$bIndex + 1];
-                    $minNextHeight = 2.0 * $lineHeight;
-
-                    if ($nextBlock['type'] === 'image') {
-                        $minNextHeight = (float) $nextBlock['height'];
-                    } elseif ($nextBlock['type'] === 'heading') {
-                        $minNextHeight = (float) $nextBlock['height'];
-                    }
-
-                    if ($currentHeight + $headingCost + $minNextHeight > $maxHeightForPage) {
-                        $nextBlockStartsNewPage = true;
-                    }
+                if ($currentHeight + $block['height'] + $minNextHeight > $maxHeightForPage && $hasContentOnCurrentPage) {
+                    $pages[] = $currentPage;
+                    $currentPage = [];
+                    $currentHeight = 0.0;
+                    $pageIndex++;
                 }
 
-                if ($currentHeight + $headingCost > $maxHeightForPage || $nextBlockStartsNewPage) {
-                    if (count($currentPage) > 0) {
-                        $pages[] = $currentPage;
-                        $currentPage = [];
-                        $currentHeight = 0.0;
-                        $pageIndex++;
-                        $maxHeightForPage = $pageContentHeight;
-                    }
+                $currentPage[] = $block;
+                $currentHeight += $block['height'];
+
+                continue;
+            }
+
+            if ($block['type'] === 'heading') {
+                $headingCost = $block['height'];
+                $nextBlock = $blocks[$bIndex + 1] ?? null;
+                $minNextHeight = self::getMinNextBlockHeight($nextBlock, $lineHeight);
+
+                if ($currentHeight + $headingCost + $minNextHeight > $maxHeightForPage && $hasContentOnCurrentPage) {
+                    $pages[] = $currentPage;
+                    $currentPage = [];
+                    $currentHeight = 0.0;
+                    $pageIndex++;
                 }
 
                 $currentPage[] = $block;
                 $currentHeight += $headingCost;
+
+                continue;
+            }
+
+            if ($block['type'] === 'image') {
+                if ($currentHeight + $block['height'] > $maxHeightForPage && $hasContentOnCurrentPage) {
+                    $pages[] = $currentPage;
+                    $currentPage = [];
+                    $currentHeight = 0.0;
+                    $pageIndex++;
+                }
+
+                $currentPage[] = $block;
+                $currentHeight += $block['height'];
+
+                continue;
+            }
+
+            if ($block['type'] === 'cuttings-summary' || $block['type'] === 'new-cuttings-summary') {
+                if ($currentHeight + $block['height'] > $maxHeightForPage && $hasContentOnCurrentPage) {
+                    $pages[] = $currentPage;
+                    $currentPage = [];
+                    $currentHeight = 0.0;
+                    $pageIndex++;
+                }
+
+                $currentPage[] = $block;
+                $currentHeight += $block['height'];
 
                 continue;
             }
@@ -1254,24 +1506,25 @@ class ReportPaginator
                 }
 
                 while (! empty($rowsRemaining)) {
-                    $maxHeightForPage = $pageContentHeight;
                     $remaining = $maxHeightForPage - $currentHeight;
-
-                    // The index of the first row currently remaining
                     $totalRows = count($rowHeights);
                     $currentIndex = $totalRows - count($rowsRemaining);
 
                     $minGridHeight = $rowHeights[$currentIndex] + $rowCaptionHeights[$currentIndex] + 2.0;
 
-                    if ($remaining < $minGridHeight && count($currentPage) > 0) {
+                    $canBreakToNextPage = $pageIndex > 0
+                        ? count($currentPage) > 0
+                        : count($currentPage) > 1 || (count($currentPage) === 1 && ($currentPage[0]['type'] ?? '') !== 'patient-card');
+
+                    if ($remaining < $minGridHeight && $canBreakToNextPage) {
                         $pages[] = $currentPage;
                         $currentPage = [];
                         $currentHeight = 0.0;
+                        $pageIndex++;
 
                         continue;
                     }
 
-                    // Find how many rows can fit in the remaining height
                     $r = 0;
                     for ($tempR = 1; $tempR <= count($rowsRemaining); $tempR++) {
                         $cost = 2.0;
@@ -1288,22 +1541,19 @@ class ReportPaginator
                         }
                     }
 
-                    // If we can't fit even one row
                     if ($r === 0) {
-                        if (count($currentPage) > 0) {
-                            // Move to next page
+                        if ($canBreakToNextPage) {
                             $pages[] = $currentPage;
                             $currentPage = [];
                             $currentHeight = 0.0;
+                            $pageIndex++;
 
                             continue;
                         } else {
-                            // Already on empty page, force 1 row to prevent infinite loop
                             $r = 1;
                         }
                     }
 
-                    // Build the slice of rows
                     $sliceImages = [];
                     for ($i = 0; $i < $r; $i++) {
                         $rowIdx = $currentIndex + $i;
@@ -1383,45 +1633,29 @@ class ReportPaginator
                 continue;
             }
 
-            if ($block['type'] === 'image') {
-                if ($currentHeight + $block['height'] > $maxHeightForPage) {
-                    $pages[] = $currentPage;
-                    $currentPage = [];
-                    $currentHeight = 0.0;
-                    $pageIndex++;
-                    $maxHeightForPage = $pageContentHeight;
-                }
-                $currentPage[] = $block;
-                $currentHeight += $block['height'];
-
-                continue;
-            }
-
-            if ($block['type'] === 'cuttings-summary' || $block['type'] === 'new-cuttings-summary') {
-                if ($currentHeight + $block['height'] > $maxHeightForPage) {
-                    $pages[] = $currentPage;
-                    $currentPage = [];
-                    $currentHeight = 0.0;
-                    $pageIndex++;
-                    $maxHeightForPage = $pageContentHeight;
-                }
-                $currentPage[] = $block;
-                $currentHeight += $block['height'];
-
-                continue;
-            }
-
             if ($block['type'] === 'paragraph') {
                 $paraInnerHtml = self::getInnerHtml($block['html'], $block['tag']);
-                $lines = self::splitHtmlIntoLines($paraInnerHtml, $maxCharsPerLine);
+                $fontLh = self::getBlockLineHeight($block, $lineHeight);
+                $fontSize = $fontLh / 1.25;
+                $baseFontSize = 2.82;
+                $dynamicMaxChars = (int) floor($maxCharsPerLine * ($baseFontSize / $fontSize));
+                $lines = self::splitHtmlIntoLines($paraInnerHtml, $dynamicMaxChars);
+                if (empty($lines)) {
+                    $lines = ['<br>'];
+                }
 
                 $i = 0;
-                while ($i < count($lines)) {
+                $totalLines = count($lines);
+                while ($i < $totalLines) {
                     $fontLineHeight = self::getBlockLineHeight($block, $lineHeight);
-                    $maxHeightForPage = $pageContentHeight;
                     $remaining = $maxHeightForPage - $currentHeight;
+                    $remainingLines = $totalLines - $i;
 
-                    if ($remaining <= 0.5 * $fontLineHeight) {
+                    $canBreakToNextPage = $pageIndex > 0
+                        ? count($currentPage) > 0
+                        : count($currentPage) > 1 || (count($currentPage) === 1 && ($currentPage[0]['type'] ?? '') !== 'patient-card');
+
+                    if ($remaining < $fontLineHeight && $canBreakToNextPage) {
                         $pages[] = $currentPage;
                         $currentPage = [];
                         $currentHeight = 0.0;
@@ -1430,20 +1664,32 @@ class ReportPaginator
                         continue;
                     }
 
-                    $linesToFit = min((int) floor($remaining / $fontLineHeight), count($lines) - $i);
-                    if ($linesToFit <= 0) {
-                        $pages[] = $currentPage;
-                        $currentPage = [];
-                        $currentHeight = 0.0;
-                        $pageIndex++;
+                    $maxLinesFit = (int) floor($remaining / $fontLineHeight);
 
-                        continue;
+                    if ($maxLinesFit >= $remainingLines) {
+                        $linesToFit = $remainingLines;
+                    } else {
+                        // Widow/orphan protection removed to maximize page space usage
+                        $linesToFit = max(1, $maxLinesFit);
+                    }
+
+                    if ($linesToFit <= 0) {
+                        if ($canBreakToNextPage) {
+                            $pages[] = $currentPage;
+                            $currentPage = [];
+                            $currentHeight = 0.0;
+                            $pageIndex++;
+
+                            continue;
+                        } else {
+                            $linesToFit = 1;
+                        }
                     }
 
                     $slice = array_slice($lines, $i, $linesToFit);
 
                     // Is this the last slice of the paragraph?
-                    $isLastSlice = ($i + $linesToFit >= count($lines));
+                    $isLastSlice = ($i + $linesToFit >= $totalLines);
                     $classAttr = ! empty($block['class']) ? $block['class'] : 'section-content';
                     $attrs = self::getRootElementAttributes($block['html']);
                     $originalStyle = $attrs['style'];
@@ -1455,9 +1701,8 @@ class ReportPaginator
                             : 'margin-bottom: 0px;';
                     }
                     $styleAttrStr = ! empty($mergedStyle) ? " style=\"{$mergedStyle}\"" : '';
-
                     $sliceHtml = "<{$block['tag']} class=\"{$classAttr}\"{$styleAttrStr}{$extraAttrs}>".implode('', $slice)."</{$block['tag']}>";
-                    $blockCost = ($linesToFit * $fontLineHeight) + ($isLastSlice ? 0.5 * $fontLineHeight : 0.0);
+                    $blockCost = ($linesToFit * $fontLineHeight) + ($isLastSlice ? 1.98 : 0.0);
 
                     $currentPage[] = [
                         'type' => 'html',
@@ -1473,17 +1718,23 @@ class ReportPaginator
             }
 
             if ($block['type'] === 'list') {
-                $listData = self::paginateList($block['html']);
+                $fontLineHeight = self::getBlockLineHeight($block, $lineHeight);
+                $fontSize = $fontLineHeight / 1.25;
+                $baseFontSize = 2.82;
+                $dynamicMaxChars = (int) floor($maxCharsPerLine * ($baseFontSize / $fontSize));
+                $listData = self::paginateList($block['html'], $dynamicMaxChars, $fontLineHeight);
                 $listItems = $listData['items'];
                 $tag = $listData['tag'];
 
                 $i = 0;
                 $olStartIndex = 1;
                 while ($i < count($listItems)) {
-                    $maxHeightForPage = $pageContentHeight;
                     $remaining = $maxHeightForPage - $currentHeight;
+                    $canBreakToNextPage = $pageIndex > 0
+                        ? count($currentPage) > 0
+                        : count($currentPage) > 1 || (count($currentPage) === 1 && ($currentPage[0]['type'] ?? '') !== 'patient-card');
 
-                    if ($remaining <= 1.0 * $lineHeight) {
+                    if ($remaining <= 1.0 * $fontLineHeight && $canBreakToNextPage) {
                         $pages[] = $currentPage;
                         $currentPage = [];
                         $currentHeight = 0.0;
@@ -1492,23 +1743,29 @@ class ReportPaginator
                         continue;
                     }
 
-                    // Estimate this item's lines
-                    $itemHtml = $listItems[$i];
-                    $itemPlainText = trim(strip_tags($itemHtml));
-                    $itemTextLines = max(1, (int) ceil(mb_strlen($itemPlainText) / ($maxCharsPerLine - 5)));
-                    $itemHeight = $itemTextLines * $lineHeight;
+                    $item = $listItems[$i];
+                    $itemHtml = $item['html'];
+                    $itemHeight = $item['height'];
 
                     if ($itemHeight > $remaining) {
-                        if ($currentHeight === 0.0) {
+                        if (! $canBreakToNextPage) {
                             $startAttr = ($tag === 'ol' && $olStartIndex > 1) ? " start=\"{$olStartIndex}\"" : '';
                             $listStyleAttr = ! empty($listData['listStyleType']) ? " data-list-style-type=\"{$listData['listStyleType']}\"" : '';
-                            $styleAttr = ! empty($listData['styleAttr']) ? " style=\"{$listData['styleAttr']}\"" : '';
+
+                            $isLastOfAll = $i + 1 >= count($listItems);
+                            $mergedStyle = $listData['styleAttr'] ?? '';
+                            if (! $isLastOfAll) {
+                                $mergedStyle = ! empty($mergedStyle)
+                                    ? (str_ends_with(trim($mergedStyle), ';') ? trim($mergedStyle) : trim($mergedStyle).';').' margin-bottom: 0px !important;'
+                                    : 'margin-bottom: 0px !important;';
+                            }
+                            $styleAttr = ! empty($mergedStyle) ? " style=\"{$mergedStyle}\"" : '';
                             $currentPage[] = [
                                 'type' => 'html',
                                 'html' => "<{$tag} class=\"section-content\"{$startAttr}{$listStyleAttr}{$styleAttr}>".$itemHtml."</{$tag}>",
-                                'height' => $itemHeight + 0.5 * $lineHeight,
+                                'height' => $itemHeight + 1.98,
                             ];
-                            $currentHeight += $itemHeight + 0.5 * $lineHeight;
+                            $currentHeight += $itemHeight + 1.98;
                             $i++;
                             $olStartIndex++;
                         } else {
@@ -1522,13 +1779,12 @@ class ReportPaginator
                         $accumulatedHeight = 0.0;
 
                         while ($i < count($listItems)) {
-                            $nextItemHtml = $listItems[$i];
-                            $nextItemPlainText = trim(strip_tags($nextItemHtml));
-                            $nextItemLines = max(1, (int) ceil(mb_strlen($nextItemPlainText) / ($maxCharsPerLine - 5)));
-                            $nextItemHeight = $nextItemLines * $lineHeight;
+                            $nextItem = $listItems[$i];
+                            $nextItemHtml = $nextItem['html'];
+                            $nextItemHeight = $nextItem['height'];
 
                             $isLastOfAll = ($i === count($listItems) - 1);
-                            $spacingOverhead = $isLastOfAll ? 0.5 * $lineHeight : 0.0;
+                            $spacingOverhead = $isLastOfAll ? 1.98 : 0.0;
 
                             if ($accumulatedHeight + $nextItemHeight + $spacingOverhead > $remaining) {
                                 break;
@@ -1541,11 +1797,19 @@ class ReportPaginator
 
                         if (count($itemsToFit) > 0) {
                             $isLastOfAll = ($i >= count($listItems));
-                            $cost = $accumulatedHeight + ($isLastOfAll ? 0.5 * $lineHeight : 0.0);
+                            $cost = $accumulatedHeight + ($isLastOfAll ? 1.98 : 0.0);
 
                             $startAttr = ($tag === 'ol' && $olStartIndex > 1) ? " start=\"{$olStartIndex}\"" : '';
                             $listStyleAttr = ! empty($listData['listStyleType']) ? " data-list-style-type=\"{$listData['listStyleType']}\"" : '';
-                            $styleAttr = ! empty($listData['styleAttr']) ? " style=\"{$listData['styleAttr']}\"" : '';
+
+                            $isLastOfAll = ($i >= count($listItems));
+                            $mergedStyle = $listData['styleAttr'] ?? '';
+                            if (! $isLastOfAll) {
+                                $mergedStyle = ! empty($mergedStyle)
+                                    ? (str_ends_with(trim($mergedStyle), ';') ? trim($mergedStyle) : trim($mergedStyle).';').' margin-bottom: 0px !important;'
+                                    : 'margin-bottom: 0px !important;';
+                            }
+                            $styleAttr = ! empty($mergedStyle) ? " style=\"{$mergedStyle}\"" : '';
                             $currentPage[] = [
                                 'type' => 'html',
                                 'html' => "<{$tag} class=\"section-content\"{$startAttr}{$listStyleAttr}{$styleAttr}>".implode('', $itemsToFit)."</{$tag}>",
@@ -1566,18 +1830,24 @@ class ReportPaginator
             }
 
             if ($block['type'] === 'table') {
-                $tableData = self::paginateTable($block['html'], $maxCharsPerLine);
+                $fontLineHeight = 3.97;
+                $fontSize = $fontLineHeight / 1.25;
+                $baseFontSize = 2.82;
+                $dynamicMaxChars = (int) floor($maxCharsPerLine * ($baseFontSize / $fontSize));
+                $tableData = self::paginateTable($block['html'], $dynamicMaxChars, $fontLineHeight);
                 $headerHtml = $tableData['headerHtml'];
+                $headerHeight = $tableData['headerHeight'];
                 $rows = $tableData['rows'];
-                $colCount = $tableData['colCount'];
 
                 $i = 0;
                 while ($i < count($rows)) {
-                    $fontLineHeight = self::getBlockLineHeight($block, $lineHeight);
-                    $maxHeightForPage = $pageContentHeight;
                     $remaining = $maxHeightForPage - $currentHeight;
+                    $canBreakToNextPage = $pageIndex > 0
+                        ? count($currentPage) > 0
+                        : count($currentPage) > 1 || (count($currentPage) === 1 && ($currentPage[0]['type'] ?? '') !== 'patient-card');
 
-                    if ($remaining <= 5 * $fontLineHeight) {
+                    $minNeededForFirstRow = $headerHeight + ($rows[$i]['height'] ?? 6.0) + ($i === 0 && $currentHeight > 0.0 ? 1.32 : 0.0);
+                    if ($remaining < $minNeededForFirstRow && $canBreakToNextPage) {
                         $pages[] = $currentPage;
                         $currentPage = [];
                         $currentHeight = 0.0;
@@ -1586,23 +1856,22 @@ class ReportPaginator
                         continue;
                     }
 
-                    $headerHeight = empty($headerHtml) ? 0.0 : 2.0 * $fontLineHeight;
-                    $remainingForRows = $remaining - $headerHeight;
+                    $tableTopMargin = ($i === 0 && $currentHeight > 0.0) ? 1.32 : 0.0;
+                    $remainingForRows = $remaining - $headerHeight - $tableTopMargin;
 
                     $rowsToFit = [];
                     $accumulatedHeight = 0.0;
 
                     while ($i < count($rows)) {
                         $row = $rows[$i];
-                        $charsPerCell = (int) floor($maxCharsPerLine / $colCount);
-                        $rowLines = max(1, (int) ceil($row['maxCellTextLen'] / $charsPerCell)) + 1;
-                        $rowHeight = $rowLines * $fontLineHeight;
+                        $rowHeight = $row['height'];
 
                         $isLastRow = ($i === count($rows) - 1);
-                        $tableSpacing = $isLastRow ? 1.0 * $fontLineHeight : 0.0;
+                        $tableBottomMargin = $isLastRow ? 2.65 : 0.0;
+                        $splitBuffer = ! $isLastRow ? 2.0 : 0.0;
 
-                        if ($accumulatedHeight + $rowHeight + $tableSpacing > $remainingForRows) {
-                            if (count($rowsToFit) === 0 && $currentHeight === 0.0) {
+                        if ($accumulatedHeight + $rowHeight + $tableBottomMargin + $splitBuffer > $remainingForRows) {
+                            if (count($rowsToFit) === 0 && ! $canBreakToNextPage) {
                                 $rowsToFit[] = $row['html'];
                                 $accumulatedHeight += $rowHeight;
                                 $i++;
@@ -1617,7 +1886,7 @@ class ReportPaginator
 
                     if (count($rowsToFit) > 0) {
                         $isLastRow = ($i >= count($rows));
-                        $cost = $accumulatedHeight + $headerHeight + ($isLastRow ? 1.0 * $fontLineHeight : 0.0);
+                        $cost = $accumulatedHeight + $headerHeight + $tableTopMargin + ($isLastRow ? 2.65 : 0.0);
 
                         $tableClass = 'section-content';
                         if (preg_match('/<table[^>]+class=["\']([^"\']+)["\']/i', $block['html'], $classMatch)) {
@@ -1629,8 +1898,22 @@ class ReportPaginator
                             $tableStyle = $styleMatch[1];
                         }
 
-                        $styleAttr = ! empty($tableStyle) ? " style=\"{$tableStyle}\"" : '';
+                        $colgroupHtml = '';
+                        if (preg_match('/<colgroup[^>]*>.*?<\/colgroup>/is', $block['html'], $colgroupMatch)) {
+                            $colgroupHtml = $colgroupMatch[0];
+                        }
+
+                        $mergedStyle = $tableStyle;
+                        if (! $isLastRow) {
+                            $mergedStyle = ! empty($mergedStyle)
+                                ? (str_ends_with(trim($mergedStyle), ';') ? trim($mergedStyle) : trim($mergedStyle).';').' margin-bottom: 0px !important;'
+                                : 'margin-bottom: 0px !important;';
+                        }
+                        $styleAttr = ! empty($mergedStyle) ? " style=\"{$mergedStyle}\"" : '';
                         $tableWrapperHtml = "<table class=\"{$tableClass}\"{$styleAttr}>";
+                        if (! empty($colgroupHtml)) {
+                            $tableWrapperHtml .= $colgroupHtml;
+                        }
                         if (! empty($headerHtml)) {
                             $tableWrapperHtml .= '<thead>'.$headerHtml.'</thead>';
                         }

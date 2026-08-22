@@ -8,6 +8,8 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { DebugHudPanel } from './page-preview/debug';
+import type { MeasuredBlock } from './page-preview/types';
 
 export interface LivePdfPreviewProps {
     specimen: any;
@@ -15,6 +17,7 @@ export interface LivePdfPreviewProps {
     isLoading: boolean;
     totalPages: number;
     renderPreviewPage: (pageNum: number) => React.ReactNode;
+    pages?: MeasuredBlock[][];
 }
 
 export default function LivePdfPreview({
@@ -23,6 +26,7 @@ export default function LivePdfPreview({
     isLoading,
     totalPages,
     renderPreviewPage,
+    pages = [],
 }: LivePdfPreviewProps) {
     const [zoomScale, setZoomScale] = useState(1);
     const [zoomMode, setZoomMode] = useState<'fit' | 'manual'>('fit');
@@ -206,6 +210,9 @@ export default function LivePdfPreview({
                     </div>
                 </div>
             </div>
+
+            {/* GSAP DevTools Floating Debug HUD */}
+            <DebugHudPanel pages={pages} totalPages={totalPages} />
 
             {/* Fullscreen Preview Sheet */}
             <Sheet open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>

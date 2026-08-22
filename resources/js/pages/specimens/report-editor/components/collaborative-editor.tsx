@@ -12,6 +12,7 @@ import type * as Y from 'yjs';
 import { cn } from '@/lib/utils';
 import { uploadReportImage } from '../actions';
 import { ImageCropperDialog } from '../image-grid-component';
+import { isSelectionInTable } from '../utils';
 import { EditorRegistryContext } from './editor-registry-context';
 import { CustomBulletList, sharedExtensions } from './tiptap-extensions';
 
@@ -116,6 +117,13 @@ function CollaborativeEditorInner({
         pos: number;
     } | null>(null);
 
+    const onFocusRef = useRef(onFocus);
+    onFocusRef.current = onFocus;
+    const onBlurRef = useRef(onBlur);
+    onBlurRef.current = onBlur;
+    const onUpdateRef = useRef(onUpdate);
+    onUpdateRef.current = onUpdate;
+
     const editor = useEditor({
         extensions: [
             StarterKit.configure({
@@ -167,7 +175,7 @@ function CollaborativeEditorInner({
         editable: true,
         onUpdate({ editor }) {
             setTimeout(() => {
-                onUpdate(editor.getHTML());
+                onUpdateRef.current?.(editor.getHTML());
             }, 0);
 
             const isDictating = editor.extensionManager.extensions.find(
@@ -182,11 +190,11 @@ function CollaborativeEditorInner({
         },
         onFocus({ editor }) {
             setIsFocused(true);
-            onFocus?.(editor);
+            onFocusRef.current?.(editor);
         },
         onBlur() {
             setIsFocused(false);
-            onBlur?.();
+            onBlurRef.current?.();
         },
     });
 
@@ -211,6 +219,45 @@ function CollaborativeEditorInner({
             };
         }
     }, [editor, onEditorReady, registry, field]);
+
+    useEffect(() => {
+        if (!editor) {
+            return;
+        }
+
+        const handleActivity = () => {
+            if (
+                editor.isFocused ||
+                !editor.state.selection.empty ||
+                isSelectionInTable(editor)
+            ) {
+                setIsFocused(true);
+                onFocusRef.current?.(editor);
+            }
+        };
+
+        editor.on('selectionUpdate', handleActivity);
+        editor.on('focus', handleActivity);
+
+        const dom = editor.view?.dom;
+
+        if (dom) {
+            dom.addEventListener('focusin', handleActivity);
+            dom.addEventListener('pointerdown', handleActivity);
+            dom.addEventListener('selectstart', handleActivity);
+        }
+
+        return () => {
+            editor.off('selectionUpdate', handleActivity);
+            editor.off('focus', handleActivity);
+
+            if (dom) {
+                dom.removeEventListener('focusin', handleActivity);
+                dom.removeEventListener('pointerdown', handleActivity);
+                dom.removeEventListener('selectstart', handleActivity);
+            }
+        };
+    }, [editor]);
 
     useEffect(() => {
         if (!editor || !provider) {
@@ -348,6 +395,11 @@ function CollaborativeEditorInner({
             </span>
             <div
                 id={`editor-container-${field}`}
+                onMouseDown={() => {
+                    if (editor) {
+                        onFocusRef.current?.(editor);
+                    }
+                }}
                 className={cn(
                     'relative rounded-lg border bg-card text-card-foreground shadow-xs transition-all duration-200',
                     isFocused ? focusColorClass : 'border-border',

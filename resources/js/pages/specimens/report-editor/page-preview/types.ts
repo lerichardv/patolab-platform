@@ -1,4 +1,4 @@
-export type { MeasuredBlock } from '../types';
+export type { MeasuredBlock, BlockDebugMeta } from '../types';
 
 export interface PreviewUser {
     id: number;

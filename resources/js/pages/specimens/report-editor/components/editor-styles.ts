@@ -1,6 +1,26 @@
 export const editorStyles = `
+  /* Reset default spacing on elements to ensure exact metric calculations */
+  .preview-content, .preview-content *, .tiptap, .tiptap * {
+    box-sizing: border-box;
+  }
+  .preview-content p, .preview-content h1, .preview-content h2, .preview-content h3, .preview-content h4, .preview-content h5, .preview-content h6, .preview-content ul, .preview-content ol, .preview-content li, .preview-content table, .preview-content tr, .preview-content th, .preview-content td {
+    margin: 0;
+    padding: 0;
+  }
+  .preview-content > *:first-child {
+    margin-top: 0 !important;
+  }
+  .preview-content {
+    margin-bottom: 0mm;
+  }
+
   /* ── Base ── */
-  .tiptap { outline: none; min-height: 160px; }
+  .tiptap {
+    outline: none;
+    min-height: 160px;
+    font-size: 8pt;
+    line-height: 1.25;
+  }
 
   /* ── Dictation Caret Style ── */
   .tiptap.is-dictating {
@@ -80,6 +100,7 @@ export const editorStyles = `
     line-height: 3.53mm; /* 8pt * 1.25 */
     text-align: justify;
     font-size: 2.82mm; /* 8pt */
+    min-height: 3.53mm;
   }
 
   /* ── Headings ── */
@@ -159,8 +180,42 @@ export const editorStyles = `
   .tiptap ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.5rem; }
   .preview-content ol { list-style-type: decimal; padding-left: 6.35mm; margin-bottom: 1.98mm; }
   
-  .tiptap li { margin-bottom: 0.15rem; }
-  .preview-content li { margin-bottom: 0mm; line-height: 3.53mm; }
+  .tiptap ul,
+  .tiptap ol,
+  .tiptap li {
+    font-size: 8pt;
+    line-height: 1.25;
+  }
+  .preview-content,
+  .preview-content ul,
+  .preview-content ol,
+  .preview-content li {
+    font-size: 2.82mm; /* 8pt */
+  }
+
+  .tiptap li { margin-bottom: 0.80mm; }
+  .preview-content li { margin-bottom: 0.80mm; line-height: 3.53mm; }
+  .tiptap li:last-child, .preview-content li:last-child { margin-bottom: 0mm; }
+
+  .preview-content li p,
+  .preview-content ul p,
+  .preview-content ol p {
+    margin: 0 !important;
+    margin-bottom: 0 !important;
+    line-height: inherit !important;
+    font-size: 2.82mm !important; /* 8pt */
+    min-height: 0 !important;
+  }
+
+  .tiptap li p,
+  .tiptap ul p,
+  .tiptap ol p {
+    margin: 0 !important;
+    margin-bottom: 0 !important;
+    line-height: inherit !important;
+    font-size: 8pt !important;
+    min-height: 0 !important;
+  }
 
   /* ── Inline marks ── */
   .tiptap u, .preview-content u { text-decoration: underline; }
@@ -269,22 +324,20 @@ export const editorStyles = `
     flex-wrap: nowrap;
     gap: 1.50mm;
     margin: 1.00mm 0mm;
-    width: 100%;
-    border: 0.26mm solid #e2e8f0;
-    border-radius: 2.12mm;
-    padding: 1.00mm;
-    background-color: rgba(248, 250, 252, 0.1);
+    max-width: 100%;
   }
 
-  .dark .preview-content div[data-type="image-grid"],
-  [class*="dark"] .preview-content div[data-type="image-grid"] {
-    border-color: rgba(30, 41, 59, 0.8);
-    background-color: rgba(2, 6, 23, 0.05);
+  .preview-content .grid-image-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    max-width: 100%;
   }
 
   .preview-content div[data-type="image-grid"] img {
     object-fit: cover;
-    margin: 0 auto;
+    margin: 0 !important;
     display: block;
     border-radius: 4px;
   }
@@ -372,6 +425,17 @@ export const editorStyles = `
     vertical-align: top;
     font-size: 2.51mm;
     line-height: 3.97mm;
+  }
+  .preview-content table th p,
+  .preview-content table td p,
+  .preview-content table p,
+  .tiptap table th p,
+  .tiptap table td p,
+  .tiptap table p {
+    margin: 0 !important;
+    line-height: inherit !important;
+    text-align: inherit !important;
+    font-size: inherit !important;
   }
   .tiptap table th {
     background-color: #f3f4f6;

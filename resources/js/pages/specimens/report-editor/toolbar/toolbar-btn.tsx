@@ -30,13 +30,18 @@ export function ToolbarBtn({
 }) {
     const { isDictating } = React.useContext(ToolbarContext);
 
+    const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        onMouseDown?.(e);
+    };
+
     return (
         <Tooltip>
             <TooltipTrigger asChild>
                 <button
                     type="button"
                     onClick={onClick}
-                    onMouseDown={onMouseDown}
+                    onMouseDown={handleMouseDown}
                     disabled={disabled || isDictating}
                     className={cn(
                         'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-sm transition-colors',

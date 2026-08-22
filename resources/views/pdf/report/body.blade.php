@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <title>Reporte de Espécimen {{ $specimen->sequence_code }}</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
-        
         * {
             box-sizing: border-box;
             margin: 0;
@@ -22,9 +20,6 @@
             margin-top: 0 !important;
         }
 
-        .section-content > *:last-child {
-            margin-bottom: 0 !important;
-        }
  
         @page {
             size: 215.9mm 279.4mm;
@@ -32,7 +27,7 @@
         }
 
         body {
-            font-family: 'Outfit', 'Helvetica Neue', Arial, sans-serif;
+            font-family: Arial, Helvetica, sans-serif;
             font-size: 2.78mm;
             color: #1f2937;
             line-height: 3.97mm;
@@ -58,10 +53,10 @@
             page-break-after: avoid;
         }
 
-        /* Content height budget (adjusted to 205.00mm) */
+        /* Content height budget (adjusted to 212.79mm) */
         .page-content {
             width: 100%;
-            height: 205.00mm;
+            height: 212.79mm;
             display: flex;
             flex-direction: column;
             justify-content: flex-start;
@@ -233,8 +228,13 @@
             font-size: 2.82mm;
             color: #1f2937;
             text-align: justify;
-            margin-bottom: 1.98mm; /* 0.5 lines */
+            margin-bottom: 0mm;
             line-height: 3.53mm;
+        }
+
+        .section-content p, .section-content h1, .section-content h2, .section-content h3, .section-content h4, .section-content h5, .section-content h6, .section-content ul, .section-content ol, .section-content li, .section-content table, .section-content tr, .section-content th, .section-content td {
+            margin: 0;
+            padding: 0;
         }
 
         .section-content p {
@@ -242,6 +242,7 @@
             text-align: justify;
             line-height: 3.53mm;
             font-size: 2.82mm;
+            min-height: 3.53mm;
         }
 
         .section-content ul {
@@ -303,9 +304,30 @@
             margin-bottom: 1.98mm;
         }
 
+        .section-content,
+        .section-content ul,
+        .section-content ol,
         .section-content li {
-            margin-bottom: 0mm;
+            font-size: 2.82mm; /* 8pt */
+        }
+
+        .section-content li {
+            margin-bottom: 0.80mm;
             line-height: 3.53mm;
+        }
+
+        .section-content li:last-child {
+            margin-bottom: 0mm;
+        }
+
+        .section-content li p,
+        .section-content ul p,
+        .section-content ol p {
+            margin: 0 !important;
+            margin-bottom: 0 !important;
+            line-height: inherit !important;
+            font-size: 2.82mm !important;
+            min-height: 0 !important;
         }
 
         .section-content h1 {
@@ -404,6 +426,15 @@
             font-size: 2.51mm;
             text-align: left;
             line-height: 3.97mm;
+        }
+
+        .section-content table th p,
+        .section-content table td p,
+        .section-content table p {
+            margin: 0 !important;
+            line-height: inherit !important;
+            text-align: inherit !important;
+            font-size: inherit !important;
         }
 
         .section-content table th {

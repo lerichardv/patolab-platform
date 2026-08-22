@@ -1,5 +1,5 @@
 import type { Editor } from '@tiptap/react';
-import { ChevronDown } from 'lucide-react';
+import { BetweenHorizontalEnd, ChevronDown } from 'lucide-react';
 import React, { useState } from 'react';
 
 import {
@@ -85,24 +85,7 @@ export function LineHeightDropdown({
                                     'border-blue-300 bg-blue-50 font-bold text-blue-600 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400',
                             )}
                         >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="h-3.5 w-3.5 text-muted-foreground"
-                            >
-                                <path d="M21 6H3" />
-                                <path d="M21 12H9" />
-                                <path d="M21 18H3" />
-                                <path d="M3 12v6" />
-                                <path d="M6 15l-3 3-3-3" />
-                            </svg>
+                            <BetweenHorizontalEnd className="h-3.5 w-3.5 text-muted-foreground" />
                             <span className="text-xs font-semibold">
                                 {currentLineHeight || '1.25'}
                             </span>

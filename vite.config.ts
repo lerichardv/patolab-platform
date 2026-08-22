@@ -7,6 +7,7 @@ import { bunny } from 'laravel-vite-plugin/fonts';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	envPrefix: ['VITE_', 'DEBUG_'],
 	resolve: {
 		alias: {
 			'y-prosemirror': '@tiptap/y-tiptap',

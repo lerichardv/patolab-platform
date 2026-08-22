@@ -39,6 +39,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'debugReport' => filter_var(env('DEBUG_REPORT', false), FILTER_VALIDATE_BOOLEAN),
             'auth' => [
                 'user' => $request->user() ? $request->user()->load('role') : null,
                 'permissions' => $request->user() ? ($request->user()->role ? ($request->user()->role->slug === 'admin' ? Permission::pluck('slug')->toArray() : $request->user()->role->permissions->pluck('slug')->toArray()) : []) : [],

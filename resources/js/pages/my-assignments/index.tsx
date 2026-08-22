@@ -1518,7 +1518,7 @@ export default function MyAssignmentsIndex({
                                                             />
                                                         </TableHead>
                                                     )}
-                                                    <TableHead className="w-[160px] font-semibold">
+                                                    <TableHead className="w-[170px] min-w-[170px] font-semibold">
                                                         Muestra
                                                     </TableHead>
                                                     <TableHead className="w-[95px] min-w-[75px] text-center font-semibold">
