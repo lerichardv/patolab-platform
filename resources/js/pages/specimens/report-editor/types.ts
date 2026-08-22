@@ -127,6 +127,41 @@ export interface ReportEditorProps {
     banks?: any[];
 }
 
+export interface BlockDebugMeta {
+    blockType?: string;
+    heightMm?: number;
+    accumHeightBeforeMm?: number;
+    accumHeightAfterMm?: number;
+    pageIndex?: number;
+    remainingSpaceAfterMm?: number;
+    lineCount?: number;
+    fontLineHeightMm?: number;
+    spacingTopMm?: number;
+    spacingBottomMm?: number;
+    charsCount?: number;
+    charsPerLine?: number;
+    rows?: Array<{
+        index: number;
+        heightMm: number;
+        textLength: number;
+        isHeader?: boolean;
+    }>;
+    items?: Array<{
+        index: number;
+        heightMm: number;
+        lineCount: number;
+        textLength: number;
+    }>;
+    cols?: Array<{ index: number; widthMm: number }>;
+    colCount?: number;
+    colWidthMm?: number;
+    headerHeightMm?: number;
+    keepWithNext?: boolean;
+    minNextHeightMm?: number;
+    formula?: string;
+    details?: string;
+}
+
 export interface MeasuredBlock {
     id: string;
     type:
@@ -154,4 +189,5 @@ export interface MeasuredBlock {
     alignment?: string;
     width?: number | null;
     images?: string[];
+    debugMeta?: BlockDebugMeta;
 }

@@ -20,9 +20,6 @@
             margin-top: 0 !important;
         }
 
-        .section-content > *:last-child {
-            margin-bottom: 0 !important;
-        }
  
         @page {
             size: 215.9mm 279.4mm;
@@ -231,7 +228,7 @@
             font-size: 2.82mm;
             color: #1f2937;
             text-align: justify;
-            margin-bottom: 1.98mm; /* 0.5 lines */
+            margin-bottom: 0mm;
             line-height: 3.53mm;
         }
 
@@ -307,9 +304,30 @@
             margin-bottom: 1.98mm;
         }
 
+        .section-content,
+        .section-content ul,
+        .section-content ol,
         .section-content li {
-            margin-bottom: 0mm;
+            font-size: 2.82mm; /* 8pt */
+        }
+
+        .section-content li {
+            margin-bottom: 0.80mm;
             line-height: 3.53mm;
+        }
+
+        .section-content li:last-child {
+            margin-bottom: 0mm;
+        }
+
+        .section-content li p,
+        .section-content ul p,
+        .section-content ol p {
+            margin: 0 !important;
+            margin-bottom: 0 !important;
+            line-height: inherit !important;
+            font-size: 2.82mm !important;
+            min-height: 0 !important;
         }
 
         .section-content h1 {

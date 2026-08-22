@@ -419,7 +419,7 @@ test('report paginator splits ordered lists across pages preserving start index'
     // Page height of 30mm can fit ~7 list items (~25mm), forcing items 8+ to page 2 with start="8"
     $pages = ReportPaginator::paginateBlocks($blocks, 30.0, 3.53, 155);
 
-    expect(count($pages))->toBe(2);
+    expect(count($pages))->toBe(3);
 
     // Page 2 should have <ol start="..."> with index > 1
     $page2List = array_filter($pages[1], fn ($b) => str_contains($b['html'] ?? '', '<ol'));

@@ -8,6 +8,7 @@ import BulletList from '@tiptap/extension-bullet-list';
 import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
 import TextAlign from '@tiptap/extension-text-align';
+import Underline from '@tiptap/extension-underline';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { mergeAttributes, ReactNodeViewRenderer } from '@tiptap/react';
@@ -954,6 +955,7 @@ export const sharedExtensions = [
     TextStyle,
     FontSize,
     LineHeight,
+    Underline,
     CustomImage.configure({
         allowBase64: false,
         resize: {

@@ -1,4 +1,5 @@
 import { getImageAspectRatio, getImageHeight } from './image-measurer';
+import { decodeHtmlEntities } from './pagination-helpers';
 
 export function getBlockLineHeight(
     block: { html?: string },
@@ -149,6 +150,12 @@ export function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             width,
             images: imgTags,
             height: gridHeight,
+            debugMeta: {
+                blockType: 'image-grid',
+                heightMm: gridHeight,
+                colCount: columns,
+                formula: `${imgTags.length} imágenes en galería (${columns} cols, ancho: ${usableWidth.toFixed(1)}mm) = ${gridHeight.toFixed(2)}mm`,
+            },
         };
     }
 
@@ -161,6 +168,11 @@ export function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             type: 'page-break',
             html: blockHtml,
             height: 0.0,
+            debugMeta: {
+                blockType: 'page-break',
+                heightMm: 0.0,
+                formula: 'Salto de página explícito (0.00mm)',
+            },
         };
     }
 
@@ -178,6 +190,12 @@ export function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             tag,
             html: blockHtml,
             height,
+            debugMeta: {
+                blockType: `heading (${tag.toUpperCase()})`,
+                heightMm: height,
+                keepWithNext: true,
+                formula: `Encabezado <${tag}>: ${height.toFixed(2)}mm (con restricción keep_with_next)`,
+            },
         };
     }
 
@@ -187,6 +205,10 @@ export function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             tag,
             html: blockHtml,
             height: 0.0,
+            debugMeta: {
+                blockType: `list (${tag.toUpperCase()})`,
+                heightMm: 0.0,
+            },
         };
     }
 
@@ -195,6 +217,10 @@ export function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             type: 'table',
             html: blockHtml,
             height: 0.0,
+            debugMeta: {
+                blockType: 'table',
+                heightMm: 0.0,
+            },
         };
     }
 
@@ -277,24 +303,50 @@ export function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
             captionHeight = captionLines * 3.6 + 1.06;
         }
 
+        const imgH = getImageHeight(blockHtml);
+        const totalHeight = imgH + captionHeight;
+
         return {
             type: 'image',
             html: wrappedHtml,
-            height: getImageHeight(blockHtml) + captionHeight,
+            height: totalHeight,
+            debugMeta: {
+                blockType: 'image',
+                heightMm: totalHeight,
+                formula: `Imagen: ${imgH.toFixed(2)}mm + pie de foto: ${captionHeight.toFixed(2)}mm = ${totalHeight.toFixed(2)}mm (${align})`,
+            },
         };
     }
 
     const classMatch = blockHtml.match(/class=["']([^"']+)["']/i);
     const className = classMatch ? classMatch[1] : '';
 
-    const plainText = blockHtml.replace(/<[^>]+>/g, '').trim();
-    const lines = Math.max(1, Math.ceil(plainText.length / maxCharsPerLine));
+    const plainText = decodeHtmlEntities(
+        blockHtml.replace(/<[^>]+>/g, ''),
+    ).trim();
+    const fontLh = getBlockLineHeight({ html: blockHtml }, 3.53);
+    const fontSize = fontLh / 1.25;
+    const baseFontSize = 2.82;
+    const dynamicMaxChars = Math.floor(
+        maxCharsPerLine * (baseFontSize / fontSize),
+    );
+    const lines = Math.max(1, Math.ceil(plainText.length / dynamicMaxChars));
+    const paraHeight = lines * fontLh;
 
     return {
         type: 'paragraph',
         tag,
         html: blockHtml,
         className,
-        height: lines * getBlockLineHeight({ html: blockHtml }, 3.53),
+        height: paraHeight,
+        debugMeta: {
+            blockType: 'paragraph',
+            heightMm: paraHeight,
+            lineCount: lines,
+            fontLineHeightMm: fontLh,
+            charsCount: plainText.length,
+            charsPerLine: dynamicMaxChars,
+            formula: `${lines} línea(s) × ${fontLh.toFixed(2)}mm = ${paraHeight.toFixed(2)}mm (${plainText.length} caracteres @ ~${dynamicMaxChars} chars/línea)`,
+        },
     };
 }

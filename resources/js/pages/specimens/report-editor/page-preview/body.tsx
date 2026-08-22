@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { cn } from '@/lib/utils';
+import { BlockDebugWrapper } from './debug/block-debug-wrapper';
 import type { MeasuredBlock, PreviewSpecimen, PreviewUser } from './types';
 
 export function PatientMetadataCard({
@@ -299,42 +300,30 @@ export default function Body({
                 justifyContent: 'flex-start',
             }}
         >
-            {pageBlocks.map((block) => {
+            {pageBlocks.map((block, index) => {
+                let content: React.ReactNode = null;
+
                 if (block.type === 'patient-card') {
-                    return (
+                    content = (
                         <PatientMetadataCard
-                            key={block.id}
                             specimen={specimen}
                             sampleCollectionDate={sampleCollectionDate}
                             reportDate={reportDate}
                         />
                     );
-                }
-
-                if (block.type === 'section-header') {
-                    return (
-                        <SectionHeader
-                            key={block.id}
-                            title={block.title || ''}
-                        />
-                    );
-                }
-
-                if (block.type === 'signature') {
-                    return (
+                } else if (block.type === 'section-header') {
+                    content = <SectionHeader title={block.title || ''} />;
+                } else if (block.type === 'signature') {
+                    content = (
                         <SignatureBlock
-                            key={block.id}
                             users={specimen.users}
                             reportDate={reportDate}
                             finalizationDate={finalizationDate}
                         />
                     );
-                }
-
-                if (block.type === 'cuttings-summary') {
-                    return (
+                } else if (block.type === 'cuttings-summary') {
+                    content = (
                         <div
-                            key={block.id}
                             className="preview-content shrink-0 select-none"
                             style={{
                                 fontSize: '2.51mm',
@@ -349,12 +338,9 @@ export default function Body({
                             <u>Cortes</u>: {block.text?.replace('Cortes: ', '')}
                         </div>
                     );
-                }
-
-                if (block.type === 'new-cuttings-summary') {
-                    return (
+                } else if (block.type === 'new-cuttings-summary') {
+                    content = (
                         <div
-                            key={block.id}
                             className="preview-content shrink-0 select-none"
                             style={{
                                 fontSize: '2.51mm',
@@ -370,16 +356,13 @@ export default function Body({
                             {block.text?.replace('Nuevos Cortes: ', '')}
                         </div>
                     );
-                }
-
-                if (
+                } else if (
                     block.type === 'html' ||
                     block.type === 'heading' ||
                     block.type === 'image'
                 ) {
-                    return (
+                    content = (
                         <div
-                            key={block.id}
                             className={cn(
                                 block.className || 'section-content',
                                 'preview-content shrink-0',
@@ -391,7 +374,19 @@ export default function Body({
                     );
                 }
 
-                return null;
+                if (!content) {
+                    return null;
+                }
+
+                return (
+                    <BlockDebugWrapper
+                        key={block.id}
+                        block={block}
+                        index={index}
+                    >
+                        {content}
+                    </BlockDebugWrapper>
+                );
             })}
         </div>
     );

@@ -32,7 +32,8 @@ export interface ReportPaginateOptions {
 export class ReportPaginator {
     public static readonly PAGE_CONTENT_HEIGHT = 212.79; // mm
     public static readonly LINE_HEIGHT = 3.53; // mm (8pt * 1.25)
-    public static readonly MAX_CHARS_PER_LINE = 130;
+    public static readonly LIST_ITEM_SPACING = 0.8; // mm (spacing between li items)
+    public static readonly MAX_CHARS_PER_LINE = 144;
     public static readonly SECTION_HEADER_HEIGHT = 7.94; // mm
     public static readonly TABLE_SPLIT_BUFFER = 2.0; // mm
 
@@ -581,12 +582,26 @@ export class ReportPaginator {
 
         // Pathologist signatures with keep_together: true
         if (signatureHeight > 0) {
+            const sigFormula = `${pathologistsCount} firma(s) de patólogo (${rowsCount} fila(s) × 25.00mm = ${signatureHeight.toFixed(2)}mm)`;
+
             if (lastPageHeight + signatureHeight > maxHeightForLastPage) {
                 computedPages.push([
                     {
                         id: 'signature',
                         type: 'signature',
                         height: signatureHeight,
+                        debugMeta: {
+                            blockType: 'signature',
+                            heightMm: signatureHeight,
+                            accumHeightBeforeMm: 0.0,
+                            accumHeightAfterMm: signatureHeight,
+                            pageIndex: computedPages.length,
+                            remainingSpaceAfterMm: Math.max(
+                                0,
+                                maxHeightForLastPage - signatureHeight,
+                            ),
+                            formula: sigFormula,
+                        },
                     },
                 ]);
             } else {
@@ -594,6 +609,19 @@ export class ReportPaginator {
                     id: 'signature',
                     type: 'signature',
                     height: signatureHeight,
+                    debugMeta: {
+                        blockType: 'signature',
+                        heightMm: signatureHeight,
+                        accumHeightBeforeMm: lastPageHeight,
+                        accumHeightAfterMm: lastPageHeight + signatureHeight,
+                        pageIndex: lastPageIndex,
+                        remainingSpaceAfterMm: Math.max(
+                            0,
+                            maxHeightForLastPage -
+                                (lastPageHeight + signatureHeight),
+                        ),
+                        formula: sigFormula,
+                    },
                 });
             }
         }
@@ -612,6 +640,11 @@ export class ReportPaginator {
                     title: 'ADDENDUM',
                     height: ReportPaginator.SECTION_HEADER_HEIGHT,
                     id: 'addendum-header',
+                    debugMeta: {
+                        blockType: 'section-header',
+                        heightMm: ReportPaginator.SECTION_HEADER_HEIGHT,
+                        formula: 'Encabezado ADDENDUM: 7.94mm',
+                    },
                 });
             }
 
@@ -661,9 +694,39 @@ export class ReportPaginator {
                       (currentPageList.length === 1 &&
                           currentPageList[0].type !== 'patient-card');
 
+            const pushBlock = (
+                b: MeasuredBlock,
+                customMeta?: Record<string, any>,
+            ) => {
+                const cost = b.height;
+                const accumBefore = currentHeightList;
+                const accumAfter = currentHeightList + cost;
+                const remainingAfter = Math.max(
+                    0,
+                    maxHeightForPage - accumAfter,
+                );
+
+                b.debugMeta = {
+                    ...(b.debugMeta || {}),
+                    blockType: b.debugMeta?.blockType || b.type,
+                    heightMm: cost,
+                    accumHeightBeforeMm: accumBefore,
+                    accumHeightAfterMm: accumAfter,
+                    pageIndex,
+                    remainingSpaceAfterMm: remainingAfter,
+                    ...(customMeta || {}),
+                };
+
+                currentPageList.push(b);
+                currentHeightList += cost;
+            };
+
             if (block.type === 'patient-card') {
-                currentPageList.push(block);
-                currentHeightList += block.height;
+                pushBlock(block, {
+                    blockType: 'patient-card',
+                    heightMm: block.height,
+                    formula: `Ficha de Paciente estimada: ${block.height.toFixed(2)}mm`,
+                });
                 continue;
             }
 
@@ -696,8 +759,13 @@ export class ReportPaginator {
                     pageIndex++;
                 }
 
-                currentPageList.push(block);
-                currentHeightList += block.height;
+                pushBlock(block, {
+                    blockType: 'section-header',
+                    heightMm: block.height,
+                    keepWithNext: true,
+                    minNextHeightMm: minNextHeight,
+                    formula: `Encabezado de Sección: 7.94mm (restricción keep_with_next: +${minNextHeight.toFixed(2)}mm)`,
+                });
                 continue;
             }
 
@@ -719,8 +787,13 @@ export class ReportPaginator {
                     pageIndex++;
                 }
 
-                currentPageList.push(block);
-                currentHeightList += headingCost;
+                pushBlock(block, {
+                    blockType: `heading (${block.tag?.toUpperCase() || 'H'})`,
+                    heightMm: headingCost,
+                    keepWithNext: true,
+                    minNextHeightMm: minNextHeight,
+                    formula: `Encabezado <${block.tag || 'h'}>: ${headingCost.toFixed(2)}mm (keep_with_next: +${minNextHeight.toFixed(2)}mm)`,
+                });
                 continue;
             }
 
@@ -735,8 +808,7 @@ export class ReportPaginator {
                     pageIndex++;
                 }
 
-                currentPageList.push(block);
-                currentHeightList += block.height;
+                pushBlock(block);
                 continue;
             }
 
@@ -754,8 +826,10 @@ export class ReportPaginator {
                     pageIndex++;
                 }
 
-                currentPageList.push(block);
-                currentHeightList += block.height;
+                pushBlock(block, {
+                    blockType: block.type,
+                    formula: `${block.type === 'cuttings-summary' ? 'Resumen de Cortes' : 'Nuevos Cortes'}: ${block.height.toFixed(2)}mm`,
+                });
                 continue;
             }
 
@@ -764,13 +838,17 @@ export class ReportPaginator {
                 const images = block.images;
 
                 if (!images || images.length === 0) {
-                    currentPageList.push({
+                    pushBlock({
                         id: `${block.id}-fallback`,
                         type: 'html',
                         html: block.html || '',
                         height: 5.3,
+                        debugMeta: {
+                            blockType: 'image-grid (vacía)',
+                            heightMm: 5.3,
+                            formula: 'Galería de imágenes vacía (5.30mm)',
+                        },
                     });
-                    currentHeightList += 5.3;
                     continue;
                 }
 
@@ -982,14 +1060,20 @@ export class ReportPaginator {
                         }
                     }
 
-                    currentPageList.push({
-                        id: `${block.id}-row-${currentIndex}-slice-${r}`,
-                        type: 'html',
-                        html: sliceHtml,
-                        height: cost,
-                    });
+                    pushBlock(
+                        {
+                            id: `${block.id}-row-${currentIndex}-slice-${r}`,
+                            type: 'html',
+                            html: sliceHtml,
+                            height: cost,
+                        },
+                        {
+                            blockType: 'image-grid',
+                            colCount: columns,
+                            formula: `Galería: ${r} fila(s) de imágenes = ${cost.toFixed(2)}mm`,
+                        },
+                    );
 
-                    currentHeightList += cost;
                     rowsRemaining = rowsRemaining.slice(r);
                 }
 
@@ -1001,7 +1085,14 @@ export class ReportPaginator {
                     block.html || '',
                     block.tag || 'p',
                 );
-                let lines = splitHtmlIntoLines(paraInnerHtml, maxCharsPerLine);
+                const fontLh = getBlockLineHeight(block, lineHeight);
+                const fontSize = fontLh / 1.25;
+                const baseFontSize = 2.82;
+                const dynamicMaxChars = Math.floor(
+                    maxCharsPerLine * (baseFontSize / fontSize),
+                );
+                let lines = splitHtmlIntoLines(paraInnerHtml, dynamicMaxChars);
+
                 if (lines.length === 0) {
                     lines = ['<br>'];
                 }
@@ -1039,26 +1130,8 @@ export class ReportPaginator {
                     if (maxLinesFit >= remainingLines) {
                         linesToFit = remainingLines;
                     } else {
-                        // Orphan prevention: at least 2 lines must fit on current page
-                        if (
-                            maxLinesFit < 2 &&
-                            remainingLines >= 2 &&
-                            canBreakToNextPage
-                        ) {
-                            pagesList.push(currentPageList);
-                            currentPageList = [];
-                            currentHeightList = 0.0;
-                            pageIndex++;
-                            continue;
-                        }
-
+                        // Widow/orphan protection removed to maximize page space usage
                         linesToFit = Math.max(1, maxLinesFit);
-                        const leftoverLines = remainingLines - linesToFit;
-
-                        // Widow prevention: at least 2 lines must carry over to next page
-                        if (leftoverLines === 1 && linesToFit > 1) {
-                            linesToFit -= 1;
-                        }
                     }
 
                     if (linesToFit <= 0) {
@@ -1095,14 +1168,22 @@ export class ReportPaginator {
                         linesToFit * fontLineHeight +
                         (isLastSlice ? 1.98 : 0.0);
 
-                    currentPageList.push({
-                        id: `${block.id}-slice-${i}`,
-                        type: 'html',
-                        html: sliceHtml,
-                        height: blockCost,
-                    });
+                    pushBlock(
+                        {
+                            id: `${block.id}-slice-${i}`,
+                            type: 'html',
+                            html: sliceHtml,
+                            height: blockCost,
+                        },
+                        {
+                            blockType: 'paragraph',
+                            lineCount: linesToFit,
+                            fontLineHeightMm: fontLineHeight,
+                            spacingBottomMm: isLastSlice ? 1.98 : 0.0,
+                            formula: `${linesToFit} línea(s) × ${fontLineHeight.toFixed(2)}mm + ${isLastSlice ? '1.98mm mb' : '0.00mm (continúa en sig. pág)'} = ${blockCost.toFixed(2)}mm`,
+                        },
+                    );
 
-                    currentHeightList += blockCost;
                     i += linesToFit;
                 }
 
@@ -1111,9 +1192,14 @@ export class ReportPaginator {
 
             if (block.type === 'list') {
                 const fontLineHeight = getBlockLineHeight(block, lineHeight);
+                const fontSize = fontLineHeight / 1.25;
+                const baseFontSize = 2.82;
+                const dynamicMaxChars = Math.floor(
+                    maxCharsPerLine * (baseFontSize / fontSize),
+                );
                 const listData = paginateList(
                     block.html || '',
-                    maxCharsPerLine,
+                    dynamicMaxChars,
                     fontLineHeight,
                 );
                 const listItems = listData.items;
@@ -1155,16 +1241,38 @@ export class ReportPaginator {
                             const listStyleAttr = listData.listStyleType
                                 ? ` data-list-style-type="${listData.listStyleType}"`
                                 : '';
-                            const styleAttr = listData.styleAttr
-                                ? ` style="${listData.styleAttr}"`
+                            const isLastOfAll = i + 1 >= listItems.length;
+                            let mergedStyle = listData.styleAttr || '';
+                            if (!isLastOfAll) {
+                                mergedStyle = mergedStyle
+                                    ? `${mergedStyle.trim().endsWith(';') ? mergedStyle : mergedStyle + ';'} margin-bottom: 0px !important;`
+                                    : 'margin-bottom: 0px !important;';
+                            }
+                            const styleAttr = mergedStyle
+                                ? ` style="${mergedStyle}"`
                                 : '';
-                            currentPageList.push({
-                                id: `${block.id}-item-${i}`,
-                                type: 'html',
-                                html: `<${tag} class="section-content"${startAttr}${listStyleAttr}${styleAttr}>${itemHtml}</${tag}>`,
-                                height: itemHeight + 1.98,
-                            });
-                            currentHeightList += itemHeight + 1.98;
+
+                            pushBlock(
+                                {
+                                    id: `${block.id}-item-${i}`,
+                                    type: 'html',
+                                    html: `<${tag} class="section-content"${startAttr}${listStyleAttr}${styleAttr}>${itemHtml}</${tag}>`,
+                                    height: itemHeight + 1.98,
+                                },
+                                {
+                                    blockType: `list (${tag.toUpperCase()})`,
+                                    items: [
+                                        {
+                                            index: i + 1,
+                                            heightMm: item.height,
+                                            lineCount: item.lineCount,
+                                            textLength: item.textLength,
+                                        },
+                                    ],
+                                    formula: `Elemento ${i + 1} de lista <${tag}>: ${(itemHeight + 1.98).toFixed(2)}mm`,
+                                },
+                            );
+
                             i++;
                             olStartIndex++;
                         } else {
@@ -1176,6 +1284,7 @@ export class ReportPaginator {
                     } else {
                         const itemsToFit: string[] = [];
                         let accumulatedHeight = 0.0;
+                        const startIndexForSlice = i;
 
                         while (i < listItems.length) {
                             const nextItem = listItems[i];
@@ -1211,18 +1320,41 @@ export class ReportPaginator {
                             const listStyleAttr = listData.listStyleType
                                 ? ` data-list-style-type="${listData.listStyleType}"`
                                 : '';
-                            const styleAttr = listData.styleAttr
-                                ? ` style="${listData.styleAttr}"`
+                            let mergedStyle = listData.styleAttr || '';
+                            if (!isLastOfAll) {
+                                mergedStyle = mergedStyle
+                                    ? `${mergedStyle.trim().endsWith(';') ? mergedStyle : mergedStyle + ';'} margin-bottom: 0px !important;`
+                                    : 'margin-bottom: 0px !important;';
+                            }
+                            const styleAttr = mergedStyle
+                                ? ` style="${mergedStyle}"`
                                 : '';
-                            currentPageList.push({
-                                id: `${block.id}-items-${olStartIndex}`,
-                                type: 'html',
-                                html: `<${tag} class="section-content"${startAttr}${listStyleAttr}${styleAttr}>${itemsToFit.join(
-                                    '',
-                                )}</${tag}>`,
-                                height: cost,
-                            });
-                            currentHeightList += cost;
+
+                            const sliceItemsMeta = listItems
+                                .slice(startIndexForSlice, i)
+                                .map((it, sIdx) => ({
+                                    index: startIndexForSlice + sIdx + 1,
+                                    heightMm: it.height,
+                                    lineCount: it.lineCount,
+                                    textLength: it.textLength,
+                                }));
+
+                            pushBlock(
+                                {
+                                    id: `${block.id}-items-${olStartIndex}`,
+                                    type: 'html',
+                                    html: `<${tag} class="section-content"${startAttr}${listStyleAttr}${styleAttr}>${itemsToFit.join(
+                                        '',
+                                    )}</${tag}>`,
+                                    height: cost,
+                                },
+                                {
+                                    blockType: `list (${tag.toUpperCase()})`,
+                                    items: sliceItemsMeta,
+                                    formula: `Lista <${tag}>: ${itemsToFit.length} elemento(s) = ${cost.toFixed(2)}mm`,
+                                },
+                            );
+
                             olStartIndex += itemsToFit.length;
                         } else {
                             pagesList.push(currentPageList);
@@ -1238,9 +1370,14 @@ export class ReportPaginator {
 
             if (block.type === 'table') {
                 const fontLineHeight = 3.97;
+                const fontSize = fontLineHeight / 1.25;
+                const baseFontSize = 2.82;
+                const dynamicMaxChars = Math.floor(
+                    maxCharsPerLine * (baseFontSize / fontSize),
+                );
                 const tableData = paginateTable(
                     block.html || '',
-                    maxCharsPerLine,
+                    dynamicMaxChars,
                     fontLineHeight,
                 );
                 const headerHtml = tableData.headerHtml;
@@ -1281,6 +1418,7 @@ export class ReportPaginator {
 
                     const rowsToFit: string[] = [];
                     let accumulatedHeight = 0.0;
+                    const startIndexForRows = i;
 
                     while (i < rows.length) {
                         const row = rows[i];
@@ -1333,8 +1471,15 @@ export class ReportPaginator {
                         );
                         const tableStyle = styleMatch ? styleMatch[1] : '';
 
-                        const styleAttr = tableStyle
-                            ? ` style="${tableStyle}"`
+                        let mergedStyle = tableStyle || '';
+                        if (!isLastRow) {
+                            mergedStyle = mergedStyle
+                                ? `${mergedStyle.trim().endsWith(';') ? mergedStyle : mergedStyle + ';'} margin-bottom: 0px !important;`
+                                : 'margin-bottom: 0px !important;';
+                        }
+
+                        const styleAttr = mergedStyle
+                            ? ` style="${mergedStyle}"`
                             : '';
 
                         const colgroupMatch = block.html?.match(
@@ -1358,13 +1503,31 @@ export class ReportPaginator {
                             '',
                         )}</tbody></table>`;
 
-                        currentPageList.push({
-                            id: `${block.id}-table-slice-${i}`,
-                            type: 'html',
-                            html: tableWrapperHtml,
-                            height: cost,
-                        });
-                        currentHeightList += cost;
+                        const sliceRowsMeta = rows
+                            .slice(startIndexForRows, i)
+                            .map((rItem, rIdx) => ({
+                                index: startIndexForRows + rIdx + 1,
+                                heightMm: rItem.height,
+                                textLength: rItem.maxCellTextLen,
+                                isHeader: rItem.isHeader,
+                            }));
+
+                        pushBlock(
+                            {
+                                id: `${block.id}-table-slice-${i}`,
+                                type: 'html',
+                                html: tableWrapperHtml,
+                                height: cost,
+                            },
+                            {
+                                blockType: 'table',
+                                colCount: tableData.colCount,
+                                colWidthMm: tableData.colWidthMm,
+                                headerHeightMm: headerHeight,
+                                rows: sliceRowsMeta,
+                                formula: `Tabla: ${rowsToFit.length} fila(s) (${tableData.colCount} cols @ ${tableData.colWidthMm.toFixed(1)}mm) + encab (${headerHeight.toFixed(2)}mm) = ${cost.toFixed(2)}mm`,
+                            },
+                        );
                     } else {
                         pagesList.push(currentPageList);
                         currentPageList = [];

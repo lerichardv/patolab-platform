@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 
 import { editorStyles } from '../components/editor-styles';
 import Body from './body';
+import { PageDebugOverlay } from './debug/page-debug-overlay';
 import Footer from './footer';
 import Header from './header';
 import type { MeasuredBlock, PreviewSpecimen } from './types';
@@ -136,6 +137,14 @@ export default function Page({
                     __html: customEditorStyles || editorStyles,
                 }}
             />
+
+            {/* GSAP-Style Visual Debug Overlay */}
+            <PageDebugOverlay
+                pageNum={pageNum}
+                totalPages={totalPages}
+                pageBlocks={pageBlocks}
+            />
+
             {/* Header preview */}
             <Header specimen={specimen} pageNum={pageNum} />
 

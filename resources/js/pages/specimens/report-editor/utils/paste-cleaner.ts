@@ -1,139 +1,18 @@
-// Supported font sizes in pt (points) matching report editor theme
-const SUPPORTED_FONT_SIZES_PT = [
-    '8pt',
-    '9pt',
-    '10pt',
-    '11pt',
-    '12pt',
-    '14pt',
-    '16pt',
-    '18pt',
-    '20pt',
-    '24pt',
-    '28pt',
-    '36pt',
-];
-
-// Supported line heights
-const SUPPORTED_LINE_HEIGHTS = ['1', '1.15', '1.25', '1.5', '1.75', '2'];
-
 /**
- * Normalizes font size string (px, pt, rem, em, %) into standardized point (pt) values.
+ * Unwraps an element by moving all its child nodes before it in its parent, then removing the element.
  */
-function normalizeFontSize(val: string): string | null {
-    if (!val) {
-        return null;
+function unwrapElement(el: Element): void {
+    const parent = el.parentNode;
+
+    if (!parent) {
+        return;
     }
 
-    const clean = val.trim().toLowerCase();
-    let pt = 8; // Default 8pt
-
-    if (clean.endsWith('pt')) {
-        const parsed = parseFloat(clean);
-
-        if (isNaN(parsed)) {
-            return null;
-        }
-
-        pt = parsed;
-    } else if (clean.endsWith('px')) {
-        const px = parseFloat(clean);
-
-        if (isNaN(px)) {
-            return null;
-        }
-
-        // 1px = 0.75pt
-        pt = px * 0.75;
-    } else if (clean.endsWith('rem') || clean.endsWith('em')) {
-        const rem = parseFloat(clean);
-
-        if (isNaN(rem)) {
-            return null;
-        }
-
-        // 1rem = 16px = 12pt
-        pt = rem * 12;
-    } else if (clean.endsWith('%')) {
-        const pct = parseFloat(clean);
-
-        if (isNaN(pct)) {
-            return null;
-        }
-
-        pt = (pct / 100) * 8;
-    } else {
-        const num = parseFloat(clean);
-
-        if (isNaN(num)) {
-            return null;
-        }
-
-        pt = num;
+    while (el.firstChild) {
+        parent.insertBefore(el.firstChild, el);
     }
 
-    // Find closest supported size in pt
-    let closest = SUPPORTED_FONT_SIZES_PT[0]; // default 8pt
-    let minDiff = Infinity;
-
-    for (const size of SUPPORTED_FONT_SIZES_PT) {
-        const sizePt = parseFloat(size);
-        const diff = Math.abs(sizePt - pt);
-
-        if (diff < minDiff) {
-            minDiff = diff;
-            closest = size;
-        }
-    }
-
-    // Default base body size (8pt) does not need explicit style
-    return closest === '8pt' ? null : closest;
-}
-
-/**
- * Normalizes line height value.
- */
-function normalizeLineHeight(val: string): string | null {
-    if (!val) {
-        return null;
-    }
-
-    const clean = val.trim().toLowerCase();
-    let num = 1.25;
-
-    if (clean.endsWith('%')) {
-        const pct = parseFloat(clean);
-
-        if (isNaN(pct)) {
-            return null;
-        }
-
-        num = pct / 100;
-    } else {
-        const parsed = parseFloat(clean);
-
-        if (isNaN(parsed)) {
-            return null;
-        }
-
-        num = parsed;
-    }
-
-    // Find closest supported line height
-    let closest = '1.25';
-    let minDiff = Infinity;
-
-    for (const lh of SUPPORTED_LINE_HEIGHTS) {
-        const lhNum = parseFloat(lh);
-        const diff = Math.abs(lhNum - num);
-
-        if (diff < minDiff) {
-            minDiff = diff;
-            closest = lh;
-        }
-    }
-
-    return closest === '1.25' ? null : closest;
+    parent.removeChild(el);
 }
 
 /**
@@ -202,7 +81,9 @@ function cleanTables(doc: Document): void {
             if (rowColCount > maxCols) {
                 maxCols = rowColCount;
             }
-        } // Create a completely new table element matching TipTap table tool structure
+        }
+
+        // Create a completely new table element matching TipTap table tool structure
         const newTable = doc.createElement('table');
         newTable.setAttribute('style', `min-width: ${maxCols * 25}px;`);
 
@@ -292,6 +173,7 @@ function cleanTables(doc: Document): void {
 
 /**
  * Detects Word mso-list paragraphs and bullet/number markers, converting them into clean semantic <ul> / <ol> lists.
+ * Standardizes all list items into <li><p> content using the default 8pt editor font size.
  */
 function cleanLists(doc: Document): void {
     const paragraphs = Array.from(doc.querySelectorAll('p, div'));
@@ -329,6 +211,11 @@ function cleanLists(doc: Document): void {
             const isOrdered = Boolean(orderedMatch);
             const listTag = isOrdered ? 'ol' : 'ul';
 
+            const alignMatch = styleAttr.match(
+                /text-align:\s*(left|center|right|justify)/i,
+            );
+            const textAlign = alignMatch ? alignMatch[1].toLowerCase() : null;
+
             // Clean leading bullet/number prefix from element
             const ignoreSpan = p.querySelector('[style*="mso-list:Ignore"]');
 
@@ -351,6 +238,10 @@ function cleanLists(doc: Document): void {
             // Create <li> containing the cleaned paragraph content
             const li = doc.createElement('li');
             const innerP = doc.createElement('p');
+
+            if (textAlign) {
+                innerP.setAttribute('style', `text-align: ${textAlign};`);
+            }
 
             while (p.firstChild) {
                 innerP.appendChild(p.firstChild);
@@ -377,87 +268,202 @@ function cleanLists(doc: Document): void {
             currentList = null;
         }
     }
+
+    // Process all lists in the document (including native <ul> and <ol>) to ensure every list line has font-size: 8pt applied using the style attribute
+    const allLists = Array.from(doc.querySelectorAll('ul, ol'));
+
+    for (const list of allLists) {
+        const listItems = Array.from(list.querySelectorAll('li'));
+
+        for (const li of listItems) {
+            let innerP = li.querySelector('p');
+
+            if (!innerP) {
+                innerP = doc.createElement('p');
+
+                while (li.firstChild) {
+                    innerP.appendChild(li.firstChild);
+                }
+
+                li.appendChild(innerP);
+            }
+
+            const existingStyle =
+                innerP.getAttribute('style') || li.getAttribute('style') || '';
+            const alignMatch = existingStyle.match(
+                /text-align:\s*(left|center|right|justify)/i,
+            );
+            const styleParts: string[] = [];
+
+            if (alignMatch) {
+                styleParts.push(`text-align: ${alignMatch[1].toLowerCase()}`);
+            }
+            styleParts.push('font-size: 8pt');
+
+            innerP.setAttribute('style', styleParts.join('; ') + ';');
+            li.setAttribute('style', 'font-size: 8pt;');
+        }
+    }
 }
 
 /**
- * Normalizes inline styling and strips non-whitelisted elements/attributes down to clean semantic HTML.
+ * Normalizes inline styling, converts formatting styles into semantic tags (strong, em, u, s),
+ * removes all span tags to make text direct children of paragraphs, and strips non-whitelisted attributes.
  */
 function cleanInlineStylesAndElements(doc: Document): void {
-    // 1. Unwrap disallowed block tags into <p> or inline children
+    // 1. Unwrap or convert disallowed block/container tags into <p>
     const disallowedContainers = Array.from(
         doc.querySelectorAll(
-            'div, section, article, header, footer, main, aside',
+            'div, section, article, header, footer, main, aside, center',
         ),
     );
 
     for (const container of disallowedContainers) {
         if (container.closest('table, ul, ol')) {
+            unwrapElement(container);
             continue;
         }
 
-        // Replace div with paragraph if it contains text or unwrap
-        const p = doc.createElement('p');
+        const tagName = container.tagName.toLowerCase();
+        const styleAttr = container.getAttribute('style') || '';
+        const alignAttr = container.getAttribute('align') || '';
+        let textAlign: string | null = null;
 
-        while (container.firstChild) {
-            p.appendChild(container.firstChild);
+        if (tagName === 'center' || alignAttr.toLowerCase() === 'center') {
+            textAlign = 'center';
+        } else if (alignAttr) {
+            textAlign = ['left', 'center', 'right', 'justify'].includes(
+                alignAttr.toLowerCase(),
+            )
+                ? alignAttr.toLowerCase()
+                : null;
         }
 
-        container.parentNode?.replaceChild(p, container);
+        if (!textAlign && styleAttr) {
+            const alignMatch = styleAttr.match(
+                /text-align:\s*(left|center|right|justify)/i,
+            );
+
+            if (alignMatch) {
+                textAlign = alignMatch[1].toLowerCase();
+            }
+        }
+
+        const hasBlockChildren = Boolean(
+            container.querySelector(
+                'p, h1, h2, h3, h4, h5, h6, ul, ol, table, blockquote',
+            ),
+        );
+
+        if (hasBlockChildren) {
+            unwrapElement(container);
+        } else {
+            const p = doc.createElement('p');
+
+            if (textAlign) {
+                p.setAttribute('style', `text-align: ${textAlign};`);
+            }
+
+            while (container.firstChild) {
+                p.appendChild(container.firstChild);
+            }
+
+            container.parentNode?.replaceChild(p, container);
+        }
     }
 
-    // 2. Normalize inline formatting
+    // 2. Normalize deprecated or alternate formatting tags
+    const bElements = Array.from(doc.querySelectorAll('b'));
+
+    for (const b of bElements) {
+        const strong = doc.createElement('strong');
+
+        while (b.firstChild) {
+            strong.appendChild(b.firstChild);
+        }
+
+        b.parentNode?.replaceChild(strong, b);
+    }
+
+    const iElements = Array.from(doc.querySelectorAll('i'));
+
+    for (const i of iElements) {
+        const em = doc.createElement('em');
+
+        while (i.firstChild) {
+            em.appendChild(i.firstChild);
+        }
+
+        i.parentNode?.replaceChild(em, i);
+    }
+
+    const insElements = Array.from(doc.querySelectorAll('ins'));
+
+    for (const ins of insElements) {
+        const u = doc.createElement('u');
+
+        while (ins.firstChild) {
+            u.appendChild(ins.firstChild);
+        }
+
+        ins.parentNode?.replaceChild(u, ins);
+    }
+
+    const strikeElements = Array.from(doc.querySelectorAll('strike, del'));
+
+    for (const strike of strikeElements) {
+        const s = doc.createElement('s');
+
+        while (strike.firstChild) {
+            s.appendChild(strike.firstChild);
+        }
+
+        strike.parentNode?.replaceChild(s, strike);
+    }
+
+    // 3. Extract formatting from inline styles (bold, italic, underline, strikethrough, text-align)
     const allElements = Array.from(doc.querySelectorAll('*'));
 
     for (const el of allElements) {
         const tagName = el.tagName.toLowerCase();
-
-        // Convert <b> to <strong>
-        if (tagName === 'b') {
-            const strong = doc.createElement('strong');
-
-            while (el.firstChild) {
-                strong.appendChild(el.firstChild);
-            }
-
-            el.parentNode?.replaceChild(strong, el);
-            continue;
-        }
-
-        // Convert <i> to <em>
-        if (tagName === 'i') {
-            const em = doc.createElement('em');
-
-            while (el.firstChild) {
-                em.appendChild(el.firstChild);
-            }
-
-            el.parentNode?.replaceChild(em, el);
-            continue;
-        }
-
-        // Convert <strike>, <del> to <s>
-        if (tagName === 'strike' || tagName === 'del') {
-            const s = doc.createElement('s');
-
-            while (el.firstChild) {
-                s.appendChild(el.firstChild);
-            }
-
-            el.parentNode?.replaceChild(s, el);
-            continue;
-        }
-
-        // Normalize style attribute
         const styleAttr = el.getAttribute('style') || '';
+        const alignAttr = el.getAttribute('align') || '';
+
+        // Check text-align on block elements
+        if (
+            ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'th', 'td'].includes(
+                tagName,
+            )
+        ) {
+            let textAlign: string | null = null;
+
+            const alignMatch = styleAttr.match(
+                /text-align:\s*(left|center|right|justify)/i,
+            );
+
+            if (alignMatch) {
+                textAlign = alignMatch[1].toLowerCase();
+            } else if (
+                alignAttr &&
+                ['left', 'center', 'right', 'justify'].includes(
+                    alignAttr.toLowerCase(),
+                )
+            ) {
+                textAlign = alignAttr.toLowerCase();
+            }
+
+            if (textAlign) {
+                el.setAttribute('style', `text-align: ${textAlign};`);
+            } else {
+                el.removeAttribute('style');
+            }
+        }
 
         if (styleAttr) {
-            const stylesToKeep: string[] = [];
-
-            // Check bold in inline style
             const isBold = /font-weight:\s*(bold|bolder|[6-9]\d\d)/i.test(
                 styleAttr,
             );
-            const isItalic = /font-style:\s*italic/i.test(styleAttr);
+            const isItalic = /font-style:\s*(italic|oblique)/i.test(styleAttr);
             const isUnderline = /text-decoration:\s*[^;]*underline/i.test(
                 styleAttr,
             );
@@ -465,101 +471,102 @@ function cleanInlineStylesAndElements(doc: Document): void {
                 styleAttr,
             );
 
-            // Check font-size
-            const sizeMatch = styleAttr.match(/font-size:\s*([^;]+)/i);
+            if (isBold || isItalic || isUnderline || isStrike) {
+                const fragment = doc.createDocumentFragment();
 
-            if (sizeMatch) {
-                const normSize = normalizeFontSize(sizeMatch[1]);
-
-                if (normSize) {
-                    stylesToKeep.push(`font-size: ${normSize}`);
+                while (el.firstChild) {
+                    fragment.appendChild(el.firstChild);
                 }
-            }
 
-            // Check line-height
-            const lhMatch = styleAttr.match(/line-height:\s*([^;]+)/i);
+                let wrapped: Node = fragment;
 
-            if (lhMatch) {
-                const normLh = normalizeLineHeight(lhMatch[1]);
-
-                if (normLh) {
-                    stylesToKeep.push(`line-height: ${normLh}`);
+                if (isStrike && tagName !== 's') {
+                    const s = doc.createElement('s');
+                    s.appendChild(wrapped);
+                    wrapped = s;
                 }
-            }
 
-            // Check text-align on block elements
-            if (
-                ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'th', 'td'].includes(
-                    tagName,
-                )
-            ) {
-                const alignMatch = styleAttr.match(
-                    /text-align:\s*(left|center|right|justify)/i,
-                );
-
-                if (alignMatch) {
-                    stylesToKeep.push(
-                        `text-align: ${alignMatch[1].toLowerCase()}`,
-                    );
+                if (isUnderline && tagName !== 'u') {
+                    const u = doc.createElement('u');
+                    u.appendChild(wrapped);
+                    wrapped = u;
                 }
-            }
 
-            // Apply cleaned styles
-            if (stylesToKeep.length > 0) {
-                el.setAttribute('style', stylesToKeep.join('; '));
-            } else {
-                el.removeAttribute('style');
-            }
+                if (isItalic && tagName !== 'em') {
+                    const em = doc.createElement('em');
+                    em.appendChild(wrapped);
+                    wrapped = em;
+                }
 
-            // Wrap element with semantic tags if styles were extracted
-            if (isBold && tagName !== 'strong') {
-                const strong = doc.createElement('strong');
-                el.parentNode?.insertBefore(strong, el);
-                strong.appendChild(el);
-            }
+                if (isBold && tagName !== 'strong') {
+                    const strong = doc.createElement('strong');
+                    strong.appendChild(wrapped);
+                    wrapped = strong;
+                }
 
-            if (isItalic && tagName !== 'em') {
-                const em = doc.createElement('em');
-                el.parentNode?.insertBefore(em, el);
-                em.appendChild(el);
-            }
-
-            if (isUnderline && tagName !== 'u') {
-                const u = doc.createElement('u');
-                el.parentNode?.insertBefore(u, el);
-                u.appendChild(el);
-            }
-
-            if (isStrike && tagName !== 's') {
-                const s = doc.createElement('s');
-                el.parentNode?.insertBefore(s, el);
-                s.appendChild(el);
+                el.appendChild(wrapped);
             }
         }
+    }
 
-        // Clean useless span elements without attributes
-        if (el.tagName.toLowerCase() === 'span' && el.attributes.length === 0) {
-            while (el.firstChild) {
-                el.parentNode?.insertBefore(el.firstChild, el);
-            }
+    // 4. Unwrap all <span>, <font>, <nobr> elements so paragraph text and semantic marks become direct children
+    let inlineWrappers = Array.from(doc.querySelectorAll('span, font, nobr'));
 
-            el.remove();
+    while (inlineWrappers.length > 0) {
+        for (const wrapper of inlineWrappers) {
+            unwrapElement(wrapper);
         }
 
-        // Strip non-whitelisted attributes
-        const allowedAttrsByTag: Record<string, string[]> = {
-            table: ['class'],
-            th: ['colspan', 'rowspan', 'style'],
-            td: ['colspan', 'rowspan', 'style'],
-            p: ['style'],
-            h1: ['style'],
-            h2: ['style'],
-            h3: ['style'],
-            h4: ['style'],
-            span: ['style'],
-            img: ['src', 'alt', 'width', 'height'],
-        };
+        inlineWrappers = Array.from(doc.querySelectorAll('span, font, nobr'));
+    }
 
+    // 5. Strip all non-whitelisted attributes across all elements
+    const allowedAttrsByTag: Record<string, string[]> = {
+        p: ['style'],
+        h1: ['style'],
+        h2: ['style'],
+        h3: ['style'],
+        h4: ['style'],
+        h5: ['style'],
+        h6: ['style'],
+        th: ['colspan', 'rowspan', 'style'],
+        td: ['colspan', 'rowspan', 'style'],
+        table: ['class', 'style'],
+        colgroup: ['style'],
+        col: ['style'],
+        ul: ['data-list-style-type', 'style'],
+        ol: ['start'],
+        img: [
+            'src',
+            'alt',
+            'width',
+            'height',
+            'data-align',
+            'data-caption',
+            'class',
+            'style',
+        ],
+        a: ['href', 'target', 'rel'],
+        strong: [],
+        em: [],
+        u: [],
+        s: [],
+        sub: [],
+        sup: [],
+        span: ['style'],
+        li: ['style'],
+        tbody: [],
+        tr: [],
+        blockquote: [],
+        code: [],
+        br: [],
+        hr: [],
+    };
+
+    const remainingElements = Array.from(doc.querySelectorAll('*'));
+
+    for (const el of remainingElements) {
+        const tagName = el.tagName.toLowerCase();
         const allowed = allowedAttrsByTag[tagName] || [];
         const attrs = Array.from(el.attributes).map((a) => a.name);
 
@@ -567,6 +574,149 @@ function cleanInlineStylesAndElements(doc: Document): void {
             if (!allowed.includes(attr)) {
                 el.removeAttribute(attr);
             }
+        }
+
+        // Clean style attribute if not valid for the tag
+        const styleAttr = el.getAttribute('style') || '';
+
+        if (styleAttr) {
+            if (
+                ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'].includes(
+                    tagName,
+                )
+            ) {
+                const styleParts: string[] = [];
+                const alignMatch = styleAttr.match(
+                    /text-align:\s*(left|center|right|justify)/i,
+                );
+
+                if (alignMatch) {
+                    styleParts.push(
+                        `text-align: ${alignMatch[1].toLowerCase()}`,
+                    );
+                }
+
+                if (styleAttr.includes('font-size') || tagName === 'li') {
+                    styleParts.push('font-size: 8pt');
+                }
+
+                if (styleParts.length > 0) {
+                    el.setAttribute('style', styleParts.join('; ') + ';');
+                } else {
+                    el.removeAttribute('style');
+                }
+            } else if (['th', 'td'].includes(tagName)) {
+                const alignMatch = styleAttr.match(
+                    /text-align:\s*(left|center|right|justify)/i,
+                );
+
+                if (alignMatch) {
+                    el.setAttribute(
+                        'style',
+                        `text-align: ${alignMatch[1].toLowerCase()};`,
+                    );
+                } else {
+                    el.removeAttribute('style');
+                }
+            } else if (tagName === 'span') {
+                el.setAttribute('style', 'font-size: 8pt;');
+            } else if (tagName === 'ul') {
+                const listStyleMatch = styleAttr.match(
+                    /list-style-type:\s*([a-z-]+)/i,
+                );
+
+                if (listStyleMatch) {
+                    el.setAttribute(
+                        'style',
+                        `list-style-type: ${listStyleMatch[1].toLowerCase()};`,
+                    );
+                } else {
+                    el.removeAttribute('style');
+                }
+            } else if (tagName === 'table') {
+                const minWidthMatch = styleAttr.match(/min-width:\s*([^;]+)/i);
+
+                if (minWidthMatch) {
+                    el.setAttribute(
+                        'style',
+                        `min-width: ${minWidthMatch[1].trim()};`,
+                    );
+                } else {
+                    el.removeAttribute('style');
+                }
+            } else if (!['img', 'colgroup', 'col'].includes(tagName)) {
+                el.removeAttribute('style');
+            }
+        }
+    }
+
+    // 6. Clean redundant nested marks and empty formatting tags
+    const formattingTags = ['strong', 'em', 'u', 's', 'sub', 'sup'];
+
+    for (const tag of formattingTags) {
+        const nestedSameTag = Array.from(doc.querySelectorAll(`${tag} ${tag}`));
+
+        for (const inner of nestedSameTag) {
+            unwrapElement(inner);
+        }
+    }
+
+    // Remove empty formatting tags (e.g. <strong></strong> or <em> </em> if purely whitespace and no children)
+    for (const tag of formattingTags) {
+        const elems = Array.from(doc.querySelectorAll(tag));
+
+        for (const elem of elems) {
+            if (!elem.hasChildNodes() || elem.textContent?.trim() === '') {
+                if (elem.querySelectorAll('img, br').length === 0) {
+                    if (elem.textContent && elem.textContent.length > 0) {
+                        elem.parentNode?.replaceChild(
+                            doc.createTextNode(elem.textContent),
+                            elem,
+                        );
+                    } else {
+                        elem.remove();
+                    }
+                }
+            }
+        }
+    }
+
+    // 7. Ensure all text inside paragraphs (in lists, tables, and body) has font-size: 8pt and is wrapped with TipTap's textStyle mark: <span style="font-size: 8pt;">
+    const paragraphs = Array.from(doc.querySelectorAll('p'));
+
+    for (const p of paragraphs) {
+        if (!p.hasChildNodes() || p.textContent?.trim() === '') {
+            continue;
+        }
+
+        const existingStyle = p.getAttribute('style') || '';
+        const alignMatch = existingStyle.match(
+            /text-align:\s*(left|center|right|justify)/i,
+        );
+        const styleParts: string[] = [];
+
+        if (alignMatch) {
+            styleParts.push(`text-align: ${alignMatch[1].toLowerCase()}`);
+        }
+        styleParts.push('font-size: 8pt');
+
+        p.setAttribute('style', styleParts.join('; ') + ';');
+
+        const existingSpans = Array.from(p.querySelectorAll('span'));
+
+        if (existingSpans.length > 0) {
+            for (const sp of existingSpans) {
+                sp.setAttribute('style', 'font-size: 8pt;');
+            }
+        } else {
+            const span = doc.createElement('span');
+            span.setAttribute('style', 'font-size: 8pt;');
+
+            while (p.firstChild) {
+                span.appendChild(p.firstChild);
+            }
+
+            p.appendChild(span);
         }
     }
 }
@@ -596,7 +746,7 @@ export function cleanPastedHtml(html: string): string {
         // Stage 4: Convert Lists
         cleanLists(doc);
 
-        // Stage 5: Clean Inline Styles & Disallowed Elements
+        // Stage 5: Clean Inline Styles, Unwrap Spans & Normalize Semantic Elements
         cleanInlineStylesAndElements(doc);
 
         // Stage 6: Return clean inner HTML

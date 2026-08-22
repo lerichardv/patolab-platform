@@ -2,7 +2,7 @@ import { PDFViewer } from '@embedpdf/react-pdf-viewer';
 import type { DropResult } from '@hello-pangea/dnd';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { HocuspocusProvider } from '@hocuspocus/provider';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 
 import type { Editor } from '@tiptap/react';
 import {
@@ -104,6 +104,7 @@ import {
     saveReportEditor,
 } from './actions';
 import LivePdfPreview from './live-pdf-preview';
+import { DebugReportProvider } from './page-preview/debug';
 import PagePreview from './page-preview/page';
 import SpecimenInsumosCard from './specimen-insumos-card';
 import { EditorToolbar } from './toolbar';
@@ -1773,6 +1774,7 @@ export default function ReportWorkspace({
             (isFinished && sessionEditingEnabled)) &&
         hasMicroAccess;
     const totalPages = pages.length > 0 ? pages.length : 1;
+    const { debugReport } = usePage().props as { debugReport?: boolean };
 
     const renderPreviewPage = (pageNum: number) => {
         const pageBlocks = pages[pageNum - 1] || [];
@@ -1793,1242 +1795,1267 @@ export default function ReportWorkspace({
     };
 
     return (
-        <EditorRegistryContext.Provider value={{ registerEditor }}>
-            <EditorLayout
-                breadcrumbs={[
-                    { title: 'Mis Asignaciones', href: '/my-assignments' },
-                    {
-                        title: specimen.sequence_code,
-                        href: `/specimens?specimen=${specimen.sequence_code}&action=view`,
-                    },
-                    { title: 'Editor de Informe', href: '#' },
-                ]}
-                headerRight={
-                    <div className="flex items-center gap-3">
-                        <CollaboratorsList users={allCollaborators} />
-                        <div className="h-6 w-px bg-border/80" />
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
-                            {globalSaveState === 'saving' ? (
-                                <>
-                                    <div className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
-                                    <span className="animate-pulse font-medium text-amber-600 dark:text-amber-500">
+        <DebugReportProvider pagePropsDebugReport={debugReport}>
+            <EditorRegistryContext.Provider value={{ registerEditor }}>
+                <EditorLayout
+                    breadcrumbs={[
+                        { title: 'Mis Asignaciones', href: '/my-assignments' },
+                        {
+                            title: specimen.sequence_code,
+                            href: `/specimens?specimen=${specimen.sequence_code}&action=view`,
+                        },
+                        { title: 'Editor de Informe', href: '#' },
+                    ]}
+                    headerRight={
+                        <div className="flex items-center gap-3">
+                            <CollaboratorsList users={allCollaborators} />
+                            <div className="h-6 w-px bg-border/80" />
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
+                                {globalSaveState === 'saving' ? (
+                                    <>
+                                        <div className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+                                        <span className="animate-pulse font-medium text-amber-600 dark:text-amber-500">
+                                            Guardando...
+                                        </span>
+                                    </>
+                                ) : isAutosaving ? (
+                                    <>
+                                        <div className="h-2 w-2 animate-pulse rounded-full bg-indigo-500" />
+                                        <span className="animate-pulse font-medium text-indigo-600 dark:text-indigo-500">
+                                            Escribiendo...
+                                        </span>
+                                    </>
+                                ) : globalSaveState === 'saved' ||
+                                  isSavedRecently ? (
+                                    <>
+                                        <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                                        <span className="font-medium text-emerald-600 dark:text-emerald-500">
+                                            ¡Guardado!
+                                        </span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                                        <span className="font-medium text-emerald-600 dark:text-emerald-500">
+                                            {timeString}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                            <button
+                                data-slot="button"
+                                onClick={handleManualSave}
+                                disabled={
+                                    globalSaveState === 'saving' ||
+                                    globalSaveState === 'saved' ||
+                                    isSavedRecently ||
+                                    isAutosaving
+                                }
+                                className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-emerald-600 px-5 py-2 text-sm font-medium whitespace-nowrap text-white shadow-xs transition-[color,box-shadow] outline-none hover:bg-emerald-600/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 has-[>svg]:px-3 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:w-auto dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+                            >
+                                {globalSaveState === 'saving' ? (
+                                    <>
+                                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                                         Guardando...
-                                    </span>
-                                </>
-                            ) : isAutosaving ? (
-                                <>
-                                    <div className="h-2 w-2 animate-pulse rounded-full bg-indigo-500" />
-                                    <span className="animate-pulse font-medium text-indigo-600 dark:text-indigo-500">
-                                        Escribiendo...
-                                    </span>
-                                </>
-                            ) : globalSaveState === 'saved' ||
-                              isSavedRecently ? (
-                                <>
-                                    <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-                                    <span className="font-medium text-emerald-600 dark:text-emerald-500">
+                                    </>
+                                ) : globalSaveState === 'saved' ||
+                                  isSavedRecently ? (
+                                    <>
+                                        <Check className="mr-1 h-4 w-4 text-white" />
                                         ¡Guardado!
-                                    </span>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                                    <span className="font-medium text-emerald-600 dark:text-emerald-500">
-                                        {timeString}
-                                    </span>
-                                </>
-                            )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="mr-1 h-4 w-4" />
+                                        Guardar
+                                    </>
+                                )}
+                            </button>
                         </div>
-                        <button
-                            data-slot="button"
-                            onClick={handleManualSave}
-                            disabled={
-                                globalSaveState === 'saving' ||
-                                globalSaveState === 'saved' ||
-                                isSavedRecently ||
-                                isAutosaving
-                            }
-                            className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-emerald-600 px-5 py-2 text-sm font-medium whitespace-nowrap text-white shadow-xs transition-[color,box-shadow] outline-none hover:bg-emerald-600/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 has-[>svg]:px-3 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:w-auto dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-                        >
-                            {globalSaveState === 'saving' ? (
-                                <>
-                                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                                    Guardando...
-                                </>
-                            ) : globalSaveState === 'saved' ||
-                              isSavedRecently ? (
-                                <>
-                                    <Check className="mr-1 h-4 w-4 text-white" />
-                                    ¡Guardado!
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="mr-1 h-4 w-4" />
-                                    Guardar
-                                </>
-                            )}
-                        </button>
-                    </div>
-                }
-            >
-                <Head title={`Editor de Informe - ${specimen.sequence_code}`} />
-                <style dangerouslySetInnerHTML={{ __html: editorStyles }} />
+                    }
+                >
+                    <Head
+                        title={`Editor de Informe - ${specimen.sequence_code}`}
+                    />
+                    <style dangerouslySetInnerHTML={{ __html: editorStyles }} />
 
-                <div className="h-[100vh] items-start bg-slate-50/50 dark:bg-slate-900/10">
-                    {/* LEFT COLUMN: Inputs and Editors */}
-                    <div className="h-[calc(100vh-64px)] w-screen overflow-auto lg:w-[50vw]">
-                        {/* Header bar with Back button and Status Badge */}
-                        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
-                            <div className="flex items-center gap-3">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() =>
-                                        router.visit('/my-assignments')
-                                    }
-                                    className="h-8 w-8 cursor-pointer"
-                                >
-                                    <ArrowLeft className="h-4 w-4" />
-                                </Button>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <div>
-                                            <h1 className="text-xl font-bold tracking-tight">
-                                                Editor de Informe
-                                            </h1>
-                                            <p className="text-xs text-muted-foreground">
-                                                {specimen.type.name} &bull;{' '}
-                                                {specimen.examination.name}
+                    <div className="h-[100vh] items-start bg-slate-50/50 dark:bg-slate-900/10">
+                        {/* LEFT COLUMN: Inputs and Editors */}
+                        <div className="h-[calc(100vh-64px)] w-screen overflow-auto lg:w-[50vw]">
+                            {/* Header bar with Back button and Status Badge */}
+                            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() =>
+                                            router.visit('/my-assignments')
+                                        }
+                                        className="h-8 w-8 cursor-pointer"
+                                    >
+                                        <ArrowLeft className="h-4 w-4" />
+                                    </Button>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <div>
+                                                <h1 className="text-xl font-bold tracking-tight">
+                                                    Editor de Informe
+                                                </h1>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {specimen.type.name} &bull;{' '}
+                                                    {specimen.examination.name}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {isFinished && !sessionEditingEnabled && (
+                                        <EnableEditingDialog
+                                            onConfirm={() => {
+                                                setSessionEditingEnabled(true);
+                                                toast.success(
+                                                    'Edición activada para esta sesión',
+                                                );
+                                            }}
+                                        />
+                                    )}
+                                    {isFinished && sessionEditingEnabled && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="animate-pulse rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-amber-600 uppercase dark:text-amber-400">
+                                                Edición Activa
+                                            </span>
+                                            <Button
+                                                onClick={
+                                                    handleStartMicroscopyFinalization
+                                                }
+                                                disabled={isGeneratingPdf}
+                                                size="sm"
+                                                className="cursor-pointer gap-2 bg-fuchsia-600 font-semibold text-white shadow-sm hover:bg-fuchsia-700"
+                                            >
+                                                {isGeneratingPdf ? (
+                                                    <>
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                        <span>
+                                                            Generando...
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Check className="h-4 w-4" />
+                                                        <span>
+                                                            Finalizar Reporte
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    )}
+                                    <div className="flex flex-col items-end gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] tracking-tight text-muted-foreground uppercase">
+                                                Fase actual
+                                            </span>
+                                            <span
+                                                className="rounded-full px-2.5 py-1 text-xs font-semibold tracking-wider uppercase"
+                                                style={{
+                                                    backgroundColor:
+                                                        specimen.status ===
+                                                        'macroscopic_review'
+                                                            ? '#8b5cf620'
+                                                            : specimen.status ===
+                                                                'processing'
+                                                              ? '#f59e0b20'
+                                                              : specimen.status ===
+                                                                  'microscopic_review'
+                                                                ? '#d946ef20'
+                                                                : '#10b98120',
+                                                    color:
+                                                        specimen.status ===
+                                                        'macroscopic_review'
+                                                            ? '#8b5cf6'
+                                                            : specimen.status ===
+                                                                'processing'
+                                                              ? '#d97706'
+                                                              : specimen.status ===
+                                                                  'microscopic_review'
+                                                                ? '#d946ef'
+                                                                : '#059669',
+                                                    border: `1px solid ${specimen.status === 'macroscopic_review' ? '#8b5cf630' : specimen.status === 'processing' ? '#d9770630' : specimen.status === 'microscopic_review' ? '#d946ef30' : '#05966930'}`,
+                                                }}
+                                            >
+                                                {specimen.status ===
+                                                'macroscopic_review'
+                                                    ? 'Macroscopía'
+                                                    : specimen.status ===
+                                                        'processing'
+                                                      ? 'Procesando'
+                                                      : specimen.status ===
+                                                          'microscopic_review'
+                                                        ? 'Microscopía'
+                                                        : 'Finalizado'}
+                                            </span>
+                                            {hasCuttingsPermission && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 cursor-pointer text-violet-600 hover:bg-violet-100 hover:text-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/30"
+                                                    onClick={() =>
+                                                        setIsManageCuttingsOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                    title="Gestionar Cortes"
+                                                >
+                                                    <Scissors className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] tracking-tight text-muted-foreground uppercase">
+                                                Su acceso:
+                                            </span>
+                                            <span
+                                                className="text-[11px] font-bold tracking-wider uppercase"
+                                                style={{
+                                                    color: accessBadgeStyle.color,
+                                                }}
+                                            >
+                                                {accessBadgeLabel}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Sticky Contextual Formatting Toolbar */}
+                            {activeEditor && (
+                                <div className="sticky top-[93px] z-10 bg-background/95 transition-all duration-205">
+                                    <div className="justify-strech flex items-center border-b border-border bg-muted/40 px-6">
+                                        <div className="flex min-h-[36px] w-full justify-between overflow-x-auto">
+                                            <EditorToolbar
+                                                editor={activeEditor}
+                                                specimenSequenceCode={
+                                                    specimen.sequence_code
+                                                }
+                                                reportId={report?.id ?? 0}
+                                                field={activeField}
+                                                isSheetOpen={isAISheetOpen}
+                                                onSheetOpenChange={
+                                                    updateAISheetOpen
+                                                }
+                                                onPopoverOpenChange={
+                                                    updatePopoverOpen
+                                                }
+                                                isDictationSheetOpen={
+                                                    isDictationSheetOpen
+                                                }
+                                                onDictationSheetOpenChange={
+                                                    updateDictationSheetOpen
+                                                }
+                                            />
+                                        </div>
+
+                                        {activeField && (
+                                            <div className="flex h-[36px] items-center">
+                                                <div className="flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs font-semibold">
+                                                    <div
+                                                        className={cn(
+                                                            'h-2 w-2 rounded-full',
+                                                            activeField ===
+                                                                'diagnosis' &&
+                                                                'animate-pulse bg-blue-500',
+                                                            activeField ===
+                                                                'macroscopy' &&
+                                                                'animate-pulse bg-violet-500',
+                                                            activeField ===
+                                                                'microscopy' &&
+                                                                'animate-pulse bg-fuchsia-500',
+                                                        )}
+                                                    />
+                                                    <span className="text-[9px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                        {activeField ===
+                                                        'diagnosis'
+                                                            ? 'Diagnóstico'
+                                                            : activeField ===
+                                                                'macroscopy'
+                                                              ? 'Macroscopía'
+                                                              : 'Microscopía'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex flex-col gap-5 p-6">
+                                {/* Specimen and Customer Summary Card */}
+                                <div className="relative rounded-xl border border-border/80 bg-card p-5 shadow-xs">
+                                    <div className="mb-3 flex items-center justify-between">
+                                        <h3 className="text-md flex items-center gap-2 font-semibold text-primary">
+                                            <UserRound className="h-4 w-4" />{' '}
+                                            Resumen de Paciente y Muestra{' '}
+                                            {specimen.sequence_code}
+                                        </h3>
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() =>
+                                                    setIsSpecimenSheetOpen(true)
+                                                }
+                                                className="h-7 w-7 cursor-pointer rounded-full text-muted-foreground hover:bg-primary/5 hover:text-primary"
+                                                title="Ver detalles de la muestra"
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                            {(canEditSpecimen ||
+                                                canEditCustomer ||
+                                                canEditReferrer) && (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger
+                                                        asChild
+                                                    >
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7 cursor-pointer rounded-full text-muted-foreground hover:bg-primary/5 hover:text-primary"
+                                                            title="Acciones de edición"
+                                                        >
+                                                            <MoreVertical className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        {canEditSpecimen && (
+                                                            <DropdownMenuItem
+                                                                onClick={() =>
+                                                                    setIsEditSpecimenOpen(
+                                                                        true,
+                                                                    )
+                                                                }
+                                                                className="cursor-pointer"
+                                                            >
+                                                                <Edit className="mr-2 h-4 w-4" />
+                                                                <span>
+                                                                    Editar
+                                                                    Muestra
+                                                                </span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {canEditCustomer && (
+                                                            <DropdownMenuItem
+                                                                onClick={() =>
+                                                                    setIsEditCustomerOpen(
+                                                                        true,
+                                                                    )
+                                                                }
+                                                                className="cursor-pointer"
+                                                            >
+                                                                <UserRound className="mr-2 h-4 w-4" />
+                                                                <span>
+                                                                    Editar
+                                                                    Paciente
+                                                                </span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {canEditReferrer && (
+                                                            <DropdownMenuItem
+                                                                onClick={() =>
+                                                                    setIsEditReferrerOpen(
+                                                                        true,
+                                                                    )
+                                                                }
+                                                                className="cursor-pointer"
+                                                            >
+                                                                <UserPlus className="mr-2 h-4 w-4" />
+                                                                <span>
+                                                                    Editar
+                                                                    Remitente
+                                                                </span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="mb-3 grid grid-cols-1 gap-4 text-xs md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <p>
+                                                <span className="font-medium text-muted-foreground">
+                                                    Paciente:
+                                                </span>{' '}
+                                                <strong className="text-card-foreground">
+                                                    {
+                                                        specimen
+                                                            .customer_relation
+                                                            .name
+                                                    }{' '}
+                                                    (
+                                                    {specimen.customer_relation
+                                                        .type === 'empresa'
+                                                        ? 'Empresa'
+                                                        : 'Cliente'}
+                                                    )
+                                                </strong>
+                                            </p>
+                                            <p>
+                                                <span className="font-medium text-muted-foreground">
+                                                    Edad / Sexo:
+                                                </span>{' '}
+                                                <strong className="text-card-foreground">
+                                                    {specimen.customer_relation
+                                                        .age ?? 'N/A'}{' '}
+                                                    años (
+                                                    {
+                                                        specimen
+                                                            .customer_relation
+                                                            .gender
+                                                    }
+                                                    )
+                                                </strong>
+                                            </p>
+                                            <p>
+                                                <span className="font-medium text-muted-foreground">
+                                                    Médico Remitente:
+                                                </span>{' '}
+                                                <strong className="text-card-foreground">
+                                                    {
+                                                        specimen
+                                                            .referrer_relation
+                                                            .name
+                                                    }
+                                                </strong>
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <p>
+                                                <span className="font-medium text-muted-foreground">
+                                                    Tipo:
+                                                </span>{' '}
+                                                <strong className="text-card-foreground">
+                                                    {specimen.type.name} -{' '}
+                                                    {specimen.examination.name}
+                                                </strong>
+                                            </p>
+                                            <p>
+                                                <span className="font-medium text-muted-foreground">
+                                                    Diagnóstico Clínico:
+                                                </span>{' '}
+                                                <strong className="text-card-foreground">
+                                                    {specimen.diagnosis ||
+                                                        'N/A'}
+                                                </strong>
+                                            </p>
+                                            <p>
+                                                <span className="font-medium text-muted-foreground">
+                                                    Sitio Anatómico:
+                                                </span>{' '}
+                                                <strong className="text-card-foreground">
+                                                    {specimen.anatomic_site ||
+                                                        'N/A'}
+                                                </strong>
                                             </p>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {isFinished && !sessionEditingEnabled && (
-                                    <EnableEditingDialog
-                                        onConfirm={() => {
-                                            setSessionEditingEnabled(true);
-                                            toast.success(
-                                                'Edición activada para esta sesión',
-                                            );
-                                        }}
-                                    />
-                                )}
-                                {isFinished && sessionEditingEnabled && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="animate-pulse rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-amber-600 uppercase dark:text-amber-400">
-                                            Edición Activa
-                                        </span>
-                                        <Button
-                                            onClick={
-                                                handleStartMicroscopyFinalization
-                                            }
-                                            disabled={isGeneratingPdf}
-                                            size="sm"
-                                            className="cursor-pointer gap-2 bg-fuchsia-600 font-semibold text-white shadow-sm hover:bg-fuchsia-700"
-                                        >
-                                            {isGeneratingPdf ? (
-                                                <>
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                    <span>Generando...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Check className="h-4 w-4" />
-                                                    <span>
-                                                        Finalizar Reporte
-                                                    </span>
-                                                </>
-                                            )}
-                                        </Button>
-                                    </div>
-                                )}
-                                <div className="flex flex-col items-end gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] tracking-tight text-muted-foreground uppercase">
-                                            Fase actual
-                                        </span>
-                                        <span
-                                            className="rounded-full px-2.5 py-1 text-xs font-semibold tracking-wider uppercase"
-                                            style={{
-                                                backgroundColor:
-                                                    specimen.status ===
-                                                    'macroscopic_review'
-                                                        ? '#8b5cf620'
-                                                        : specimen.status ===
-                                                            'processing'
-                                                          ? '#f59e0b20'
-                                                          : specimen.status ===
-                                                              'microscopic_review'
-                                                            ? '#d946ef20'
-                                                            : '#10b98120',
-                                                color:
-                                                    specimen.status ===
-                                                    'macroscopic_review'
-                                                        ? '#8b5cf6'
-                                                        : specimen.status ===
-                                                            'processing'
-                                                          ? '#d97706'
-                                                          : specimen.status ===
-                                                              'microscopic_review'
-                                                            ? '#d946ef'
-                                                            : '#059669',
-                                                border: `1px solid ${specimen.status === 'macroscopic_review' ? '#8b5cf630' : specimen.status === 'processing' ? '#d9770630' : specimen.status === 'microscopic_review' ? '#d946ef30' : '#05966930'}`,
-                                            }}
-                                        >
-                                            {specimen.status ===
-                                            'macroscopic_review'
-                                                ? 'Macroscopía'
-                                                : specimen.status ===
-                                                    'processing'
-                                                  ? 'Procesando'
-                                                  : specimen.status ===
-                                                      'microscopic_review'
-                                                    ? 'Microscopía'
-                                                    : 'Finalizado'}
-                                        </span>
-                                        {hasCuttingsPermission && (
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7 cursor-pointer text-violet-600 hover:bg-violet-100 hover:text-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/30"
-                                                onClick={() =>
-                                                    setIsManageCuttingsOpen(
-                                                        true,
-                                                    )
-                                                }
-                                                title="Gestionar Cortes"
+
+                                    <div className="flex w-full flex-row flex-nowrap items-center justify-stretch gap-5 pt-3">
+                                        <div className="flex w-full flex-col items-start gap-1.5">
+                                            <label
+                                                htmlFor="report-date"
+                                                className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-foreground"
                                             >
-                                                <Scissors className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] tracking-tight text-muted-foreground uppercase">
-                                            Su acceso:
-                                        </span>
-                                        <span
-                                            className="text-[11px] font-bold tracking-wider uppercase"
-                                            style={{
-                                                color: accessBadgeStyle.color,
-                                            }}
-                                        >
-                                            {accessBadgeLabel}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Sticky Contextual Formatting Toolbar */}
-                        {activeEditor && (
-                            <div className="sticky top-[93px] z-10 bg-background/95 transition-all duration-205">
-                                <div className="justify-strech flex items-center border-b border-border bg-muted/40 px-6">
-                                    <div className="flex min-h-[36px] w-full justify-between overflow-x-auto">
-                                        <EditorToolbar
-                                            editor={activeEditor}
-                                            specimenSequenceCode={
-                                                specimen.sequence_code
-                                            }
-                                            reportId={report?.id ?? 0}
-                                            field={activeField}
-                                            isSheetOpen={isAISheetOpen}
-                                            onSheetOpenChange={
-                                                updateAISheetOpen
-                                            }
-                                            onPopoverOpenChange={
-                                                updatePopoverOpen
-                                            }
-                                            isDictationSheetOpen={
-                                                isDictationSheetOpen
-                                            }
-                                            onDictationSheetOpenChange={
-                                                updateDictationSheetOpen
-                                            }
-                                        />
-                                    </div>
-
-                                    {activeField && (
-                                        <div className="flex h-[36px] items-center">
-                                            <div className="flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs font-semibold">
-                                                <div
-                                                    className={cn(
-                                                        'h-2 w-2 rounded-full',
-                                                        activeField ===
-                                                            'diagnosis' &&
-                                                            'animate-pulse bg-blue-500',
-                                                        activeField ===
-                                                            'macroscopy' &&
-                                                            'animate-pulse bg-violet-500',
-                                                        activeField ===
-                                                            'microscopy' &&
-                                                            'animate-pulse bg-fuchsia-500',
-                                                    )}
+                                                <Calendar className="h-4 w-4 text-muted-foreground" />{' '}
+                                                Fecha de Recepción
+                                            </label>
+                                            <div className="w-full">
+                                                <DatePicker
+                                                    value={reportDate}
+                                                    disabled={
+                                                        (isFinished &&
+                                                            !sessionEditingEnabled) ||
+                                                        (!hasMacroAccess &&
+                                                            !hasMicroAccess)
+                                                    }
+                                                    onChange={handleUpdateDate}
                                                 />
-                                                <span className="text-[9px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                    {activeField === 'diagnosis'
-                                                        ? 'Diagnóstico'
-                                                        : activeField ===
-                                                            'macroscopy'
-                                                          ? 'Macroscopía'
-                                                          : 'Microscopía'}
-                                                </span>
                                             </div>
                                         </div>
-                                    )}
+                                        <div className="flex w-full flex-col items-start gap-1.5">
+                                            <label
+                                                htmlFor="sample-collection-date"
+                                                className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-foreground"
+                                            >
+                                                <Calendar className="h-4 w-4 text-muted-foreground" />{' '}
+                                                Fecha de la toma
+                                            </label>
+                                            <div className="w-full">
+                                                <DatePicker
+                                                    value={sampleCollectionDate}
+                                                    disabled={
+                                                        (isFinished &&
+                                                            !sessionEditingEnabled) ||
+                                                        (!hasMacroAccess &&
+                                                            !hasMicroAccess)
+                                                    }
+                                                    onChange={
+                                                        handleUpdateSampleCollectionDate
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex w-full flex-col items-start gap-1.5">
+                                            <label
+                                                htmlFor="finalization-date"
+                                                className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-foreground"
+                                            >
+                                                <Calendar className="h-4 w-4 text-muted-foreground" />{' '}
+                                                Fecha de finalización
+                                            </label>
+                                            <div className="w-full">
+                                                <DatePicker
+                                                    value={finalizationDate}
+                                                    disabled={
+                                                        (isFinished &&
+                                                            !sessionEditingEnabled) ||
+                                                        (!hasMacroAccess &&
+                                                            !hasMicroAccess)
+                                                    }
+                                                    onChange={
+                                                        handleUpdateFinalizationDate
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
 
-                        <div className="flex flex-col gap-5 p-6">
-                            {/* Specimen and Customer Summary Card */}
-                            <div className="relative rounded-xl border border-border/80 bg-card p-5 shadow-xs">
-                                <div className="mb-3 flex items-center justify-between">
-                                    <h3 className="text-md flex items-center gap-2 font-semibold text-primary">
-                                        <UserRound className="h-4 w-4" />{' '}
-                                        Resumen de Paciente y Muestra{' '}
-                                        {specimen.sequence_code}
-                                    </h3>
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() =>
-                                                setIsSpecimenSheetOpen(true)
-                                            }
-                                            className="h-7 w-7 cursor-pointer rounded-full text-muted-foreground hover:bg-primary/5 hover:text-primary"
-                                            title="Ver detalles de la muestra"
-                                        >
-                                            <Eye className="h-4 w-4" />
-                                        </Button>
-                                        {(canEditSpecimen ||
-                                            canEditCustomer ||
-                                            canEditReferrer) && (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-7 w-7 cursor-pointer rounded-full text-muted-foreground hover:bg-primary/5 hover:text-primary"
-                                                        title="Acciones de edición"
-                                                    >
-                                                        <MoreVertical className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    {canEditSpecimen && (
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                setIsEditSpecimenOpen(
-                                                                    true,
-                                                                )
+                                <SpecimenInsumosCard
+                                    specimen={specimen}
+                                    products={products}
+                                    isFinished={isFinished}
+                                    sessionEditingEnabled={
+                                        sessionEditingEnabled
+                                    }
+                                    hasMacroAccess={hasMacroAccess}
+                                    hasMicroAccess={hasMicroAccess}
+                                />
+
+                                {/* Template Selector */}
+                                <TemplateSelector
+                                    templates={templates}
+                                    isFinished={isFinished}
+                                    hasMacroAccess={hasMacroAccess}
+                                    hasMicroAccess={hasMicroAccess}
+                                    onApplyTemplate={handleApplyTemplate}
+                                />
+
+                                <DragDropContext onDragEnd={handleDragEnd}>
+                                    <Droppable droppableId="report-editors">
+                                        {(provided) => (
+                                            <div
+                                                {...provided.droppableProps}
+                                                ref={provided.innerRef}
+                                                className="space-y-6"
+                                            >
+                                                {sectionsOrder.map(
+                                                    (section, index) => (
+                                                        <Draggable
+                                                            key={section.key}
+                                                            draggableId={
+                                                                section.key
                                                             }
-                                                            className="cursor-pointer"
-                                                        >
-                                                            <Edit className="mr-2 h-4 w-4" />
-                                                            <span>
-                                                                Editar Muestra
-                                                            </span>
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    {canEditCustomer && (
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                setIsEditCustomerOpen(
-                                                                    true,
-                                                                )
+                                                            index={index}
+                                                            isDragDisabled={
+                                                                !hasMacroAccess &&
+                                                                !hasMicroAccess
                                                             }
-                                                            className="cursor-pointer"
                                                         >
-                                                            <UserRound className="mr-2 h-4 w-4" />
-                                                            <span>
-                                                                Editar Paciente
-                                                            </span>
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    {canEditReferrer && (
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                setIsEditReferrerOpen(
-                                                                    true,
-                                                                )
-                                                            }
-                                                            className="cursor-pointer"
-                                                        >
-                                                            <UserPlus className="mr-2 h-4 w-4" />
-                                                            <span>
-                                                                Editar Remitente
-                                                            </span>
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                                            {(
+                                                                provided,
+                                                                snapshot,
+                                                            ) => (
+                                                                <div
+                                                                    ref={
+                                                                        provided.innerRef
+                                                                    }
+                                                                    {...provided.draggableProps}
+                                                                    className={cn(
+                                                                        'space-y-3 rounded-xl border border-transparent transition-all duration-200',
+                                                                        snapshot.isDragging &&
+                                                                            'rotate-1 border-primary/20 bg-card/65 shadow-lg ring-1 ring-primary/10 backdrop-blur-xs',
+                                                                    )}
+                                                                >
+                                                                    {section.key ===
+                                                                        'clinical_details_html' && (
+                                                                        <ClinicalDetailsEditor
+                                                                            reportId={
+                                                                                report.id
+                                                                            }
+                                                                            specimen={
+                                                                                specimen
+                                                                            }
+                                                                            auth={
+                                                                                auth
+                                                                            }
+                                                                            clinicalDetailsHtml={
+                                                                                clinicalDetailsHtml
+                                                                            }
+                                                                            setClinicalDetailsHtml={
+                                                                                setClinicalDetailsHtml
+                                                                            }
+                                                                            setClinicalDetailsUsers={
+                                                                                setClinicalDetailsUsers
+                                                                            }
+                                                                            clinicalDetailsDoc={
+                                                                                clinicalDetailsDoc
+                                                                            }
+                                                                            clinicalDetailsProvider={
+                                                                                clinicalDetailsProvider
+                                                                            }
+                                                                            headingsToggles={
+                                                                                headingsToggles
+                                                                            }
+                                                                            handleHeadingToggle={
+                                                                                handleHeadingToggle
+                                                                            }
+                                                                            isAssigned={
+                                                                                isAssigned
+                                                                            }
+                                                                            isFinished={
+                                                                                isFinished
+                                                                            }
+                                                                            sessionEditingEnabled={
+                                                                                sessionEditingEnabled
+                                                                            }
+                                                                            hasMacroAccess={
+                                                                                hasMacroAccess
+                                                                            }
+                                                                            hasMicroAccess={
+                                                                                hasMicroAccess
+                                                                            }
+                                                                            handleEditorFocus={
+                                                                                handleEditorFocus
+                                                                            }
+                                                                            handleEditorBlur={
+                                                                                handleEditorBlur
+                                                                            }
+                                                                            dragHandleProps={
+                                                                                provided.dragHandleProps
+                                                                            }
+                                                                        />
+                                                                    )}
+
+                                                                    {section.key ===
+                                                                        'diagnosis_html' && (
+                                                                        <DiagnosisEditor
+                                                                            reportId={
+                                                                                report.id
+                                                                            }
+                                                                            specimen={
+                                                                                specimen
+                                                                            }
+                                                                            auth={
+                                                                                auth
+                                                                            }
+                                                                            diagnosisHtml={
+                                                                                diagnosisHtml
+                                                                            }
+                                                                            setDiagnosisHtml={
+                                                                                setDiagnosisHtml
+                                                                            }
+                                                                            setDiagnosisUsers={
+                                                                                setDiagnosisUsers
+                                                                            }
+                                                                            diagnosisDoc={
+                                                                                diagnosisDoc
+                                                                            }
+                                                                            diagnosisProvider={
+                                                                                diagnosisProvider
+                                                                            }
+                                                                            headingsToggles={
+                                                                                headingsToggles
+                                                                            }
+                                                                            handleHeadingToggle={
+                                                                                handleHeadingToggle
+                                                                            }
+                                                                            isAssigned={
+                                                                                isAssigned
+                                                                            }
+                                                                            isFinished={
+                                                                                isFinished
+                                                                            }
+                                                                            sessionEditingEnabled={
+                                                                                sessionEditingEnabled
+                                                                            }
+                                                                            hasMacroAccess={
+                                                                                hasMacroAccess
+                                                                            }
+                                                                            hasMicroAccess={
+                                                                                hasMicroAccess
+                                                                            }
+                                                                            handleEditorFocus={
+                                                                                handleEditorFocus
+                                                                            }
+                                                                            handleEditorBlur={
+                                                                                handleEditorBlur
+                                                                            }
+                                                                            dragHandleProps={
+                                                                                provided.dragHandleProps
+                                                                            }
+                                                                        />
+                                                                    )}
+
+                                                                    {section.key ===
+                                                                        'macroscopy_html' && (
+                                                                        <MacroscopyEditor
+                                                                            reportId={
+                                                                                report.id
+                                                                            }
+                                                                            specimen={
+                                                                                specimen
+                                                                            }
+                                                                            auth={
+                                                                                auth
+                                                                            }
+                                                                            macroscopyHtml={
+                                                                                macroscopyHtml
+                                                                            }
+                                                                            setMacroscopyHtml={
+                                                                                setMacroscopyHtml
+                                                                            }
+                                                                            setMacroscopyUsers={
+                                                                                setMacroscopyUsers
+                                                                            }
+                                                                            macroscopyDoc={
+                                                                                macroscopyDoc
+                                                                            }
+                                                                            macroscopyProvider={
+                                                                                macroscopyProvider
+                                                                            }
+                                                                            headingsToggles={
+                                                                                headingsToggles
+                                                                            }
+                                                                            handleHeadingToggle={
+                                                                                handleHeadingToggle
+                                                                            }
+                                                                            isAssigned={
+                                                                                isAssigned
+                                                                            }
+                                                                            isFinished={
+                                                                                isFinished
+                                                                            }
+                                                                            sessionEditingEnabled={
+                                                                                sessionEditingEnabled
+                                                                            }
+                                                                            hasMacroAccess={
+                                                                                hasMacroAccess
+                                                                            }
+                                                                            hasMicroAccess={
+                                                                                hasMicroAccess
+                                                                            }
+                                                                            isMacroscopyEditable={
+                                                                                isMacroscopyEditable
+                                                                            }
+                                                                            hasCuttingsPermission={
+                                                                                hasCuttingsPermission
+                                                                            }
+                                                                            onManageCuttingsClick={() =>
+                                                                                setIsManageCuttingsOpen(
+                                                                                    true,
+                                                                                )
+                                                                            }
+                                                                            onTransitionState={
+                                                                                handleTransitionState
+                                                                            }
+                                                                            handleEditorFocus={
+                                                                                handleEditorFocus
+                                                                            }
+                                                                            handleEditorBlur={
+                                                                                handleEditorBlur
+                                                                            }
+                                                                            dragHandleProps={
+                                                                                provided.dragHandleProps
+                                                                            }
+                                                                        />
+                                                                    )}
+
+                                                                    {section.key ===
+                                                                        'microscopy_html' && (
+                                                                        <MicroscopyEditor
+                                                                            reportId={
+                                                                                report.id
+                                                                            }
+                                                                            specimen={
+                                                                                specimen
+                                                                            }
+                                                                            auth={
+                                                                                auth
+                                                                            }
+                                                                            microscopyHtml={
+                                                                                microscopyHtml
+                                                                            }
+                                                                            setMicroscopyHtml={
+                                                                                setMicroscopyHtml
+                                                                            }
+                                                                            setMicroscopyUsers={
+                                                                                setMicroscopyUsers
+                                                                            }
+                                                                            microscopyDoc={
+                                                                                microscopyDoc
+                                                                            }
+                                                                            microscopyProvider={
+                                                                                microscopyProvider
+                                                                            }
+                                                                            headingsToggles={
+                                                                                headingsToggles
+                                                                            }
+                                                                            handleHeadingToggle={
+                                                                                handleHeadingToggle
+                                                                            }
+                                                                            isAssigned={
+                                                                                isAssigned
+                                                                            }
+                                                                            isFinished={
+                                                                                isFinished
+                                                                            }
+                                                                            sessionEditingEnabled={
+                                                                                sessionEditingEnabled
+                                                                            }
+                                                                            hasMacroAccess={
+                                                                                hasMacroAccess
+                                                                            }
+                                                                            hasMicroAccess={
+                                                                                hasMicroAccess
+                                                                            }
+                                                                            isMicroscopyEditable={
+                                                                                isMicroscopyEditable
+                                                                            }
+                                                                            isGeneratingPdf={
+                                                                                isGeneratingPdf
+                                                                            }
+                                                                            onTransitionState={
+                                                                                handleTransitionState
+                                                                            }
+                                                                            onStartMicroscopyFinalization={
+                                                                                handleStartMicroscopyFinalization
+                                                                            }
+                                                                            handleEditorFocus={
+                                                                                handleEditorFocus
+                                                                            }
+                                                                            handleEditorBlur={
+                                                                                handleEditorBlur
+                                                                            }
+                                                                            dragHandleProps={
+                                                                                provided.dragHandleProps
+                                                                            }
+                                                                        />
+                                                                    )}
+
+                                                                    {section.key ===
+                                                                        'comments_notes_html' && (
+                                                                        <CommentsNotesEditor
+                                                                            reportId={
+                                                                                report.id
+                                                                            }
+                                                                            specimen={
+                                                                                specimen
+                                                                            }
+                                                                            auth={
+                                                                                auth
+                                                                            }
+                                                                            commentsNotesHtml={
+                                                                                commentsNotesHtml
+                                                                            }
+                                                                            setCommentsNotesHtml={
+                                                                                setCommentsNotesHtml
+                                                                            }
+                                                                            setCommentsNotesUsers={
+                                                                                setCommentsNotesUsers
+                                                                            }
+                                                                            commentsNotesDoc={
+                                                                                commentsNotesDoc
+                                                                            }
+                                                                            commentsNotesProvider={
+                                                                                commentsNotesProvider
+                                                                            }
+                                                                            headingsToggles={
+                                                                                headingsToggles
+                                                                            }
+                                                                            handleHeadingToggle={
+                                                                                handleHeadingToggle
+                                                                            }
+                                                                            isAssigned={
+                                                                                isAssigned
+                                                                            }
+                                                                            isFinished={
+                                                                                isFinished
+                                                                            }
+                                                                            sessionEditingEnabled={
+                                                                                sessionEditingEnabled
+                                                                            }
+                                                                            hasMacroAccess={
+                                                                                hasMacroAccess
+                                                                            }
+                                                                            hasMicroAccess={
+                                                                                hasMicroAccess
+                                                                            }
+                                                                            handleEditorFocus={
+                                                                                handleEditorFocus
+                                                                            }
+                                                                            handleEditorBlur={
+                                                                                handleEditorBlur
+                                                                            }
+                                                                            dragHandleProps={
+                                                                                provided.dragHandleProps
+                                                                            }
+                                                                        />
+                                                                    )}
+
+                                                                    {section.key ===
+                                                                        'protocols_html' && (
+                                                                        <ProtocolsEditor
+                                                                            reportId={
+                                                                                report.id
+                                                                            }
+                                                                            specimen={
+                                                                                specimen
+                                                                            }
+                                                                            auth={
+                                                                                auth
+                                                                            }
+                                                                            protocolsHtml={
+                                                                                protocolsHtml
+                                                                            }
+                                                                            setProtocolsHtml={
+                                                                                setProtocolsHtml
+                                                                            }
+                                                                            setProtocolsUsers={
+                                                                                setProtocolsUsers
+                                                                            }
+                                                                            protocolsDoc={
+                                                                                protocolsDoc
+                                                                            }
+                                                                            protocolsProvider={
+                                                                                protocolsProvider
+                                                                            }
+                                                                            headingsToggles={
+                                                                                headingsToggles
+                                                                            }
+                                                                            handleHeadingToggle={
+                                                                                handleHeadingToggle
+                                                                            }
+                                                                            isAssigned={
+                                                                                isAssigned
+                                                                            }
+                                                                            isFinished={
+                                                                                isFinished
+                                                                            }
+                                                                            sessionEditingEnabled={
+                                                                                sessionEditingEnabled
+                                                                            }
+                                                                            hasMacroAccess={
+                                                                                hasMacroAccess
+                                                                            }
+                                                                            hasMicroAccess={
+                                                                                hasMicroAccess
+                                                                            }
+                                                                            handleEditorFocus={
+                                                                                handleEditorFocus
+                                                                            }
+                                                                            handleEditorBlur={
+                                                                                handleEditorBlur
+                                                                            }
+                                                                            dragHandleProps={
+                                                                                provided.dragHandleProps
+                                                                            }
+                                                                        />
+                                                                    )}
+
+                                                                    {section.key ===
+                                                                        'legend_html' && (
+                                                                        <LegendEditor
+                                                                            reportId={
+                                                                                report.id
+                                                                            }
+                                                                            specimen={
+                                                                                specimen
+                                                                            }
+                                                                            auth={
+                                                                                auth
+                                                                            }
+                                                                            legendHtml={
+                                                                                legendHtml
+                                                                            }
+                                                                            setLegendHtml={
+                                                                                setLegendHtml
+                                                                            }
+                                                                            setLegendUsers={
+                                                                                setLegendUsers
+                                                                            }
+                                                                            legendDoc={
+                                                                                legendDoc
+                                                                            }
+                                                                            legendProvider={
+                                                                                legendProvider
+                                                                            }
+                                                                            headingsToggles={
+                                                                                headingsToggles
+                                                                            }
+                                                                            handleHeadingToggle={
+                                                                                handleHeadingToggle
+                                                                            }
+                                                                            isAssigned={
+                                                                                isAssigned
+                                                                            }
+                                                                            isFinished={
+                                                                                isFinished
+                                                                            }
+                                                                            sessionEditingEnabled={
+                                                                                sessionEditingEnabled
+                                                                            }
+                                                                            hasMacroAccess={
+                                                                                hasMacroAccess
+                                                                            }
+                                                                            hasMicroAccess={
+                                                                                hasMicroAccess
+                                                                            }
+                                                                            handleEditorFocus={
+                                                                                handleEditorFocus
+                                                                            }
+                                                                            handleEditorBlur={
+                                                                                handleEditorBlur
+                                                                            }
+                                                                            dragHandleProps={
+                                                                                provided.dragHandleProps
+                                                                            }
+                                                                        />
+                                                                    )}
+
+                                                                    {section.key ===
+                                                                        'open_text_html' && (
+                                                                        <OpenTextEditor
+                                                                            reportId={
+                                                                                report.id
+                                                                            }
+                                                                            specimen={
+                                                                                specimen
+                                                                            }
+                                                                            auth={
+                                                                                auth
+                                                                            }
+                                                                            openTextHtml={
+                                                                                openTextHtml
+                                                                            }
+                                                                            setOpenTextHtml={
+                                                                                setOpenTextHtml
+                                                                            }
+                                                                            setOpenTextUsers={
+                                                                                setOpenTextUsers
+                                                                            }
+                                                                            openTextDoc={
+                                                                                openTextDoc
+                                                                            }
+                                                                            openTextProvider={
+                                                                                openTextProvider
+                                                                            }
+                                                                            openTextLabel={
+                                                                                openTextLabel
+                                                                            }
+                                                                            onOpenTextLabelChange={
+                                                                                handleOpenTextLabelChange
+                                                                            }
+                                                                            headingsToggles={
+                                                                                headingsToggles
+                                                                            }
+                                                                            handleHeadingToggle={
+                                                                                handleHeadingToggle
+                                                                            }
+                                                                            isAssigned={
+                                                                                isAssigned
+                                                                            }
+                                                                            isFinished={
+                                                                                isFinished
+                                                                            }
+                                                                            sessionEditingEnabled={
+                                                                                sessionEditingEnabled
+                                                                            }
+                                                                            hasMacroAccess={
+                                                                                hasMacroAccess
+                                                                            }
+                                                                            hasMicroAccess={
+                                                                                hasMicroAccess
+                                                                            }
+                                                                            handleEditorFocus={
+                                                                                handleEditorFocus
+                                                                            }
+                                                                            handleEditorBlur={
+                                                                                handleEditorBlur
+                                                                            }
+                                                                            dragHandleProps={
+                                                                                provided.dragHandleProps
+                                                                            }
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </Draggable>
+                                                    ),
+                                                )}
+                                                {provided.placeholder}
+                                            </div>
                                         )}
-                                    </div>
-                                </div>
-                                <div className="mb-3 grid grid-cols-1 gap-4 text-xs md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <p>
-                                            <span className="font-medium text-muted-foreground">
-                                                Paciente:
-                                            </span>{' '}
-                                            <strong className="text-card-foreground">
-                                                {
-                                                    specimen.customer_relation
-                                                        .name
-                                                }{' '}
-                                                (
-                                                {specimen.customer_relation
-                                                    .type === 'empresa'
-                                                    ? 'Empresa'
-                                                    : 'Cliente'}
-                                                )
-                                            </strong>
-                                        </p>
-                                        <p>
-                                            <span className="font-medium text-muted-foreground">
-                                                Edad / Sexo:
-                                            </span>{' '}
-                                            <strong className="text-card-foreground">
-                                                {specimen.customer_relation
-                                                    .age ?? 'N/A'}{' '}
-                                                años (
-                                                {
-                                                    specimen.customer_relation
-                                                        .gender
-                                                }
-                                                )
-                                            </strong>
-                                        </p>
-                                        <p>
-                                            <span className="font-medium text-muted-foreground">
-                                                Médico Remitente:
-                                            </span>{' '}
-                                            <strong className="text-card-foreground">
-                                                {
-                                                    specimen.referrer_relation
-                                                        .name
-                                                }
-                                            </strong>
-                                        </p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <p>
-                                            <span className="font-medium text-muted-foreground">
-                                                Tipo:
-                                            </span>{' '}
-                                            <strong className="text-card-foreground">
-                                                {specimen.type.name} -{' '}
-                                                {specimen.examination.name}
-                                            </strong>
-                                        </p>
-                                        <p>
-                                            <span className="font-medium text-muted-foreground">
-                                                Diagnóstico Clínico:
-                                            </span>{' '}
-                                            <strong className="text-card-foreground">
-                                                {specimen.diagnosis || 'N/A'}
-                                            </strong>
-                                        </p>
-                                        <p>
-                                            <span className="font-medium text-muted-foreground">
-                                                Sitio Anatómico:
-                                            </span>{' '}
-                                            <strong className="text-card-foreground">
-                                                {specimen.anatomic_site ||
-                                                    'N/A'}
-                                            </strong>
-                                        </p>
-                                    </div>
-                                </div>
+                                    </Droppable>
+                                </DragDropContext>
 
-                                <div className="flex w-full flex-row flex-nowrap items-center justify-stretch gap-5 pt-3">
-                                    <div className="flex w-full flex-col items-start gap-1.5">
-                                        <label
-                                            htmlFor="report-date"
-                                            className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-foreground"
-                                        >
-                                            <Calendar className="h-4 w-4 text-muted-foreground" />{' '}
-                                            Fecha de Recepción
-                                        </label>
-                                        <div className="w-full">
-                                            <DatePicker
-                                                value={reportDate}
-                                                disabled={
-                                                    (isFinished &&
-                                                        !sessionEditingEnabled) ||
-                                                    (!hasMacroAccess &&
-                                                        !hasMicroAccess)
-                                                }
-                                                onChange={handleUpdateDate}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex w-full flex-col items-start gap-1.5">
-                                        <label
-                                            htmlFor="sample-collection-date"
-                                            className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-foreground"
-                                        >
-                                            <Calendar className="h-4 w-4 text-muted-foreground" />{' '}
-                                            Fecha de la toma
-                                        </label>
-                                        <div className="w-full">
-                                            <DatePicker
-                                                value={sampleCollectionDate}
-                                                disabled={
-                                                    (isFinished &&
-                                                        !sessionEditingEnabled) ||
-                                                    (!hasMacroAccess &&
-                                                        !hasMicroAccess)
-                                                }
-                                                onChange={
-                                                    handleUpdateSampleCollectionDate
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex w-full flex-col items-start gap-1.5">
-                                        <label
-                                            htmlFor="finalization-date"
-                                            className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-foreground"
-                                        >
-                                            <Calendar className="h-4 w-4 text-muted-foreground" />{' '}
-                                            Fecha de finalización
-                                        </label>
-                                        <div className="w-full">
-                                            <DatePicker
-                                                value={finalizationDate}
-                                                disabled={
-                                                    (isFinished &&
-                                                        !sessionEditingEnabled) ||
-                                                    (!hasMacroAccess &&
-                                                        !hasMicroAccess)
-                                                }
-                                                onChange={
-                                                    handleUpdateFinalizationDate
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
+                                <AddendumEditor
+                                    reportId={report.id}
+                                    specimen={specimen}
+                                    auth={auth}
+                                    addendumHtml={addendumHtml}
+                                    setAddendumHtml={setAddendumHtml}
+                                    setAddendumUsers={setAddendumUsers}
+                                    addendumDoc={addendumDoc}
+                                    addendumProvider={addendumProvider}
+                                    headingsToggles={headingsToggles}
+                                    handleHeadingToggle={handleHeadingToggle}
+                                    isAssigned={isAssigned}
+                                    isFinished={isFinished}
+                                    sessionEditingEnabled={
+                                        sessionEditingEnabled
+                                    }
+                                    hasMacroAccess={hasMacroAccess}
+                                    hasMicroAccess={hasMicroAccess}
+                                    handleEditorFocus={handleEditorFocus}
+                                    handleEditorBlur={handleEditorBlur}
+                                />
                             </div>
-
-                            <SpecimenInsumosCard
-                                specimen={specimen}
-                                products={products}
-                                isFinished={isFinished}
-                                sessionEditingEnabled={sessionEditingEnabled}
-                                hasMacroAccess={hasMacroAccess}
-                                hasMicroAccess={hasMicroAccess}
-                            />
-
-                            {/* Template Selector */}
-                            <TemplateSelector
-                                templates={templates}
-                                isFinished={isFinished}
-                                hasMacroAccess={hasMacroAccess}
-                                hasMicroAccess={hasMicroAccess}
-                                onApplyTemplate={handleApplyTemplate}
-                            />
-
-                            <DragDropContext onDragEnd={handleDragEnd}>
-                                <Droppable droppableId="report-editors">
-                                    {(provided) => (
-                                        <div
-                                            {...provided.droppableProps}
-                                            ref={provided.innerRef}
-                                            className="space-y-6"
-                                        >
-                                            {sectionsOrder.map(
-                                                (section, index) => (
-                                                    <Draggable
-                                                        key={section.key}
-                                                        draggableId={
-                                                            section.key
-                                                        }
-                                                        index={index}
-                                                        isDragDisabled={
-                                                            !hasMacroAccess &&
-                                                            !hasMicroAccess
-                                                        }
-                                                    >
-                                                        {(
-                                                            provided,
-                                                            snapshot,
-                                                        ) => (
-                                                            <div
-                                                                ref={
-                                                                    provided.innerRef
-                                                                }
-                                                                {...provided.draggableProps}
-                                                                className={cn(
-                                                                    'space-y-3 rounded-xl border border-transparent transition-all duration-200',
-                                                                    snapshot.isDragging &&
-                                                                        'rotate-1 border-primary/20 bg-card/65 shadow-lg ring-1 ring-primary/10 backdrop-blur-xs',
-                                                                )}
-                                                            >
-                                                                {section.key ===
-                                                                    'clinical_details_html' && (
-                                                                    <ClinicalDetailsEditor
-                                                                        reportId={
-                                                                            report.id
-                                                                        }
-                                                                        specimen={
-                                                                            specimen
-                                                                        }
-                                                                        auth={
-                                                                            auth
-                                                                        }
-                                                                        clinicalDetailsHtml={
-                                                                            clinicalDetailsHtml
-                                                                        }
-                                                                        setClinicalDetailsHtml={
-                                                                            setClinicalDetailsHtml
-                                                                        }
-                                                                        setClinicalDetailsUsers={
-                                                                            setClinicalDetailsUsers
-                                                                        }
-                                                                        clinicalDetailsDoc={
-                                                                            clinicalDetailsDoc
-                                                                        }
-                                                                        clinicalDetailsProvider={
-                                                                            clinicalDetailsProvider
-                                                                        }
-                                                                        headingsToggles={
-                                                                            headingsToggles
-                                                                        }
-                                                                        handleHeadingToggle={
-                                                                            handleHeadingToggle
-                                                                        }
-                                                                        isAssigned={
-                                                                            isAssigned
-                                                                        }
-                                                                        isFinished={
-                                                                            isFinished
-                                                                        }
-                                                                        sessionEditingEnabled={
-                                                                            sessionEditingEnabled
-                                                                        }
-                                                                        hasMacroAccess={
-                                                                            hasMacroAccess
-                                                                        }
-                                                                        hasMicroAccess={
-                                                                            hasMicroAccess
-                                                                        }
-                                                                        handleEditorFocus={
-                                                                            handleEditorFocus
-                                                                        }
-                                                                        handleEditorBlur={
-                                                                            handleEditorBlur
-                                                                        }
-                                                                        dragHandleProps={
-                                                                            provided.dragHandleProps
-                                                                        }
-                                                                    />
-                                                                )}
-
-                                                                {section.key ===
-                                                                    'diagnosis_html' && (
-                                                                    <DiagnosisEditor
-                                                                        reportId={
-                                                                            report.id
-                                                                        }
-                                                                        specimen={
-                                                                            specimen
-                                                                        }
-                                                                        auth={
-                                                                            auth
-                                                                        }
-                                                                        diagnosisHtml={
-                                                                            diagnosisHtml
-                                                                        }
-                                                                        setDiagnosisHtml={
-                                                                            setDiagnosisHtml
-                                                                        }
-                                                                        setDiagnosisUsers={
-                                                                            setDiagnosisUsers
-                                                                        }
-                                                                        diagnosisDoc={
-                                                                            diagnosisDoc
-                                                                        }
-                                                                        diagnosisProvider={
-                                                                            diagnosisProvider
-                                                                        }
-                                                                        headingsToggles={
-                                                                            headingsToggles
-                                                                        }
-                                                                        handleHeadingToggle={
-                                                                            handleHeadingToggle
-                                                                        }
-                                                                        isAssigned={
-                                                                            isAssigned
-                                                                        }
-                                                                        isFinished={
-                                                                            isFinished
-                                                                        }
-                                                                        sessionEditingEnabled={
-                                                                            sessionEditingEnabled
-                                                                        }
-                                                                        hasMacroAccess={
-                                                                            hasMacroAccess
-                                                                        }
-                                                                        hasMicroAccess={
-                                                                            hasMicroAccess
-                                                                        }
-                                                                        handleEditorFocus={
-                                                                            handleEditorFocus
-                                                                        }
-                                                                        handleEditorBlur={
-                                                                            handleEditorBlur
-                                                                        }
-                                                                        dragHandleProps={
-                                                                            provided.dragHandleProps
-                                                                        }
-                                                                    />
-                                                                )}
-
-                                                                {section.key ===
-                                                                    'macroscopy_html' && (
-                                                                    <MacroscopyEditor
-                                                                        reportId={
-                                                                            report.id
-                                                                        }
-                                                                        specimen={
-                                                                            specimen
-                                                                        }
-                                                                        auth={
-                                                                            auth
-                                                                        }
-                                                                        macroscopyHtml={
-                                                                            macroscopyHtml
-                                                                        }
-                                                                        setMacroscopyHtml={
-                                                                            setMacroscopyHtml
-                                                                        }
-                                                                        setMacroscopyUsers={
-                                                                            setMacroscopyUsers
-                                                                        }
-                                                                        macroscopyDoc={
-                                                                            macroscopyDoc
-                                                                        }
-                                                                        macroscopyProvider={
-                                                                            macroscopyProvider
-                                                                        }
-                                                                        headingsToggles={
-                                                                            headingsToggles
-                                                                        }
-                                                                        handleHeadingToggle={
-                                                                            handleHeadingToggle
-                                                                        }
-                                                                        isAssigned={
-                                                                            isAssigned
-                                                                        }
-                                                                        isFinished={
-                                                                            isFinished
-                                                                        }
-                                                                        sessionEditingEnabled={
-                                                                            sessionEditingEnabled
-                                                                        }
-                                                                        hasMacroAccess={
-                                                                            hasMacroAccess
-                                                                        }
-                                                                        hasMicroAccess={
-                                                                            hasMicroAccess
-                                                                        }
-                                                                        isMacroscopyEditable={
-                                                                            isMacroscopyEditable
-                                                                        }
-                                                                        hasCuttingsPermission={
-                                                                            hasCuttingsPermission
-                                                                        }
-                                                                        onManageCuttingsClick={() =>
-                                                                            setIsManageCuttingsOpen(
-                                                                                true,
-                                                                            )
-                                                                        }
-                                                                        onTransitionState={
-                                                                            handleTransitionState
-                                                                        }
-                                                                        handleEditorFocus={
-                                                                            handleEditorFocus
-                                                                        }
-                                                                        handleEditorBlur={
-                                                                            handleEditorBlur
-                                                                        }
-                                                                        dragHandleProps={
-                                                                            provided.dragHandleProps
-                                                                        }
-                                                                    />
-                                                                )}
-
-                                                                {section.key ===
-                                                                    'microscopy_html' && (
-                                                                    <MicroscopyEditor
-                                                                        reportId={
-                                                                            report.id
-                                                                        }
-                                                                        specimen={
-                                                                            specimen
-                                                                        }
-                                                                        auth={
-                                                                            auth
-                                                                        }
-                                                                        microscopyHtml={
-                                                                            microscopyHtml
-                                                                        }
-                                                                        setMicroscopyHtml={
-                                                                            setMicroscopyHtml
-                                                                        }
-                                                                        setMicroscopyUsers={
-                                                                            setMicroscopyUsers
-                                                                        }
-                                                                        microscopyDoc={
-                                                                            microscopyDoc
-                                                                        }
-                                                                        microscopyProvider={
-                                                                            microscopyProvider
-                                                                        }
-                                                                        headingsToggles={
-                                                                            headingsToggles
-                                                                        }
-                                                                        handleHeadingToggle={
-                                                                            handleHeadingToggle
-                                                                        }
-                                                                        isAssigned={
-                                                                            isAssigned
-                                                                        }
-                                                                        isFinished={
-                                                                            isFinished
-                                                                        }
-                                                                        sessionEditingEnabled={
-                                                                            sessionEditingEnabled
-                                                                        }
-                                                                        hasMacroAccess={
-                                                                            hasMacroAccess
-                                                                        }
-                                                                        hasMicroAccess={
-                                                                            hasMicroAccess
-                                                                        }
-                                                                        isMicroscopyEditable={
-                                                                            isMicroscopyEditable
-                                                                        }
-                                                                        isGeneratingPdf={
-                                                                            isGeneratingPdf
-                                                                        }
-                                                                        onTransitionState={
-                                                                            handleTransitionState
-                                                                        }
-                                                                        onStartMicroscopyFinalization={
-                                                                            handleStartMicroscopyFinalization
-                                                                        }
-                                                                        handleEditorFocus={
-                                                                            handleEditorFocus
-                                                                        }
-                                                                        handleEditorBlur={
-                                                                            handleEditorBlur
-                                                                        }
-                                                                        dragHandleProps={
-                                                                            provided.dragHandleProps
-                                                                        }
-                                                                    />
-                                                                )}
-
-                                                                {section.key ===
-                                                                    'comments_notes_html' && (
-                                                                    <CommentsNotesEditor
-                                                                        reportId={
-                                                                            report.id
-                                                                        }
-                                                                        specimen={
-                                                                            specimen
-                                                                        }
-                                                                        auth={
-                                                                            auth
-                                                                        }
-                                                                        commentsNotesHtml={
-                                                                            commentsNotesHtml
-                                                                        }
-                                                                        setCommentsNotesHtml={
-                                                                            setCommentsNotesHtml
-                                                                        }
-                                                                        setCommentsNotesUsers={
-                                                                            setCommentsNotesUsers
-                                                                        }
-                                                                        commentsNotesDoc={
-                                                                            commentsNotesDoc
-                                                                        }
-                                                                        commentsNotesProvider={
-                                                                            commentsNotesProvider
-                                                                        }
-                                                                        headingsToggles={
-                                                                            headingsToggles
-                                                                        }
-                                                                        handleHeadingToggle={
-                                                                            handleHeadingToggle
-                                                                        }
-                                                                        isAssigned={
-                                                                            isAssigned
-                                                                        }
-                                                                        isFinished={
-                                                                            isFinished
-                                                                        }
-                                                                        sessionEditingEnabled={
-                                                                            sessionEditingEnabled
-                                                                        }
-                                                                        hasMacroAccess={
-                                                                            hasMacroAccess
-                                                                        }
-                                                                        hasMicroAccess={
-                                                                            hasMicroAccess
-                                                                        }
-                                                                        handleEditorFocus={
-                                                                            handleEditorFocus
-                                                                        }
-                                                                        handleEditorBlur={
-                                                                            handleEditorBlur
-                                                                        }
-                                                                        dragHandleProps={
-                                                                            provided.dragHandleProps
-                                                                        }
-                                                                    />
-                                                                )}
-
-                                                                {section.key ===
-                                                                    'protocols_html' && (
-                                                                    <ProtocolsEditor
-                                                                        reportId={
-                                                                            report.id
-                                                                        }
-                                                                        specimen={
-                                                                            specimen
-                                                                        }
-                                                                        auth={
-                                                                            auth
-                                                                        }
-                                                                        protocolsHtml={
-                                                                            protocolsHtml
-                                                                        }
-                                                                        setProtocolsHtml={
-                                                                            setProtocolsHtml
-                                                                        }
-                                                                        setProtocolsUsers={
-                                                                            setProtocolsUsers
-                                                                        }
-                                                                        protocolsDoc={
-                                                                            protocolsDoc
-                                                                        }
-                                                                        protocolsProvider={
-                                                                            protocolsProvider
-                                                                        }
-                                                                        headingsToggles={
-                                                                            headingsToggles
-                                                                        }
-                                                                        handleHeadingToggle={
-                                                                            handleHeadingToggle
-                                                                        }
-                                                                        isAssigned={
-                                                                            isAssigned
-                                                                        }
-                                                                        isFinished={
-                                                                            isFinished
-                                                                        }
-                                                                        sessionEditingEnabled={
-                                                                            sessionEditingEnabled
-                                                                        }
-                                                                        hasMacroAccess={
-                                                                            hasMacroAccess
-                                                                        }
-                                                                        hasMicroAccess={
-                                                                            hasMicroAccess
-                                                                        }
-                                                                        handleEditorFocus={
-                                                                            handleEditorFocus
-                                                                        }
-                                                                        handleEditorBlur={
-                                                                            handleEditorBlur
-                                                                        }
-                                                                        dragHandleProps={
-                                                                            provided.dragHandleProps
-                                                                        }
-                                                                    />
-                                                                )}
-
-                                                                {section.key ===
-                                                                    'legend_html' && (
-                                                                    <LegendEditor
-                                                                        reportId={
-                                                                            report.id
-                                                                        }
-                                                                        specimen={
-                                                                            specimen
-                                                                        }
-                                                                        auth={
-                                                                            auth
-                                                                        }
-                                                                        legendHtml={
-                                                                            legendHtml
-                                                                        }
-                                                                        setLegendHtml={
-                                                                            setLegendHtml
-                                                                        }
-                                                                        setLegendUsers={
-                                                                            setLegendUsers
-                                                                        }
-                                                                        legendDoc={
-                                                                            legendDoc
-                                                                        }
-                                                                        legendProvider={
-                                                                            legendProvider
-                                                                        }
-                                                                        headingsToggles={
-                                                                            headingsToggles
-                                                                        }
-                                                                        handleHeadingToggle={
-                                                                            handleHeadingToggle
-                                                                        }
-                                                                        isAssigned={
-                                                                            isAssigned
-                                                                        }
-                                                                        isFinished={
-                                                                            isFinished
-                                                                        }
-                                                                        sessionEditingEnabled={
-                                                                            sessionEditingEnabled
-                                                                        }
-                                                                        hasMacroAccess={
-                                                                            hasMacroAccess
-                                                                        }
-                                                                        hasMicroAccess={
-                                                                            hasMicroAccess
-                                                                        }
-                                                                        handleEditorFocus={
-                                                                            handleEditorFocus
-                                                                        }
-                                                                        handleEditorBlur={
-                                                                            handleEditorBlur
-                                                                        }
-                                                                        dragHandleProps={
-                                                                            provided.dragHandleProps
-                                                                        }
-                                                                    />
-                                                                )}
-
-                                                                {section.key ===
-                                                                    'open_text_html' && (
-                                                                    <OpenTextEditor
-                                                                        reportId={
-                                                                            report.id
-                                                                        }
-                                                                        specimen={
-                                                                            specimen
-                                                                        }
-                                                                        auth={
-                                                                            auth
-                                                                        }
-                                                                        openTextHtml={
-                                                                            openTextHtml
-                                                                        }
-                                                                        setOpenTextHtml={
-                                                                            setOpenTextHtml
-                                                                        }
-                                                                        setOpenTextUsers={
-                                                                            setOpenTextUsers
-                                                                        }
-                                                                        openTextDoc={
-                                                                            openTextDoc
-                                                                        }
-                                                                        openTextProvider={
-                                                                            openTextProvider
-                                                                        }
-                                                                        openTextLabel={
-                                                                            openTextLabel
-                                                                        }
-                                                                        onOpenTextLabelChange={
-                                                                            handleOpenTextLabelChange
-                                                                        }
-                                                                        headingsToggles={
-                                                                            headingsToggles
-                                                                        }
-                                                                        handleHeadingToggle={
-                                                                            handleHeadingToggle
-                                                                        }
-                                                                        isAssigned={
-                                                                            isAssigned
-                                                                        }
-                                                                        isFinished={
-                                                                            isFinished
-                                                                        }
-                                                                        sessionEditingEnabled={
-                                                                            sessionEditingEnabled
-                                                                        }
-                                                                        hasMacroAccess={
-                                                                            hasMacroAccess
-                                                                        }
-                                                                        hasMicroAccess={
-                                                                            hasMicroAccess
-                                                                        }
-                                                                        handleEditorFocus={
-                                                                            handleEditorFocus
-                                                                        }
-                                                                        handleEditorBlur={
-                                                                            handleEditorBlur
-                                                                        }
-                                                                        dragHandleProps={
-                                                                            provided.dragHandleProps
-                                                                        }
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </Draggable>
-                                                ),
-                                            )}
-                                            {provided.placeholder}
-                                        </div>
-                                    )}
-                                </Droppable>
-                            </DragDropContext>
-
-                            <AddendumEditor
-                                reportId={report.id}
-                                specimen={specimen}
-                                auth={auth}
-                                addendumHtml={addendumHtml}
-                                setAddendumHtml={setAddendumHtml}
-                                setAddendumUsers={setAddendumUsers}
-                                addendumDoc={addendumDoc}
-                                addendumProvider={addendumProvider}
-                                headingsToggles={headingsToggles}
-                                handleHeadingToggle={handleHeadingToggle}
-                                isAssigned={isAssigned}
-                                isFinished={isFinished}
-                                sessionEditingEnabled={sessionEditingEnabled}
-                                hasMacroAccess={hasMacroAccess}
-                                hasMicroAccess={hasMicroAccess}
-                                handleEditorFocus={handleEditorFocus}
-                                handleEditorBlur={handleEditorBlur}
-                            />
                         </div>
+
+                        <LivePdfPreview
+                            specimen={specimen}
+                            isFinished={isFinished}
+                            isLoading={isLoading}
+                            totalPages={totalPages}
+                            renderPreviewPage={renderPreviewPage}
+                            pages={pages}
+                        />
                     </div>
 
-                    <LivePdfPreview
+                    <SpecimenViewSheet
+                        key={
+                            isSpecimenSheetOpen
+                                ? `view_${specimen.id}_${specimen.sample_collection_date || ''}_${specimen.report?.report_date || ''}`
+                                : 'closed_view'
+                        }
                         specimen={specimen}
-                        isFinished={isFinished}
-                        isLoading={isLoading}
-                        totalPages={totalPages}
-                        renderPreviewPage={renderPreviewPage}
+                        open={isSpecimenSheetOpen}
+                        onOpenChange={setIsSpecimenSheetOpen}
+                        onEditClick={() => {
+                            setIsSpecimenSheetOpen(false);
+                            setIsEditSpecimenOpen(true);
+                        }}
+                        onAssignPathologistClick={() =>
+                            setIsAssignSheetOpen(true)
+                        }
                     />
-                </div>
 
-                <SpecimenViewSheet
-                    key={
-                        isSpecimenSheetOpen
-                            ? `view_${specimen.id}_${specimen.sample_collection_date || ''}_${specimen.report?.report_date || ''}`
-                            : 'closed_view'
-                    }
-                    specimen={specimen}
-                    open={isSpecimenSheetOpen}
-                    onOpenChange={setIsSpecimenSheetOpen}
-                    onEditClick={() => {
-                        setIsSpecimenSheetOpen(false);
-                        setIsEditSpecimenOpen(true);
-                    }}
-                    onAssignPathologistClick={() => setIsAssignSheetOpen(true)}
-                />
+                    <SpecimenPathologistSheet
+                        specimen={specimen}
+                        open={isAssignSheetOpen}
+                        onOpenChange={setIsAssignSheetOpen}
+                        pathologists={pathologists}
+                    />
 
-                <SpecimenPathologistSheet
-                    specimen={specimen}
-                    open={isAssignSheetOpen}
-                    onOpenChange={setIsAssignSheetOpen}
-                    pathologists={pathologists}
-                />
+                    <ManageCuttingsSheet
+                        specimen={specimen}
+                        cuttingCodes={cutting_codes}
+                        cuttingPrefixes={cutting_prefixes}
+                        cuttingSlideTypes={cutting_slide_types}
+                        users={users}
+                        open={isManageCuttingsOpen}
+                        onOpenChange={setIsManageCuttingsOpen}
+                        canEdit={isAssigned}
+                        onInsertConcatenatedString={
+                            handleInsertConcatenatedString
+                        }
+                    />
+                    <CustomerSheet
+                        customer={specimen.customer_relation as any}
+                        open={isEditCustomerOpen}
+                        onOpenChange={setIsEditCustomerOpen}
+                        onSuccess={() => {
+                            router.reload({
+                                only: ['specimen'],
+                                onSuccess: () => {
+                                    notifyCollaborationServer();
+                                },
+                            });
+                        }}
+                    />
 
-                <ManageCuttingsSheet
-                    specimen={specimen}
-                    cuttingCodes={cutting_codes}
-                    cuttingPrefixes={cutting_prefixes}
-                    cuttingSlideTypes={cutting_slide_types}
-                    users={users}
-                    open={isManageCuttingsOpen}
-                    onOpenChange={setIsManageCuttingsOpen}
-                    canEdit={isAssigned}
-                    onInsertConcatenatedString={handleInsertConcatenatedString}
-                />
-                <CustomerSheet
-                    customer={specimen.customer_relation as any}
-                    open={isEditCustomerOpen}
-                    onOpenChange={setIsEditCustomerOpen}
-                    onSuccess={() => {
-                        router.reload({
-                            only: ['specimen'],
-                            onSuccess: () => {
-                                notifyCollaborationServer();
-                            },
-                        });
-                    }}
-                />
+                    <ReferrerSheet
+                        referrer={specimen.referrer_relation as any}
+                        referrerTypes={referrerTypes}
+                        open={isEditReferrerOpen}
+                        onOpenChange={setIsEditReferrerOpen}
+                        onSuccess={() => {
+                            router.reload({
+                                only: ['specimen'],
+                                onSuccess: () => {
+                                    notifyCollaborationServer();
+                                },
+                            });
+                        }}
+                    />
 
-                <ReferrerSheet
-                    referrer={specimen.referrer_relation as any}
-                    referrerTypes={referrerTypes}
-                    open={isEditReferrerOpen}
-                    onOpenChange={setIsEditReferrerOpen}
-                    onSuccess={() => {
-                        router.reload({
-                            only: ['specimen'],
-                            onSuccess: () => {
-                                notifyCollaborationServer();
-                            },
-                        });
-                    }}
-                />
+                    <SpecimenSheet
+                        key={
+                            isEditSpecimenOpen
+                                ? `edit_${specimen.id}_${specimen.sample_collection_date || ''}_${specimen.report?.report_date || ''}`
+                                : 'closed_edit'
+                        }
+                        specimen={specimen}
+                        open={isEditSpecimenOpen}
+                        onOpenChange={setIsEditSpecimenOpen}
+                        specimenTypes={specimenTypes}
+                        examinations={examinations}
+                        categories={categories}
+                        referrers={referrers}
+                        referrerTypes={referrerTypes}
+                        priorities={priorities}
+                        locations={locations}
+                        sequences={sequences}
+                        activeLocationId={activeLocationId}
+                        products={[]}
+                        banks={[]}
+                        showPaymentMethodEdition={false}
+                        onSuccess={() => {
+                            router.reload({
+                                only: ['specimen'],
+                                onSuccess: () => {
+                                    notifyCollaborationServer();
+                                },
+                            });
+                        }}
+                    />
 
-                <SpecimenSheet
-                    key={
-                        isEditSpecimenOpen
-                            ? `edit_${specimen.id}_${specimen.sample_collection_date || ''}_${specimen.report?.report_date || ''}`
-                            : 'closed_edit'
-                    }
-                    specimen={specimen}
-                    open={isEditSpecimenOpen}
-                    onOpenChange={setIsEditSpecimenOpen}
-                    specimenTypes={specimenTypes}
-                    examinations={examinations}
-                    categories={categories}
-                    referrers={referrers}
-                    referrerTypes={referrerTypes}
-                    priorities={priorities}
-                    locations={locations}
-                    sequences={sequences}
-                    activeLocationId={activeLocationId}
-                    products={[]}
-                    banks={[]}
-                    showPaymentMethodEdition={false}
-                    onSuccess={() => {
-                        router.reload({
-                            only: ['specimen'],
-                            onSuccess: () => {
-                                notifyCollaborationServer();
-                            },
-                        });
-                    }}
-                />
+                    <MissingSignaturesDialog
+                        open={showSignatureWarning}
+                        onOpenChange={setShowSignatureWarning}
+                        unsignedPathologists={unsignedPathologists}
+                    />
 
-                <MissingSignaturesDialog
-                    open={showSignatureWarning}
-                    onOpenChange={setShowSignatureWarning}
-                    unsignedPathologists={unsignedPathologists}
-                />
-
-                <CompleteMicroscopyDialog
-                    open={showCompleteMicroscopyDialog}
-                    onOpenChange={setShowCompleteMicroscopyDialog}
-                    tempPdfUrl={tempPdfUrl}
-                    onConfirm={() => handleTransitionState('finalized')}
-                />
-            </EditorLayout>
-        </EditorRegistryContext.Provider>
+                    <CompleteMicroscopyDialog
+                        open={showCompleteMicroscopyDialog}
+                        onOpenChange={setShowCompleteMicroscopyDialog}
+                        tempPdfUrl={tempPdfUrl}
+                        onConfirm={() => handleTransitionState('finalized')}
+                    />
+                </EditorLayout>
+            </EditorRegistryContext.Provider>
+        </DebugReportProvider>
     );
 }

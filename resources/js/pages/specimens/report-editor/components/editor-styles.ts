@@ -10,15 +10,17 @@ export const editorStyles = `
   .preview-content > *:first-child {
     margin-top: 0 !important;
   }
-  .preview-content > *:last-child {
-    margin-bottom: 0 !important;
+  .preview-content {
+    margin-bottom: 0mm;
   }
-	.preview-content {
-		margin-bottom: 1mm;
-	}
 
   /* ── Base ── */
-  .tiptap { outline: none; min-height: 160px; }
+  .tiptap {
+    outline: none;
+    min-height: 160px;
+    font-size: 8pt;
+    line-height: 1.25;
+  }
 
   /* ── Dictation Caret Style ── */
   .tiptap.is-dictating {
@@ -178,8 +180,42 @@ export const editorStyles = `
   .tiptap ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.5rem; }
   .preview-content ol { list-style-type: decimal; padding-left: 6.35mm; margin-bottom: 1.98mm; }
   
-  .tiptap li { margin-bottom: 0.15rem; }
-  .preview-content li { margin-bottom: 0mm; line-height: 3.53mm; }
+  .tiptap ul,
+  .tiptap ol,
+  .tiptap li {
+    font-size: 8pt;
+    line-height: 1.25;
+  }
+  .preview-content,
+  .preview-content ul,
+  .preview-content ol,
+  .preview-content li {
+    font-size: 2.82mm; /* 8pt */
+  }
+
+  .tiptap li { margin-bottom: 0.80mm; }
+  .preview-content li { margin-bottom: 0.80mm; line-height: 3.53mm; }
+  .tiptap li:last-child, .preview-content li:last-child { margin-bottom: 0mm; }
+
+  .preview-content li p,
+  .preview-content ul p,
+  .preview-content ol p {
+    margin: 0 !important;
+    margin-bottom: 0 !important;
+    line-height: inherit !important;
+    font-size: 2.82mm !important; /* 8pt */
+    min-height: 0 !important;
+  }
+
+  .tiptap li p,
+  .tiptap ul p,
+  .tiptap ol p {
+    margin: 0 !important;
+    margin-bottom: 0 !important;
+    line-height: inherit !important;
+    font-size: 8pt !important;
+    min-height: 0 !important;
+  }
 
   /* ── Inline marks ── */
   .tiptap u, .preview-content u { text-decoration: underline; }
