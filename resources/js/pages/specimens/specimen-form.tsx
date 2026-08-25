@@ -21,6 +21,7 @@ import {
     Info,
     Layers,
     ChevronDown,
+    Search,
 } from 'lucide-react';
 import React from 'react';
 import { createPortal } from 'react-dom';
@@ -269,6 +270,8 @@ export default function SpecimenForm({
         React.useState(false);
     const [isExaminationSheetOpen, setIsExaminationSheetOpen] =
         React.useState(false);
+    const [examinationSearchQuery, setExaminationSearchQuery] =
+        React.useState('');
     const [isCategorySheetOpen, setIsCategorySheetOpen] = React.useState(false);
     const [isEditPricesSheetOpen, setIsEditPricesSheetOpen] =
         React.useState(false);
@@ -858,6 +861,26 @@ export default function SpecimenForm({
                 a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }),
             );
     }, [examinations, data.specimen_type]);
+
+    const searchedExaminations = React.useMemo(() => {
+        if (!examinationSearchQuery) {
+            return filteredExaminations;
+        }
+
+        const query = examinationSearchQuery
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+
+        return filteredExaminations.filter((exam) => {
+            const name = exam.name
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+
+            return name.includes(query);
+        });
+    }, [filteredExaminations, examinationSearchQuery]);
 
     React.useEffect(() => {
         if (data.specimen_type) {
@@ -2063,7 +2086,14 @@ export default function SpecimenForm({
                                         <Plus className="h-3 w-3" /> Nuevo
                                     </button>
                                 </div>
-                                <Popover modal={true}>
+                                <Popover
+                                    modal={true}
+                                    onOpenChange={(open) => {
+                                        if (!open) {
+                                            setExaminationSearchQuery('');
+                                        }
+                                    }}
+                                >
                                     <PopoverTrigger asChild>
                                         <Button
                                             variant="outline"
@@ -2091,6 +2121,21 @@ export default function SpecimenForm({
                                         align="start"
                                     >
                                         <div className="space-y-1.5">
+                                            <div className="relative px-1 py-1">
+                                                <Search className="absolute top-3 left-3 h-4 w-4 text-muted-foreground/70" />
+                                                <Input
+                                                    placeholder="Buscar análisis..."
+                                                    value={
+                                                        examinationSearchQuery
+                                                    }
+                                                    onChange={(e) => {
+                                                        setExaminationSearchQuery(
+                                                            e.target.value,
+                                                        );
+                                                    }}
+                                                    className="h-9 w-full pr-3 pl-9 text-sm focus-visible:ring-1"
+                                                />
+                                            </div>
                                             <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
                                                 <span>
                                                     Filtrar por análisis
@@ -2098,15 +2143,15 @@ export default function SpecimenForm({
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        const allExamIds =
-                                                            filteredExaminations.map(
+                                                        const visibleExamIds =
+                                                            searchedExaminations.map(
                                                                 (e) =>
                                                                     e.id.toString(),
                                                             );
                                                         const areAllSelected =
-                                                            allExamIds.length >
+                                                            visibleExamIds.length >
                                                                 0 &&
-                                                            allExamIds.every(
+                                                            visibleExamIds.every(
                                                                 (id) =>
                                                                     (
                                                                         data.selected_examination_ids ||
@@ -2117,8 +2162,26 @@ export default function SpecimenForm({
                                                             );
                                                         const nextExams =
                                                             areAllSelected
-                                                                ? []
-                                                                : allExamIds;
+                                                                ? (
+                                                                      data.selected_examination_ids ||
+                                                                      []
+                                                                  ).filter(
+                                                                      (
+                                                                          id: string,
+                                                                      ) =>
+                                                                          !visibleExamIds.includes(
+                                                                              id,
+                                                                          ),
+                                                                  )
+                                                                : [
+                                                                      ...new Set(
+                                                                          [
+                                                                              ...(data.selected_examination_ids ||
+                                                                                  []),
+                                                                              ...visibleExamIds,
+                                                                          ],
+                                                                      ),
+                                                                  ];
 
                                                         const examObjs =
                                                             nextExams.map(
@@ -2162,9 +2225,9 @@ export default function SpecimenForm({
                                                     }}
                                                     className="cursor-pointer font-medium transition-colors hover:text-primary"
                                                 >
-                                                    {filteredExaminations.length >
+                                                    {searchedExaminations.length >
                                                         0 &&
-                                                    filteredExaminations.every(
+                                                    searchedExaminations.every(
                                                         (e) =>
                                                             (
                                                                 data.selected_examination_ids ||
@@ -2178,97 +2241,111 @@ export default function SpecimenForm({
                                                 </button>
                                             </div>
                                             <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
-                                                {filteredExaminations.map(
-                                                    (exam) => {
-                                                        const examIdStr =
-                                                            exam.id.toString();
-                                                        const isChecked = (
-                                                            data.selected_examination_ids ||
-                                                            []
-                                                        ).includes(examIdStr);
+                                                {searchedExaminations.length ===
+                                                0 ? (
+                                                    <div className="py-6 text-center text-xs text-muted-foreground select-none">
+                                                        No se encontraron
+                                                        resultados.
+                                                    </div>
+                                                ) : (
+                                                    searchedExaminations.map(
+                                                        (exam) => {
+                                                            const examIdStr =
+                                                                exam.id.toString();
+                                                            const isChecked = (
+                                                                data.selected_examination_ids ||
+                                                                []
+                                                            ).includes(
+                                                                examIdStr,
+                                                            );
 
-                                                        return (
-                                                            <div
-                                                                key={exam.id}
-                                                                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
-                                                                onClick={() => {
-                                                                    const currentSelected =
-                                                                        data.selected_examination_ids ||
-                                                                        [];
-                                                                    const nextExams =
-                                                                        isChecked
-                                                                            ? currentSelected.filter(
-                                                                                  (
-                                                                                      id: string,
-                                                                                  ) =>
-                                                                                      id !==
-                                                                                      examIdStr,
-                                                                              )
-                                                                            : [
-                                                                                  ...currentSelected,
-                                                                                  examIdStr,
-                                                                              ];
-
-                                                                    const examObjs =
-                                                                        nextExams.map(
-                                                                            (
-                                                                                idStr: string,
-                                                                            ) => {
-                                                                                const examObj =
-                                                                                    filteredExaminations.find(
-                                                                                        (
-                                                                                            e,
-                                                                                        ) =>
-                                                                                            e.id.toString() ===
-                                                                                            idStr,
-                                                                                    );
-
-                                                                                return {
-                                                                                    examination_id:
-                                                                                        parseInt(
-                                                                                            idStr,
-                                                                                            10,
-                                                                                        ),
-                                                                                    name: examObj
-                                                                                        ? examObj.name
-                                                                                        : '',
-                                                                                    quantity: 1,
-                                                                                    amount: 0,
-                                                                                    discount: 0,
-                                                                                    subtotal: 0,
-                                                                                };
-                                                                            },
-                                                                        );
-
-                                                                    setData(
-                                                                        (
-                                                                            d,
-                                                                        ) => ({
-                                                                            ...d,
-                                                                            selected_examination_ids:
-                                                                                nextExams,
-                                                                            specimen_type_examination:
-                                                                                nextExams[0] ||
-                                                                                '',
-                                                                            examinations:
-                                                                                examObjs,
-                                                                        }),
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <Checkbox
-                                                                    checked={
-                                                                        isChecked
+                                                            return (
+                                                                <div
+                                                                    key={
+                                                                        exam.id
                                                                     }
-                                                                    className="pointer-events-none"
-                                                                    onCheckedChange={() => {}}
-                                                                />
-                                                                <span className="truncate">
-                                                                    {exam.name}
-                                                                </span>
-                                                            </div>
-                                                        );
-                                                    },
+                                                                    className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+                                                                    onClick={() => {
+                                                                        const currentSelected =
+                                                                            data.selected_examination_ids ||
+                                                                            [];
+                                                                        const nextExams =
+                                                                            isChecked
+                                                                                ? currentSelected.filter(
+                                                                                      (
+                                                                                          id: string,
+                                                                                      ) =>
+                                                                                          id !==
+                                                                                          examIdStr,
+                                                                                  )
+                                                                                : [
+                                                                                      ...currentSelected,
+                                                                                      examIdStr,
+                                                                                  ];
+
+                                                                        const examObjs =
+                                                                            nextExams.map(
+                                                                                (
+                                                                                    idStr: string,
+                                                                                ) => {
+                                                                                    const examObj =
+                                                                                        filteredExaminations.find(
+                                                                                            (
+                                                                                                e,
+                                                                                            ) =>
+                                                                                                e.id.toString() ===
+                                                                                                idStr,
+                                                                                        );
+
+                                                                                    return {
+                                                                                        examination_id:
+                                                                                            parseInt(
+                                                                                                idStr,
+                                                                                                10,
+                                                                                            ),
+                                                                                        name: examObj
+                                                                                            ? examObj.name
+                                                                                            : '',
+                                                                                        quantity: 1,
+                                                                                        amount: 0,
+                                                                                        discount: 0,
+                                                                                        subtotal: 0,
+                                                                                    };
+                                                                                },
+                                                                            );
+
+                                                                        setData(
+                                                                            (
+                                                                                d,
+                                                                            ) => ({
+                                                                                ...d,
+                                                                                selected_examination_ids:
+                                                                                    nextExams,
+                                                                                specimen_type_examination:
+                                                                                    nextExams[0] ||
+                                                                                    '',
+                                                                                examinations:
+                                                                                    examObjs,
+                                                                            }),
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <Checkbox
+                                                                        checked={
+                                                                            isChecked
+                                                                        }
+                                                                        className="pointer-events-none"
+                                                                        onCheckedChange={() => {}}
+                                                                    />
+                                                                    <span className="truncate">
+                                                                        {
+                                                                            exam.name
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        },
+                                                    )
                                                 )}
                                             </div>
                                         </div>

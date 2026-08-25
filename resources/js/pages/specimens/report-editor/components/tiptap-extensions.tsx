@@ -9,7 +9,8 @@ import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey, Selection } from '@tiptap/pm/state';
+import { canJoin } from '@tiptap/pm/transform';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { mergeAttributes, ReactNodeViewRenderer } from '@tiptap/react';
 import ImageGridComponent from '../image-grid-component';
@@ -175,6 +176,7 @@ export const LineHeight = Extension.create({
                                         lineHeight,
                                     });
                                 }
+
                                 applied = true;
                             }
                         },
@@ -947,12 +949,478 @@ export const HIGHLIGHT_COLORS = [
     { name: 'Teal', color: '#008080' },
     { name: 'Verde oscuro', color: '#008000' },
     { name: 'Morado', color: '#800080' },
-    { name: 'Rojo oscuro', color: '#800000' },
-    { name: 'Verde oliva', color: '#808000' },
     { name: 'Gris oscuro', color: '#808080' },
     { name: 'Gris claro', color: '#c0c0c0' },
     { name: 'Negro', color: '#000000' },
 ];
+
+const isBlockEmpty = (node: any) => {
+    if (!node || !node.isTextblock) {
+        return false;
+    }
+    const text = node.textContent
+        .replace(/[\u200b\u200c\u200d\ufeff]/g, '')
+        .trim();
+    return node.content.size === 0 || text === '';
+};
+
+export function handleListAndBlockKeyDown(
+    view: any,
+    event: KeyboardEvent,
+): boolean {
+    try {
+        if (event.key !== 'Backspace' && event.key !== 'Delete') {
+            return false;
+        }
+
+        const { state } = view;
+        const { selection } = state;
+        const { $from, empty } = selection;
+
+        if (event.key === 'Backspace') {
+            if (!empty) {
+                return false;
+            }
+
+            const topLevelIndex = $from.index(0);
+            const topLevelNode = state.doc.child(topLevelIndex);
+            const parentNode = $from.parent;
+
+            console.log('[handleListAndBlockKeyDown] Key:', event.key, {
+                empty,
+                depth: $from.depth,
+                parentOffset: $from.parentOffset,
+                parentType: parentNode.type.name,
+                parentContentSize: parentNode.content.size,
+                parentText: parentNode.textContent,
+                topLevelIndex,
+                topLevelType: topLevelNode.type.name,
+                topLevelEmpty: isBlockEmpty(topLevelNode),
+                childCount: state.doc.childCount,
+            });
+
+            // 1. Cursor is in an empty top-level block (e.g. empty <p> following a list)
+            if (isBlockEmpty(topLevelNode) && state.doc.childCount > 1) {
+                console.log(
+                    '[handleListAndBlockKeyDown] Deleting empty top-level node at index:',
+                    topLevelIndex,
+                );
+                const from = $from.before(1);
+                const to = $from.after(1);
+                const tr = state.tr.delete(from, to);
+
+                const posBefore = Math.max(0, from - 1);
+                let resolvedSelection: Selection | null = null;
+
+                if (posBefore > 0) {
+                    resolvedSelection =
+                        Selection.findFrom(
+                            tr.doc.resolve(posBefore),
+                            -1,
+                            true,
+                        ) || Selection.near(tr.doc.resolve(posBefore), -1);
+                } else {
+                    resolvedSelection =
+                        Selection.findFrom(tr.doc.resolve(0), 1, true) ||
+                        Selection.near(tr.doc.resolve(0), 1);
+                }
+
+                if (resolvedSelection) {
+                    tr.setSelection(resolvedSelection);
+                }
+
+                tr.scrollIntoView();
+                view.dispatch(tr);
+
+                return true;
+            }
+
+            // 2. Cursor is at the START of a non-empty top-level block immediately following a list
+            if (
+                $from.depth === 1 &&
+                $from.parentOffset === 0 &&
+                topLevelIndex > 0
+            ) {
+                const prevSibling = state.doc.child(topLevelIndex - 1);
+
+                if (
+                    prevSibling.type.name === 'bulletList' ||
+                    prevSibling.type.name === 'orderedList'
+                ) {
+                    console.log(
+                        '[handleListAndBlockKeyDown] Joining non-empty node into list',
+                    );
+                    const listType = prevSibling.type;
+                    const itemType = state.schema.nodes.listItem;
+
+                    if (itemType) {
+                        const from = $from.before(1);
+                        const to = $from.after(1);
+                        const tr = state.tr;
+
+                        const wrapped = itemType.create(null, $from.parent);
+                        const listNode = listType.create(
+                            prevSibling.attrs,
+                            wrapped,
+                        );
+
+                        tr.replaceWith(from, to, listNode);
+
+                        if (canJoin(tr.doc, from)) {
+                            tr.join(from);
+                        }
+
+                        const newPos = tr.mapping.map($from.pos);
+                        const newSelection =
+                            Selection.findFrom(
+                                tr.doc.resolve(newPos),
+                                1,
+                                true,
+                            ) || Selection.near(tr.doc.resolve(newPos));
+
+                        if (newSelection) {
+                            tr.setSelection(newSelection);
+                        }
+
+                        tr.scrollIntoView();
+                        view.dispatch(tr);
+
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if (event.key === 'Delete') {
+            if (!empty) {
+                return false;
+            }
+
+            const topLevelIndex = $from.index(0);
+            const topLevelNode = state.doc.child(topLevelIndex);
+
+            // 1. Cursor is in an empty top-level block
+            if (isBlockEmpty(topLevelNode) && state.doc.childCount > 1) {
+                console.log(
+                    '[handleListAndBlockKeyDown] Delete key: Deleting empty top-level node at index:',
+                    topLevelIndex,
+                );
+                const from = $from.before(1);
+                const to = $from.after(1);
+                const tr = state.tr.delete(from, to);
+
+                let resolvedSelection = Selection.findFrom(
+                    tr.doc.resolve(Math.min(from, tr.doc.content.size)),
+                    1,
+                    true,
+                );
+
+                if (!resolvedSelection) {
+                    const posBefore = Math.max(0, from - 1);
+                    resolvedSelection =
+                        Selection.findFrom(
+                            tr.doc.resolve(posBefore),
+                            -1,
+                            true,
+                        ) || Selection.near(tr.doc.resolve(posBefore), -1);
+                }
+
+                if (resolvedSelection) {
+                    tr.setSelection(resolvedSelection);
+                }
+
+                tr.scrollIntoView();
+                view.dispatch(tr);
+
+                return true;
+            }
+
+            // 2. Cursor is at the end of a list or block, and the NEXT sibling is an empty block
+            if (topLevelIndex < state.doc.childCount - 1) {
+                const topLevelEnd = $from.after(1);
+                const textAfterInTopNode = state.doc.textBetween(
+                    $from.pos,
+                    topLevelEnd,
+                );
+
+                if (textAfterInTopNode.trim().length === 0) {
+                    const nextSibling = state.doc.child(topLevelIndex + 1);
+
+                    if (isBlockEmpty(nextSibling)) {
+                        console.log(
+                            '[handleListAndBlockKeyDown] Delete key: Deleting empty next node',
+                        );
+                        const tr = state.tr;
+                        const nextFrom = topLevelEnd;
+                        const nextTo = topLevelEnd + nextSibling.nodeSize;
+
+                        tr.delete(nextFrom, nextTo);
+                        tr.scrollIntoView();
+                        view.dispatch(tr);
+
+                        return true;
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[handleListAndBlockKeyDown] Intercepted Error:', err);
+    }
+
+    return false;
+}
+
+export const ListAndBlockBackspaceFix = Extension.create({
+    name: 'listAndBlockBackspaceFix',
+    priority: 10000,
+
+    addProseMirrorPlugins() {
+        return [
+            new Plugin({
+                key: new PluginKey('listAndBlockBackspaceFixPlugin'),
+                props: {
+                    handleKeyDown(view, event) {
+                        if (
+                            event.key !== 'Backspace' &&
+                            event.key !== 'Delete'
+                        ) {
+                            return false;
+                        }
+
+                        const { state } = view;
+                        const { selection } = state;
+                        const { $from, empty } = selection;
+
+                        const topLevelIndex = $from.index(0);
+                        const topLevelNode = state.doc.child(topLevelIndex);
+                        const parentNode = $from.parent;
+
+                        console.log(
+                            '[ListAndBlockBackspaceFix] Key:',
+                            event.key,
+                            {
+                                empty,
+                                depth: $from.depth,
+                                parentOffset: $from.parentOffset,
+                                parentType: parentNode.type.name,
+                                parentContentSize: parentNode.content.size,
+                                parentText: parentNode.textContent,
+                                topLevelIndex,
+                                topLevelType: topLevelNode.type.name,
+                                topLevelEmpty: isBlockEmpty(topLevelNode),
+                                childCount: state.doc.childCount,
+                            },
+                        );
+
+                        if (event.key === 'Backspace') {
+                            if (!empty) {
+                                return false;
+                            }
+
+                            // 1. Cursor is in an empty top-level block (e.g. empty <p> following a list)
+                            if (
+                                isBlockEmpty(topLevelNode) &&
+                                state.doc.childCount > 1
+                            ) {
+                                console.log(
+                                    '[ListAndBlockBackspaceFix] Deleting empty top-level node at index:',
+                                    topLevelIndex,
+                                );
+                                const from = $from.before(1);
+                                const to = $from.after(1);
+                                const tr = state.tr.delete(from, to);
+
+                                const posBefore = Math.max(0, from - 1);
+                                let resolvedSelection: Selection | null = null;
+
+                                if (posBefore > 0) {
+                                    resolvedSelection =
+                                        Selection.findFrom(
+                                            tr.doc.resolve(posBefore),
+                                            -1,
+                                            true,
+                                        ) ||
+                                        Selection.near(
+                                            tr.doc.resolve(posBefore),
+                                            -1,
+                                        );
+                                } else {
+                                    resolvedSelection =
+                                        Selection.findFrom(
+                                            tr.doc.resolve(0),
+                                            1,
+                                            true,
+                                        ) ||
+                                        Selection.near(tr.doc.resolve(0), 1);
+                                }
+
+                                if (resolvedSelection) {
+                                    tr.setSelection(resolvedSelection);
+                                }
+
+                                tr.scrollIntoView();
+                                view.dispatch(tr);
+
+                                return true;
+                            }
+
+                            // 2. Cursor is at the START of a non-empty top-level block immediately following a list
+                            if (
+                                $from.depth === 1 &&
+                                $from.parentOffset === 0 &&
+                                topLevelIndex > 0
+                            ) {
+                                const prevSibling = state.doc.child(
+                                    topLevelIndex - 1,
+                                );
+
+                                if (
+                                    prevSibling.type.name === 'bulletList' ||
+                                    prevSibling.type.name === 'orderedList'
+                                ) {
+                                    console.log(
+                                        '[ListAndBlockBackspaceFix] Joining non-empty node into list',
+                                    );
+                                    const listType = prevSibling.type;
+                                    const itemType =
+                                        state.schema.nodes.listItem;
+
+                                    if (itemType) {
+                                        const from = $from.before(1);
+                                        const to = $from.after(1);
+                                        const tr = state.tr;
+
+                                        const wrapped = itemType.create(
+                                            null,
+                                            $from.parent,
+                                        );
+                                        const listNode = listType.create(
+                                            prevSibling.attrs,
+                                            wrapped,
+                                        );
+
+                                        tr.replaceWith(from, to, listNode);
+
+                                        if (canJoin(tr.doc, from)) {
+                                            tr.join(from);
+                                        }
+
+                                        const newPos = tr.mapping.map(
+                                            $from.pos,
+                                        );
+                                        const newSelection =
+                                            Selection.findFrom(
+                                                tr.doc.resolve(newPos),
+                                                1,
+                                                true,
+                                            ) ||
+                                            Selection.near(
+                                                tr.doc.resolve(newPos),
+                                            );
+
+                                        if (newSelection) {
+                                            tr.setSelection(newSelection);
+                                        }
+
+                                        tr.scrollIntoView();
+                                        view.dispatch(tr);
+
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (event.key === 'Delete') {
+                            if (!empty) {
+                                return false;
+                            }
+
+                            // 1. Cursor is in an empty top-level block
+                            if (
+                                isBlockEmpty(topLevelNode) &&
+                                state.doc.childCount > 1
+                            ) {
+                                console.log(
+                                    '[ListAndBlockBackspaceFix] Delete key: Deleting empty top-level node at index:',
+                                    topLevelIndex,
+                                );
+                                const from = $from.before(1);
+                                const to = $from.after(1);
+                                const tr = state.tr.delete(from, to);
+
+                                let resolvedSelection = Selection.findFrom(
+                                    tr.doc.resolve(
+                                        Math.min(from, tr.doc.content.size),
+                                    ),
+                                    1,
+                                    true,
+                                );
+
+                                if (!resolvedSelection) {
+                                    const posBefore = Math.max(0, from - 1);
+                                    resolvedSelection =
+                                        Selection.findFrom(
+                                            tr.doc.resolve(posBefore),
+                                            -1,
+                                            true,
+                                        ) ||
+                                        Selection.near(
+                                            tr.doc.resolve(posBefore),
+                                            -1,
+                                        );
+                                }
+
+                                if (resolvedSelection) {
+                                    tr.setSelection(resolvedSelection);
+                                }
+
+                                tr.scrollIntoView();
+                                view.dispatch(tr);
+
+                                return true;
+                            }
+
+                            // 2. Cursor is at the end of a list or block, and the NEXT sibling is an empty block
+                            if (topLevelIndex < state.doc.childCount - 1) {
+                                const topLevelEnd = $from.after(1);
+                                const textAfterInTopNode =
+                                    state.doc.textBetween(
+                                        $from.pos,
+                                        topLevelEnd,
+                                    );
+
+                                if (textAfterInTopNode.trim().length === 0) {
+                                    const nextSibling = state.doc.child(
+                                        topLevelIndex + 1,
+                                    );
+
+                                    if (isBlockEmpty(nextSibling)) {
+                                        console.log(
+                                            '[ListAndBlockBackspaceFix] Delete key: Deleting empty next node',
+                                        );
+                                        const tr = state.tr;
+                                        const nextFrom = topLevelEnd;
+                                        const nextTo =
+                                            topLevelEnd + nextSibling.nodeSize;
+
+                                        tr.delete(nextFrom, nextTo);
+                                        tr.scrollIntoView();
+                                        view.dispatch(tr);
+
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+
+                        return false;
+                    },
+                },
+            }),
+        ];
+    },
+});
 
 export const sharedExtensions = [
     TextStyle,
@@ -971,4 +1439,5 @@ export const sharedExtensions = [
     Highlight.configure({ multicolor: true }),
     ImageGrid,
     PasteCleaner,
+    ListAndBlockBackspaceFix,
 ];

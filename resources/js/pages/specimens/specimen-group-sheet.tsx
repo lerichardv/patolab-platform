@@ -22,6 +22,7 @@ import {
     ChevronDown,
     ChevronUp,
     Layers,
+    Search,
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
@@ -298,6 +299,8 @@ export default function SpecimenGroupSheet({
     const [nestedAgregarInsumos, setNestedAgregarInsumos] = useState(false);
     const [nestedInsumos, setNestedInsumos] = useState<any[]>([]);
     const [supplySearchQuery, setSupplySearchQuery] = useState('');
+    const [nestedExaminationSearchQuery, setNestedExaminationSearchQuery] =
+        useState('');
 
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
     const [customerSheetSource, setCustomerSheetSource] = useState<
@@ -3679,6 +3682,32 @@ export default function SpecimenGroupSheet({
                                                         e.specimen_type?.toString() ===
                                                         nestedSpecimenType,
                                                 );
+                                            const searchedExams =
+                                                filteredExams.filter((exam) => {
+                                                    if (
+                                                        !nestedExaminationSearchQuery
+                                                    ) {
+                                                        return true;
+                                                    }
+
+                                                    const query =
+                                                        nestedExaminationSearchQuery
+                                                            .toLowerCase()
+                                                            .normalize('NFD')
+                                                            .replace(
+                                                                /[\u0300-\u036f]/g,
+                                                                '',
+                                                            );
+                                                    const name = exam.name
+                                                        .toLowerCase()
+                                                        .normalize('NFD')
+                                                        .replace(
+                                                            /[\u0300-\u036f]/g,
+                                                            '',
+                                                        );
+
+                                                    return name.includes(query);
+                                                });
                                             const selectedExamIds =
                                                 nestedExamination
                                                     ? nestedExamination.split(
@@ -3687,7 +3716,16 @@ export default function SpecimenGroupSheet({
                                                     : [];
 
                                             return (
-                                                <Popover modal={true}>
+                                                <Popover
+                                                    modal={true}
+                                                    onOpenChange={(open) => {
+                                                        if (!open) {
+                                                            setNestedExaminationSearchQuery(
+                                                                '',
+                                                            );
+                                                        }
+                                                    }}
+                                                >
                                                     <PopoverTrigger asChild>
                                                         <Button
                                                             variant="outline"
@@ -3715,6 +3753,25 @@ export default function SpecimenGroupSheet({
                                                         align="start"
                                                     >
                                                         <div className="space-y-1.5">
+                                                            <div className="relative px-1 py-1">
+                                                                <Search className="absolute top-3 left-3 h-4 w-4 text-muted-foreground/70" />
+                                                                <Input
+                                                                    placeholder="Buscar análisis..."
+                                                                    value={
+                                                                        nestedExaminationSearchQuery
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) => {
+                                                                        setNestedExaminationSearchQuery(
+                                                                            e
+                                                                                .target
+                                                                                .value,
+                                                                        );
+                                                                    }}
+                                                                    className="h-9 w-full pr-3 pl-9 text-sm focus-visible:ring-1"
+                                                                />
+                                                            </div>
                                                             <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
                                                                 <span>
                                                                     Filtrar por
@@ -3723,17 +3780,17 @@ export default function SpecimenGroupSheet({
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => {
-                                                                        const allIds =
-                                                                            filteredExams.map(
+                                                                        const visibleIds =
+                                                                            searchedExams.map(
                                                                                 (
                                                                                     e,
                                                                                 ) =>
                                                                                     e.id.toString(),
                                                                             );
                                                                         const areAll =
-                                                                            allIds.length >
+                                                                            visibleIds.length >
                                                                                 0 &&
-                                                                            allIds.every(
+                                                                            visibleIds.every(
                                                                                 (
                                                                                     id,
                                                                                 ) =>
@@ -3743,8 +3800,26 @@ export default function SpecimenGroupSheet({
                                                                             );
                                                                         const nextVal =
                                                                             areAll
-                                                                                ? ''
-                                                                                : allIds.join(
+                                                                                ? selectedExamIds
+                                                                                      .filter(
+                                                                                          (
+                                                                                              id,
+                                                                                          ) =>
+                                                                                              !visibleIds.includes(
+                                                                                                  id,
+                                                                                              ),
+                                                                                      )
+                                                                                      .join(
+                                                                                          ',',
+                                                                                      )
+                                                                                : [
+                                                                                      ...new Set(
+                                                                                          [
+                                                                                              ...selectedExamIds,
+                                                                                              ...visibleIds,
+                                                                                          ],
+                                                                                      ),
+                                                                                  ].join(
                                                                                       ',',
                                                                                   );
                                                                         setNestedExamination(
@@ -3762,9 +3837,9 @@ export default function SpecimenGroupSheet({
                                                                     }}
                                                                     className="cursor-pointer font-medium transition-colors hover:text-primary"
                                                                 >
-                                                                    {filteredExams.length >
+                                                                    {searchedExams.length >
                                                                         0 &&
-                                                                    filteredExams.every(
+                                                                    searchedExams.every(
                                                                         (e) =>
                                                                             selectedExamIds.includes(
                                                                                 e.id.toString(),
@@ -3775,66 +3850,77 @@ export default function SpecimenGroupSheet({
                                                                 </button>
                                                             </div>
                                                             <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
-                                                                {filteredExams.map(
-                                                                    (exam) => {
-                                                                        const examIdStr =
-                                                                            exam.id.toString();
-                                                                        const isChecked =
-                                                                            selectedExamIds.includes(
-                                                                                examIdStr,
-                                                                            );
+                                                                {searchedExams.length ===
+                                                                0 ? (
+                                                                    <div className="py-6 text-center text-xs text-muted-foreground select-none">
+                                                                        No se
+                                                                        encontraron
+                                                                        resultados.
+                                                                    </div>
+                                                                ) : (
+                                                                    searchedExams.map(
+                                                                        (
+                                                                            exam,
+                                                                        ) => {
+                                                                            const examIdStr =
+                                                                                exam.id.toString();
+                                                                            const isChecked =
+                                                                                selectedExamIds.includes(
+                                                                                    examIdStr,
+                                                                                );
 
-                                                                        return (
-                                                                            <div
-                                                                                key={
-                                                                                    exam.id
-                                                                                }
-                                                                                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
-                                                                                onClick={() => {
-                                                                                    const nextIds =
-                                                                                        isChecked
-                                                                                            ? selectedExamIds.filter(
-                                                                                                  (
-                                                                                                      id,
-                                                                                                  ) =>
-                                                                                                      id !==
+                                                                            return (
+                                                                                <div
+                                                                                    key={
+                                                                                        exam.id
+                                                                                    }
+                                                                                    className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+                                                                                    onClick={() => {
+                                                                                        const nextIds =
+                                                                                            isChecked
+                                                                                                ? selectedExamIds.filter(
+                                                                                                      (
+                                                                                                          id,
+                                                                                                      ) =>
+                                                                                                          id !==
+                                                                                                          examIdStr,
+                                                                                                  )
+                                                                                                : [
+                                                                                                      ...selectedExamIds,
                                                                                                       examIdStr,
-                                                                                              )
-                                                                                            : [
-                                                                                                  ...selectedExamIds,
-                                                                                                  examIdStr,
-                                                                                              ];
-                                                                                    setNestedExamination(
-                                                                                        nextIds.join(
-                                                                                            ',',
-                                                                                        ),
-                                                                                    );
-                                                                                    setNestedErrors(
-                                                                                        (
-                                                                                            prev,
-                                                                                        ) => ({
-                                                                                            ...prev,
-                                                                                            specimen_type_examination:
-                                                                                                '',
-                                                                                        }),
-                                                                                    );
-                                                                                }}
-                                                                            >
-                                                                                <Checkbox
-                                                                                    checked={
-                                                                                        isChecked
-                                                                                    }
-                                                                                    className="pointer-events-none"
-                                                                                    onCheckedChange={() => {}}
-                                                                                />
-                                                                                <span className="truncate">
-                                                                                    {
-                                                                                        exam.name
-                                                                                    }
-                                                                                </span>
-                                                                            </div>
-                                                                        );
-                                                                    },
+                                                                                                  ];
+                                                                                        setNestedExamination(
+                                                                                            nextIds.join(
+                                                                                                ',',
+                                                                                            ),
+                                                                                        );
+                                                                                        setNestedErrors(
+                                                                                            (
+                                                                                                prev,
+                                                                                            ) => ({
+                                                                                                ...prev,
+                                                                                                specimen_type_examination:
+                                                                                                    '',
+                                                                                            }),
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    <Checkbox
+                                                                                        checked={
+                                                                                            isChecked
+                                                                                        }
+                                                                                        className="pointer-events-none"
+                                                                                        onCheckedChange={() => {}}
+                                                                                    />
+                                                                                    <span className="truncate">
+                                                                                        {
+                                                                                            exam.name
+                                                                                        }
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        },
+                                                                    )
                                                                 )}
                                                             </div>
                                                         </div>
