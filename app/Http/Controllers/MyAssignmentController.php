@@ -112,7 +112,7 @@ class MyAssignmentController extends Controller
                 $query->where(function ($subQ) use ($examinationIds) {
                     $subQ->whereIn('specimen.specimen_type_examination', $examinationIds)
                         ->orWhereHas('examinations', function ($pivotQ) use ($examinationIds) {
-                            $pivotQ->whereIn('specimen_type_examinations.id', $examinationIds);
+                            $pivotQ->whereIn('specimen_type_examination.id', $examinationIds);
                         })
                         ->orWhereHas('invoiceRelation.invoiceSpecimens', function ($invQ) use ($examinationIds) {
                             $invQ->whereIn('examination_id', $examinationIds);
