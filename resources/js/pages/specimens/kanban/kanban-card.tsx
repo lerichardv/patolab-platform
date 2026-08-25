@@ -294,12 +294,48 @@ export function KanbanCard({
                                 </div>
                                 <div className="text-xs text-muted-foreground">
                                     {specimen.sequence_code && (
-                                        <div className="mb-0.5 w-fit rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
+                                        <div className="mb-1 w-fit rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
                                             {specimen.sequence_code}
                                         </div>
                                     )}
-                                    {specimen.type?.name} -{' '}
-                                    {specimen.examination?.name}
+                                    {specimen.type?.name && (
+                                        <div className="text-[11px] font-semibold text-muted-foreground">
+                                            {specimen.type.name}
+                                        </div>
+                                    )}
+                                    {(() => {
+                                        const exams =
+                                            specimen.examinations &&
+                                            specimen.examinations.length > 0
+                                                ? specimen.examinations
+                                                : specimen.examination
+                                                  ? [specimen.examination]
+                                                  : [];
+
+                                        if (exams.length === 0) {
+                                            return null;
+                                        }
+
+                                        return (
+                                            <div className="mt-1 flex flex-col gap-0.5 text-xs font-medium text-foreground">
+                                                {exams.map((exam: any) => (
+                                                    <div
+                                                        key={exam.id}
+                                                        className="flex items-center gap-1.5"
+                                                    >
+                                                        {exams.length > 1 ? (
+                                                            <span className="h-1 w-1 shrink-0 rounded-full bg-primary/20" />
+                                                        ) : (
+                                                            ''
+                                                        )}
+                                                        <span className="truncate">
+                                                            {exam.name}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                             {(() => {

@@ -283,6 +283,83 @@ const getCuttingsSummary = (cuttings?: any[]) => {
     };
 };
 
+const getSpecimenExaminations = (specimen: Specimen) => {
+    if (!specimen) return [];
+
+    const examList: Array<{ id?: number; name: string; code?: string }> = [];
+    const seenNames = new Set<string>();
+
+    const invoice = specimen.group?.invoice
+        ? specimen.group.invoice
+        : specimen.invoice_relation || (specimen as any).invoiceRelation;
+
+    const invoiceItems =
+        invoice?.invoice_specimens ||
+        invoice?.invoiceSpecimens ||
+        invoice?.credit_invoice_specimens ||
+        invoice?.group_specimens ||
+        [];
+
+    if (Array.isArray(invoiceItems) && invoiceItems.length > 0) {
+        invoiceItems.forEach((item: any) => {
+            if (!item.specimen_id || item.specimen_id === specimen.id) {
+                const examObj = item.examination;
+                const examName =
+                    examObj?.name || item.examination_name || item.name;
+                if (examName && !seenNames.has(examName)) {
+                    seenNames.add(examName);
+                    examList.push({
+                        id: item.examination_id || examObj?.id,
+                        name: examName,
+                        code: examObj?.code || item.code,
+                    });
+                }
+            }
+        });
+    }
+
+    const specimenExams = (specimen as any).examinations;
+    if (Array.isArray(specimenExams) && specimenExams.length > 0) {
+        specimenExams.forEach((exam: any) => {
+            const name = exam.name;
+            if (name && !seenNames.has(name)) {
+                seenNames.add(name);
+                examList.push({
+                    id: exam.id,
+                    name: name,
+                    code: exam.code,
+                });
+            }
+        });
+    }
+
+    const specimenExamPivots = (specimen as any).specimen_examinations;
+    if (Array.isArray(specimenExamPivots) && specimenExamPivots.length > 0) {
+        specimenExamPivots.forEach((se: any) => {
+            const exam = se.examination || se;
+            const name = exam.name;
+            if (name && !seenNames.has(name)) {
+                seenNames.add(name);
+                examList.push({
+                    id: exam.id || se.examination_id,
+                    name: name,
+                    code: exam.code,
+                });
+            }
+        });
+    }
+
+    if (examList.length === 0 && specimen.examination?.name) {
+        examList.push({
+            id: specimen.examination.id,
+            name: specimen.examination.name,
+            code: (specimen.examination as any).code,
+        });
+    }
+
+    return examList;
+};
+
 function CopyButton({ text }: { text: string }) {
     const [copied, setCopied] = useState(false);
 
@@ -447,6 +524,7 @@ export default function MyAssignmentsIndex({
         ) {
             return [];
         }
+
         if (
             rawFilter === undefined ||
             rawFilter === null ||
@@ -454,9 +532,11 @@ export default function MyAssignmentsIndex({
         ) {
             return allItems.map((item) => item.id.toString());
         }
+
         if (Array.isArray(rawFilter)) {
             return rawFilter.map((id) => id.toString());
         }
+
         return [rawFilter.toString()];
     };
 
@@ -471,6 +551,7 @@ export default function MyAssignmentsIndex({
     const getSpecimenTypeId = (exam: any): string | null => {
         const typeId =
             exam.specimen_type || exam.specimen_type_id || exam.type?.id;
+
         return typeId ? typeId.toString() : null;
     };
 
@@ -481,6 +562,7 @@ export default function MyAssignmentsIndex({
 
         return examinations.filter((exam) => {
             const typeId = getSpecimenTypeId(exam);
+
             return typeId && selectedSpecimenTypeIds.includes(typeId);
         });
     }, [examinations, selectedSpecimenTypeIds, specimenTypes.length]);
@@ -501,6 +583,7 @@ export default function MyAssignmentsIndex({
 
             const validExamsForNextTypes = examinations.filter((exam) => {
                 const typeId = getSpecimenTypeId(exam);
+
                 return typeId && nextTypeIds.includes(typeId);
             });
             const validExamIdsForNextTypes = validExamsForNextTypes.map((e) =>
@@ -515,6 +598,7 @@ export default function MyAssignmentsIndex({
                 const addedExamIds = examinations
                     .filter((exam) => {
                         const typeId = getSpecimenTypeId(exam);
+
                         return typeId && addedTypeIds.includes(typeId);
                     })
                     .map((e) => e.id.toString());
@@ -637,11 +721,15 @@ export default function MyAssignmentsIndex({
                         specimenTypeId.toString(),
                     ));
 
-            const examId =
-                specimen.specimen_type_examination || specimen.examination?.id;
+            const allExams = getSpecimenExaminations(specimen);
             const matchesExamination =
                 selectedExaminationIds.length === examinations.length ||
-                (examId && selectedExaminationIds.includes(examId.toString()));
+                (allExams.length > 0 &&
+                    allExams.some(
+                        (e) =>
+                            e.id &&
+                            selectedExaminationIds.includes(e.id.toString()),
+                    ));
 
             const matchesCuttings =
                 !showCuttingsOnly ||
@@ -1841,12 +1929,48 @@ export default function MyAssignmentsIndex({
                                                                             ?.name ||
                                                                             'N/A'}
                                                                     </div>
-                                                                    <div className="mt-0.5 text-xs text-muted-foreground">
-                                                                        {specimen
-                                                                            .examination
-                                                                            ?.name ||
-                                                                            'N/A'}
-                                                                    </div>
+                                                                    {(() => {
+                                                                        const exams =
+                                                                            getSpecimenExaminations(
+                                                                                specimen,
+                                                                            );
+                                                                        if (
+                                                                            exams.length ===
+                                                                            0
+                                                                        ) {
+                                                                            return (
+                                                                                <div className="mt-0.5 text-xs text-muted-foreground">
+                                                                                    N/A
+                                                                                </div>
+                                                                            );
+                                                                        }
+
+                                                                        return (
+                                                                            <div className="mt-1 flex flex-col gap-0.5">
+                                                                                {exams.map(
+                                                                                    (
+                                                                                        exam,
+                                                                                        idx,
+                                                                                    ) => (
+                                                                                        <div
+                                                                                            key={
+                                                                                                idx
+                                                                                            }
+                                                                                            className="text-xs font-medium text-muted-foreground"
+                                                                                        >
+                                                                                            {exams.length >
+                                                                                            1
+                                                                                                ? '•'
+                                                                                                : ''}{' '}
+                                                                                            {
+                                                                                                exam.name
+                                                                                            }
+                                                                                        </div>
+                                                                                    ),
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
                                                                 </TableCell>
                                                                 <TableCell>
                                                                     {(() => {

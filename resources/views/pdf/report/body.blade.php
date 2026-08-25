@@ -589,7 +589,7 @@
                             <tr>
                                 <td style="width: 55%;">
                                     <strong>Nombre:</strong> {{ $customer->name ?? 'N/A' }}<br>
-                                    <strong>Edad:</strong> {{ $customer->age ?? 'N/A' }} años &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ in_array(strtolower($customer->gender ?? ''), ['m', 'masculino', 'hombre']) ? 'M' : (in_array(strtolower($customer->gender ?? ''), ['f', 'femenino', 'mujer']) ? 'F' : (in_array(strtolower($customer->gender ?? ''), ['o', 'otro']) ? 'O' : 'N/A')) }}<br>
+                                    <strong>Edad:</strong> {{ $customer->age ?? 'N/A' }} {{ $customer->age && $customer->age > 0 ? 'años' : '' }} &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ in_array(strtolower($customer->gender ?? ''), ['m', 'masculino', 'hombre']) ? 'M' : (in_array(strtolower($customer->gender ?? ''), ['f', 'femenino', 'mujer']) ? 'F' : (in_array(strtolower($customer->gender ?? ''), ['o', 'otro']) ? 'O' : 'N/A')) }}<br>
                                     <strong>Médico Remitente:</strong> {{ $referrer->name ?? 'N/A' }}<br>
                                     <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? '' }}
                                 </td>

@@ -2,25 +2,20 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Model representing 'credit_invoice_specimens' table.
+ * Model representing 'invoice_specimens' table.
  *
- * Purpose:
- * This model/table holds the specimens that correspond to a credit and an invoice.
- * It stores the exact values (amounts, discounts, totals) charged for each specimen
- * on a grouped credit at the time of creation.
- *
- * Tracking:
- * The 'is_paid' column tracks payment status per specimen in grouped credits.
- * On the credit payment form, this allows the user to select specific specimens
- * to pay, making partial payments for the customer.
+ * Stores the breakdown details (discounts, subtotals, taxes, and total) of each individual
+ * specimen within an invoice, serving individual, group, and credit invoices.
  */
-class CreditInvoiceSpecimen extends Model
+class InvoiceSpecimen extends Model
 {
+    use Auditable;
     use HasFactory;
 
     protected $table = 'invoice_specimens';
@@ -29,9 +24,16 @@ class CreditInvoiceSpecimen extends Model
     {
         static::creating(function ($model) {
             if ($model->invoice_id && $model->specimen_id) {
-                $existing = static::where('invoice_id', $model->invoice_id)
-                    ->where('specimen_id', $model->specimen_id)
-                    ->first();
+                $query = static::where('invoice_id', $model->invoice_id)
+                    ->where('specimen_id', $model->specimen_id);
+
+                if ($model->examination_id) {
+                    $query->where('examination_id', $model->examination_id);
+                } else {
+                    $query->whereNull('examination_id');
+                }
+
+                $existing = $query->first();
 
                 if ($existing) {
                     $attrs = array_filter($model->getAttributes(), fn ($val) => ! is_null($val));
@@ -44,10 +46,14 @@ class CreditInvoiceSpecimen extends Model
     }
 
     protected $fillable = [
-        'credit_id',
         'invoice_id',
         'specimen_id',
+        'examination_id',
+        'is_group',
+        'group_id',
+        'credit_id',
         'is_paid',
+        'quantity_paid',
         'quantity',
         'amount',
         'discount',
@@ -58,7 +64,6 @@ class CreditInvoiceSpecimen extends Model
         'isv_15',
         'isv_18',
         'total',
-        'quantity_paid',
         'selected_price',
         'custom_specimen_price',
         'additional_discount_enabled',
@@ -68,7 +73,9 @@ class CreditInvoiceSpecimen extends Model
     ];
 
     protected $casts = [
+        'is_group' => 'boolean',
         'is_paid' => 'boolean',
+        'quantity_paid' => 'integer',
         'quantity' => 'integer',
         'amount' => 'decimal:2',
         'discount' => 'decimal:2',
@@ -79,20 +86,11 @@ class CreditInvoiceSpecimen extends Model
         'isv_15' => 'decimal:2',
         'isv_18' => 'decimal:2',
         'total' => 'decimal:2',
-        'quantity_paid' => 'integer',
         'custom_specimen_price' => 'decimal:2',
         'additional_discount_enabled' => 'boolean',
         'additional_discount' => 'decimal:2',
         'age_discount_amount' => 'decimal:2',
     ];
-
-    /**
-     * Get the credit associated with this record.
-     */
-    public function credit(): BelongsTo
-    {
-        return $this->belongsTo(Credit::class, 'credit_id');
-    }
 
     /**
      * Get the invoice associated with this record.
@@ -108,5 +106,29 @@ class CreditInvoiceSpecimen extends Model
     public function specimen(): BelongsTo
     {
         return $this->belongsTo(Specimen::class, 'specimen_id');
+    }
+
+    /**
+     * Get the examination associated with this record.
+     */
+    public function examination(): BelongsTo
+    {
+        return $this->belongsTo(SpecimenTypeExamination::class, 'examination_id');
+    }
+
+    /**
+     * Get the specimen group associated with this record (if group invoice).
+     */
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(SpecimenGroup::class, 'group_id');
+    }
+
+    /**
+     * Get the credit associated with this record (if credit invoice).
+     */
+    public function credit(): BelongsTo
+    {
+        return $this->belongsTo(Credit::class, 'credit_id');
     }
 }

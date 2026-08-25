@@ -80,6 +80,7 @@ class Specimen extends Model
         'customer',
         'location_id',
         'specimen_type',
+        // LEGACY: The specimen_type_examination column is legacy. The correct way to store specimen_type_examinations is by creating them on InvoiceSpecimen (or examinations pivot).
         'specimen_type_examination',
         'specimen_category',
         'referrer',
@@ -126,6 +127,13 @@ class Specimen extends Model
         'expected_internal_finalization_date',
     ];
 
+    public function resolveRouteBinding($value, $field = null)
+    {
+        return $this->where('id', $value)
+            ->orWhere('sequence_code', $value)
+            ->firstOrFail();
+    }
+
     public function cancelledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cancelled_by_id');
@@ -154,6 +162,16 @@ class Specimen extends Model
     public function examination(): BelongsTo
     {
         return $this->belongsTo(SpecimenTypeExamination::class, 'specimen_type_examination');
+    }
+
+    public function specimenExaminations(): HasMany
+    {
+        return $this->hasMany(SpecimenExamination::class, 'specimen_id');
+    }
+
+    public function examinations(): BelongsToMany
+    {
+        return $this->belongsToMany(SpecimenTypeExamination::class, 'specimen_examinations', 'specimen_id', 'examination_id');
     }
 
     public function category(): BelongsTo
@@ -297,11 +315,19 @@ class Specimen extends Model
     }
 
     /**
-     * Get the group specimen breakdown record for this specimen.
+     * Get the invoice breakdown record for this specimen.
      */
     public function invoiceGroupSpecimen(): HasOne
     {
-        return $this->hasOne(InvoiceGroupSpecimen::class, 'specimen_id');
+        return $this->hasOne(InvoiceSpecimen::class, 'specimen_id');
+    }
+
+    /**
+     * Get the invoice breakdown record for this specimen.
+     */
+    public function invoiceSpecimen(): HasOne
+    {
+        return $this->hasOne(InvoiceSpecimen::class, 'specimen_id');
     }
 
     /**

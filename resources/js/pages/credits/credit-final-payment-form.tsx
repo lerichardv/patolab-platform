@@ -1,6 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import type { FormEventHandler } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { payFinal as payFinalCredit } from '@/actions/App/Http/Controllers/CreditController';
 import InputError from '@/components/input-error';
@@ -31,6 +31,7 @@ interface Invoice {
     full_invoice_number?: string | null;
     cai_range_id?: number | null;
     payment_type?: string;
+    specimen?: any;
 }
 
 interface CreditInvoiceSpecimen {
@@ -45,18 +46,37 @@ interface CreditInvoiceSpecimen {
     total: string | number;
     quantity: number;
     quantity_paid?: number;
+    examination_id?: number;
+    examination_name?: string;
+    examination?: {
+        id?: number;
+        name: string;
+        code?: string;
+    };
     specimen?: {
         id: number;
         sequence_code: string;
         customer_relation?: {
             name: string;
         };
+        customerRelation?: {
+            name: string;
+        };
         type?: {
             name: string;
         };
         examination?: {
+            id?: number;
             name: string;
+            code?: string;
         };
+        examinations?: Array<{
+            id: number;
+            name: string;
+            code?: string;
+        }>;
+        specimen_examinations?: any[];
+        specimenExaminations?: any[];
     };
 }
 
@@ -72,6 +92,7 @@ interface Credit {
     customer?: Customer;
     last_payment_date?: string | null;
     reminder_interval_in_seconds?: number;
+    invoice_specimens?: CreditInvoiceSpecimen[];
     credit_invoice_specimens?: CreditInvoiceSpecimen[];
     invoices?: Invoice[];
     invoice?: Invoice;
@@ -80,6 +101,76 @@ interface Credit {
         invoice?: Invoice;
     };
     specimen?: any;
+}
+
+function extractSpecimenExaminations(
+    spec: any,
+    fallbackCreditItems?: any[],
+): Array<{ id?: number; name: string; code?: string }> {
+    const list: Array<{ id?: number; name: string; code?: string }> = [];
+    const seen = new Set<string>();
+
+    const addExam = (name?: string, id?: number, code?: string) => {
+        if (name && !seen.has(name.trim().toLowerCase())) {
+            seen.add(name.trim().toLowerCase());
+            list.push({ id, name: name.trim(), code });
+        }
+    };
+
+    if (Array.isArray(spec?.examinations) && spec.examinations.length > 0) {
+        spec.examinations.forEach((e: any) => {
+            addExam(e.name, e.id, e.code);
+        });
+    }
+
+    if (
+        Array.isArray(spec?.specimen_examinations) &&
+        spec.specimen_examinations.length > 0
+    ) {
+        spec.specimen_examinations.forEach((se: any) => {
+            const exam = se.examination || se;
+            addExam(exam.name, exam.id || se.examination_id, exam.code);
+        });
+    }
+
+    if (
+        Array.isArray(spec?.specimenExaminations) &&
+        spec.specimenExaminations.length > 0
+    ) {
+        spec.specimenExaminations.forEach((se: any) => {
+            const exam = se.examination || se;
+            addExam(exam.name, exam.id || se.examination_id, exam.code);
+        });
+    }
+
+    if (Array.isArray(fallbackCreditItems) && fallbackCreditItems.length > 0) {
+        fallbackCreditItems.forEach((item: any) => {
+            if (
+                !spec?.id ||
+                !item.specimen_id ||
+                item.specimen_id === spec.id
+            ) {
+                const exam = item.examination || item.specimen?.examination;
+                const examName =
+                    exam?.name || item.examination_name || item.name;
+                addExam(
+                    examName,
+                    item.examination_id || exam?.id,
+                    exam?.code || item.code,
+                );
+            }
+        });
+    }
+
+    if (list.length === 0 && spec?.examination?.name) {
+        addExam(
+            spec.examination.name,
+            spec.examination.id,
+            spec.examination.code,
+        );
+    }
+
+    return list;
 }
 
 interface Bank {
@@ -91,6 +182,23 @@ interface Props {
     credit: Credit;
     banks?: Bank[];
     onSuccess: () => void;
+}
+
+interface GroupedFinalPaymentSpecimen {
+    specimen_id: number;
+    specimen?: any;
+    is_paid: boolean;
+    amount: number;
+    discount: number;
+    total: number;
+    quantity: number;
+    quantity_paid: number;
+    items: CreditInvoiceSpecimen[];
+    examinations: Array<{
+        id?: number;
+        name: string;
+        code?: string;
+    }>;
 }
 
 export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
@@ -108,12 +216,95 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
         originalInvoice?.cai_range_id,
     );
 
-    const unpaidSpecimens =
-        credit.credit_invoice_specimens?.filter((item) => !item.is_paid) || [];
-    const initialSpecimens = unpaidSpecimens.map((item) => ({
-        id: item.specimen_id,
-        quantity: item.quantity - (item.quantity_paid ?? 0),
-    }));
+    const allCreditSpecimens =
+        credit.invoice_specimens || credit.credit_invoice_specimens || [];
+
+    const groupedCreditSpecimens = useMemo(() => {
+        const rawList = allCreditSpecimens;
+
+        const groupMap = new Map<number, GroupedFinalPaymentSpecimen>();
+
+        rawList.forEach((item) => {
+            const specId = item.specimen_id;
+            if (!specId) return;
+
+            const unitPrice = parseFloat(String(item.amount || '0'));
+            const unitDiscount = parseFloat(String(item.discount || '0'));
+            const qty = item.quantity || 1;
+            const itemTotal =
+                item.total !== undefined && item.total !== null
+                    ? parseFloat(String(item.total))
+                    : (unitPrice - unitDiscount) * qty;
+
+            if (!groupMap.has(specId)) {
+                groupMap.set(specId, {
+                    specimen_id: specId,
+                    specimen: item.specimen,
+                    is_paid: Boolean(item.is_paid),
+                    amount: unitPrice,
+                    discount: unitDiscount,
+                    total: itemTotal,
+                    quantity: qty,
+                    quantity_paid: item.quantity_paid ?? 0,
+                    items: [item],
+                    examinations: [],
+                });
+            } else {
+                const existing = groupMap.get(specId)!;
+                existing.is_paid = existing.is_paid && Boolean(item.is_paid);
+                existing.amount += unitPrice;
+                existing.discount += unitDiscount;
+                existing.total += itemTotal;
+                existing.items.push(item);
+                if (!existing.specimen && item.specimen) {
+                    existing.specimen = item.specimen;
+                }
+            }
+        });
+
+        const result: GroupedFinalPaymentSpecimen[] = [];
+
+        groupMap.forEach((entry) => {
+            entry.examinations = extractSpecimenExaminations(
+                entry.specimen,
+                entry.items,
+            );
+            result.push(entry);
+        });
+
+        return result;
+    }, [allCreditSpecimens]);
+
+    const unpaidSpecimens = useMemo(() => {
+        return groupedCreditSpecimens.filter(
+            (item: GroupedFinalPaymentSpecimen) => !item.is_paid,
+        );
+    }, [groupedCreditSpecimens]);
+
+    const initialSpecimens = unpaidSpecimens.map(
+        (item: GroupedFinalPaymentSpecimen) => ({
+            id: item.specimen_id,
+            quantity: Math.max(1, item.quantity - (item.quantity_paid ?? 0)),
+        }),
+    );
+
+    const singleSpecimen =
+        credit.specimen ||
+        credit.invoices?.find((inv: any) => inv.specimen)?.specimen ||
+        credit.invoices?.[0]?.specimen ||
+        allCreditSpecimens[0]?.specimen ||
+        null;
+
+    const singlePatientName =
+        singleSpecimen?.customer_relation?.name ||
+        singleSpecimen?.customerRelation?.name ||
+        credit.customer?.name ||
+        'N/A';
+
+    const singleSpecExams = extractSpecimenExaminations(
+        singleSpecimen,
+        allCreditSpecimens,
+    );
 
     const [showConfirm, setShowConfirm] = useState(false);
 
@@ -229,84 +420,170 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
                             </span>
                         </div>
 
-                        <div className="max-h-[220px] space-y-2.5 overflow-y-auto pr-1">
-                            {unpaidSpecimens.map((item) => {
-                                const spec = item.specimen;
-                                const maxQty =
-                                    item.quantity - (item.quantity_paid ?? 0);
+                        <div className="max-h-[260px] space-y-2.5 overflow-y-auto pr-1">
+                            {unpaidSpecimens.map(
+                                (item: GroupedFinalPaymentSpecimen) => {
+                                    const spec = item.specimen;
+                                    const maxQty =
+                                        item.quantity -
+                                        (item.quantity_paid ?? 0);
+                                    const specPatientName =
+                                        spec?.customer_relation?.name ||
+                                        spec?.customerRelation?.name ||
+                                        credit.customer?.name ||
+                                        'N/A';
+                                    const specType = spec?.type?.name || 'N/A';
+                                    const specExams = item.examinations;
 
-                                return (
-                                    <div
-                                        key={item.specimen_id}
-                                        className="flex items-start justify-between rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs"
-                                    >
-                                        <div className="flex flex-col space-y-1">
-                                            <span className="font-mono font-bold text-foreground">
-                                                {spec?.sequence_code || 'N/A'}
-                                            </span>
-                                            <span className="font-semibold text-muted-foreground">
-                                                Paciente:{' '}
-                                                {spec?.customer_relation
-                                                    ?.name || 'N/A'}
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground/80">
-                                                {spec?.type?.name || 'N/A'}
-                                                {spec?.examination?.name &&
-                                                    ` - ${spec.examination.name}`}
-                                            </span>
-                                            <span className="text-[10px] font-semibold text-primary">
-                                                Cantidad a liquidar: {maxQty}
-                                            </span>
+                                    return (
+                                        <div
+                                            key={item.specimen_id}
+                                            className="flex items-start justify-between rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs"
+                                        >
+                                            <div className="flex flex-col space-y-1.5">
+                                                <span className="font-mono font-bold text-foreground">
+                                                    {spec?.sequence_code ||
+                                                        'N/A'}
+                                                </span>
+                                                <span className="font-semibold text-muted-foreground">
+                                                    Paciente:{' '}
+                                                    <strong className="text-foreground">
+                                                        {specPatientName}
+                                                    </strong>
+                                                </span>
+                                                <div className="flex flex-col gap-1 pt-0.5">
+                                                    <span className="text-[11px] font-semibold text-foreground">
+                                                        Tipo:{' '}
+                                                        <span className="font-normal text-muted-foreground">
+                                                            {specType}
+                                                        </span>
+                                                    </span>
+                                                    {specExams.length > 0 ? (
+                                                        <div className="flex flex-col gap-0.5 pl-1">
+                                                            <span className="text-[10px] font-medium text-muted-foreground">
+                                                                {specExams.length >
+                                                                1
+                                                                    ? 'Exámenes:'
+                                                                    : 'Examen:'}
+                                                            </span>
+                                                            <div className="flex flex-col gap-0.5">
+                                                                {specExams.map(
+                                                                    (
+                                                                        exam,
+                                                                        idx,
+                                                                    ) => (
+                                                                        <div
+                                                                            key={
+                                                                                idx
+                                                                            }
+                                                                            className="flex items-center gap-1.5 text-[11px] font-medium text-foreground"
+                                                                        >
+                                                                            <span className="h-1 w-1 shrink-0 rounded-full bg-primary" />
+                                                                            <span>
+                                                                                {
+                                                                                    exam.name
+                                                                                }
+                                                                            </span>
+                                                                            {exam.code && (
+                                                                                <span className="font-mono text-[9px] text-muted-foreground uppercase">
+                                                                                    (
+                                                                                    {
+                                                                                        exam.code
+                                                                                    }
+
+                                                                                    )
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    ),
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            Examen: N/A
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="text-[10px] font-semibold text-primary">
+                                                    Cantidad a liquidar:{' '}
+                                                    {maxQty}
+                                                </span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="font-bold text-foreground">
+                                                    L. {item.total.toFixed(2)}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="text-right">
-                                            <span className="font-bold text-foreground">
-                                                L.{' '}
-                                                {(
-                                                    (parseFloat(
-                                                        String(item.amount),
-                                                    ) -
-                                                        parseFloat(
-                                                            String(
-                                                                item.discount,
-                                                            ),
-                                                        )) *
-                                                    maxQty
-                                                ).toFixed(2)}
-                                            </span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                },
+                            )}
                         </div>
                     </div>
                 ) : (
-                    credit.specimen && (
-                        <div className="flex items-start justify-between rounded-xl border border-primary/20 bg-primary/5 p-4 text-xs shadow-sm">
-                            <div className="flex flex-col space-y-1">
+                    <div className="flex items-start justify-between rounded-xl border border-primary/20 bg-primary/5 p-4 text-xs shadow-sm">
+                        <div className="flex flex-col space-y-1.5">
+                            {singleSpecimen?.sequence_code && (
                                 <span className="font-mono text-sm font-bold text-foreground">
-                                    {credit.specimen.sequence_code || 'N/A'}
+                                    {singleSpecimen.sequence_code}
                                 </span>
-                                <span className="font-semibold text-muted-foreground">
-                                    Paciente:{' '}
-                                    {credit.specimen.customer_relation?.name ||
-                                        'N/A'}
+                            )}
+                            <span className="font-semibold text-muted-foreground">
+                                Paciente:{' '}
+                                <strong className="text-foreground">
+                                    {singlePatientName}
+                                </strong>
+                            </span>
+                            <div className="flex flex-col gap-1 pt-0.5">
+                                <span className="text-xs font-semibold text-foreground">
+                                    Tipo:{' '}
+                                    <span className="font-normal text-muted-foreground">
+                                        {singleSpecimen?.type?.name || 'N/A'}
+                                    </span>
                                 </span>
-                                <span className="text-[10px] text-muted-foreground/85">
-                                    {credit.specimen.type?.name || 'N/A'}
-                                    {credit.specimen.examination?.name &&
-                                        ` - ${credit.specimen.examination.name}`}
-                                </span>
-                                <span className="mt-1 inline-flex w-fit items-center rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                                    Muestra única del crédito
-                                </span>
+                                {singleSpecExams.length > 0 ? (
+                                    <div className="flex flex-col gap-1 pl-1">
+                                        <span className="text-[10px] font-medium text-muted-foreground">
+                                            {singleSpecExams.length > 1
+                                                ? 'Exámenes a realizar:'
+                                                : 'Examen:'}
+                                        </span>
+                                        <div className="flex flex-col gap-1">
+                                            {singleSpecExams.map(
+                                                (exam, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className="flex items-center gap-1.5 text-xs font-medium text-foreground"
+                                                    >
+                                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                                                        <span>{exam.name}</span>
+                                                        {exam.code && (
+                                                            <span className="font-mono text-[10px] text-muted-foreground uppercase">
+                                                                ({exam.code})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <span className="text-xs text-muted-foreground">
+                                        Examen: N/A
+                                    </span>
+                                )}
                             </div>
-                            <div className="text-right">
-                                <span className="text-sm font-bold text-foreground">
-                                    L. {remainingVal.toFixed(2)}
-                                </span>
-                            </div>
+                            <span className="mt-1 inline-flex w-fit items-center rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                Muestra única del crédito
+                            </span>
                         </div>
-                    )
+                        <div className="text-right">
+                            <span className="text-sm font-bold text-foreground">
+                                L. {remainingVal.toFixed(2)}
+                            </span>
+                        </div>
+                    </div>
                 )}
             </div>
 

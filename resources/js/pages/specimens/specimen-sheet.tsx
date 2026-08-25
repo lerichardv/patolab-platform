@@ -55,7 +55,7 @@ export default function SpecimenSheet({
 
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (open && !specimen && isFormDirty) {
+            if (open && isFormDirty) {
                 e.preventDefault();
                 e.returnValue = '';
 
@@ -67,11 +67,11 @@ export default function SpecimenSheet({
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-    }, [open, specimen, isFormDirty]);
+    }, [open, isFormDirty]);
 
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen) {
-            if (!specimen && isFormDirty) {
+            if (isFormDirty) {
                 setShowCloseConfirm(true);
 
                 return;
@@ -96,6 +96,7 @@ export default function SpecimenSheet({
                     <SpecimenForm
                         specimen={specimen}
                         onSuccess={() => {
+                            setIsFormDirty(false);
                             onSuccess?.();
                             onOpenChange(false);
                         }}
@@ -126,8 +127,9 @@ export default function SpecimenSheet({
                             ¿Estás seguro de salir?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Todos los datos ingresados en la nueva muestra se
-                            perderán permanentemente.
+                            {specimen
+                                ? 'Se han modificado datos o los exámenes de la muestra. Si sale sin guardar, los cambios realizados se perderán permanentemente.'
+                                : 'Todos los datos ingresados en la nueva muestra se perderán permanentemente.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -139,6 +141,7 @@ export default function SpecimenSheet({
                         <AlertDialogAction
                             onClick={() => {
                                 setShowCloseConfirm(false);
+                                setIsFormDirty(false);
                                 onOpenChange(false);
                             }}
                             className="bg-destructive text-destructive-foreground text-white hover:bg-destructive/90"

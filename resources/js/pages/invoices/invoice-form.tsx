@@ -14,6 +14,9 @@ import {
     Coins,
     BadgePercent,
     Info,
+    Tag,
+    ChevronDown,
+    Edit2,
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -32,6 +35,11 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
     Command,
     CommandEmpty,
@@ -60,6 +68,10 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import {
+    calculateInvoiceItem,
+    calculateConsolidatedTotals,
+} from '@/services/invoice-calculation';
 import {
     PaymentMethodSheet,
     PaymentResume,
@@ -492,13 +504,20 @@ export default function InvoiceForm({
                 }
             }
 
-            if (invoice.is_group || invoice.group_id) {
-                const rawGroupSpecimens =
-                    invoice.group_specimens || invoice.groupSpecimens || [];
+            const rawGroupSpecimens =
+                invoice.group_specimens ||
+                invoice.groupSpecimens ||
+                invoice.invoice_specimens ||
+                invoice.invoiceSpecimens ||
+                [];
+
+            if (rawGroupSpecimens.length > 0) {
                 const loadedGroupSpecimens = rawGroupSpecimens.map(
                     (gs: any) => {
-                        const spec = gs.specimen;
-                        const availablePrices = spec?.examination?.prices || [];
+                        const spec = gs.specimen || invoice.specimen;
+                        const examObj = gs.examination || spec?.examination;
+                        const availablePrices =
+                            examObj?.prices || spec?.examination?.prices || [];
                         const sortedPrices = [...availablePrices].sort(
                             (a: any, b: any) =>
                                 parseFloat(b.amount) - parseFloat(a.amount),
@@ -511,16 +530,46 @@ export default function InvoiceForm({
                         const amount = parseFloat(gs.amount) || 0;
                         const specQty = parseInt(gs.quantity) || 1;
 
-                        const exactMatch = sortedPrices.find(
+                        const rawSelected = gs.selected_price
+                            ? gs.selected_price.toString()
+                            : '';
+                        let custom_specimen_price = gs.custom_specimen_price
+                            ? gs.custom_specimen_price.toString()
+                            : '0';
+                        let selected_price = '';
+
+                        let matched = sortedPrices.find(
                             (p: any) =>
-                                Math.abs(parseFloat(p.amount) - amount) < 0.01,
+                                Math.abs(
+                                    parseFloat(p.amount) -
+                                        parseFloat(rawSelected),
+                                ) < 0.01,
                         );
 
-                        let selected_price = '';
-                        let custom_specimen_price = '0';
+                        if (
+                            !matched &&
+                            rawSelected !== 'custom' &&
+                            amount > 0
+                        ) {
+                            matched = sortedPrices.find(
+                                (p: any) =>
+                                    Math.abs(parseFloat(p.amount) - amount) <
+                                    0.01,
+                            );
+                        }
 
-                        if (exactMatch) {
-                            selected_price = exactMatch.amount.toString();
+                        if (matched) {
+                            selected_price = matched.amount.toString();
+                        } else if (rawSelected === 'custom') {
+                            selected_price = 'custom';
+                            custom_specimen_price =
+                                parseFloat(custom_specimen_price) > 0
+                                    ? custom_specimen_price
+                                    : amount > 0
+                                      ? amount.toString()
+                                      : maxPrice.toString();
+                        } else if (sortedPrices.length > 0) {
+                            selected_price = sortedPrices[0].amount.toString();
                         } else {
                             selected_price = 'custom';
                             custom_specimen_price = amount.toString();
@@ -528,14 +577,18 @@ export default function InvoiceForm({
 
                         return {
                             id: gs.id,
-                            specimen_id: gs.specimen_id,
+                            specimen_id: gs.specimen_id || invoice.specimen_id,
+                            examination_id: gs.examination_id || examObj?.id,
                             sequence_code: spec?.sequence_code || 'Sin código',
                             patient_name:
                                 spec?.customer_relation?.name ||
                                 invoice.customer?.name ||
                                 'N/A',
                             type_name: spec?.type?.name || 'N/A',
-                            examination_name: spec?.examination?.name || 'N/A',
+                            examination_name:
+                                examObj?.name ||
+                                spec?.examination?.name ||
+                                'N/A',
                             available_prices: availablePrices,
                             selected_price,
                             custom_specimen_price,
@@ -579,16 +632,23 @@ export default function InvoiceForm({
                     initial_payment_amount: initialAmt,
                     initial_payment_type: initialType,
                 }));
-            } else if (invoice.specimen && availablePrices.length > 0) {
+            } else if (invoice.specimen) {
+                const spec = invoice.specimen;
+                const examObj = spec?.examination;
+                const availablePrices = examObj?.prices || [];
                 const sortedPrices = [...availablePrices].sort(
                     (a: any, b: any) =>
                         parseFloat(b.amount) - parseFloat(a.amount),
                 );
-                const maxPrice = parseFloat(sortedPrices[0].amount) || 0;
+                const maxPrice =
+                    sortedPrices.length > 0
+                        ? parseFloat(sortedPrices[0].amount) || 0
+                        : 0;
+
+                const amount = parseFloat(invoice.amount) || 0;
                 const totalDiscount = parseFloat(invoice.discount || 0);
                 const discountWithoutAge = Math.max(0, totalDiscount - ageAmt);
 
-                // Exact match check
                 const exactMatch = sortedPrices.find((p: any) => {
                     const specimenDiscount =
                         Math.max(0, maxPrice - parseFloat(p.amount)) * qty;
@@ -598,61 +658,74 @@ export default function InvoiceForm({
                     );
                 });
 
-                if (exactMatch) {
-                    setData((d: any) => ({
-                        ...d,
-                        quantity: qty,
-                        selected_price: exactMatch.amount.toString(),
-                        custom_specimen_price: '0',
-                        group_specimens: [],
-                        additional_discount_enabled: false,
-                        additional_discount: '0',
-                        custom_amount_enabled: customEnabled,
-                        custom_amount: customAmt.toString(),
-                        custom_amount_reason: customReason,
-                        age_discount_type: ageType,
-                        age_discount_amount: ageAmt.toString(),
-                        has_initial_payment: hasInitial,
-                        initial_payment_amount: initialAmt,
-                        initial_payment_type: initialType,
-                    }));
-                } else {
-                    const targetPrice = maxPrice - discountWithoutAge / qty;
-                    setData((d: any) => ({
-                        ...d,
-                        quantity: qty,
-                        selected_price: 'custom',
-                        custom_specimen_price: targetPrice.toFixed(2),
-                        group_specimens: [],
-                        additional_discount_enabled: false,
-                        additional_discount: '0',
-                        custom_amount_enabled: customEnabled,
-                        custom_amount: customAmt.toString(),
-                        custom_amount_reason: customReason,
-                        age_discount_type: ageType,
-                        age_discount_amount: ageAmt.toString(),
-                        has_initial_payment: hasInitial,
-                        initial_payment_amount: initialAmt,
-                        initial_payment_type: initialType,
-                    }));
-                }
-            } else {
-                const totalDisc = parseFloat(invoice.discount || 0) || 0;
-                const ageAmt =
-                    parseFloat(invoice.age_discount_amount || 0) || 0;
-                const additionalDisc = Math.max(0, totalDisc - ageAmt);
+                let selected_price = '';
+                let custom_specimen_price = '0';
 
-                const unitPrice = invoice.specimen
-                    ? (parseFloat(invoice.amount) - customAmt) / qty
-                    : 0;
+                if (exactMatch) {
+                    selected_price = exactMatch.amount.toString();
+                } else {
+                    selected_price = 'custom';
+                    custom_specimen_price =
+                        maxPrice > 0
+                            ? (maxPrice - discountWithoutAge / qty).toFixed(2)
+                            : amount.toFixed(2);
+                }
+
+                const singleLoadedItem = {
+                    id: 0,
+                    specimen_id: spec.id,
+                    examination_id: examObj?.id,
+                    sequence_code: spec?.sequence_code || 'Sin código',
+                    patient_name:
+                        spec?.customer_relation?.name ||
+                        invoice.customer?.name ||
+                        'N/A',
+                    type_name: spec?.type?.name || 'N/A',
+                    examination_name: examObj?.name || 'N/A',
+                    available_prices: availablePrices,
+                    selected_price,
+                    custom_specimen_price,
+                    quantity: qty,
+                    max_price: maxPrice,
+                    age_discount_type: ageType,
+                    age_discount_amount: ageAmt.toString(),
+                    additional_discount_enabled: false,
+                    additional_discount: '0',
+                    insumos: (spec?.products || []).map((p: any) => ({
+                        id: p.id,
+                        quantity: p.pivot?.quantity || 0,
+                        price: p.pivot?.price || p.price || 0,
+                        name: p.name,
+                        code: p.code,
+                    })),
+                };
 
                 setData((d: any) => ({
                     ...d,
                     quantity: qty,
-                    selected_price: invoice.specimen ? 'custom' : '',
-                    custom_specimen_price: invoice.specimen
-                        ? unitPrice.toFixed(2)
-                        : '0',
+                    selected_price,
+                    custom_specimen_price,
+                    group_specimens: [singleLoadedItem],
+                    additional_discount_enabled: false,
+                    additional_discount: '0',
+                    custom_amount_enabled: customEnabled,
+                    custom_amount: customAmt.toString(),
+                    custom_amount_reason: customReason,
+                    age_discount_type: ageType,
+                    age_discount_amount: ageAmt.toString(),
+                    has_initial_payment: hasInitial,
+                    initial_payment_amount: initialAmt,
+                    initial_payment_type: initialType,
+                }));
+            } else {
+                const totalDisc = parseFloat(invoice.discount || 0) || 0;
+                const additionalDisc = Math.max(0, totalDisc - ageAmt);
+
+                setData((d: any) => ({
+                    ...d,
+                    quantity: qty,
+                    selected_price: '',
+                    custom_specimen_price: '0',
                     group_specimens: [],
                     additional_discount_enabled: additionalDisc > 0,
                     additional_discount: additionalDisc.toString(),
@@ -667,216 +740,122 @@ export default function InvoiceForm({
                 }));
             }
         }
-    }, [invoice, availablePrices, setData]);
+    }, [invoice, setData]);
 
-    // Derived values
-    const selectedPriceVal =
-        data.selected_price === 'custom'
-            ? parseFloat(data.custom_specimen_price) || 0
-            : parseFloat(data.selected_price) || 0;
-    const quantityVal = parseInt(data.quantity) || 1;
-
-    const baseSpecimenPriceVal = React.useMemo(() => {
-        return Math.max(maxSpecimenPriceVal, selectedPriceVal);
-    }, [maxSpecimenPriceVal, selectedPriceVal]);
-
-    const totalSpecimenAmount = React.useMemo(() => {
-        if (!isGroupInvoice || !data.group_specimens) {
-            return 0;
+    // Derived values using InvoiceCalculationService algorithm
+    const calculatedLineItems = React.useMemo(() => {
+        if (!data.group_specimens || data.group_specimens.length === 0) {
+            return [];
         }
 
-        return data.group_specimens.reduce((sum: number, gs: any) => {
-            const priceVal =
-                gs.selected_price === 'custom'
-                    ? parseFloat(gs.custom_specimen_price) || 0
-                    : parseFloat(gs.selected_price) || 0;
-            const basePrice = Math.max(gs.max_price || 0, priceVal);
-            const qty = gs.quantity || 1;
+        return data.group_specimens.map((gs: any) => {
+            const prices = gs.available_prices || gs.examination?.prices || [];
 
-            return sum + basePrice * qty;
-        }, 0);
-    }, [isGroupInvoice, data.group_specimens]);
-
-    // Auto-calculate specimen discount (Rate / Category discount)
-    const specimenDiscountVal = React.useMemo(() => {
-        if (hasSpecimen) {
-            return (
-                Math.max(0, baseSpecimenPriceVal - selectedPriceVal) *
-                quantityVal
+            const itemCalc = calculateInvoiceItem(
+                {
+                    examination_id: gs.examination_id,
+                    selected_price: gs.selected_price,
+                    custom_specimen_price: gs.custom_specimen_price,
+                    quantity: gs.quantity,
+                    age_discount_type: gs.age_discount_type,
+                    additional_discount_enabled: gs.additional_discount_enabled,
+                    additional_discount: gs.additional_discount,
+                    available_prices: prices,
+                    max_price: gs.max_price,
+                },
+                gs.examination,
+                {
+                    third_age_discount: thirdAgePercent,
+                    fourth_age_discount: fourthAgePercent,
+                },
             );
-        } else if (isGroupInvoice) {
-            if (!data.group_specimens) {
-                return 0;
-            }
 
-            return data.group_specimens.reduce((sum: number, gs: any) => {
-                const priceVal =
-                    gs.selected_price === 'custom'
-                        ? parseFloat(gs.custom_specimen_price) || 0
-                        : parseFloat(gs.selected_price) || 0;
-                const basePrice = Math.max(gs.max_price || 0, priceVal);
-                const diff = Math.max(0, basePrice - priceVal);
-                const qty = gs.quantity || 1;
+            return {
+                ...gs,
+                ...itemCalc,
+                prices,
+                qty: itemCalc.quantity,
+                ageDiscountAmount: itemCalc.age_discount_amount,
+                addDiscountAmount: itemCalc.additional_discount,
+            };
+        });
+    }, [data.group_specimens, thirdAgePercent, fourthAgePercent]);
 
-                return sum + diff * qty;
-            }, 0);
+    const consolidatedTotals = React.useMemo(() => {
+        const extra = data.custom_amount_enabled
+            ? parseFloat(data.custom_amount) || 0
+            : 0;
+
+        if (calculatedLineItems.length > 0) {
+            return calculateConsolidatedTotals(calculatedLineItems, 0, extra);
         }
 
-        return 0;
+        // Standalone (no specimen/group) fallback
+        const standaloneItem = calculateInvoiceItem(
+            {
+                amount: data.amount,
+                quantity: data.quantity,
+                age_discount_type: data.age_discount_type,
+                additional_discount_enabled: data.additional_discount_enabled,
+                additional_discount: data.additional_discount,
+            },
+            null,
+            {
+                third_age_discount: thirdAgePercent,
+                fourth_age_discount: fourthAgePercent,
+            },
+        );
+
+        return calculateConsolidatedTotals([standaloneItem], 0, extra);
     }, [
-        hasSpecimen,
-        isGroupInvoice,
-        baseSpecimenPriceVal,
-        selectedPriceVal,
-        quantityVal,
-        data.group_specimens,
-    ]);
-
-    // Auto-calculate age discount
-    const ageDiscountVal = React.useMemo(() => {
-        if (isGroupInvoice) {
-            if (!data.group_specimens) {
-                return 0;
-            }
-
-            return data.group_specimens.reduce((sum: number, gs: any) => {
-                const ageDisc = parseFloat(gs.age_discount_amount) || 0;
-                const qty = gs.quantity || 1;
-
-                return sum + ageDisc * qty;
-            }, 0);
-        }
-
-        const basePrice = hasSpecimen
-            ? selectedPriceVal
-            : parseFloat(data.amount) || 0;
-
-        const qty = quantityVal;
-
-        if (data.age_discount_type === 'third') {
-            return ((basePrice * thirdAgePercent) / 100) * qty;
-        } else if (data.age_discount_type === 'fourth') {
-            return ((basePrice * fourthAgePercent) / 100) * qty;
-        }
-
-        return 0;
-    }, [
-        hasSpecimen,
-        isGroupInvoice,
-        selectedPriceVal,
+        calculatedLineItems,
+        data.quantity,
         data.amount,
         data.age_discount_type,
-        thirdAgePercent,
-        fourthAgePercent,
-        quantityVal,
-        data.group_specimens,
-    ]);
-
-    const autoDiscountTotal = specimenDiscountVal + ageDiscountVal;
-
-    // Reactively update age_discount_amount in form data
-    useEffect(() => {
-        if (data.age_discount_amount !== ageDiscountVal.toString()) {
-            setData('age_discount_amount', ageDiscountVal.toString());
-        }
-    }, [ageDiscountVal, data.age_discount_amount, setData]);
-
-    // Reactively update custom_amount when custom_amount_enabled changes
-    const customAmountVal = data.custom_amount_enabled
-        ? parseFloat(data.custom_amount) || 0
-        : 0;
-
-    // Reactively update amount in form data
-    useEffect(() => {
-        if (hasSpecimen) {
-            const amountToSet =
-                baseSpecimenPriceVal * quantityVal + customAmountVal;
-
-            if (data.amount !== amountToSet.toString()) {
-                setData('amount', amountToSet.toString());
-            }
-        } else if (isGroupInvoice) {
-            const amountToSet = totalSpecimenAmount + customAmountVal;
-
-            if (data.amount !== amountToSet.toString()) {
-                setData('amount', amountToSet.toString());
-            }
-        }
-    }, [
-        baseSpecimenPriceVal,
-        quantityVal,
-        customAmountVal,
-        hasSpecimen,
-        isGroupInvoice,
-        totalSpecimenAmount,
-        data.amount,
-        setData,
-    ]);
-
-    // Auto-calculate additional discount
-    const additionalDiscountVal = React.useMemo(() => {
-        if (isGroupInvoice) {
-            if (!data.group_specimens) {
-                return 0;
-            }
-
-            return data.group_specimens.reduce((sum: number, gs: any) => {
-                const addDisc = gs.additional_discount_enabled
-                    ? parseFloat(gs.additional_discount) || 0
-                    : 0;
-                const qty = gs.quantity || 1;
-
-                return sum + addDisc * qty;
-            }, 0);
-        }
-
-        return data.additional_discount_enabled
-            ? parseFloat(data.additional_discount) || 0
-            : 0;
-    }, [
-        isGroupInvoice,
-        data.group_specimens,
         data.additional_discount_enabled,
         data.additional_discount,
+        data.custom_amount_enabled,
+        data.custom_amount,
+        thirdAgePercent,
+        fourthAgePercent,
     ]);
 
-    const totalDiscountVal = autoDiscountTotal + additionalDiscountVal;
+    const subtotalVal = consolidatedTotals.subtotal;
+    const totalVal = consolidatedTotals.total;
+    const totalDiscountVal = consolidatedTotals.discount;
 
     useEffect(() => {
-        if (data.discount !== totalDiscountVal.toString()) {
-            setData('discount', totalDiscountVal.toString());
+        const amtStr = consolidatedTotals.amount.toFixed(2);
+        const discStr = consolidatedTotals.discount.toFixed(2);
+        const subStr = consolidatedTotals.subtotal.toFixed(2);
+        const totStr = consolidatedTotals.total.toFixed(2);
+
+        if (
+            data.amount !== amtStr ||
+            data.discount !== discStr ||
+            data.subtotal !== subStr ||
+            data.total !== totStr ||
+            data.quantity !== consolidatedTotals.quantity
+        ) {
+            setData((d: any) => ({
+                ...d,
+                quantity: consolidatedTotals.quantity,
+                amount: amtStr,
+                discount: discStr,
+                subtotal: subStr,
+                total: totStr,
+                exempt_amount: totStr,
+            }));
         }
-    }, [totalDiscountVal, data.discount, setData]);
-
-    // Reactively update subtotal and total in form data
-    const subtotalVal = hasSpecimen
-        ? Math.max(
-              0,
-              baseSpecimenPriceVal * quantityVal +
-                  customAmountVal -
-                  totalDiscountVal,
-          )
-        : isGroupInvoice
-          ? Math.max(
-                0,
-                totalSpecimenAmount + customAmountVal - totalDiscountVal,
-            )
-          : Math.max(
-                0,
-                (parseFloat(data.amount) || 0) * quantityVal +
-                    customAmountVal -
-                    totalDiscountVal,
-            );
-
-    const totalVal = subtotalVal;
-
-    useEffect(() => {
-        setData((d) => ({
-            ...d,
-            subtotal: subtotalVal.toFixed(2),
-            total: totalVal.toFixed(2),
-        }));
-    }, [subtotalVal, totalVal, setData]);
+    }, [
+        consolidatedTotals,
+        data.amount,
+        data.discount,
+        data.subtotal,
+        data.total,
+        data.quantity,
+        setData,
+    ]);
 
     // Keep total_paid in sync with payment choices reactively
     useEffect(() => {
@@ -952,20 +931,7 @@ export default function InvoiceForm({
         }
 
         if (hasSpecimen || isGroupInvoice) {
-            if (hasSpecimen) {
-                if (!data.selected_price) {
-                    localErrors.selected_price =
-                        'La lista de precios es requerida.';
-                } else if (data.selected_price === 'custom') {
-                    if (!data.custom_specimen_price) {
-                        localErrors.custom_specimen_price =
-                            'El precio personalizado es requerido.';
-                    } else if (parseFloat(data.custom_specimen_price) < 0) {
-                        localErrors.custom_specimen_price =
-                            'El precio personalizado debe ser mayor o igual a 0.';
-                    }
-                }
-            } else if (isGroupInvoice) {
+            if (data.group_specimens && data.group_specimens.length > 0) {
                 data.group_specimens.forEach((gs: any, idx: number) => {
                     if (!gs.selected_price) {
                         localErrors[
@@ -984,6 +950,19 @@ export default function InvoiceForm({
                         }
                     }
                 });
+            } else if (hasSpecimen) {
+                if (!data.selected_price) {
+                    localErrors.selected_price =
+                        'La lista de precios es requerida.';
+                } else if (data.selected_price === 'custom') {
+                    if (!data.custom_specimen_price) {
+                        localErrors.custom_specimen_price =
+                            'El precio personalizado es requerido.';
+                    } else if (parseFloat(data.custom_specimen_price) < 0) {
+                        localErrors.custom_specimen_price =
+                            'El precio personalizado debe ser mayor o igual a 0.';
+                    }
+                }
             }
 
             if (data.custom_amount_enabled) {
@@ -1007,11 +986,7 @@ export default function InvoiceForm({
             const additionalDiscountVal = data.additional_discount_enabled
                 ? parseFloat(data.additional_discount) || 0
                 : 0;
-            const maxAllowedDiscount = hasSpecimen
-                ? baseSpecimenPriceVal * quantityVal +
-                  customAmountVal -
-                  autoDiscountTotal
-                : totalSpecimenAmount + customAmountVal - autoDiscountTotal;
+            const maxAllowedDiscount = consolidatedTotals.amount;
 
             if (data.additional_discount_enabled) {
                 if (!data.additional_discount || additionalDiscountVal < 0) {
@@ -1207,7 +1182,7 @@ export default function InvoiceForm({
     };
 
     return (
-        <form onSubmit={handlePreSubmit} className="space-y-6 px-5 py-2">
+        <form onSubmit={handlePreSubmit} className="mb-5 space-y-6 px-5 py-2">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
                 {/* Left Column: Form Inputs */}
                 <div className="flex flex-col gap-6 lg:col-span-8">
@@ -1233,891 +1208,504 @@ export default function InvoiceForm({
                         )}
                     </div>
 
-                    {/* Billing configuration inputs based on hasSpecimen */}
-                    {hasSpecimen ? (
+                    {/* Billing configuration inputs based on specimen or group */}
+                    {data.group_specimens && data.group_specimens.length > 0 ? (
                         <div className="space-y-4">
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                {/* Lista de Precios */}
-                                <div className="grid gap-2">
-                                    <Label
-                                        htmlFor="selected_price"
-                                        className="flex items-center gap-1"
-                                    >
-                                        <Coins className="h-3.5 w-3.5 text-muted-foreground" />
-                                        Lista de Precios{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Select
-                                        value={data.selected_price}
-                                        onValueChange={(val) =>
-                                            setData('selected_price', val)
-                                        }
-                                    >
-                                        <SelectTrigger
-                                            id="selected_price"
-                                            className="w-full"
+                            <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                {isGroupInvoice
+                                    ? 'Configuración de Precios por Muestra'
+                                    : 'Configuración de Precios por Análisis'}
+                            </h3>
+                            {data.group_specimens.map(
+                                (gs: any, idx: number) => {
+                                    const calc = calculatedLineItems[idx] || {};
+                                    const prices = gs.available_prices || [];
+                                    const qty = gs.quantity || 1;
+                                    const specimenSubtotal =
+                                        calc.lineSubtotal || 0;
+                                    const specimenTotalDiscount =
+                                        calc.totalLineDiscount || 0;
+
+                                    return (
+                                        <Card
+                                            key={gs.id || idx}
+                                            className="overflow-hidden border border-border/80 pt-6 pb-2 shadow-sm"
                                         >
-                                            <SelectValue placeholder="Seleccione un Precio" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {availablePrices.length > 0 ? (
-                                                <>
-                                                    {availablePrices.map(
-                                                        (price: any) => (
-                                                            <SelectItem
-                                                                key={price.id}
-                                                                value={price.amount.toString()}
-                                                            >
-                                                                L.{' '}
-                                                                {parseFloat(
-                                                                    price.amount,
-                                                                ).toFixed(2)}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                    <SelectItem value="custom">
-                                                        Precio Personalizado
-                                                    </SelectItem>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <SelectItem
-                                                        value="0"
-                                                        disabled
-                                                    >
-                                                        No hay precios
-                                                        configurados para este
-                                                        tipo de muestra
-                                                    </SelectItem>
-                                                    <SelectItem value="custom">
-                                                        Precio Personalizado
-                                                    </SelectItem>
-                                                </>
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                    {data.selected_price === 'custom' && (
-                                        <div className="mt-1 grid gap-1.5 transition-all duration-300">
-                                            <Label
-                                                htmlFor="custom_specimen_price"
-                                                className="text-xs"
-                                            >
-                                                Precio Muestra Personalizado
-                                                (L.){' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <div className="relative">
-                                                <span className="absolute top-1/2 left-3 -translate-y-1/2 font-mono text-sm text-muted-foreground select-none">
-                                                    L.
-                                                </span>
-                                                <Input
-                                                    id="custom_specimen_price"
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    value={
-                                                        data.custom_specimen_price
-                                                    }
-                                                    onChange={(e) =>
-                                                        setData(
-                                                            'custom_specimen_price',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="0.00"
-                                                    className="pl-7 font-mono"
-                                                    required
-                                                />
-                                            </div>
-                                            {errors.custom_specimen_price && (
-                                                <span className="text-[10px] text-destructive">
-                                                    {
-                                                        errors.custom_specimen_price
-                                                    }
-                                                </span>
-                                            )}
-                                        </div>
-                                    )}
-                                    {errors.selected_price && (
-                                        <span className="text-[10px] text-destructive">
-                                            {errors.selected_price}
-                                        </span>
-                                    )}
-                                    {invoice.specimen?.type && (
-                                        <span className="truncate text-[10px] text-muted-foreground">
-                                            <strong className="text-foreground">
-                                                {invoice.specimen.type.name}
-                                            </strong>
-                                            {invoice.specimen.examination
-                                                ?.name &&
-                                                ` - ${invoice.specimen.examination.name}`}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Cantidad */}
-                                <div className="grid gap-2">
-                                    <Label htmlFor="quantity">
-                                        Cantidad{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <NumberPicker
-                                        value={data.quantity}
-                                        onChange={(val) =>
-                                            setData('quantity', val)
-                                        }
-                                        min={1}
-                                        className="flex items-start"
-                                    />
-                                    <p className="text-[10px] text-muted-foreground">
-                                        Número de muestras a procesar.
-                                    </p>
-                                </div>
-
-                                {/* Descuento Calculado */}
-                                <div className="grid gap-2">
-                                    <Label htmlFor="auto_discount">
-                                        Descuento Automático (L.)
-                                    </Label>
-                                    <Input
-                                        id="auto_discount"
-                                        type="text"
-                                        value={parseFloat(
-                                            autoDiscountTotal.toString(),
-                                        ).toFixed(2)}
-                                        readOnly
-                                        disabled
-                                        className="bg-muted font-mono font-semibold text-emerald-600 disabled:opacity-100 dark:text-emerald-400"
-                                    />
-                                    <p className="text-[10px] text-muted-foreground">
-                                        Incluye selección de tarifa y descuento
-                                        por edad.
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Descuento Adicional Switch + Input (styling matching specimen-form.tsx) */}
-                            <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex flex-col gap-0.5">
-                                        <Label
-                                            htmlFor="additional-discount-toggle"
-                                            className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold"
-                                        >
-                                            <BadgePercent className="h-3.5 w-3.5 text-muted-foreground" />
-                                            Descuento Adicional Personalizado
-                                        </Label>
-                                        <span className="text-[10px] text-muted-foreground">
-                                            Permite aplicar un descuento
-                                            adicional personalizado a la
-                                            factura.
-                                        </span>
-                                    </div>
-                                    <Switch
-                                        id="additional-discount-toggle"
-                                        checked={
-                                            data.additional_discount_enabled
-                                        }
-                                        onCheckedChange={(checked) => {
-                                            setData((d) => ({
-                                                ...d,
-                                                additional_discount_enabled:
-                                                    checked,
-                                                additional_discount: checked
-                                                    ? d.additional_discount ||
-                                                      '0'
-                                                    : '0',
-                                            }));
-                                        }}
-                                    />
-                                </div>
-                                {data.additional_discount_enabled && (
-                                    <div className="flex flex-col gap-3 border-t border-border/50 pt-2 transition-all duration-300">
-                                        <div className="grid gap-1.5">
-                                            <Label
-                                                htmlFor="additional_discount"
-                                                className="text-xs"
-                                            >
-                                                Monto de Descuento Adicional
-                                                (L.){' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Input
-                                                id="additional_discount"
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                value={data.additional_discount}
-                                                onChange={(e) =>
-                                                    setData(
-                                                        'additional_discount',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="0.00"
-                                                className="font-mono"
-                                                required
-                                            />
-                                            {errors.additional_discount && (
-                                                <span className="text-[10px] text-destructive">
-                                                    {errors.additional_discount}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Cobrar otro importe Switch + Inputs */}
-                            <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex flex-col gap-0.5">
-                                        <Label
-                                            htmlFor="custom-amount-toggle"
-                                            className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold"
-                                        >
-                                            <Coins className="h-3.5 w-3.5 text-muted-foreground" />
-                                            Cobrar otro importe personalizado
-                                        </Label>
-                                        <span className="text-[10px] text-muted-foreground">
-                                            Permite agregar un importe manual
-                                            para servicios adicionales.
-                                        </span>
-                                    </div>
-                                    <Switch
-                                        id="custom-amount-toggle"
-                                        checked={data.custom_amount_enabled}
-                                        onCheckedChange={(checked) => {
-                                            setData((d) => ({
-                                                ...d,
-                                                custom_amount_enabled: checked,
-                                                custom_amount: checked
-                                                    ? d.custom_amount || '0'
-                                                    : '0',
-                                                custom_amount_reason: checked
-                                                    ? d.custom_amount_reason ||
-                                                      ''
-                                                    : '',
-                                            }));
-                                        }}
-                                    />
-                                </div>
-                                {data.custom_amount_enabled && (
-                                    <div className="flex flex-col gap-3 border-t border-border/50 pt-2 transition-all duration-300">
-                                        <div className="grid gap-1.5">
-                                            <Label
-                                                htmlFor="custom_amount"
-                                                className="text-xs"
-                                            >
-                                                Importe Adicional Personalizado
-                                                (L.){' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Input
-                                                id="custom_amount"
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                value={data.custom_amount}
-                                                onChange={(e) =>
-                                                    setData(
-                                                        'custom_amount',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="0.00"
-                                                className="font-mono"
-                                                required
-                                            />
-                                            {errors.custom_amount && (
-                                                <span className="text-[10px] text-destructive">
-                                                    {errors.custom_amount}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="grid gap-1.5">
-                                            <Label
-                                                htmlFor="custom_amount_reason"
-                                                className="text-xs"
-                                            >
-                                                Concepto / Razón del Importe
-                                                Adicional{' '}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Input
-                                                id="custom_amount_reason"
-                                                type="text"
-                                                value={
-                                                    data.custom_amount_reason
-                                                }
-                                                onChange={(e) =>
-                                                    setData(
-                                                        'custom_amount_reason',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="Ej. Materiales especiales, urgencia, etc."
-                                                required
-                                            />
-                                            {errors.custom_amount_reason && (
-                                                <span className="text-[10px] text-destructive">
-                                                    {
-                                                        errors.custom_amount_reason
-                                                    }
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Descuentos por Edad (Tercera/Cuarta) switches (styling matching specimen-form.tsx) */}
-                            <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-                                <div className="mb-2 flex flex-col gap-0.5 border-b pb-2">
-                                    <Label className="flex items-center gap-1.5 text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                        <Percent className="h-3.5 w-3.5 text-muted-foreground" />
-                                        Descuentos por Edad
-                                    </Label>
-                                    <span className="text-[10px] text-muted-foreground">
-                                        Aplique el descuento de la tercera o
-                                        cuarta edad al paciente. Solo se puede
-                                        aplicar uno a la vez.
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex flex-col gap-0.5">
-                                        <Label
-                                            htmlFor="third-age-discount-toggle"
-                                            className="cursor-pointer text-xs font-semibold"
-                                        >
-                                            Tercera Edad ({thirdAgePercent}%)
-                                        </Label>
-                                        <span className="text-[10px] text-muted-foreground">
-                                            Aplica {thirdAgePercent}% de
-                                            descuento sobre el precio base.
-                                        </span>
-                                    </div>
-                                    <Switch
-                                        id="third-age-discount-toggle"
-                                        checked={
-                                            data.age_discount_type === 'third'
-                                        }
-                                        onCheckedChange={(checked) => {
-                                            setData(
-                                                'age_discount_type',
-                                                checked ? 'third' : null,
-                                            );
-                                        }}
-                                    />
-                                </div>
-                                <div className="mt-1 flex items-center justify-between border-t border-border/50 pt-3">
-                                    <div className="flex flex-col gap-0.5">
-                                        <Label
-                                            htmlFor="fourth-age-discount-toggle"
-                                            className="cursor-pointer text-xs font-semibold"
-                                        >
-                                            Cuarta Edad ({fourthAgePercent}%)
-                                        </Label>
-                                        <span className="text-[10px] text-muted-foreground">
-                                            Aplica {fourthAgePercent}% de
-                                            descuento sobre el precio base.
-                                        </span>
-                                    </div>
-                                    <Switch
-                                        id="fourth-age-discount-toggle"
-                                        checked={
-                                            data.age_discount_type === 'fourth'
-                                        }
-                                        onCheckedChange={(checked) => {
-                                            setData(
-                                                'age_discount_type',
-                                                checked ? 'fourth' : null,
-                                            );
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    ) : isGroupInvoice ? (
-                        <div className="space-y-4">
-                            {/* Render Group Specimens (matching step 2 facturacion of specimen-group-sheet.tsx) */}
-                            <div className="space-y-4">
-                                <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                    Configuración de Precios e Insumos por
-                                    Muestra
-                                </h3>
-                                {data.group_specimens.map(
-                                    (gs: any, idx: number) => {
-                                        const prices =
-                                            gs.available_prices || [];
-                                        const maxVal =
-                                            prices.length > 0
-                                                ? Math.max(
-                                                      ...prices.map(
-                                                          (p: any) =>
-                                                              parseFloat(
-                                                                  p.amount,
-                                                              ) || 0,
-                                                      ),
-                                                  )
-                                                : 0;
-                                        const chosen =
-                                            gs.selected_price === 'custom'
-                                                ? parseFloat(
-                                                      gs.custom_specimen_price,
-                                                  ) || 0
-                                                : parseFloat(
-                                                      gs.selected_price,
-                                                  ) || 0;
-                                        const diffDiscount = Math.max(
-                                            0,
-                                            maxVal - chosen,
-                                        );
-                                        const ageDiscVal =
-                                            parseFloat(
-                                                gs.age_discount_amount,
-                                            ) || 0;
-                                        const addDiscVal =
-                                            gs.additional_discount_enabled
-                                                ? parseFloat(
-                                                      gs.additional_discount,
-                                                  ) || 0
-                                                : 0;
-                                        const qty = gs.quantity || 1;
-                                        const specimenSubtotal = Math.max(
-                                            0,
-                                            (maxVal -
-                                                (diffDiscount +
-                                                    ageDiscVal +
-                                                    addDiscVal)) *
-                                                qty,
-                                        );
-
-                                        return (
-                                            <Card
-                                                key={gs.id || idx}
-                                                className="overflow-hidden border border-border/80 shadow-sm"
-                                            >
-                                                <CardHeader className="flex flex-row items-center justify-between bg-muted/40 px-4 py-3">
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <div className="text-sm font-bold text-foreground">
-                                                            Muestra #{idx + 1} -{' '}
-                                                            {gs.type_name}
-                                                            {gs.examination_name &&
-                                                                ` - ${gs.examination_name}`}
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            Paciente:{' '}
-                                                            <strong className="text-foreground">
-                                                                {
-                                                                    gs.patient_name
-                                                                }
-                                                            </strong>
-                                                        </div>
-                                                        {gs.sequence_code && (
-                                                            <div className="mt-0.5 w-fit rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
-                                                                {
-                                                                    gs.sequence_code
-                                                                }
+                                            <CardHeader className="flex flex-row items-center justify-between px-4">
+                                                <div className="flex flex-col gap-0.5">
+                                                    {isGroupInvoice ? (
+                                                        <>
+                                                            <div className="text-[11px] font-semibold text-muted-foreground">
+                                                                Muestra #
+                                                                {idx + 1} -{' '}
+                                                                <strong className="text-foreground">
+                                                                    {
+                                                                        gs.type_name
+                                                                    }
+                                                                </strong>
                                                             </div>
-                                                        )}
-                                                    </div>
+                                                            <div className="text-sm font-bold text-foreground">
+                                                                {gs.examination_name ||
+                                                                    'Análisis'}
+                                                            </div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                Paciente:{' '}
+                                                                <strong className="text-foreground">
+                                                                    {
+                                                                        gs.patient_name
+                                                                    }
+                                                                </strong>
+                                                                {gs.sequence_code && (
+                                                                    <>
+                                                                        {' '}
+                                                                        &nbsp;|&nbsp;
+                                                                        Muestra:{' '}
+                                                                        <span className="font-mono text-[10px] font-bold text-primary">
+                                                                            {
+                                                                                gs.sequence_code
+                                                                            }
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                Tipo de muestra:{' '}
+                                                                <strong className="text-foreground">
+                                                                    {gs.type_name ||
+                                                                        invoice
+                                                                            ?.specimen
+                                                                            ?.type
+                                                                            ?.name ||
+                                                                        'Muestra'}
+                                                                </strong>
+                                                            </div>
+                                                            <div className="text-sm font-bold text-foreground">
+                                                                {gs.examination_name ||
+                                                                    'Análisis'}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
                                                     <Badge
                                                         variant="outline"
-                                                        className="font-mono text-xs"
+                                                        className="border-emerald-500/30 bg-emerald-500/10 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400"
+                                                    >
+                                                        Descuento: L.{' '}
+                                                        {specimenTotalDiscount.toFixed(
+                                                            2,
+                                                        )}
+                                                    </Badge>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="font-mono text-xs font-semibold text-primary"
                                                     >
                                                         Subtotal: L.{' '}
                                                         {specimenSubtotal.toFixed(
                                                             2,
                                                         )}
                                                     </Badge>
-                                                </CardHeader>
-                                                <CardContent className="space-y-4 p-4">
-                                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                                        <div className="grid gap-2">
-                                                            <Label className="text-xs font-semibold">
-                                                                Seleccionar
-                                                                Precio (L.)
-                                                            </Label>
-                                                            <Select
-                                                                value={
-                                                                    gs.selected_price
-                                                                }
-                                                                onValueChange={(
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="space-y-4 p-4">
+                                                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+                                                    <div className="grid gap-2">
+                                                        <Label className="text-xs font-semibold">
+                                                            Importe / Precio
+                                                            Base (L.) *
+                                                        </Label>
+                                                        <Select
+                                                            value={
+                                                                gs.selected_price
+                                                            }
+                                                            onValueChange={(
+                                                                val,
+                                                            ) =>
+                                                                handleUpdateGroupSpecimenPrice(
+                                                                    gs.id,
                                                                     val,
-                                                                ) =>
-                                                                    handleUpdateGroupSpecimenPrice(
-                                                                        gs.id,
-                                                                        val,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <SelectTrigger className="h-9">
-                                                                    <SelectValue placeholder="Seleccione un precio" />
-                                                                </SelectTrigger>
-                                                                <SelectContent className="z-[110]">
-                                                                    {prices.length >
-                                                                    0 ? (
-                                                                        <>
-                                                                            {prices.map(
-                                                                                (
-                                                                                    p: any,
-                                                                                ) => (
-                                                                                    <SelectItem
-                                                                                        key={
-                                                                                            p.id
-                                                                                        }
-                                                                                        value={p.amount.toString()}
-                                                                                    >
-                                                                                        L.{' '}
-                                                                                        {parseFloat(
-                                                                                            p.amount,
-                                                                                        ).toFixed(
-                                                                                            2,
-                                                                                        )}
-                                                                                    </SelectItem>
-                                                                                ),
-                                                                            )}
-                                                                            <SelectItem value="custom">
-                                                                                Precio
-                                                                                Personalizado
-                                                                            </SelectItem>
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <SelectItem
-                                                                                value="0"
-                                                                                disabled
-                                                                            >
-                                                                                No
-                                                                                hay
-                                                                                precios
-                                                                                configurados
-                                                                            </SelectItem>
-                                                                            <SelectItem value="custom">
-                                                                                Precio
-                                                                                Personalizado
-                                                                            </SelectItem>
-                                                                        </>
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            {gs.selected_price ===
-                                                                'custom' && (
-                                                                <div className="mt-2 grid gap-1 transition-all duration-300">
-                                                                    <div className="relative">
-                                                                        <span className="absolute top-1/2 left-3 -translate-y-1/2 font-mono text-xs text-muted-foreground select-none">
-                                                                            L.
-                                                                        </span>
-                                                                        <Input
-                                                                            type="number"
-                                                                            step="0.01"
-                                                                            min="0"
-                                                                            value={
-                                                                                gs.custom_specimen_price ||
-                                                                                ''
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                handleUpdateGroupSpecimenCustomPrice(
-                                                                                    gs.id,
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                                )
-                                                                            }
-                                                                            placeholder="0.00"
-                                                                            className="h-8 pl-7 font-mono text-xs"
-                                                                            required
-                                                                        />
-                                                                    </div>
-                                                                    {(
-                                                                        errors as any
-                                                                    )[
-                                                                        `group_specimens.${idx}.custom_specimen_price`
-                                                                    ] && (
-                                                                        <span className="text-[10px] text-destructive">
-                                                                            {
-                                                                                (
-                                                                                    errors as any
-                                                                                )[
-                                                                                    `group_specimens.${idx}.custom_specimen_price`
-                                                                                ]
-                                                                            }
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            {(errors as any)[
-                                                                `group_specimens.${idx}.selected_price`
-                                                            ] && (
-                                                                <span className="mt-1 block text-[10px] text-destructive">
-                                                                    {
-                                                                        (
-                                                                            errors as any
-                                                                        )[
-                                                                            `group_specimens.${idx}.selected_price`
-                                                                        ]
-                                                                    }
+                                                                )
+                                                            }
+                                                        >
+                                                            <SelectTrigger className="h-9">
+                                                                <SelectValue placeholder="Seleccione un precio" />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="z-[110]">
+                                                                {prices.length >
+                                                                0 ? (
+                                                                    <>
+                                                                        {prices.map(
+                                                                            (
+                                                                                p: any,
+                                                                            ) => (
+                                                                                <SelectItem
+                                                                                    key={
+                                                                                        p.id
+                                                                                    }
+                                                                                    value={p.amount.toString()}
+                                                                                >
+                                                                                    L.{' '}
+                                                                                    {parseFloat(
+                                                                                        p.amount,
+                                                                                    ).toFixed(
+                                                                                        2,
+                                                                                    )}
+                                                                                </SelectItem>
+                                                                            ),
+                                                                        )}
+                                                                        <SelectItem value="custom">
+                                                                            Precio
+                                                                            Personalizado
+                                                                        </SelectItem>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <SelectItem
+                                                                            value="0"
+                                                                            disabled
+                                                                        >
+                                                                            No
+                                                                            hay
+                                                                            precios
+                                                                            configurados
+                                                                        </SelectItem>
+                                                                        <SelectItem value="custom">
+                                                                            Precio
+                                                                            Personalizado
+                                                                        </SelectItem>
+                                                                    </>
+                                                                )}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        {gs.selected_price ===
+                                                            'custom' && (
+                                                            <div className="relative mt-1">
+                                                                <span className="absolute top-1/2 left-3 -translate-y-1/2 font-mono text-xs text-muted-foreground select-none">
+                                                                    L.
                                                                 </span>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="grid gap-2">
-                                                            <Label className="text-xs font-semibold">
-                                                                Cantidad
-                                                            </Label>
-                                                            <NumberPicker
-                                                                value={qty}
-                                                                onChange={(
-                                                                    val,
-                                                                ) =>
-                                                                    handleUpdateGroupSpecimenQuantity(
-                                                                        gs.id,
-                                                                        val,
-                                                                    )
-                                                                }
-                                                                min={1}
-                                                            />
-                                                        </div>
-
-                                                        <div className="grid gap-2">
-                                                            <Label className="text-xs font-semibold">
-                                                                Descuento
-                                                                Estimado (L.)
-                                                            </Label>
-                                                            <Input
-                                                                type="number"
-                                                                value={(
-                                                                    (diffDiscount +
-                                                                        ageDiscVal +
-                                                                        addDiscVal) *
-                                                                    qty
-                                                                ).toFixed(2)}
-                                                                disabled
-                                                                readOnly
-                                                                className="h-9 bg-muted font-mono font-semibold text-emerald-600"
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Age discounts switches */}
-                                                    <div className="grid grid-cols-1 gap-4 border-t pt-3 md:grid-cols-2">
-                                                        <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-2.5">
-                                                            <div className="flex flex-col gap-0.5">
-                                                                <Label className="text-xs font-semibold">
-                                                                    Tercera Edad
-                                                                    (
-                                                                    {
-                                                                        thirdAgePercent
-                                                                    }
-                                                                    %)
-                                                                </Label>
-                                                                <span className="text-[10px] text-muted-foreground">
-                                                                    Aplica
-                                                                    descuento al
-                                                                    precio base
-                                                                </span>
-                                                            </div>
-                                                            <Switch
-                                                                checked={
-                                                                    gs.age_discount_type ===
-                                                                    'third'
-                                                                }
-                                                                onCheckedChange={() =>
-                                                                    handleUpdateGroupSpecimenAgeDiscountToggle(
-                                                                        gs.id,
-                                                                        'third',
-                                                                    )
-                                                                }
-                                                            />
-                                                        </div>
-
-                                                        <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-2.5">
-                                                            <div className="flex flex-col gap-0.5">
-                                                                <Label className="text-xs font-semibold">
-                                                                    Cuarta Edad
-                                                                    (
-                                                                    {
-                                                                        fourthAgePercent
-                                                                    }
-                                                                    %)
-                                                                </Label>
-                                                                <span className="text-[10px] text-muted-foreground">
-                                                                    Aplica
-                                                                    descuento al
-                                                                    precio base
-                                                                </span>
-                                                            </div>
-                                                            <Switch
-                                                                checked={
-                                                                    gs.age_discount_type ===
-                                                                    'fourth'
-                                                                }
-                                                                onCheckedChange={() =>
-                                                                    handleUpdateGroupSpecimenAgeDiscountToggle(
-                                                                        gs.id,
-                                                                        'fourth',
-                                                                    )
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Additional discount toggle for specimen */}
-                                                    <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex flex-col gap-0.5">
-                                                                <Label className="text-xs font-semibold">
-                                                                    Descuento
-                                                                    Adicional
-                                                                    Muestra
-                                                                </Label>
-                                                                <span className="text-[10px] text-muted-foreground">
-                                                                    Descuento
-                                                                    extra
-                                                                    personalizado
-                                                                </span>
-                                                            </div>
-                                                            <Switch
-                                                                checked={
-                                                                    !!gs.additional_discount_enabled
-                                                                }
-                                                                onCheckedChange={(
-                                                                    checked,
-                                                                ) =>
-                                                                    handleUpdateGroupSpecimenAdditionalDiscountToggle(
-                                                                        gs.id,
-                                                                        checked,
-                                                                    )
-                                                                }
-                                                            />
-                                                        </div>
-                                                        {!!gs.additional_discount_enabled && (
-                                                            <div className="border-t border-border/50 pt-2">
                                                                 <Input
                                                                     type="number"
                                                                     step="0.01"
                                                                     min="0"
-                                                                    placeholder="0.00"
                                                                     value={
-                                                                        gs.additional_discount ||
+                                                                        gs.custom_specimen_price ||
                                                                         ''
                                                                     }
                                                                     onChange={(
                                                                         e,
                                                                     ) =>
-                                                                        handleUpdateGroupSpecimenAdditionalDiscountChange(
+                                                                        handleUpdateGroupSpecimenCustomPrice(
                                                                             gs.id,
                                                                             e
                                                                                 .target
                                                                                 .value,
                                                                         )
                                                                     }
-                                                                    className="h-8 font-mono text-xs"
+                                                                    placeholder="0.00"
+                                                                    className="h-8 pl-7 font-mono text-xs"
+                                                                    required
                                                                 />
                                                                 {(
                                                                     errors as any
                                                                 )[
-                                                                    `group_specimens.${idx}.additional_discount`
+                                                                    `group_specimens.${idx}.custom_specimen_price`
                                                                 ] && (
-                                                                    <span className="mt-1 block text-[10px] text-destructive">
+                                                                    <span className="text-[10px] text-destructive">
                                                                         {
                                                                             (
                                                                                 errors as any
                                                                             )[
-                                                                                `group_specimens.${idx}.additional_discount`
+                                                                                `group_specimens.${idx}.custom_specimen_price`
                                                                             ]
                                                                         }
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         )}
+                                                        {(errors as any)[
+                                                            `group_specimens.${idx}.selected_price`
+                                                        ] && (
+                                                            <span className="mt-1 block text-[10px] text-destructive">
+                                                                {
+                                                                    (
+                                                                        errors as any
+                                                                    )[
+                                                                        `group_specimens.${idx}.selected_price`
+                                                                    ]
+                                                                }
+                                                            </span>
+                                                        )}
                                                     </div>
 
-                                                    {/* Supply summary for specimen */}
-                                                    {gs.insumos &&
-                                                        gs.insumos.length >
-                                                            0 && (
-                                                            <div className="space-y-2 border-t pt-3">
-                                                                <Label className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                                                    Insumos /
-                                                                    Reactivos
-                                                                </Label>
-                                                                <div className="divide-y divide-border/60 overflow-hidden rounded-lg border bg-card/50">
-                                                                    {gs.insumos.map(
-                                                                        (
-                                                                            ins: any,
-                                                                        ) => (
-                                                                            <div
-                                                                                key={
-                                                                                    ins.id
-                                                                                }
-                                                                                className="flex items-center justify-between p-2.5 text-xs transition-colors hover:bg-muted/10"
-                                                                            >
-                                                                                <div className="flex max-w-[70%] flex-col gap-0.5">
-                                                                                    <span className="truncate font-medium text-foreground">
-                                                                                        {
-                                                                                            ins.name
-                                                                                        }
-                                                                                    </span>
-                                                                                    <span className="font-mono text-[10px] text-muted-foreground">
-                                                                                        {
-                                                                                            ins.code
-                                                                                        }
-                                                                                    </span>
-                                                                                </div>
-                                                                                <div className="flex shrink-0 flex-col gap-0.5 text-right">
-                                                                                    <span className="font-semibold text-foreground">
-                                                                                        {
-                                                                                            ins.quantity
-                                                                                        }{' '}
-                                                                                        x
-                                                                                        L.{' '}
-                                                                                        {parseFloat(
-                                                                                            ins.price,
-                                                                                        ).toFixed(
-                                                                                            2,
-                                                                                        )}
-                                                                                    </span>
-                                                                                    <span className="font-mono text-[10px] text-muted-foreground">
-                                                                                        Total:
-                                                                                        L.{' '}
-                                                                                        {(
-                                                                                            ins.quantity *
-                                                                                            parseFloat(
-                                                                                                ins.price,
-                                                                                            )
-                                                                                        ).toFixed(
-                                                                                            2,
-                                                                                        )}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                        ),
+                                                    <div className="flex flex-col items-start gap-2">
+                                                        <Label className="text-xs font-semibold">
+                                                            Cantidad *
+                                                        </Label>
+                                                        <NumberPicker
+                                                            value={qty}
+                                                            onChange={(val) =>
+                                                                handleUpdateGroupSpecimenQuantity(
+                                                                    gs.id,
+                                                                    val,
+                                                                )
+                                                            }
+                                                            min={1}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Collapsible Discounts Section */}
+                                                <Collapsible
+                                                    defaultOpen={
+                                                        specimenTotalDiscount >
+                                                            0 ||
+                                                        gs.additional_discount_enabled ||
+                                                        !!gs.age_discount_type
+                                                    }
+                                                    className="rounded-lg border bg-muted/20 p-3"
+                                                >
+                                                    <CollapsibleTrigger asChild>
+                                                        <button
+                                                            type="button"
+                                                            className="group flex w-full cursor-pointer items-center justify-between text-xs font-semibold text-foreground transition-colors hover:text-primary"
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <Tag className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover:text-primary" />
+                                                                <span>
+                                                                    Opciones de
+                                                                    Descuento
+                                                                </span>
+                                                                {specimenTotalDiscount >
+                                                                    0 && (
+                                                                    <Badge
+                                                                        variant="secondary"
+                                                                        className="h-5 px-1.5 font-mono text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                                                                    >
+                                                                        -L.{' '}
+                                                                        {specimenTotalDiscount.toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                                                        </button>
+                                                    </CollapsibleTrigger>
+
+                                                    <CollapsibleContent className="space-y-3 pt-3">
+                                                        {/* Descuento Adicional Muestra */}
+                                                        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <Label className="cursor-pointer text-xs font-semibold">
+                                                                        Descuento
+                                                                        Adicional
+                                                                        Muestra
+                                                                    </Label>
+                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                        Descuento
+                                                                        extra
+                                                                        personalizado
+                                                                        a esta
+                                                                        muestra.
+                                                                    </span>
+                                                                </div>
+                                                                <Switch
+                                                                    checked={
+                                                                        !!gs.additional_discount_enabled
+                                                                    }
+                                                                    onCheckedChange={(
+                                                                        checked,
+                                                                    ) =>
+                                                                        handleUpdateGroupSpecimenAdditionalDiscountToggle(
+                                                                            gs.id,
+                                                                            checked,
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+                                                            {!!gs.additional_discount_enabled && (
+                                                                <div className="border-t border-border/50 pt-2">
+                                                                    <Input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min="0"
+                                                                        placeholder="0.00"
+                                                                        value={
+                                                                            gs.additional_discount ||
+                                                                            ''
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            handleUpdateGroupSpecimenAdditionalDiscountChange(
+                                                                                gs.id,
+                                                                                e
+                                                                                    .target
+                                                                                    .value,
+                                                                            )
+                                                                        }
+                                                                        className="h-8 font-mono text-xs"
+                                                                    />
+                                                                    {(
+                                                                        errors as any
+                                                                    )[
+                                                                        `group_specimens.${idx}.additional_discount`
+                                                                    ] && (
+                                                                        <span className="mt-1 block text-[10px] text-destructive">
+                                                                            {
+                                                                                (
+                                                                                    errors as any
+                                                                                )[
+                                                                                    `group_specimens.${idx}.additional_discount`
+                                                                                ]
+                                                                            }
+                                                                        </span>
                                                                     )}
                                                                 </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Descuentos por Edad Switches */}
+                                                        <div className="grid grid-cols-1 gap-3 border-t pt-3 md:grid-cols-2">
+                                                            <div className="flex items-center justify-between rounded-lg border bg-card p-2.5">
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <Label className="text-xs font-semibold">
+                                                                        Tercera
+                                                                        Edad (
+                                                                        {
+                                                                            thirdAgePercent
+                                                                        }
+                                                                        %)
+                                                                    </Label>
+                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                        Aplica
+                                                                        descuento
+                                                                        al
+                                                                        precio
+                                                                        base
+                                                                    </span>
+                                                                </div>
+                                                                <Switch
+                                                                    checked={
+                                                                        gs.age_discount_type ===
+                                                                        'third'
+                                                                    }
+                                                                    onCheckedChange={() =>
+                                                                        handleUpdateGroupSpecimenAgeDiscountToggle(
+                                                                            gs.id,
+                                                                            'third',
+                                                                        )
+                                                                    }
+                                                                />
                                                             </div>
-                                                        )}
-                                                </CardContent>
-                                            </Card>
-                                        );
-                                    },
-                                )}
-                            </div>
+
+                                                            <div className="flex items-center justify-between rounded-lg border bg-card p-2.5">
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <Label className="text-xs font-semibold">
+                                                                        Cuarta
+                                                                        Edad (
+                                                                        {
+                                                                            fourthAgePercent
+                                                                        }
+                                                                        %)
+                                                                    </Label>
+                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                        Aplica
+                                                                        descuento
+                                                                        al
+                                                                        precio
+                                                                        base
+                                                                    </span>
+                                                                </div>
+                                                                <Switch
+                                                                    checked={
+                                                                        gs.age_discount_type ===
+                                                                        'fourth'
+                                                                    }
+                                                                    onCheckedChange={() =>
+                                                                        handleUpdateGroupSpecimenAgeDiscountToggle(
+                                                                            gs.id,
+                                                                            'fourth',
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </CollapsibleContent>
+                                                </Collapsible>
+
+                                                {/* Supply summary for specimen */}
+                                                {gs.insumos &&
+                                                    gs.insumos.length > 0 && (
+                                                        <div className="space-y-2 border-t pt-3">
+                                                            <Label className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                                                Insumos /
+                                                                Reactivos
+                                                            </Label>
+                                                            <div className="divide-y divide-border/60 overflow-hidden rounded-lg border bg-card/50">
+                                                                {gs.insumos.map(
+                                                                    (
+                                                                        ins: any,
+                                                                    ) => (
+                                                                        <div
+                                                                            key={
+                                                                                ins.id
+                                                                            }
+                                                                            className="flex items-center justify-between p-2.5 text-xs transition-colors hover:bg-muted/10"
+                                                                        >
+                                                                            <div className="flex max-w-[70%] flex-col gap-0.5">
+                                                                                <span className="truncate font-medium text-foreground">
+                                                                                    {
+                                                                                        ins.name
+                                                                                    }
+                                                                                </span>
+                                                                                <span className="font-mono text-[10px] text-muted-foreground">
+                                                                                    {
+                                                                                        ins.code
+                                                                                    }
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="flex shrink-0 flex-col gap-0.5 text-right">
+                                                                                <span className="font-semibold text-foreground">
+                                                                                    {
+                                                                                        ins.quantity
+                                                                                    }{' '}
+                                                                                    x
+                                                                                    L.{' '}
+                                                                                    {parseFloat(
+                                                                                        ins.price,
+                                                                                    ).toFixed(
+                                                                                        2,
+                                                                                    )}
+                                                                                </span>
+                                                                                <span className="font-mono text-[10px] text-muted-foreground">
+                                                                                    Total:
+                                                                                    L.{' '}
+                                                                                    {(
+                                                                                        ins.quantity *
+                                                                                        parseFloat(
+                                                                                            ins.price,
+                                                                                        )
+                                                                                    ).toFixed(
+                                                                                        2,
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    ),
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                },
+                            )}
 
                             {/* Descuento Automático Group */}
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -2128,9 +1716,7 @@ export default function InvoiceForm({
                                     <Input
                                         id="auto_discount_group"
                                         type="text"
-                                        value={parseFloat(
-                                            autoDiscountTotal.toString(),
-                                        ).toFixed(2)}
+                                        value={totalDiscountVal.toFixed(2)}
                                         readOnly
                                         disabled
                                         className="bg-muted font-mono font-semibold text-emerald-600 disabled:opacity-100 dark:text-emerald-400"
@@ -2288,7 +1874,7 @@ export default function InvoiceForm({
                                     )}
                                 </div>
 
-                                <div className="grid gap-1.5">
+                                <div className="flex flex-col items-start gap-1.5">
                                     <Label htmlFor="quantity">
                                         Cantidad{' '}
                                         <span className="text-destructive">
@@ -2301,7 +1887,6 @@ export default function InvoiceForm({
                                             setData('quantity', val)
                                         }
                                         min={1}
-                                        className="flex items-start"
                                     />
                                 </div>
 
@@ -2313,9 +1898,7 @@ export default function InvoiceForm({
                                     <Input
                                         id="auto_discount_ns"
                                         type="text"
-                                        value={parseFloat(
-                                            autoDiscountTotal.toString(),
-                                        ).toFixed(2)}
+                                        value={totalDiscountVal.toFixed(2)}
                                         readOnly
                                         disabled
                                         className="bg-muted font-mono font-semibold text-emerald-600 disabled:opacity-100 dark:text-emerald-400"
@@ -2726,12 +2309,12 @@ export default function InvoiceForm({
                                 </span>
                                 <span className="font-semibold text-foreground">
                                     L.{' '}
-                                    {(isGroupInvoice
-                                        ? totalSpecimenAmount
-                                        : hasSpecimen
-                                          ? baseSpecimenPriceVal * quantityVal
-                                          : (parseFloat(data.amount) || 0) *
-                                            quantityVal
+                                    {(
+                                        consolidatedTotals.amount -
+                                        (data.custom_amount_enabled
+                                            ? parseFloat(data.custom_amount) ||
+                                              0
+                                            : 0)
                                     ).toFixed(2)}
                                 </span>
                             </div>
@@ -2743,7 +2326,12 @@ export default function InvoiceForm({
                                             Importe Personalizado:
                                         </span>
                                         <span className="font-semibold text-foreground text-primary">
-                                            L. {customAmountVal.toFixed(2)}
+                                            L.{' '}
+                                            {(
+                                                parseFloat(
+                                                    data.custom_amount,
+                                                ) || 0
+                                            ).toFixed(2)}
                                         </span>
                                     </div>
                                     {data.custom_amount_reason && (
@@ -2759,40 +2347,62 @@ export default function InvoiceForm({
                                     <span className="text-[10px] font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
                                         Descuentos Aplicados
                                     </span>
-                                    {(hasSpecimen || isGroupInvoice) &&
-                                        specimenDiscountVal > 0 && (
-                                            <div className="flex justify-between text-xs">
-                                                <span>Categoría Muestra:</span>
-                                                <span className="font-semibold">
-                                                    - L.{' '}
-                                                    {specimenDiscountVal.toFixed(
-                                                        2,
-                                                    )}
-                                                </span>
-                                            </div>
-                                        )}
-                                    {ageDiscountVal > 0 && (
+                                    {calculatedLineItems.some(
+                                        (i: any) => i.priceDiscount > 0,
+                                    ) && (
                                         <div className="flex justify-between text-xs">
                                             <span>
-                                                {data.age_discount_type ===
-                                                'third'
-                                                    ? 'Tercera Edad'
-                                                    : 'Cuarta Edad'}
-                                                :
+                                                Categoría / Tarifa Muestra:
                                             </span>
                                             <span className="font-semibold">
-                                                - L. {ageDiscountVal.toFixed(2)}
+                                                - L.{' '}
+                                                {calculatedLineItems
+                                                    .reduce(
+                                                        (sum: number, i: any) =>
+                                                            sum +
+                                                            (i.priceDiscount ||
+                                                                0),
+                                                        0,
+                                                    )
+                                                    .toFixed(2)}
                                             </span>
                                         </div>
                                     )}
-                                    {additionalDiscountVal > 0 && (
+                                    {calculatedLineItems.some(
+                                        (i: any) => i.ageDiscountAmount > 0,
+                                    ) && (
+                                        <div className="flex justify-between text-xs">
+                                            <span>Descuento por Edad:</span>
+                                            <span className="font-semibold">
+                                                - L.{' '}
+                                                {calculatedLineItems
+                                                    .reduce(
+                                                        (sum: number, i: any) =>
+                                                            sum +
+                                                            (i.ageDiscountAmount ||
+                                                                0),
+                                                        0,
+                                                    )
+                                                    .toFixed(2)}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {calculatedLineItems.some(
+                                        (i: any) => i.addDiscountAmount > 0,
+                                    ) && (
                                         <div className="flex justify-between text-xs">
                                             <span>Descuento Adicional:</span>
                                             <span className="font-semibold">
                                                 - L.{' '}
-                                                {additionalDiscountVal.toFixed(
-                                                    2,
-                                                )}
+                                                {calculatedLineItems
+                                                    .reduce(
+                                                        (sum: number, i: any) =>
+                                                            sum +
+                                                            (i.addDiscountAmount ||
+                                                                0),
+                                                        0,
+                                                    )
+                                                    .toFixed(2)}
                                             </span>
                                         </div>
                                     )}

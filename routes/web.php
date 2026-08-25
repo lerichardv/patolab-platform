@@ -63,6 +63,7 @@ Route::get('/dev-login', function () {
 
 Route::get('specimen/{specimen_code}', [SpecimenController::class, 'showPublic'])->name('specimens.show-public');
 Route::get('specimen-group/{id}', [SpecimenGroupController::class, 'showPublic'])->name('specimen-groups.show-public');
+Route::get('maintenance', fn () => response()->view('errors.503'))->name('maintenance');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {

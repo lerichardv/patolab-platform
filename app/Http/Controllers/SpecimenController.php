@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Inventory;
 use App\Models\InventoryMovement;
 use App\Models\Invoice;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\Priority;
 use App\Models\PrioritySpecimenOrder;
@@ -27,6 +28,7 @@ use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
 use App\Services\DateFilterService;
 use App\Services\ImageOptimizerService;
+use App\Services\InvoiceCalculationService;
 use App\Services\InvoicePdfService;
 use App\Services\ReportPdfService;
 use App\Services\WhatsAppService;
@@ -144,6 +146,7 @@ class SpecimenController extends Controller
                 'customerRelation',
                 'type',
                 'examination',
+                'examinations',
                 'category',
                 'referrerRelation',
                 'invoiceRelation.creditRelation',
@@ -572,6 +575,69 @@ class SpecimenController extends Controller
                 'transfer_authorization_code' => $validated['transfer_authorization_code'] ?? null,
             ]);
 
+            $calculatedItems = [];
+            $settingsMap = Setting::all()->pluck('setting_value', 'setting_key')->toArray();
+
+            if ($request->has('examinations') && is_array($request->input('examinations')) && count($request->input('examinations')) > 0) {
+                $examItems = $request->input('examinations');
+                $examIds = array_filter(array_column($examItems, 'examination_id'));
+                if (count($examIds) > 0) {
+                    $specimen->examinations()->sync($examIds);
+                }
+
+                foreach ($examItems as $item) {
+                    if (empty($item['examination_id'])) {
+                        continue;
+                    }
+                    $calcItem = InvoiceCalculationService::calculateItem($item, null, $settingsMap);
+                    $calculatedItems[] = $calcItem;
+
+                    InvoiceSpecimen::create(array_merge($calcItem, [
+                        'invoice_id' => $invoice->id,
+                        'specimen_id' => $specimen->id,
+                        'is_group' => false,
+                        'group_id' => null,
+                        'credit_id' => $creditId,
+                        'is_paid' => $validated['payment_type'] !== 'credit',
+                        'quantity_paid' => $validated['payment_type'] !== 'credit' ? $calcItem['quantity'] : 0,
+                    ]));
+                }
+            } else {
+                if ($specimen->specimen_type_examination) {
+                    $specimen->examinations()->sync([$specimen->specimen_type_examination]);
+                }
+
+                $legacyItem = [
+                    'examination_id' => $specimen->specimen_type_examination,
+                    'quantity' => $qty,
+                    'amount' => $unitPrice,
+                    'selected_price' => null,
+                    'custom_specimen_price' => $customAmountVal,
+                    'additional_discount_enabled' => false,
+                    'additional_discount' => 0.00,
+                    'age_discount_type' => $validated['age_discount_type'] ?? null,
+                    'age_discount_amount' => (float) ($validated['age_discount_amount'] ?? 0.00),
+                ];
+                $calcItem = InvoiceCalculationService::calculateItem($legacyItem, null, $settingsMap);
+                $calculatedItems[] = $calcItem;
+
+                InvoiceSpecimen::create(array_merge($calcItem, [
+                    'invoice_id' => $invoice->id,
+                    'specimen_id' => $specimen->id,
+                    'is_group' => false,
+                    'group_id' => null,
+                    'credit_id' => $creditId,
+                    'is_paid' => $validated['payment_type'] !== 'credit',
+                    'quantity_paid' => $validated['payment_type'] !== 'credit' ? $qty : 0,
+                ]));
+            }
+
+            // Consolidate totals and update Invoice header
+            $insumosTotal = (float) ($insumosTotalVal ?? 0.0);
+            $customExtra = $isCustomAmount ? $customAmountVal : 0.0;
+            $consolidated = InvoiceCalculationService::calculateConsolidatedTotals($calculatedItems, $insumosTotal, $customExtra);
+            $invoice->update($consolidated);
+
             if (! $isCredit && $caiRange) {
                 $caiRange->increment('last_used_number');
                 if ($caiRange->last_used_number >= $caiRange->end_number) {
@@ -709,6 +775,19 @@ class SpecimenController extends Controller
                 },
             ],
             'regenerate_pdf' => 'nullable|boolean',
+            'quantity' => 'nullable|integer|min:1',
+            'amount' => 'nullable|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
+            'custom_amount_enabled' => 'nullable|boolean',
+            'custom_amount' => 'nullable|numeric|min:0',
+            'custom_amount_reason' => 'nullable|string|max:255',
+            'age_discount_type' => 'nullable|string|in:third,fourth',
+            'age_discount_amount' => 'nullable|numeric|min:0',
+            'examinations' => 'nullable|array',
+            'insumos' => 'nullable|array',
+            'insumos.*.id' => 'required|exists:products,id',
+            'insumos.*.quantity' => 'required|integer|min:1',
+            'insumos.*.price' => 'required|numeric|min:0',
         ]);
 
         $group = $specimen->group ?? ($specimen->group_id ? SpecimenGroup::find($specimen->group_id) : null);
@@ -852,6 +931,18 @@ class SpecimenController extends Controller
 
             $specimen->update($validated);
 
+            if ($request->has('examinations') && is_array($request->input('examinations')) && count($request->input('examinations')) > 0) {
+                $examItems = $request->input('examinations');
+                $examIds = array_filter(array_column($examItems, 'examination_id'));
+                if (count($examIds) > 0) {
+                    $specimen->examinations()->sync($examIds);
+                }
+            } else {
+                if (isset($validated['specimen_type_examination'])) {
+                    $specimen->examinations()->sync([$validated['specimen_type_examination']]);
+                }
+            }
+
             if ($oldPriorityId != $validated['priority_id']) {
                 PrioritySpecimenOrder::where('specimen_id', $specimen->id)
                     ->where('priority_id', '!=', $validated['priority_id'])
@@ -864,10 +955,86 @@ class SpecimenController extends Controller
                 );
             }
 
-            // Payment type logic
+            // Payment type logic & Invoice items recalculation
             $invoice = $specimen->is_group && $specimen->group
                 ? $specimen->group->invoice
                 : $specimen->invoiceRelation;
+
+            if ($invoice && $request->has('examinations') && is_array($request->input('examinations')) && count($request->input('examinations')) > 0) {
+                $examItems = $request->input('examinations');
+                InvoiceSpecimen::where('invoice_id', $invoice->id)->where('specimen_id', $specimen->id)->delete();
+
+                $calculatedItems = [];
+                $settingsMap = Setting::all()->pluck('setting_value', 'setting_key')->toArray();
+                $creditId = $invoice->credit_payment_id;
+
+                foreach ($examItems as $item) {
+                    if (empty($item['examination_id'])) {
+                        continue;
+                    }
+                    $calcItem = InvoiceCalculationService::calculateItem($item, null, $settingsMap);
+                    $calculatedItems[] = $calcItem;
+
+                    InvoiceSpecimen::create(array_merge($calcItem, [
+                        'invoice_id' => $invoice->id,
+                        'specimen_id' => $specimen->id,
+                        'is_group' => false,
+                        'group_id' => null,
+                        'credit_id' => $creditId,
+                        'is_paid' => $invoice->payment_type !== 'credit',
+                        'quantity_paid' => $invoice->payment_type !== 'credit' ? $calcItem['quantity'] : 0,
+                    ]));
+                }
+
+                $insumosTotal = 0.00;
+                if (! empty($validated['insumos'])) {
+                    foreach ($validated['insumos'] as $insumo) {
+                        $insumosTotal += (float) $insumo['price'] * (int) $insumo['quantity'];
+                    }
+                }
+
+                $isCustomAmount = ! empty($request->input('custom_amount_enabled')) && (float) ($request->input('custom_amount') ?? 0) > 0;
+                $customAmountVal = $isCustomAmount ? (float) $request->input('custom_amount') : 0.00;
+                $customAmountReasonVal = $isCustomAmount ? ($request->input('custom_amount_reason') ?? null) : null;
+
+                $consolidated = InvoiceCalculationService::calculateConsolidatedTotals($calculatedItems, $insumosTotal, $customAmountVal);
+
+                $invoiceUpdateData = array_merge($consolidated, [
+                    'custom_amount' => $customAmountVal,
+                    'custom_amount_reason' => $customAmountReasonVal,
+                    'age_discount_type' => $request->input('age_discount_type') ?? null,
+                    'age_discount_amount' => (float) ($request->input('age_discount_amount') ?? 0.00),
+                ]);
+
+                if ($invoice->payment_type !== 'credit') {
+                    $invoiceUpdateData['total_paid'] = $consolidated['total'];
+                }
+
+                $invoice->update($invoiceUpdateData);
+
+                if ($invoice->creditRelation) {
+                    $initialPaymentAmount = (float) $invoice->creditRelation->amount_paid;
+                    $invoice->creditRelation->update([
+                        'credit_amount' => $consolidated['total'],
+                        'amount_remaining' => max(0, $consolidated['total'] - $initialPaymentAmount),
+                    ]);
+                }
+            } elseif ($invoice && $request->has('amount')) {
+                $amount = (float) $request->input('amount');
+                $discount = (float) ($request->input('discount') ?? 0.00);
+                $subtotal = $amount - $discount;
+                $qty = (int) ($request->input('quantity') ?? 1);
+
+                $invoice->update([
+                    'quantity' => $qty,
+                    'amount' => $amount,
+                    'discount' => $discount,
+                    'subtotal' => $subtotal,
+                    'tax_exempt_amount' => $subtotal,
+                    'total' => $subtotal,
+                    'total_paid' => $invoice->payment_type !== 'credit' ? $subtotal : $invoice->total_paid,
+                ]);
+            }
 
             if ($invoice && $request->filled('payment_type')) {
                 $newPaymentType = $request->input('payment_type');
@@ -1451,18 +1618,23 @@ class SpecimenController extends Controller
             'customerRelation',
             'type',
             'examination',
+            'examinations',
+            'specimenExaminations.examination',
             'category',
             'referrerRelation',
             'priority',
             'invoiceRelation.creditRelation',
             'invoiceRelation.transferBank',
             'invoiceRelation.caiRange',
+            'invoiceRelation.invoiceSpecimens.examination',
             'users',
             'collaborators',
             'group.invoice.creditRelation',
             'group.invoice.transferBank',
             'group.invoice.caiRange',
-            'group.specimens',
+            'group.invoice.invoiceSpecimens.examination',
+            'group.specimens.examinations',
+            'group.specimens.specimenExaminations.examination',
             'report',
             'workOrders.task',
             'workOrders.users',

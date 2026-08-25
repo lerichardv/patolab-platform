@@ -58,6 +58,14 @@ class SpecimenGroup extends Model
      */
     public function invoiceGroupSpecimens(): HasMany
     {
-        return $this->hasMany(InvoiceGroupSpecimen::class, 'group_id');
+        return $this->hasMany(InvoiceSpecimen::class, 'group_id');
+    }
+
+    /**
+     * Get all invoice specimens associated with this group.
+     */
+    public function invoiceSpecimens(): HasMany
+    {
+        return $this->hasMany(InvoiceSpecimen::class, 'group_id');
     }
 }

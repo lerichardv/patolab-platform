@@ -30,7 +30,13 @@ import HeadingSheet from '@/components/heading-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetDescription,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn, addWithoutWeekends } from '@/lib/utils';
 
@@ -110,6 +116,90 @@ export default function SpecimenViewSheet({
     const [copiedGroup, setCopiedGroup] = useState(false);
     const [generating, setGenerating] = useState(false);
 
+    const invoice =
+        specimen?.is_group && specimen?.group && specimen?.group?.invoice
+            ? specimen.group.invoice
+            : specimen?.invoice_relation || specimen?.invoiceRelation;
+    const credit = invoice?.credit_relation || invoice?.creditRelation;
+
+    const specimenExaminations = useMemo(() => {
+        if (!specimen) return [];
+
+        const examList: Array<{ id?: number; name: string; code?: string }> =
+            [];
+        const seenNames = new Set<string>();
+
+        const invoiceItems =
+            invoice?.invoice_specimens ||
+            invoice?.invoiceSpecimens ||
+            invoice?.credit_invoice_specimens ||
+            invoice?.group_specimens ||
+            [];
+
+        if (Array.isArray(invoiceItems) && invoiceItems.length > 0) {
+            invoiceItems.forEach((item: any) => {
+                if (!item.specimen_id || item.specimen_id === specimen.id) {
+                    const examObj = item.examination;
+                    const examName =
+                        examObj?.name || item.examination_name || item.name;
+                    if (examName && !seenNames.has(examName)) {
+                        seenNames.add(examName);
+                        examList.push({
+                            id: item.examination_id || examObj?.id,
+                            name: examName,
+                            code: examObj?.code || item.code,
+                        });
+                    }
+                }
+            });
+        }
+
+        if (
+            Array.isArray(specimen.examinations) &&
+            specimen.examinations.length > 0
+        ) {
+            specimen.examinations.forEach((exam: any) => {
+                const name = exam.name;
+                if (name && !seenNames.has(name)) {
+                    seenNames.add(name);
+                    examList.push({
+                        id: exam.id,
+                        name: name,
+                        code: exam.code,
+                    });
+                }
+            });
+        }
+
+        if (
+            Array.isArray(specimen.specimen_examinations) &&
+            specimen.specimen_examinations.length > 0
+        ) {
+            specimen.specimen_examinations.forEach((se: any) => {
+                const exam = se.examination || se;
+                const name = exam.name;
+                if (name && !seenNames.has(name)) {
+                    seenNames.add(name);
+                    examList.push({
+                        id: exam.id || se.examination_id,
+                        name: name,
+                        code: exam.code,
+                    });
+                }
+            });
+        }
+
+        if (examList.length === 0 && specimen.examination?.name) {
+            examList.push({
+                id: specimen.examination.id,
+                name: specimen.examination.name,
+                code: specimen.examination.code,
+            });
+        }
+
+        return examList;
+    }, [specimen, invoice]);
+
     const handleGenerateReport = () => {
         if (!specimen) {
             return;
@@ -161,12 +251,6 @@ export default function SpecimenViewSheet({
         setCopiedGroup(true);
         setTimeout(() => setCopiedGroup(false), 2000);
     };
-
-    const invoice =
-        specimen.is_group && specimen.group && specimen.group.invoice
-            ? specimen.group.invoice
-            : specimen.invoice_relation || specimen.invoiceRelation;
-    const credit = invoice?.credit_relation || invoice?.creditRelation;
 
     const customerRelation =
         specimen.customer_relation || specimen.customerRelation;
@@ -378,12 +462,24 @@ export default function SpecimenViewSheet({
                     }
                 }}
             >
-                <div className="flex h-full flex-col gap-6 pb-8">
+                <div className="mb-5 flex h-full flex-col gap-6 pb-8">
                     {/* Header */}
                     <div className="flex flex-col gap-4 border-b pr-12 pb-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <HeadingSheet
-                                title="Detalles de la Muestra"
+                                title={
+                                    <div className="flex flex-wrap items-center gap-2.5">
+                                        <span>Detalles de la Muestra</span>
+                                        {specimen?.sequence_code && (
+                                            <Badge
+                                                variant="outline"
+                                                className="font-mono text-xl font-bold tracking-wide text-primary"
+                                            >
+                                                {specimen.sequence_code}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                }
                                 description={`Registrada el ${formattedDate}`}
                             />
                         </div>
@@ -433,17 +529,17 @@ export default function SpecimenViewSheet({
                                 <Separator />
 
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    {specimen.sequence_code && (
-                                        <div className="space-y-1 rounded-md border border-dashed bg-muted/40 p-2.5 sm:col-span-2">
-                                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                <Tag className="h-3.5 w-3.5" />{' '}
-                                                Código de Secuencia (Muestra)
-                                            </span>
-                                            <p className="font-mono text-sm font-bold text-primary">
-                                                {specimen.sequence_code}
-                                            </p>
-                                        </div>
-                                    )}
+                                    {/* {specimen.sequence_code && (
+										<div className="space-y-1 rounded-md border border-dashed bg-muted/40 p-2.5 sm:col-span-2">
+											<span className="flex items-center gap-1 text-xs text-muted-foreground">
+												<Tag className="h-3.5 w-3.5" />{' '}
+												Código de Secuencia (Muestra)
+											</span>
+											<p className="font-mono text-sm font-bold text-primary">
+												{specimen.sequence_code}
+											</p>
+										</div>
+									)} */}
                                     {specimen.group && (
                                         <div className="flex animate-in flex-col gap-2 space-y-1 rounded-md border border-dashed border-purple-500/25 bg-purple-500/5 p-2.5 duration-200 fade-in-50 sm:col-span-2 dark:bg-purple-500/10">
                                             <span className="flex items-center gap-1 text-xs font-semibold text-purple-600 dark:text-purple-300">
@@ -566,6 +662,15 @@ export default function SpecimenViewSheet({
                                     <div className="space-y-1">
                                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                             <User className="h-3.5 w-3.5" />{' '}
+                                            Código de Muestra
+                                        </span>
+                                        <p className="text-sm font-bold text-primary">
+                                            {specimen.sequence_code}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <User className="h-3.5 w-3.5" />{' '}
                                             Paciente
                                         </span>
                                         <p className="text-sm font-medium">
@@ -674,13 +779,48 @@ export default function SpecimenViewSheet({
                                         </div>
                                     </div>
                                     <div className="space-y-1 sm:col-span-2">
-                                        <span className="text-xs text-muted-foreground">
-                                            Examen
+                                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Microscope className="h-3.5 w-3.5" />{' '}
+                                            Tipo de Muestra
                                         </span>
-                                        <p className="text-sm font-medium">
-                                            {specimen.type?.name} -{' '}
-                                            {specimen.examination?.name}
+                                        <p className="text-sm font-medium text-foreground">
+                                            {specimen.type?.name || 'N/A'}
                                         </p>
+                                    </div>
+                                    <div className="space-y-1 sm:col-span-2">
+                                        <span className="text-xs text-muted-foreground">
+                                            {specimenExaminations.length > 1
+                                                ? 'Exámenes Configurados'
+                                                : 'Examen'}
+                                        </span>
+                                        {specimenExaminations.length > 0 ? (
+                                            <div className="flex flex-col gap-1.5 pt-0.5">
+                                                {specimenExaminations.map(
+                                                    (exam, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            className="flex items-center gap-2 text-sm font-medium text-foreground"
+                                                        >
+                                                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                                                            <span>
+                                                                {exam.name}
+                                                            </span>
+                                                            {exam.code && (
+                                                                <span className="font-mono text-[10px] text-muted-foreground uppercase">
+                                                                    ({exam.code}
+                                                                    )
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm font-medium text-foreground">
+                                                {specimen.examination?.name ||
+                                                    'N/A'}
+                                            </p>
+                                        )}
                                     </div>
                                     {formattedClientEstimatedDate && (
                                         <div className="space-y-1 sm:col-span-2">

@@ -127,19 +127,27 @@ class Invoice extends Model
     }
 
     /**
-     * Get the individual specimen records associated with this invoice.
+     * Get all specimen breakdown records associated with this invoice.
      */
-    public function creditInvoiceSpecimens(): HasMany
+    public function invoiceSpecimens(): HasMany
     {
-        return $this->hasMany(CreditInvoiceSpecimen::class, 'invoice_id');
+        return $this->hasMany(InvoiceSpecimen::class, 'invoice_id');
     }
 
     /**
-     * Get the group specimen breakdown records associated with this invoice.
+     * Get the individual specimen records associated with this invoice (alias for backward compatibility).
+     */
+    public function creditInvoiceSpecimens(): HasMany
+    {
+        return $this->hasMany(InvoiceSpecimen::class, 'invoice_id');
+    }
+
+    /**
+     * Get the group specimen breakdown records associated with this invoice (alias for backward compatibility).
      */
     public function groupSpecimens(): HasMany
     {
-        return $this->hasMany(InvoiceGroupSpecimen::class, 'invoice_id');
+        return $this->hasMany(InvoiceSpecimen::class, 'invoice_id');
     }
 
     /**

@@ -46,7 +46,11 @@ export function PatientMetadataCard({
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Edad:
                         </strong>{' '}
-                        {specimen.customer_relation.age ?? 'N/A'} años
+                        {specimen.customer_relation.age ?? 'N/A'}{' '}
+                        {specimen.customer_relation.age &&
+                        specimen.customer_relation.age > 0
+                            ? 'años'
+                            : ''}
                         &nbsp;&nbsp;&nbsp;{' '}
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Sexo:

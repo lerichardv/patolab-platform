@@ -3,7 +3,7 @@
 use App\Models\CaiRange;
 use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\InvoiceGroupSpecimen;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\Permission;
 use App\Models\Priority;
@@ -152,7 +152,7 @@ test('invoice listing search by specimen sequence code finds specimen group invo
         'group_id' => $group->id,
     ]);
 
-    InvoiceGroupSpecimen::create([
+    InvoiceSpecimen::create([
         'invoice_id' => $groupInvoice->id,
         'group_id' => $group->id,
         'specimen_id' => $groupSpecimen->id,

@@ -25,6 +25,56 @@ interface Props {
     onViewSpecimenClick?: (specimen: any) => void;
 }
 
+function extractSpecimenExaminations(
+    spec: any,
+): Array<{ id?: number; name: string; code?: string }> {
+    const list: Array<{ id?: number; name: string; code?: string }> = [];
+    const seen = new Set<string>();
+
+    const addExam = (name?: string, id?: number, code?: string) => {
+        if (name && !seen.has(name.trim().toLowerCase())) {
+            seen.add(name.trim().toLowerCase());
+            list.push({ id, name: name.trim(), code });
+        }
+    };
+
+    if (Array.isArray(spec?.examinations) && spec.examinations.length > 0) {
+        spec.examinations.forEach((e: any) => {
+            addExam(e.name, e.id, e.code);
+        });
+    }
+
+    if (
+        Array.isArray(spec?.specimen_examinations) &&
+        spec.specimen_examinations.length > 0
+    ) {
+        spec.specimen_examinations.forEach((se: any) => {
+            const exam = se.examination || se;
+            addExam(exam.name, exam.id || se.examination_id, exam.code);
+        });
+    }
+
+    if (
+        Array.isArray(spec?.specimenExaminations) &&
+        spec.specimenExaminations.length > 0
+    ) {
+        spec.specimenExaminations.forEach((se: any) => {
+            const exam = se.examination || se;
+            addExam(exam.name, exam.id || se.examination_id, exam.code);
+        });
+    }
+
+    if (list.length === 0 && spec?.examination?.name) {
+        addExam(
+            spec.examination.name,
+            spec.examination.id,
+            spec.examination.code,
+        );
+    }
+
+    return list;
+}
+
 export default function SpecimenGroupViewSheet({
     group,
     open,
@@ -68,13 +118,14 @@ export default function SpecimenGroupViewSheet({
     const credit = group.credit || invoice?.credit_relation;
 
     // Build a set of paid specimen IDs from the group's credit (if any)
+    const creditItems =
+        credit?.invoice_specimens || credit?.credit_invoice_specimens || [];
     const paidSpecimenIds = new Set<number>(
-        (credit?.credit_invoice_specimens || [])
+        creditItems
             .filter((s: any) => s.is_paid)
             .map((s: any) => s.specimen_id),
     );
-    const hasCreditInfo =
-        credit && (credit.credit_invoice_specimens || []).length > 0;
+    const hasCreditInfo = credit && creditItems.length > 0;
 
     const getPaymentTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
@@ -117,7 +168,7 @@ export default function SpecimenGroupViewSheet({
                     </div>
 
                     {/* Content Grid */}
-                    <div className="grid grid-cols-1 gap-6 px-5 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-6 px-5 pb-5 lg:grid-cols-3">
                         {/* Specimens List (Left 2 Columns) */}
                         <div className="space-y-6 lg:col-span-2">
                             {group.access_token && (
@@ -183,6 +234,10 @@ export default function SpecimenGroupViewSheet({
                                         const isSpecPaid = hasCreditInfo
                                             ? paidSpecimenIds.has(specimen.id)
                                             : null;
+                                        const specExams =
+                                            extractSpecimenExaminations(
+                                                specimen,
+                                            );
 
                                         return (
                                             <div
@@ -293,25 +348,68 @@ export default function SpecimenGroupViewSheet({
                                                         <span className="font-medium text-foreground">
                                                             {specimen
                                                                 .customer_relation
-                                                                ?.name || 'N/A'}
+                                                                ?.name ||
+                                                                specimen
+                                                                    .customerRelation
+                                                                    ?.name ||
+                                                                'N/A'}
                                                         </span>
                                                     </div>
                                                     <div>
                                                         <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                            Examen
+                                                            Tipo
                                                         </span>
                                                         <span className="font-medium text-foreground">
-                                                            {
-                                                                specimen.type
-                                                                    ?.name
-                                                            }{' '}
-                                                            -{' '}
-                                                            {
-                                                                specimen
-                                                                    .examination
-                                                                    ?.name
-                                                            }
+                                                            {specimen.type
+                                                                ?.name || 'N/A'}
                                                         </span>
+                                                    </div>
+                                                    <div className="sm:col-span-2">
+                                                        <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                            {specExams.length >
+                                                            1
+                                                                ? 'Exámenes a Realizar'
+                                                                : 'Examen'}
+                                                        </span>
+                                                        {specExams.length >
+                                                        0 ? (
+                                                            <div className="mt-1 flex flex-wrap gap-1.5">
+                                                                {specExams.map(
+                                                                    (
+                                                                        exam,
+                                                                        idx,
+                                                                    ) => (
+                                                                        <div
+                                                                            key={
+                                                                                idx
+                                                                            }
+                                                                            className="inline-flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-medium text-foreground"
+                                                                        >
+                                                                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                                                                            <span>
+                                                                                {
+                                                                                    exam.name
+                                                                                }
+                                                                            </span>
+                                                                            {exam.code && (
+                                                                                <span className="font-mono text-[10px] text-muted-foreground uppercase">
+                                                                                    (
+                                                                                    {
+                                                                                        exam.code
+                                                                                    }
+
+                                                                                    )
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    ),
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="font-medium text-muted-foreground">
+                                                                N/A
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div>
                                                         <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
@@ -329,7 +427,11 @@ export default function SpecimenGroupViewSheet({
                                                         <span className="font-medium text-foreground">
                                                             {specimen
                                                                 .referrer_relation
-                                                                ?.name || 'N/A'}
+                                                                ?.name ||
+                                                                specimen
+                                                                    .referrerRelation
+                                                                    ?.name ||
+                                                                'N/A'}
                                                         </span>
                                                     </div>
                                                     {specimen.anatomic_site && (
