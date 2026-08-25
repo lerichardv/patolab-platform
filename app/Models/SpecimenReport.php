@@ -14,7 +14,33 @@ class SpecimenReport extends Model
     use Auditable;
     use HasFactory;
 
-    protected $table = 'specimen_reports';
+    /**
+     * The attributes that should not be tracked in the audit log.
+     *
+     * HTML rich text content and binary Yjs document state vectors are omitted
+     * to keep audit logs lightweight.
+     */
+    protected array $auditIgnore = [
+        'macroscopy_html',
+        'microscopy_html',
+        'diagnosis_html',
+        'clinical_details_html',
+        'comments_notes_html',
+        'protocols_html',
+        'legend_html',
+        'open_text_html',
+        'addendum_html',
+        'yjs_macroscopy_state',
+        'yjs_microscopy_state',
+        'yjs_diagnosis_state',
+        'yjs_report_date_state',
+        'yjs_clinical_details_state',
+        'yjs_comments_notes_state',
+        'yjs_protocols_state',
+        'yjs_legend_state',
+        'yjs_open_text_state',
+        'yjs_addendum_state',
+    ];
 
     /**
      * The attributes that are mass assignable.

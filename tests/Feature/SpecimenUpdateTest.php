@@ -1208,3 +1208,94 @@ test('status date columns are automatically assigned when specimen status change
 
     Carbon::setTestNow();
 });
+
+test('updating specimen examinations syncs pivot and updates invoice totals', function () {
+    $editRole = Role::create(['slug' => 'admin', 'name' => 'Admin']);
+    Gate::define('specimens.edit', fn () => true);
+
+    $user = User::factory()->create([
+        'role_id' => $editRole->id,
+        'active' => true,
+    ]);
+
+    $customer = Customer::factory()->create();
+    $location = Location::create(['name' => 'Principal', 'address' => 'Dirección', 'active' => true]);
+    $type = SpecimenType::create(['name' => 'Biopsia', 'active' => true]);
+    $exam1 = SpecimenTypeExamination::create([
+        'specimen_type' => $type->id,
+        'name' => 'Examen 1',
+        'code' => 'EX1',
+        'description' => 'Desc 1',
+        'active' => true,
+    ]);
+    $exam2 = SpecimenTypeExamination::create([
+        'specimen_type' => $type->id,
+        'name' => 'Examen 2',
+        'code' => 'EX2',
+        'description' => 'Desc 2',
+        'active' => true,
+    ]);
+    $category = SpecimenCategory::create(['name' => 'Categoría', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Tipo de Referente', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Referente', 'referrer_type' => $referrerType->id, 'active' => true]);
+    $priority = Priority::create(['name' => 'Baja', 'color' => '#10b981', 'order' => 3, 'active' => true]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'BIO-0001-08-2026',
+        'customer' => $customer->id,
+        'location_id' => $location->id,
+        'specimen_type' => $type->id,
+        'specimen_type_examination' => $exam1->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+    $specimen->examinations()->sync([$exam1->id]);
+
+    $invoice = Invoice::create([
+        'full_invoice_number' => 'INV-001',
+        'invoice_number' => '001',
+        'customer_id' => $customer->id,
+        'specimen_id' => $specimen->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'amount' => 500.00,
+        'discount' => 0.00,
+        'subtotal' => 500.00,
+        'total' => 500.00,
+        'total_paid' => 500.00,
+        'invoice_file' => '',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->put(route('specimens.update', $specimen->id), [
+            'customer' => $customer->id,
+            'specimen_type' => $type->id,
+            'specimen_type_examination' => $exam2->id,
+            'specimen_category' => $category->id,
+            'referrer' => $referrer->id,
+            'status' => 'received',
+            'priority_id' => $priority->id,
+            'examinations' => [
+                [
+                    'examination_id' => $exam2->id,
+                    'quantity' => 1,
+                    'amount' => 750.00,
+                    'selected_price' => '750.00',
+                ],
+            ],
+            'amount' => 750.00,
+            'discount' => 0.00,
+            'regenerate_pdf' => false,
+        ]);
+
+    $response->assertRedirect();
+    $specimen->refresh();
+    $invoice->refresh();
+
+    expect($specimen->specimen_type_examination)->toBe($exam2->id);
+    expect($specimen->examinations->pluck('id')->toArray())->toContain($exam2->id);
+    expect((float) $invoice->total)->toEqual(750.00);
+});

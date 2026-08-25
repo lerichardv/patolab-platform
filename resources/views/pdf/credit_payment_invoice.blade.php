@@ -424,7 +424,7 @@
                 @if($credit->is_group && !empty($paidSpecimens) && count($paidSpecimens) > 0)
                     @foreach($paidSpecimens as $index => $spec)
                         @php
-                            $detail = DB::table('credit_invoice_specimens')
+                            $detail = DB::table('invoice_specimens')
                                 ->where('credit_id', $credit->id)
                                 ->where('specimen_id', $spec->id)
                                 ->first();

@@ -10,6 +10,7 @@ use App\Models\Specimen;
 use App\Models\SpecimenCategory;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
+use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -128,4 +129,52 @@ test('unassigned user is forbidden from creating/storing a report', function () 
     ]);
 
     $response->assertStatus(403);
+});
+
+test('assigned user can create a report with multiple templates in ordered concatenation', function () {
+    $this->actingAs($this->assignedUser);
+
+    $exam2 = SpecimenTypeExamination::create([
+        'specimen_type' => $this->specimenType->id,
+        'name' => 'Inmunohistoquímica',
+        'code' => 'IHQ',
+    ]);
+
+    $this->specimen->examinations()->attach([$this->examination->id, $exam2->id]);
+
+    $template1 = SpecimenTypeTemplate::create([
+        'name' => 'Plantilla Examen 1',
+        'specimen_type_id' => $this->specimenType->id,
+        'specimen_type_examination_id' => $this->examination->id,
+        'user_id' => $this->assignedUser->id,
+        'macroscopy_html' => '<p>Macroscopía 1</p>',
+        'microscopy_html' => '<p>Microscopía 1</p>',
+        'diagnosis_html' => '<p>Diagnóstico 1</p>',
+        'addendum_html' => '<p>Addendum 1</p>',
+    ]);
+
+    $template2 = SpecimenTypeTemplate::create([
+        'name' => 'Plantilla Examen 2',
+        'specimen_type_id' => $this->specimenType->id,
+        'specimen_type_examination_id' => $exam2->id,
+        'user_id' => $this->assignedUser->id,
+        'macroscopy_html' => '<p>Macroscopía 2</p>',
+        'microscopy_html' => '<p>Microscopía 2</p>',
+        'diagnosis_html' => '<p>Diagnóstico 2</p>',
+        'addendum_html' => '<p>Addendum 2</p>',
+    ]);
+
+    $response = $this->post(route('specimens.report-editor.store', $this->specimen->sequence_code), [
+        'template_ids' => [$template1->id, $template2->id],
+    ]);
+
+    $response->assertRedirect();
+
+    $this->specimen->refresh();
+    expect($this->specimen->status)->toBe('macroscopic_review')
+        ->and($this->specimen->report)->not->toBeNull()
+        ->and($this->specimen->report->macroscopy_html)->toBe('<p>Macroscopía 1</p><p>Macroscopía 2</p>')
+        ->and($this->specimen->report->microscopy_html)->toBe('<p>Microscopía 1</p><p>Microscopía 2</p>')
+        ->and($this->specimen->report->diagnosis_html)->toBe('<p>Diagnóstico 1</p><p>Diagnóstico 2</p>')
+        ->and($this->specimen->report->addendum_html)->toBe('<p>Addendum 1</p><p>Addendum 2</p>');
 });

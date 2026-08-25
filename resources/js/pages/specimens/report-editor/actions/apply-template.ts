@@ -21,10 +21,12 @@ export interface ApplyTemplateResponse {
 
 export async function applyReportTemplate(
     sequenceCode: string,
-    templateId: number | string,
+    templateIds: (number | string)[] | number | string,
 ): Promise<ApplyTemplateResponse> {
+    const ids = Array.isArray(templateIds) ? templateIds : [templateIds];
+
     return postJson<ApplyTemplateResponse>(
         `/specimens/${sequenceCode}/report-editor/apply-template`,
-        { template_id: templateId },
+        { template_id: ids[0], template_ids: ids },
     );
 }

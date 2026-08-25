@@ -61,7 +61,10 @@ export function FontSizeDropdown({
         }
     };
 
-    const currentFontSize = editor?.getAttributes('textStyle').fontSize;
+    const currentFontSize =
+        editor && !editor.isDestroyed && editor.view
+            ? editor.getAttributes('textStyle').fontSize
+            : undefined;
     const displaySize = currentFontSize
         ? currentFontSize.replace(/pt|px/g, '')
         : '8';

@@ -3,10 +3,9 @@
 use App\Models\Bank;
 use App\Models\CaiRange;
 use App\Models\Credit;
-use App\Models\CreditInvoiceSpecimen;
 use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\InvoiceGroupSpecimen;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\Permission;
 use App\Models\Priority;
@@ -127,7 +126,7 @@ test('extracting a single specimen creates a new SpecimenGroup with original cus
             'group_id' => $group->id,
         ]);
 
-        InvoiceGroupSpecimen::create([
+        InvoiceSpecimen::create([
             'invoice_id' => $originalInvoice->id,
             'group_id' => $group->id,
             'specimen_id' => $spec->id,
@@ -140,7 +139,7 @@ test('extracting a single specimen creates a new SpecimenGroup with original cus
             'selected_price' => '300.00',
         ]);
 
-        CreditInvoiceSpecimen::create([
+        InvoiceSpecimen::create([
             'credit_id' => $credit->id,
             'invoice_id' => $originalInvoice->id,
             'specimen_id' => $spec->id,
@@ -199,10 +198,10 @@ test('extracting a single specimen creates a new SpecimenGroup with original cus
         ->and((float) $newInvoice->total)->toBe(300.00)
         ->and((int) $newInvoice->quantity)->toBe(1);
 
-    expect(InvoiceGroupSpecimen::where('invoice_id', $originalInvoice->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeFalse()
-        ->and(CreditInvoiceSpecimen::where('credit_id', $credit->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeFalse()
-        ->and(InvoiceGroupSpecimen::where('group_id', $newGroup->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeTrue()
-        ->and(CreditInvoiceSpecimen::where('credit_id', $newCredit->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeTrue();
+    expect(InvoiceSpecimen::where('invoice_id', $originalInvoice->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeFalse()
+        ->and(InvoiceSpecimen::where('credit_id', $credit->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeFalse()
+        ->and(InvoiceSpecimen::where('group_id', $newGroup->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeTrue()
+        ->and(InvoiceSpecimen::where('credit_id', $newCredit->id)->where('specimen_id', $extractedSpecimen->id)->exists())->toBeTrue();
 
     $originalInvoice->refresh();
     expect((float) $originalInvoice->amount)->toBe(600.00)
@@ -268,7 +267,7 @@ test('extracting a single specimen with para seguro creates a SpecimenGroup with
         'group_id' => $group->id,
     ]);
 
-    InvoiceGroupSpecimen::create([
+    InvoiceSpecimen::create([
         'invoice_id' => $originalInvoice->id,
         'group_id' => $group->id,
         'specimen_id' => $spec1->id,
@@ -281,7 +280,7 @@ test('extracting a single specimen with para seguro creates a SpecimenGroup with
         'selected_price' => '250.00',
     ]);
 
-    CreditInvoiceSpecimen::create([
+    InvoiceSpecimen::create([
         'credit_id' => $credit->id,
         'invoice_id' => $originalInvoice->id,
         'specimen_id' => $spec1->id,
@@ -309,7 +308,7 @@ test('extracting a single specimen with para seguro creates a SpecimenGroup with
         'group_id' => $group->id,
     ]);
 
-    InvoiceGroupSpecimen::create([
+    InvoiceSpecimen::create([
         'invoice_id' => $originalInvoice->id,
         'group_id' => $group->id,
         'specimen_id' => $spec2->id,
@@ -322,7 +321,7 @@ test('extracting a single specimen with para seguro creates a SpecimenGroup with
         'selected_price' => '250.00',
     ]);
 
-    CreditInvoiceSpecimen::create([
+    InvoiceSpecimen::create([
         'credit_id' => $credit->id,
         'invoice_id' => $originalInvoice->id,
         'specimen_id' => $spec2->id,
@@ -428,7 +427,7 @@ test('extracting multiple specimens creates a new SpecimenGroup with new credit 
             'group_id' => $group->id,
         ]);
 
-        InvoiceGroupSpecimen::create([
+        InvoiceSpecimen::create([
             'invoice_id' => $originalInvoice->id,
             'group_id' => $group->id,
             'specimen_id' => $spec->id,
@@ -441,7 +440,7 @@ test('extracting multiple specimens creates a new SpecimenGroup with new credit 
             'selected_price' => '300.00',
         ]);
 
-        CreditInvoiceSpecimen::create([
+        InvoiceSpecimen::create([
             'credit_id' => $credit->id,
             'invoice_id' => $originalInvoice->id,
             'specimen_id' => $spec->id,
@@ -493,8 +492,8 @@ test('extracting multiple specimens creates a new SpecimenGroup with new credit 
         ->and((float) $newInvoice->total)->toBe(600.00)
         ->and((int) $newInvoice->quantity)->toBe(2);
 
-    expect(InvoiceGroupSpecimen::where('group_id', $newGroup->id)->count())->toBe(2)
-        ->and(CreditInvoiceSpecimen::where('credit_id', $newCredit->id)->count())->toBe(2);
+    expect(InvoiceSpecimen::where('group_id', $newGroup->id)->count())->toBe(2)
+        ->and(InvoiceSpecimen::where('credit_id', $newCredit->id)->count())->toBe(2);
 
     $originalInvoice->refresh();
     $credit->refresh();
@@ -567,7 +566,7 @@ test('extracting specimens preserves individual specimen patient relation while 
         'group_id' => $group->id,
     ]);
 
-    InvoiceGroupSpecimen::create([
+    InvoiceSpecimen::create([
         'invoice_id' => $originalInvoice->id,
         'group_id' => $group->id,
         'specimen_id' => $spec1->id,
@@ -580,7 +579,7 @@ test('extracting specimens preserves individual specimen patient relation while 
         'selected_price' => '400.00',
     ]);
 
-    CreditInvoiceSpecimen::create([
+    InvoiceSpecimen::create([
         'credit_id' => $credit->id,
         'invoice_id' => $originalInvoice->id,
         'specimen_id' => $spec1->id,
@@ -607,7 +606,7 @@ test('extracting specimens preserves individual specimen patient relation while 
         'group_id' => $group->id,
     ]);
 
-    InvoiceGroupSpecimen::create([
+    InvoiceSpecimen::create([
         'invoice_id' => $originalInvoice->id,
         'group_id' => $group->id,
         'specimen_id' => $spec2->id,
@@ -620,7 +619,7 @@ test('extracting specimens preserves individual specimen patient relation while 
         'selected_price' => '400.00',
     ]);
 
-    CreditInvoiceSpecimen::create([
+    InvoiceSpecimen::create([
         'credit_id' => $credit->id,
         'invoice_id' => $originalInvoice->id,
         'specimen_id' => $spec2->id,
@@ -705,7 +704,7 @@ test('cannot extract all specimens from group', function () {
         'group_id' => $group->id,
     ]);
 
-    CreditInvoiceSpecimen::create([
+    InvoiceSpecimen::create([
         'credit_id' => $credit->id,
         'invoice_id' => $originalInvoice->id,
         'specimen_id' => $spec1->id,
@@ -730,7 +729,7 @@ test('cannot extract all specimens from group', function () {
         'group_id' => $group->id,
     ]);
 
-    CreditInvoiceSpecimen::create([
+    InvoiceSpecimen::create([
         'credit_id' => $credit->id,
         'invoice_id' => $originalInvoice->id,
         'specimen_id' => $spec2->id,

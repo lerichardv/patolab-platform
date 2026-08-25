@@ -477,6 +477,7 @@ export default function CuttingsReportIndex({
         ) {
             return [];
         }
+
         if (
             rawFilter === undefined ||
             rawFilter === null ||
@@ -484,9 +485,11 @@ export default function CuttingsReportIndex({
         ) {
             return allItems.map((item) => item.id.toString());
         }
+
         if (Array.isArray(rawFilter)) {
             return rawFilter.map((id) => id.toString());
         }
+
         return [rawFilter.toString()];
     };
 
@@ -504,6 +507,7 @@ export default function CuttingsReportIndex({
                 parseInitialIds(filters.specimen_type_id, specimenTypes),
             );
         }
+
         if (filters.examination_id !== undefined) {
             setSelectedExaminationIds(
                 parseInitialIds(filters.examination_id, examinations),
@@ -519,6 +523,7 @@ export default function CuttingsReportIndex({
     const getSpecimenTypeId = (exam: any): string | null => {
         const typeId =
             exam.specimen_type || exam.specimen_type_id || exam.type?.id;
+
         return typeId ? typeId.toString() : null;
     };
 
@@ -529,6 +534,7 @@ export default function CuttingsReportIndex({
 
         return examinations.filter((exam) => {
             const typeId = getSpecimenTypeId(exam);
+
             return typeId && selectedSpecimenTypeIds.includes(typeId);
         });
     }, [examinations, selectedSpecimenTypeIds, specimenTypes.length]);
@@ -549,6 +555,7 @@ export default function CuttingsReportIndex({
 
             const validExamsForNextTypes = examinations.filter((exam) => {
                 const typeId = getSpecimenTypeId(exam);
+
                 return typeId && nextTypeIds.includes(typeId);
             });
             const validExamIdsForNextTypes = validExamsForNextTypes.map((e) =>
@@ -563,6 +570,7 @@ export default function CuttingsReportIndex({
                 const addedExamIds = examinations
                     .filter((exam) => {
                         const typeId = getSpecimenTypeId(exam);
+
                         return typeId && addedTypeIds.includes(typeId);
                     })
                     .map((e) => e.id.toString());

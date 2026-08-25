@@ -447,172 +447,214 @@
                 </tr>
             </thead>
             <tbody>
-                @if($invoice->is_group)
-                    @php
-                        $specimensList = [];
-                        if (isset($groupSpecimens)) {
-                            $specimensList = $groupSpecimens;
-                        } elseif ($invoice->is_group && $invoice->groupSpecimens && $invoice->groupSpecimens->isNotEmpty()) {
-                            foreach ($invoice->groupSpecimens as $groupSpecimen) {
-                                $specimen = $groupSpecimen->specimen;
-                                $qty = (int) ($groupSpecimen->quantity ?? 1);
-                                if ($qty <= 0) {
-                                    $qty = 1;
-                                }
-                                $totalPrice = (float) $groupSpecimen->amount;
-                                $totalDiscount = (float) $groupSpecimen->discount;
-                                
-                                $typeName = $specimen->type->name ?? '';
-                                $examName = $specimen->examination->name ?? 'Examen';
-                                $combinedName = $typeName ? $typeName . ' - ' . $examName : $examName;
+                @php
+                    $specimensList = [];
+                    $rawItems = collect();
 
-                                $specimensList[] = [
-                                    'sequence_code' => $specimen->sequence_code ?? '',
-                                    'exam_name' => $combinedName,
-                                    'patient_name' => $specimen->customerRelation->name ?? 'Paciente',
-                                    'price' => $totalPrice,
-                                    'discount' => $totalDiscount,
-                                    'age_discount_type' => $groupSpecimen->age_discount_type,
-                                    'age_discount_amount' => (float) $groupSpecimen->age_discount_amount,
-                                    'additional_discount_enabled' => (bool) $groupSpecimen->additional_discount_enabled,
-                                    'additional_discount' => (float) $groupSpecimen->additional_discount,
+                    if ($invoice->invoiceSpecimens && $invoice->invoiceSpecimens->isNotEmpty()) {
+                        $rawItems = $invoice->invoiceSpecimens;
+                    } elseif ($invoice->groupSpecimens && $invoice->groupSpecimens->isNotEmpty()) {
+                        $rawItems = $invoice->groupSpecimens;
+                    }
+
+                    if ($rawItems->isNotEmpty()) {
+                        $groupedBySpecimen = $rawItems->groupBy('specimen_id');
+
+                        foreach ($groupedBySpecimen as $specId => $items) {
+                            $firstItem = $items->first();
+                            $specimen = $firstItem->specimen;
+
+                            $typeName = $specimen->type->name ?? '';
+                            $sequenceCode = $specimen->sequence_code ?? '';
+                            $patientName = $specimen->customerRelation->name ?? ($customer->name ?? 'Paciente');
+
+                            $specExams = [];
+                            $specQuantity = 0;
+                            $specBasePrice = 0.0;
+                            $specDiscount = 0.0;
+                            $specTotal = 0.0;
+
+                            foreach ($items as $item) {
+                                $qty = max(1, (int) ($item->quantity ?? 1));
+                                $examName = $item->examination->name ?? ($specimen->examination->name ?? 'Examen');
+                                $itemPrice = (float) $item->amount;
+                                $itemDiscount = (float) $item->discount;
+                                $itemSubtotal = (float) $item->subtotal;
+
+                                $specQuantity += $qty;
+                                $specBasePrice += $itemPrice;
+                                $specDiscount += $itemDiscount;
+                                $specTotal += $itemSubtotal;
+
+                                $specExams[] = [
+                                    'name' => $examName,
+                                    'price' => $itemPrice,
+                                    'discount' => $itemDiscount,
                                     'quantity' => $qty,
+                                    'subtotal' => $itemSubtotal,
+                                    'age_discount_type' => $item->age_discount_type,
+                                    'age_discount_amount' => (float) ($item->age_discount_amount ?? 0),
+                                    'additional_discount_enabled' => (bool) $item->additional_discount_enabled,
+                                    'additional_discount' => (float) ($item->additional_discount ?? 0),
                                 ];
                             }
-                        } elseif ($invoice->is_group && $invoice->specimenGroup) {
-                            foreach ($invoice->specimenGroup->specimens as $specimen) {
-                                $igs = $specimen->invoiceGroupSpecimen()->where('invoice_id', $invoice->id)->first() ?? $specimen->invoiceGroupSpecimen;
-                                $price = 0.00;
-                                $discount = 0.00;
-                                $qty = 1;
-                                $ageDiscountType = null;
-                                $ageDiscountAmount = 0.00;
-                                $additionalDiscountEnabled = false;
-                                $additionalDiscount = 0.00;
-                                
-                                if ($igs) {
-                                    $price = (float)$igs->amount;
-                                    $discount = (float)$igs->discount;
-                                    $qty = (int)$igs->quantity;
-                                    $ageDiscountType = $igs->age_discount_type;
-                                    $ageDiscountAmount = (float)$igs->age_discount_amount;
-                                    $additionalDiscountEnabled = (bool)$igs->additional_discount_enabled;
-                                    $additionalDiscount = (float)$igs->additional_discount;
-                                } else if ($specimen->examination && $specimen->examination->prices->isNotEmpty()) {
-                                    $price = (float)$specimen->examination->prices->first()->amount;
-                                }
-                                
-                                $typeName = $specimen->type->name ?? '';
-                                $examName = $specimen->examination->name ?? 'Examen';
-                                $combinedName = $typeName ? $typeName . ' - ' . $examName : $examName;
 
-                                $specimensList[] = [
-                                    'sequence_code' => $specimen->sequence_code,
-                                    'exam_name' => $combinedName,
-                                    'patient_name' => $specimen->customerRelation->name ?? 'Paciente',
-                                    'price' => $price,
-                                    'discount' => $discount,
-                                    'age_discount_type' => $ageDiscountType,
-                                    'age_discount_amount' => $ageDiscountAmount,
-                                    'additional_discount_enabled' => $additionalDiscountEnabled,
-                                    'additional_discount' => $additionalDiscount,
-                                    'quantity' => $qty,
-                                ];
-                            }
+                            $specimensList[] = [
+                                'type_name' => $typeName,
+                                'sequence_code' => $sequenceCode,
+                                'patient_name' => $patientName,
+                                'quantity' => $specQuantity,
+                                'price' => $specBasePrice,
+                                'discount' => $specDiscount,
+                                'total' => $specTotal,
+                                'examinations' => $specExams,
+                            ];
                         }
-                        $rowNum = 1;
-                    @endphp
-                    @foreach($specimensList as $spec)
-                        @php
-                            $qty = (int) ($spec['quantity'] ?? 1);
-                            if ($qty <= 0) {
-                                $qty = 1;
+                    } elseif (isset($groupSpecimens) && count($groupSpecimens) > 0) {
+                        $groupedBySeq = [];
+                        foreach ($groupSpecimens as $gSpec) {
+                            $code = $gSpec['sequence_code'] ?? 'N/A';
+                            if (! isset($groupedBySeq[$code])) {
+                                $groupedBySeq[$code] = [
+                                    'type_name' => count(explode(' - ', $gSpec['exam_name'] ?? '')) > 1 ? explode(' - ', $gSpec['exam_name'])[0] : '',
+                                    'sequence_code' => $code,
+                                    'patient_name' => $gSpec['patient_name'] ?? ($customer->name ?? 'Paciente'),
+                                    'quantity' => 0,
+                                    'price' => 0.0,
+                                    'discount' => 0.0,
+                                    'total' => 0.0,
+                                    'examinations' => [],
+                                ];
                             }
-                            $rowPrice = (float) $spec['price'];
-                            $rowDiscount = (float) $spec['discount'];
-                            $rowTotal = ($rowPrice - $rowDiscount) * $qty;
-                        @endphp
-                        <tr>
-                            <td>{{ $rowNum++ }}</td>
-                            <td>
-                                <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">{{ $spec['exam_name'] }}</div>
-                                <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
-                                    Paciente: {{ $spec['patient_name'] }} &nbsp;|&nbsp; Muestra: <span style="font-family: monospace; font-weight: bold; color: #1e3a8a; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px;">{{ $spec['sequence_code'] }}</span>
-                                </div>
-                                @if(!empty($spec['age_discount_type']) && (float)($spec['age_discount_amount'] ?? 0) > 0)
-                                    <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
-                                        * Descuento de {{ $spec['age_discount_type'] === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }} aplicado: - L. {{ number_format($spec['age_discount_amount'], 2) }}
-                                    </div>
-                                @endif
-                                @if(!empty($spec['additional_discount_enabled']) && (float)($spec['additional_discount'] ?? 0) > 0)
-                                    <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
-                                        * Descuento Adicional aplicado: - L. {{ number_format($spec['additional_discount'], 2) }}
-                                    </div>
-                                @endif
-                            </td>
-                            <td>{{ $qty }}</td>
-                            <td class="text-right">L. {{ number_format($rowPrice, 2) }}</td>
-                            <td class="text-right">L. {{ number_format($rowDiscount, 2) }}</td>
-                            <td class="text-right">L. {{ number_format($rowTotal, 2) }}</td>
-                        </tr>
-                    @endforeach
-                    @if((float)($invoice->custom_amount ?? 0) > 0)
-                    <tr>
-                        <td>{{ $rowNum++ }}</td>
-                        <td>
-                            <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">{{ $invoice->custom_amount_reason ?? 'Cargo Adicional Personalizado' }}</div>
-                            <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
-                                Servicios
-                            </div>
-                        </td>
-                        <td>1</td>
-                        <td class="text-right">L. {{ number_format($invoice->custom_amount, 2) }}</td>
-                        <td class="text-right">L. 0.00</td>
-                        <td class="text-right">L. {{ number_format($invoice->custom_amount, 2) }}</td>
-                    </tr>
-                    @endif
-                @else
+
+                            $parts = explode(' - ', $gSpec['exam_name'] ?? '');
+                            $examPart = count($parts) > 1 ? $parts[1] : ($gSpec['exam_name'] ?? 'Análisis');
+                            $qty = max(1, (int) ($gSpec['quantity'] ?? 1));
+                            $price = (float) ($gSpec['price'] ?? 0);
+                            $disc = (float) ($gSpec['discount'] ?? 0);
+                            $sub = max(0.0, ($price - $disc) * $qty);
+
+                            $groupedBySeq[$code]['quantity'] += $qty;
+                            $groupedBySeq[$code]['price'] += $price;
+                            $groupedBySeq[$code]['discount'] += $disc;
+                            $groupedBySeq[$code]['total'] += $sub;
+
+                            $groupedBySeq[$code]['examinations'][] = [
+                                'name' => $examPart,
+                                'price' => $price,
+                                'discount' => $disc,
+                                'quantity' => $qty,
+                                'subtotal' => $sub,
+                                'age_discount_type' => $gSpec['age_discount_type'] ?? null,
+                                'age_discount_amount' => (float) ($gSpec['age_discount_amount'] ?? 0),
+                                'additional_discount_enabled' => ! empty($gSpec['additional_discount_enabled']),
+                                'additional_discount' => (float) ($gSpec['additional_discount'] ?? 0),
+                            ];
+                        }
+                        $specimensList = array_values($groupedBySeq);
+                    } else {
+                        // Single specimen fallback without invoice_specimens pivot rows
+                        $specimen = $invoice->specimen;
+                        if ($specimen) {
+                            $typeName = $specimen->type->name ?? '';
+                            $patientName = $customer->name ?? 'Paciente';
+                            $sequenceCode = $specimen->sequence_code ?? '';
+
+                            $exams = $specimen->examinations && $specimen->examinations->isNotEmpty()
+                                ? $specimen->examinations
+                                : collect([$examination ?? $specimen->examination]);
+
+                            $specExams = [];
+                            foreach ($exams as $ex) {
+                                if ($ex) {
+                                    $specExams[] = [
+                                        'name' => $ex->name ?? 'Análisis',
+                                        'price' => (float) $invoice->amount,
+                                        'discount' => (float) $invoice->discount,
+                                        'quantity' => (int) ($invoice->quantity ?? 1),
+                                        'subtotal' => (float) $invoice->total,
+                                        'age_discount_type' => $invoice->age_discount_type,
+                                        'age_discount_amount' => (float) $invoice->age_discount_amount,
+                                        'additional_discount_enabled' => false,
+                                        'additional_discount' => 0.00,
+                                    ];
+                                }
+                            }
+
+                            $specimensList[] = [
+                                'type_name' => $typeName,
+                                'sequence_code' => $sequenceCode,
+                                'patient_name' => $patientName,
+                                'quantity' => (int) ($invoice->quantity ?? 1),
+                                'price' => (float) $invoice->amount,
+                                'discount' => (float) $invoice->discount,
+                                'total' => (float) $invoice->total,
+                                'examinations' => $specExams,
+                            ];
+                        }
+                    }
+                    $rowNum = 1;
+                @endphp
+
+                @foreach($specimensList as $spec)
                     @php
-                        $qty = (int) ($invoice->quantity ?? 1);
+                        $qty = (int) ($spec['quantity'] ?? 1);
                         if ($qty <= 0) {
                             $qty = 1;
                         }
-                        $unitBaseExamPrice = (float)$invoice->amount;
-                        $unitDiscount = (float)$invoice->discount / $qty;
-                        $rowNum = 2;
+                        $rowPrice = (float) $spec['price'];
+                        $rowDiscount = (float) $spec['discount'];
+                        $rowTotal = (float) $spec['total'];
                     @endphp
                     <tr>
-                        <td>1</td>
-                        <td>
-                            <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">
-                                @if($invoice->specimen && $invoice->specimen->type)
-                                    {{ $invoice->specimen->type->name }} - 
-                                @endif
-                                {{ $examination->name }}
-                            </div>
-                            <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
-                                Paciente: {{ $customer->name }}
-                                @if($invoice->specimen && $invoice->specimen->sequence_code)
-                                    &nbsp;|&nbsp; Muestra: <span style="font-family: monospace; font-weight: bold; color: #1e3a8a; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 1px 4px; border-radius: 3px;">{{ $invoice->specimen->sequence_code }}</span>
-                                @endif
-                            </div>
-                            @if($invoice->age_discount_type)
-                                <div style="font-size: 8.5px; color: #10b981; margin-top: 3px; font-weight: 500;">
-                                    * Descuento de {{ $invoice->age_discount_type === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }} aplicado: - L. {{ number_format($invoice->age_discount_amount, 2) }}
+                        <td style="vertical-align: middle; padding: 6px 4px;">{{ $rowNum++ }}</td>
+                        <td style="vertical-align: middle; padding: 6px 4px;">
+                            @if(!empty($spec['type_name']))
+                                <div style="font-size: 7.5px; font-weight: 700; text-transform: uppercase; color: #6b7280; letter-spacing: 0.3px; line-height: 1; margin-bottom: 3px;">
+                                    {{ $spec['type_name'] }}
                                 </div>
                             @endif
+
+                            <div style="display: flex; flex-direction: column; gap: 3px;">
+                                @foreach($spec['examinations'] as $exam)
+                                    <div>
+                                        <div style="font-weight: 500; font-size: 10px; color: #4b5563; line-height: 1.2;">
+                                            {{ $exam['name'] }} <span style="font-size: 9px; font-weight: 600; color: #1e3a8a;"> x{{ max(1, (int) ($exam['quantity'] ?? 1)) }}</span>
+                                        </div>
+                                        @if(!empty($exam['age_discount_type']) && (float)($exam['age_discount_amount'] ?? 0) > 0)
+                                            <div style="font-size: 7.5px; color: #059669; margin-top: 1px; font-weight: 500;">
+                                                * Descuento {{ $exam['age_discount_type'] === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }}: - L. {{ number_format($exam['age_discount_amount'], 2) }}
+                                            </div>
+                                        @endif
+                                        @if(!empty($exam['additional_discount_enabled']) && (float)($exam['additional_discount'] ?? 0) > 0)
+                                            <div style="font-size: 7.5px; color: #059669; margin-top: 1px; font-weight: 500;">
+                                                * Descuento Adicional: - L. {{ number_format($exam['additional_discount'], 2) }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div style="font-size: 8px; color: #4b5563; margin-top: 4px;">
+                                Paciente: {{ $spec['patient_name'] }}
+                                @if(!empty($spec['sequence_code']))
+                                    &nbsp;|&nbsp; Muestra: <span style="font-family: monospace; font-weight: bold; color: #1e3a8a; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 0px 3px; border-radius: 2px;">{{ $spec['sequence_code'] }}</span>
+                                @endif
+                            </div>
                         </td>
-                        <td>{{ $qty }}</td>
-                        <td class="text-right">L. {{ number_format($unitBaseExamPrice, 2) }}</td>
-                        <td class="text-right">L. {{ number_format($unitDiscount, 2) }}</td>
-                        <td class="text-right">L. {{ number_format(($unitBaseExamPrice - $unitDiscount) * $qty, 2) }}</td>
+                        <td style="vertical-align: middle; padding: 6px 4px;">{{ $qty }}</td>
+                        <td class="text-right" style="vertical-align: middle; padding: 6px 4px;">L. {{ number_format($rowPrice, 2) }}</td>
+                        <td class="text-right" style="vertical-align: middle; padding: 6px 4px;">L. {{ number_format($rowDiscount, 2) }}</td>
+                        <td class="text-right" style="vertical-align: middle; padding: 6px 4px;">L. {{ number_format($rowTotal, 2) }}</td>
                     </tr>
-                    @if((float)($invoice->custom_amount ?? 0) > 0)
+                @endforeach
+
+                @if((float)($invoice->custom_amount ?? 0) > 0)
                     <tr>
                         <td>{{ $rowNum++ }}</td>
                         <td>
-                            <div style="font-weight: bold; font-size: 10.5px; color: #1f2937;">{{ $invoice->custom_amount_reason ?? 'Cargo Adicional Personalizado' }}</div>
-                            <div style="font-size: 8.5px; color: #4b5563; margin-top: 3px;">
+                            <div style="font-weight: bold; font-size: 10px; color: #1f2937;">{{ $invoice->custom_amount_reason ?? 'Cargo Adicional Personalizado' }}</div>
+                            <div style="font-size: 8px; color: #4b5563; margin-top: 2px;">
                                 Servicios
                             </div>
                         </td>
@@ -621,7 +663,6 @@
                         <td class="text-right">L. 0.00</td>
                         <td class="text-right">L. {{ number_format($invoice->custom_amount, 2) }}</td>
                     </tr>
-                    @endif
                 @endif
             </tbody>
         </table>

@@ -156,6 +156,10 @@ interface Invoice {
     isv_15?: string | number | null;
     is_group?: boolean;
     group_id?: number | null;
+    invoice_specimens?: any[];
+    invoiceSpecimens?: any[];
+    credit_invoice_specimens?: any[];
+    group_specimens?: any[];
 }
 
 interface Props {
@@ -339,11 +343,14 @@ function getInvoiceDisplayValues(
     const hasDateFilter = Boolean(dateFrom || dateTo);
 
     const isCredit = invoice.payment_type === 'credit';
-    const breakdownRecords = isCredit
-        ? invoice.credit_invoice_specimens ||
-          invoice.creditInvoiceSpecimens ||
-          []
-        : invoice.group_specimens || invoice.groupSpecimens || [];
+    const breakdownRecords =
+        invoice.invoice_specimens ||
+        invoice.invoiceSpecimens ||
+        (isCredit
+            ? invoice.credit_invoice_specimens ||
+              invoice.creditInvoiceSpecimens ||
+              []
+            : invoice.group_specimens || invoice.groupSpecimens || []);
 
     const breakdownBySpecimenId: Record<number, any> = {};
     breakdownRecords.forEach((b: any) => {
@@ -489,7 +496,10 @@ const getSpecimenDateRangeText = (
     }
 
     const creditSpecs =
-        invoice.credit_invoice_specimens || invoice.creditInvoiceSpecimens;
+        invoice.invoice_specimens ||
+        invoice.invoiceSpecimens ||
+        invoice.credit_invoice_specimens ||
+        invoice.creditInvoiceSpecimens;
     const groupSpecs = invoice.group_specimens || invoice.groupSpecimens;
 
     let specimens: { code: string; date: string; time: string }[] = [];
@@ -2431,34 +2441,58 @@ export default function InvoicesIndex({
                                                                             >
                                                                                 <Coins className="mr-2 h-4 w-4 text-muted-foreground" />
                                                                                 <span>
-                                                                                    Pago
-                                                                                    final
+                                                                                    Generar
+                                                                                    Factura
+                                                                                    Final
                                                                                 </span>
                                                                             </DropdownMenuItem>
                                                                             {(() => {
                                                                                 const credit =
                                                                                     invoice.credit_relation;
+                                                                                const rawSpecimens =
+                                                                                    credit?.credit_invoice_specimens ||
+                                                                                    credit?.invoice_specimens ||
+                                                                                    [];
+                                                                                const uniqueSpecimenIds =
+                                                                                    new Set(
+                                                                                        rawSpecimens
+                                                                                            .map(
+                                                                                                (
+                                                                                                    s: any,
+                                                                                                ) =>
+                                                                                                    s.specimen_id ||
+                                                                                                    s.id,
+                                                                                            )
+                                                                                            .filter(
+                                                                                                Boolean,
+                                                                                            ),
+                                                                                    );
                                                                                 const specimensCount =
-                                                                                    credit
-                                                                                        .credit_invoice_specimens
-                                                                                        ?.length ??
-                                                                                    invoice
-                                                                                        .group
-                                                                                        ?.specimens
-                                                                                        ?.length ??
-                                                                                    (invoice.is_group
-                                                                                        ? 2
-                                                                                        : 1);
+                                                                                    uniqueSpecimenIds.size >
+                                                                                    0
+                                                                                        ? uniqueSpecimenIds.size
+                                                                                        : (credit
+                                                                                              ?.group
+                                                                                              ?.specimens
+                                                                                              ?.length ??
+                                                                                          invoice
+                                                                                              .group
+                                                                                              ?.specimens
+                                                                                              ?.length ??
+                                                                                          (invoice.is_group ||
+                                                                                          credit?.is_group
+                                                                                              ? 2
+                                                                                              : 1));
                                                                                 const remaining =
                                                                                     parseFloat(
                                                                                         String(
-                                                                                            credit.amount_remaining ||
+                                                                                            credit?.amount_remaining ||
                                                                                                 '0',
                                                                                         ),
                                                                                     );
                                                                                 const isSingleOrPaid =
                                                                                     (!invoice.is_group &&
-                                                                                        !credit.is_group) ||
+                                                                                        !credit?.is_group) ||
                                                                                     specimensCount <=
                                                                                         1 ||
                                                                                     remaining <=
@@ -2471,7 +2505,15 @@ export default function InvoicesIndex({
                                                                                                 !isSingleOrPaid
                                                                                             ) {
                                                                                                 handleExtractSpecimenClick(
-                                                                                                    credit,
+                                                                                                    {
+                                                                                                        ...credit,
+                                                                                                        customer:
+                                                                                                            credit?.customer ||
+                                                                                                            invoice.customer,
+                                                                                                        group:
+                                                                                                            credit?.group ||
+                                                                                                            invoice.group,
+                                                                                                    },
                                                                                                 );
                                                                                             }
                                                                                         }}

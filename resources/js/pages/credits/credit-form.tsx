@@ -86,6 +86,7 @@ interface Credit {
     customer?: Customer;
     last_payment_date?: string | null;
     reminder_interval_in_seconds?: number;
+    invoice_specimens?: CreditInvoiceSpecimen[];
     credit_invoice_specimens?: CreditInvoiceSpecimen[];
 }
 
@@ -399,10 +400,11 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
         setIsPaymentSheetOpen(false);
     };
 
+    const creditSpecimens =
+        credit.invoice_specimens || credit.credit_invoice_specimens || [];
+
     const handleSpecimenToggle = (specimenId: number) => {
-        const item = credit.credit_invoice_specimens?.find(
-            (x) => x.specimen_id === specimenId,
-        );
+        const item = creditSpecimens.find((x) => x.specimen_id === specimenId);
 
         if (!item) {
             return;
@@ -425,9 +427,7 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
         specimenId: number,
         newQty: number,
     ) => {
-        const item = credit.credit_invoice_specimens?.find(
-            (x) => x.specimen_id === specimenId,
-        );
+        const item = creditSpecimens.find((x) => x.specimen_id === specimenId);
 
         if (!item) {
             return;
@@ -451,7 +451,7 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
     const recalculateAmountPaid = (
         newSpecimens: { id: number; quantity: number }[],
     ) => {
-        const specimensList = credit.credit_invoice_specimens || [];
+        const specimensList = creditSpecimens;
         const selectedSum = newSpecimens.reduce((sum, specItem) => {
             const dbItem = specimensList.find(
                 (x) => x.specimen_id === specItem.id,
@@ -478,8 +478,7 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
 
     const handleSelectAll = () => {
         const unpaidSpecimens =
-            credit.credit_invoice_specimens?.filter((item) => !item.is_paid) ||
-            [];
+            creditSpecimens.filter((item) => !item.is_paid) || [];
         const newSpecimens = unpaidSpecimens.map((item) => {
             const maxQty = item.quantity - (item.quantity_paid ?? 0);
 
@@ -714,8 +713,8 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
             </div>
 
             {credit.is_group &&
-                credit.credit_invoice_specimens &&
-                credit.credit_invoice_specimens.length > 0 && (
+                creditSpecimens &&
+                creditSpecimens.length > 0 && (
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
@@ -746,7 +745,7 @@ export default function CreditForm({ credit, banks = [], onSuccess }: Props) {
                             </div>
                         </div>
                         <div className="max-h-[280px] space-y-2.5 overflow-y-auto rounded-xl border bg-card p-3 shadow-inner">
-                            {credit.credit_invoice_specimens.map((item) => {
+                            {creditSpecimens.map((item) => {
                                 const spec = item.specimen;
                                 const isPaid = item.is_paid;
                                 const maxQty =

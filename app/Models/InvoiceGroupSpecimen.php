@@ -17,7 +17,25 @@ class InvoiceGroupSpecimen extends Model
 {
     use HasFactory;
 
-    protected $table = 'invoice_group_specimens';
+    protected $table = 'invoice_specimens';
+
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            if ($model->invoice_id && $model->specimen_id) {
+                $existing = static::where('invoice_id', $model->invoice_id)
+                    ->where('specimen_id', $model->specimen_id)
+                    ->first();
+
+                if ($existing) {
+                    $attrs = array_filter($model->getAttributes(), fn ($val) => ! is_null($val));
+                    $existing->update($attrs);
+
+                    return false;
+                }
+            }
+        });
+    }
 
     protected $fillable = [
         'invoice_id',

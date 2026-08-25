@@ -70,9 +70,22 @@ export default function SpecimenWorkOrdersSheet({
                     </SheetHeader>
                     <Separator className="my-2" />
                     <div className="flex flex-col gap-4 px-5 py-2 select-none">
-                        {specimen?.work_orders &&
-                        specimen.work_orders.length > 0 ? (
-                            specimen.work_orders.map((order: any) => {
+                        {(() => {
+                            const workOrdersList =
+                                specimen?.work_orders ||
+                                specimen?.workOrders ||
+                                [];
+
+                            if (workOrdersList.length === 0) {
+                                return (
+                                    <p className="py-4 text-center text-sm text-muted-foreground">
+                                        No hay órdenes de trabajo asignadas a
+                                        esta muestra.
+                                    </p>
+                                );
+                            }
+
+                            return workOrdersList.map((order: any) => {
                                 const priorityLabel =
                                     order.priority === 1
                                         ? 'Alta'
@@ -99,10 +112,16 @@ export default function SpecimenWorkOrdersSheet({
                                     props.auth?.permissions?.includes(
                                         'work_orders.admin_view',
                                     );
-                                const canModify =
-                                    isAdmin ||
+                                const isCreator =
                                     order.created_by_id ===
-                                        props.auth?.user?.id;
+                                    props.auth?.user?.id;
+                                const canDelete = isAdmin || isCreator;
+                                const canEdit =
+                                    isAdmin ||
+                                    isCreator ||
+                                    props.auth?.permissions?.includes(
+                                        'work_orders.edit',
+                                    );
 
                                 return (
                                     <div
@@ -185,41 +204,45 @@ export default function SpecimenWorkOrdersSheet({
                                                 )}
                                             </div>
 
-                                            {canModify && (
+                                            {(canEdit || canDelete) && (
                                                 <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-7 px-2.5 text-[11px]"
-                                                        onClick={() => {
-                                                            setEditingWorkOrder(
-                                                                order,
-                                                            );
-                                                            setIsEditWorkOrderSheetOpen(
-                                                                true,
-                                                            );
-                                                        }}
-                                                    >
-                                                        <Edit className="mr-1 h-3 w-3" />
-                                                        Editar
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        variant="destructive"
-                                                        size="sm"
-                                                        className="h-7 px-2.5 text-[11px]"
-                                                        onClick={() => {
-                                                            setWorkOrderToDelete(
-                                                                order,
-                                                            );
-                                                            setIsDeleteDialogOpen(
-                                                                true,
-                                                            );
-                                                        }}
-                                                    >
-                                                        <Trash2 className="h-3 w-3" />
-                                                    </Button>
+                                                    {canEdit && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 px-2.5 text-[11px]"
+                                                            onClick={() => {
+                                                                setEditingWorkOrder(
+                                                                    order,
+                                                                );
+                                                                setIsEditWorkOrderSheetOpen(
+                                                                    true,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <Edit className="mr-1 h-3 w-3" />
+                                                            Editar
+                                                        </Button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="destructive"
+                                                            size="sm"
+                                                            className="h-7 px-2.5 text-[11px]"
+                                                            onClick={() => {
+                                                                setWorkOrderToDelete(
+                                                                    order,
+                                                                );
+                                                                setIsDeleteDialogOpen(
+                                                                    true,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -263,13 +286,8 @@ export default function SpecimenWorkOrdersSheet({
                                         )}
                                     </div>
                                 );
-                            })
-                        ) : (
-                            <p className="py-4 text-center text-sm text-muted-foreground">
-                                No hay órdenes de trabajo asignadas a esta
-                                muestra.
-                            </p>
-                        )}
+                            });
+                        })()}
                     </div>
                 </SheetContent>
             </Sheet>

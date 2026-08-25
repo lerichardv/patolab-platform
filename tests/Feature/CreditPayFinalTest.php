@@ -108,7 +108,7 @@ test('submitting a final payment registers payment, updates credit, assigns invo
     ]);
 
     // Insert specimen group association
-    DB::table('credit_invoice_specimens')->insert([
+    DB::table('invoice_specimens')->insert([
         'credit_id' => $credit->id,
         'invoice_id' => $originalInvoice->id,
         'specimen_id' => $specimen->id,
@@ -149,7 +149,7 @@ test('submitting a final payment registers payment, updates credit, assigns invo
     expect($credit->status)->toEqual('invoice generated');
 
     // Assert specimens are marked as paid
-    $specimenRecord = DB::table('credit_invoice_specimens')
+    $specimenRecord = DB::table('invoice_specimens')
         ->where('credit_id', $credit->id)
         ->where('specimen_id', $specimen->id)
         ->first();

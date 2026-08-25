@@ -25,8 +25,12 @@ interface SpecimenItem {
     id: number;
     sequence_code?: string;
     customer_relation?: { name: string };
+    customerRelation?: { name: string };
     type?: { name: string };
-    examination?: { name: string };
+    examination?: { id?: number; name: string; code?: string };
+    examinations?: Array<{ id: number; name: string; code?: string }>;
+    specimen_examinations?: any[];
+    specimenExaminations?: any[];
 }
 
 interface CreditInvoiceSpecimen {
@@ -38,7 +42,84 @@ interface CreditInvoiceSpecimen {
     discount: string | number;
     subtotal: string | number;
     total: string | number;
+    examination_id?: number;
+    examination_name?: string;
+    examination?: {
+        id?: number;
+        name: string;
+        code?: string;
+    };
     specimen?: SpecimenItem;
+}
+
+function extractSpecimenExaminations(
+    spec: any,
+    fallbackCreditItems?: any[],
+): Array<{ id?: number; name: string; code?: string }> {
+    const list: Array<{ id?: number; name: string; code?: string }> = [];
+    const seen = new Set<string>();
+
+    const addExam = (name?: string, id?: number, code?: string) => {
+        if (name && !seen.has(name.trim().toLowerCase())) {
+            seen.add(name.trim().toLowerCase());
+            list.push({ id, name: name.trim(), code });
+        }
+    };
+
+    if (Array.isArray(spec?.examinations) && spec.examinations.length > 0) {
+        spec.examinations.forEach((e: any) => {
+            addExam(e.name, e.id, e.code);
+        });
+    }
+
+    if (
+        Array.isArray(spec?.specimen_examinations) &&
+        spec.specimen_examinations.length > 0
+    ) {
+        spec.specimen_examinations.forEach((se: any) => {
+            const exam = se.examination || se;
+            addExam(exam.name, exam.id || se.examination_id, exam.code);
+        });
+    }
+
+    if (
+        Array.isArray(spec?.specimenExaminations) &&
+        spec.specimenExaminations.length > 0
+    ) {
+        spec.specimenExaminations.forEach((se: any) => {
+            const exam = se.examination || se;
+            addExam(exam.name, exam.id || se.examination_id, exam.code);
+        });
+    }
+
+    if (Array.isArray(fallbackCreditItems) && fallbackCreditItems.length > 0) {
+        fallbackCreditItems.forEach((item: any) => {
+            if (
+                !spec?.id ||
+                !item.specimen_id ||
+                item.specimen_id === spec.id
+            ) {
+                const exam = item.examination || item.specimen?.examination;
+                const examName =
+                    exam?.name || item.examination_name || item.name;
+                addExam(
+                    examName,
+                    item.examination_id || exam?.id,
+                    exam?.code || item.code,
+                );
+            }
+        });
+    }
+
+    if (list.length === 0 && spec?.examination?.name) {
+        addExam(
+            spec.examination.name,
+            spec.examination.id,
+            spec.examination.code,
+        );
+    }
+
+    return list;
 }
 
 interface InvoiceModel {
@@ -81,6 +162,7 @@ interface Credit {
     customer?: Customer;
     invoices?: InvoiceModel[];
     group?: any;
+    invoice_specimens?: CreditInvoiceSpecimen[];
     credit_invoice_specimens?: CreditInvoiceSpecimen[];
 }
 
@@ -379,7 +461,8 @@ export default function CreditViewSheet({ credit, open, onOpenChange }: Props) {
     const paymentInvoices =
         credit.invoices?.filter((inv) => inv.payment_type !== 'credit') || [];
 
-    const creditSpecimens = credit.credit_invoice_specimens || [];
+    const creditSpecimens =
+        credit.invoice_specimens || credit.credit_invoice_specimens || [];
     const paidCount = creditSpecimens.filter((s) => s.is_paid).length;
     const pendingCount = creditSpecimens.filter((s) => !s.is_paid).length;
 
@@ -599,15 +682,85 @@ export default function CreditViewSheet({ credit, open, onOpenChange }: Props) {
                                                             </span>{' '}
                                                             {spec
                                                                 ?.customer_relation
-                                                                ?.name || 'N/A'}
-                                                        </span>
-                                                        <span className="text-[11px] text-muted-foreground">
-                                                            {spec?.type?.name ||
+                                                                ?.name ||
+                                                                spec
+                                                                    ?.customerRelation
+                                                                    ?.name ||
+                                                                credit.customer
+                                                                    ?.name ||
                                                                 'N/A'}
-                                                            {spec?.examination
-                                                                ?.name &&
-                                                                ` — ${spec.examination.name}`}
                                                         </span>
+                                                        <div className="flex flex-col gap-1 pt-0.5">
+                                                            <span className="text-[11px] font-semibold text-foreground">
+                                                                Tipo:{' '}
+                                                                <span className="font-normal text-muted-foreground">
+                                                                    {spec?.type
+                                                                        ?.name ||
+                                                                        'N/A'}
+                                                                </span>
+                                                            </span>
+                                                            {(() => {
+                                                                const exams =
+                                                                    extractSpecimenExaminations(
+                                                                        spec,
+                                                                        [item],
+                                                                    );
+                                                                if (
+                                                                    exams.length ===
+                                                                    0
+                                                                ) {
+                                                                    return (
+                                                                        <span className="text-[10px] text-muted-foreground">
+                                                                            Examen:
+                                                                            N/A
+                                                                        </span>
+                                                                    );
+                                                                }
+
+                                                                return (
+                                                                    <div className="flex flex-col gap-0.5 pl-1">
+                                                                        <span className="text-[10px] font-medium text-muted-foreground">
+                                                                            {exams.length >
+                                                                            1
+                                                                                ? 'Exámenes:'
+                                                                                : 'Examen:'}
+                                                                        </span>
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            {exams.map(
+                                                                                (
+                                                                                    exam,
+                                                                                    idx,
+                                                                                ) => (
+                                                                                    <div
+                                                                                        key={
+                                                                                            idx
+                                                                                        }
+                                                                                        className="flex items-center gap-1.5 text-[11px] font-medium text-foreground"
+                                                                                    >
+                                                                                        <span className="h-1 w-1 shrink-0 rounded-full bg-primary" />
+                                                                                        <span>
+                                                                                            {
+                                                                                                exam.name
+                                                                                            }
+                                                                                        </span>
+                                                                                        {exam.code && (
+                                                                                            <span className="font-mono text-[9px] text-muted-foreground uppercase">
+                                                                                                (
+                                                                                                {
+                                                                                                    exam.code
+                                                                                                }
+
+                                                                                                )
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                ),
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     </div>
                                                     <div className="text-right">
                                                         <div className="text-xs font-bold text-foreground">

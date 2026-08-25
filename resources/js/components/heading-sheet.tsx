@@ -5,7 +5,7 @@ import {
 } from '@/components/ui/sheet';
 
 interface HeadingSheetProps {
-    title: string;
+    title: React.ReactNode;
     description: string;
 }
 

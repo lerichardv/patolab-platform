@@ -4,7 +4,7 @@ use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\InvoiceGroupSpecimen;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\Priority;
 use App\Models\Referrer;
@@ -106,7 +106,7 @@ test('billing summary report shows only specimens added in date range for groupe
         'group_id' => $group->id,
     ]);
 
-    $igs1 = InvoiceGroupSpecimen::create([
+    $igs1 = InvoiceSpecimen::create([
         'invoice_id' => $invoice->id,
         'group_id' => $group->id,
         'specimen_id' => $specimen1->id,
@@ -133,7 +133,7 @@ test('billing summary report shows only specimens added in date range for groupe
         'group_id' => $group->id,
     ]);
 
-    $igs2 = InvoiceGroupSpecimen::create([
+    $igs2 = InvoiceSpecimen::create([
         'invoice_id' => $invoice->id,
         'group_id' => $group->id,
         'specimen_id' => $specimen2->id,

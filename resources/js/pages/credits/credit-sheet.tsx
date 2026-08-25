@@ -19,6 +19,7 @@ interface Credit {
     customer?: Customer;
     last_payment_date?: string | null;
     reminder_interval_in_seconds?: number;
+    invoice_specimens?: any[];
     credit_invoice_specimens?: any[];
 }
 

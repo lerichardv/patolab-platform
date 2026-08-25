@@ -86,10 +86,17 @@ class Credit extends Model
 
     /**
      * Get the individual specimen records associated with this credit.
-     * Only applies to credits where is_group is true.
      */
     public function creditInvoiceSpecimens(): HasMany
     {
-        return $this->hasMany(CreditInvoiceSpecimen::class, 'credit_id');
+        return $this->hasMany(InvoiceSpecimen::class, 'credit_id');
+    }
+
+    /**
+     * Get all invoice specimens associated with this credit.
+     */
+    public function invoiceSpecimens(): HasMany
+    {
+        return $this->hasMany(InvoiceSpecimen::class, 'credit_id');
     }
 }

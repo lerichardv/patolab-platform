@@ -107,6 +107,18 @@ trait Auditable
     {
         $ignored = ['created_at', 'updated_at', 'deleted_at', 'password', 'remember_token'];
 
+        if (property_exists($this, 'auditIgnore') && is_array($this->auditIgnore)) {
+            $ignored = array_merge($ignored, $this->auditIgnore);
+        }
+
+        if (property_exists($this, 'auditExclude') && is_array($this->auditExclude)) {
+            $ignored = array_merge($ignored, $this->auditExclude);
+        }
+
+        if (property_exists($this, 'dontAudit') && is_array($this->dontAudit)) {
+            $ignored = array_merge($ignored, $this->dontAudit);
+        }
+
         return in_array($column, $ignored);
     }
 }

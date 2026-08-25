@@ -12,6 +12,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import GroupInvoiceForm from './group-invoice-form';
 import InvoiceForm from './invoice-form';
 
 interface Props {
@@ -42,6 +43,18 @@ export default function InvoiceSheet({
 
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+
+    const isGroupInvoice = Boolean(
+        invoice &&
+        (invoice.is_group === true ||
+            invoice.is_group === 1 ||
+            invoice.is_group === '1' ||
+            Boolean(invoice.group_id) ||
+            Boolean(invoice.specimen_group_id) ||
+            Boolean(invoice.group) ||
+            invoice.specimen?.is_group === true ||
+            invoice.specimen?.is_group === 1),
+    );
 
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -76,20 +89,35 @@ export default function InvoiceSheet({
             <Sheet open={open} onOpenChange={handleOpenChange}>
                 <SheetContent className="w-full overflow-y-auto pb-12 sm:max-w-[90vw] md:max-w-[1000px] lg:max-w-[1100px]">
                     <HeadingSheet
-                        title="Editar Factura"
+                        title={
+                            isGroupInvoice
+                                ? 'Editar Factura Grupal'
+                                : 'Editar Factura Individual'
+                        }
                         description="Realice cambios en la información de la factura aquí. Todos los importes y datos de pago pueden ser ajustados."
                     />
-                    {invoice && (
-                        <InvoiceForm
-                            invoice={invoice}
-                            banks={banks}
-                            specimenTypes={finalSpecimenTypes}
-                            examinations={finalExaminations}
-                            settings={finalSettings}
-                            onSuccess={() => onOpenChange(false)}
-                            setIsDirty={setIsFormDirty}
-                        />
-                    )}
+                    {invoice &&
+                        (isGroupInvoice ? (
+                            <GroupInvoiceForm
+                                invoice={invoice}
+                                banks={banks}
+                                specimenTypes={finalSpecimenTypes}
+                                examinations={finalExaminations}
+                                settings={finalSettings}
+                                onSuccess={() => onOpenChange(false)}
+                                setIsDirty={setIsFormDirty}
+                            />
+                        ) : (
+                            <InvoiceForm
+                                invoice={invoice}
+                                banks={banks}
+                                specimenTypes={finalSpecimenTypes}
+                                examinations={finalExaminations}
+                                settings={finalSettings}
+                                onSuccess={() => onOpenChange(false)}
+                                setIsDirty={setIsFormDirty}
+                            />
+                        ))}
                 </SheetContent>
             </Sheet>
 

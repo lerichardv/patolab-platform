@@ -2,10 +2,9 @@
 
 use App\Models\CaiRange;
 use App\Models\Credit;
-use App\Models\CreditInvoiceSpecimen;
 use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\InvoiceGroupSpecimen;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\Permission;
 use App\Models\Priority;
@@ -145,7 +144,7 @@ test('invoice list filters individual invoices by invoice created_at and grouped
     ]);
     $specimen3->forceFill(['created_at' => '2026-08-07 10:00:00'])->save();
 
-    InvoiceGroupSpecimen::create([
+    InvoiceSpecimen::create([
         'invoice_id' => $invoice3->id,
         'group_id' => $group3->id,
         'specimen_id' => $specimen3->id,
@@ -202,7 +201,7 @@ test('invoice list filters individual invoices by invoice created_at and grouped
         'specimen_id' => $specimen4->id,
     ]);
 
-    CreditInvoiceSpecimen::create([
+    InvoiceSpecimen::create([
         'credit_id' => $credit->id,
         'invoice_id' => $invoice4->id,
         'specimen_id' => $specimen4->id,

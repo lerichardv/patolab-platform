@@ -109,7 +109,18 @@ class MyAssignmentController extends Controller
             if (empty($examinationIds)) {
                 $query->whereRaw('1 = 0');
             } else {
-                $query->whereIn('specimen.specimen_type_examination', $examinationIds);
+                $query->where(function ($subQ) use ($examinationIds) {
+                    $subQ->whereIn('specimen.specimen_type_examination', $examinationIds)
+                        ->orWhereHas('examinations', function ($pivotQ) use ($examinationIds) {
+                            $pivotQ->whereIn('specimen_type_examinations.id', $examinationIds);
+                        })
+                        ->orWhereHas('invoiceRelation.invoiceSpecimens', function ($invQ) use ($examinationIds) {
+                            $invQ->whereIn('examination_id', $examinationIds);
+                        })
+                        ->orWhereHas('group.invoice.invoiceSpecimens', function ($groupInvQ) use ($examinationIds) {
+                            $groupInvQ->whereIn('examination_id', $examinationIds);
+                        });
+                });
             }
         }
 
@@ -125,7 +136,7 @@ class MyAssignmentController extends Controller
             ->select('specimen.*')
             ->orderBy('priorities.order', 'asc')
             ->orderBy('specimen.created_at', 'desc')
-            ->with(['priority', 'customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'workOrders.task', 'workOrders.users', 'cuttings.code', 'cuttings.prefix', 'cuttings.responsible'])
+            ->with(['priority', 'customerRelation', 'type', 'examination', 'examinations', 'specimenExaminations.examination', 'category', 'referrerRelation', 'invoiceRelation.invoiceSpecimens.examination', 'invoiceRelation.creditRelation', 'invoiceRelation.transferBank', 'users', 'collaborators', 'group.invoice.invoiceSpecimens.examination', 'group.invoice.creditRelation', 'group.invoice.transferBank', 'report', 'workOrders.task', 'workOrders.users', 'cuttings.code', 'cuttings.prefix', 'cuttings.responsible'])
             ->get();
 
         $priorities = Priority::orderBy('order', 'asc')->get();

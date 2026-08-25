@@ -50,24 +50,24 @@ class CreditGroupReportController extends Controller
                 break;
             case 'payment_method':
                 $query->leftJoin('invoices as inv_pm', 'specimen.id', '=', 'inv_pm.specimen_id')
-                    ->leftJoin('invoice_group_specimens as igs_pm', 'specimen.id', '=', 'igs_pm.specimen_id')
+                    ->leftJoin('invoice_specimens as igs_pm', 'specimen.id', '=', 'igs_pm.specimen_id')
                     ->leftJoin('invoices as inv_grp_pm', 'igs_pm.invoice_id', '=', 'inv_grp_pm.id')
                     ->orderByRaw('COALESCE(inv_pm.payment_type, inv_grp_pm.payment_type) '.$sortDirection);
                 break;
             case 'credit':
                 $query->leftJoin('invoices as inv_cr', 'specimen.id', '=', 'inv_cr.specimen_id')
-                    ->leftJoin('invoice_group_specimens as igs_cr', 'specimen.id', '=', 'igs_cr.specimen_id')
+                    ->leftJoin('invoice_specimens as igs_cr', 'specimen.id', '=', 'igs_cr.specimen_id')
                     ->leftJoin('invoices as inv_grp_cr', 'igs_cr.invoice_id', '=', 'inv_grp_cr.id')
                     ->orderByRaw('CASE WHEN COALESCE(inv_cr.credit_payment_id, inv_grp_cr.credit_payment_id) IS NULL THEN 0 ELSE 1 END '.$sortDirection);
                 break;
             case 'total':
                 $query->leftJoin('invoices as inv_tot', 'specimen.id', '=', 'inv_tot.specimen_id')
-                    ->leftJoin('invoice_group_specimens as igs_tot', 'specimen.id', '=', 'igs_tot.specimen_id')
+                    ->leftJoin('invoice_specimens as igs_tot', 'specimen.id', '=', 'igs_tot.specimen_id')
                     ->orderByRaw('COALESCE(igs_tot.total, inv_tot.total) '.$sortDirection);
                 break;
             case 'total_paid':
                 $query->leftJoin('invoices as inv_pd', 'specimen.id', '=', 'inv_pd.specimen_id')
-                    ->leftJoin('invoice_group_specimens as igs_pd', 'specimen.id', '=', 'igs_pd.specimen_id')
+                    ->leftJoin('invoice_specimens as igs_pd', 'specimen.id', '=', 'igs_pd.specimen_id')
                     ->leftJoin('invoices as inv_grp_pd', 'igs_pd.invoice_id', '=', 'inv_grp_pd.id')
                     ->orderByRaw('COALESCE(inv_pd.total_paid, inv_grp_pd.total_paid) '.$sortDirection);
                 break;
@@ -146,24 +146,24 @@ class CreditGroupReportController extends Controller
                 break;
             case 'payment_method':
                 $query->leftJoin('invoices as inv_pm', 'specimen.id', '=', 'inv_pm.specimen_id')
-                    ->leftJoin('invoice_group_specimens as igs_pm', 'specimen.id', '=', 'igs_pm.specimen_id')
+                    ->leftJoin('invoice_specimens as igs_pm', 'specimen.id', '=', 'igs_pm.specimen_id')
                     ->leftJoin('invoices as inv_grp_pm', 'igs_pm.invoice_id', '=', 'inv_grp_pm.id')
                     ->orderByRaw('COALESCE(inv_pm.payment_type, inv_grp_pm.payment_type) '.$sortDirection);
                 break;
             case 'credit':
                 $query->leftJoin('invoices as inv_cr', 'specimen.id', '=', 'inv_cr.specimen_id')
-                    ->leftJoin('invoice_group_specimens as igs_cr', 'specimen.id', '=', 'igs_cr.specimen_id')
+                    ->leftJoin('invoice_specimens as igs_cr', 'specimen.id', '=', 'igs_cr.specimen_id')
                     ->leftJoin('invoices as inv_grp_cr', 'igs_cr.invoice_id', '=', 'inv_grp_cr.id')
                     ->orderByRaw('CASE WHEN COALESCE(inv_cr.credit_payment_id, inv_grp_cr.credit_payment_id) IS NULL THEN 0 ELSE 1 END '.$sortDirection);
                 break;
             case 'total':
                 $query->leftJoin('invoices as inv_tot', 'specimen.id', '=', 'inv_tot.specimen_id')
-                    ->leftJoin('invoice_group_specimens as igs_tot', 'specimen.id', '=', 'igs_tot.specimen_id')
+                    ->leftJoin('invoice_specimens as igs_tot', 'specimen.id', '=', 'igs_tot.specimen_id')
                     ->orderByRaw('COALESCE(igs_tot.total, inv_tot.total) '.$sortDirection);
                 break;
             case 'total_paid':
                 $query->leftJoin('invoices as inv_pd', 'specimen.id', '=', 'inv_pd.specimen_id')
-                    ->leftJoin('invoice_group_specimens as igs_pd', 'specimen.id', '=', 'igs_pd.specimen_id')
+                    ->leftJoin('invoice_specimens as igs_pd', 'specimen.id', '=', 'igs_pd.specimen_id')
                     ->leftJoin('invoices as inv_grp_pd', 'igs_pd.invoice_id', '=', 'inv_grp_pd.id')
                     ->orderByRaw('COALESCE(inv_pd.total_paid, inv_grp_pd.total_paid) '.$sortDirection);
                 break;
@@ -426,6 +426,8 @@ class CreditGroupReportController extends Controller
             'group.specimens.type',
             'group.specimens.customerRelation',
             'group.specimens.examination.prices',
+            'group.specimens.examinations',
+            'group.specimens.specimenExaminations.examination',
             'group.specimens.category',
             'group.specimens.referrerRelation',
             'group.specimens.priority',

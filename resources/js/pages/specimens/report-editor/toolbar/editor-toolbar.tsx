@@ -377,7 +377,18 @@ export function EditorToolbar({
         input.click();
     };
 
+    if (!editor || editor.isDestroyed || !editor.view) {
+        return null;
+    }
+
     const inTable = isSelectionInTable(editor);
+    const canUndo = Boolean(editor.can?.()?.undo?.());
+    const canRedo = Boolean(editor.can?.()?.redo?.());
+    const canAddColumnAfter = Boolean(editor.can?.()?.addColumnAfter?.());
+    const canAddRowAfter = Boolean(editor.can?.()?.addRowAfter?.());
+    const canDeleteColumn = Boolean(editor.can?.()?.deleteColumn?.());
+    const canDeleteRow = Boolean(editor.can?.()?.deleteRow?.());
+    const canDeleteTable = Boolean(editor.can?.()?.deleteTable?.());
 
     return (
         <ToolbarContext.Provider value={{ isDictating }}>
@@ -388,14 +399,14 @@ export function EditorToolbar({
                         <ToolbarBtn
                             onClick={() => editor?.chain().focus().undo().run()}
                             title="Deshacer (Ctrl+Z)"
-                            disabled={!editor?.can().undo()}
+                            disabled={!canUndo}
                         >
                             <Undo2 className="h-3.5 w-3.5" />
                         </ToolbarBtn>
                         <ToolbarBtn
                             onClick={() => editor?.chain().focus().redo().run()}
                             title="Rehacer (Ctrl+Y)"
-                            disabled={!editor?.can().redo()}
+                            disabled={!canRedo}
                         >
                             <Redo2 className="h-3.5 w-3.5" />
                         </ToolbarBtn>
@@ -1043,7 +1054,7 @@ export function EditorToolbar({
                                             .run()
                                     }
                                     title="Añadir columna a la derecha"
-                                    disabled={!editor?.can().addColumnAfter()}
+                                    disabled={!canAddColumnAfter}
                                 >
                                     <BetweenVerticalEnd className="h-3.5 w-3.5" />
                                 </ToolbarBtn>
@@ -1056,7 +1067,7 @@ export function EditorToolbar({
                                             .run()
                                     }
                                     title="Añadir fila abajo"
-                                    disabled={!editor?.can().addRowAfter()}
+                                    disabled={!canAddRowAfter}
                                 >
                                     <BetweenHorizontalEnd className="h-3.5 w-3.5" />
                                 </ToolbarBtn>
@@ -1069,7 +1080,7 @@ export function EditorToolbar({
                                             .run()
                                     }
                                     title="Eliminar columna actual"
-                                    disabled={!editor?.can().deleteColumn()}
+                                    disabled={!canDeleteColumn}
                                 >
                                     <BetweenVerticalEnd className="h-3.5 w-3.5 text-red-500" />
                                 </ToolbarBtn>
@@ -1082,7 +1093,7 @@ export function EditorToolbar({
                                             .run()
                                     }
                                     title="Eliminar fila actual"
-                                    disabled={!editor?.can().deleteRow()}
+                                    disabled={!canDeleteRow}
                                 >
                                     <BetweenHorizontalEnd className="h-3.5 w-3.5 text-red-500" />
                                 </ToolbarBtn>
@@ -1095,7 +1106,7 @@ export function EditorToolbar({
                                             .run()
                                     }
                                     title="Eliminar tabla completa"
-                                    disabled={!editor?.can().deleteTable()}
+                                    disabled={!canDeleteTable}
                                 >
                                     <Trash2 className="h-3.5 w-3.5 text-red-500" />
                                 </ToolbarBtn>

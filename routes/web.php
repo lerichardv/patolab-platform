@@ -58,11 +58,13 @@ Route::inertia('/', 'welcome', [
 
 Route::get('/dev-login', function () {
     Auth::loginUsingId(7);
+
     return redirect('/specimens/BIO-0010-08-2026/report-editor');
 });
 
 Route::get('specimen/{specimen_code}', [SpecimenController::class, 'showPublic'])->name('specimens.show-public');
 Route::get('specimen-group/{id}', [SpecimenGroupController::class, 'showPublic'])->name('specimen-groups.show-public');
+Route::get('maintenance', fn () => response()->view('errors.503'))->name('maintenance');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
