@@ -745,6 +745,8 @@ class SpecimenGroupController extends Controller
             $examinationIds = collect($specimensData)->pluck('specimen_type_examination')->unique()->toArray();
             $examinations = SpecimenTypeExamination::with('prices')->whereIn('id', $examinationIds)->get()->keyBy('id');
 
+            $settingsMap = Setting::all()->pluck('setting_value', 'setting_key')->toArray();
+
             foreach ($specimensData as $specData) {
                 $qty = (int) ($specData['quantity'] ?? 1);
 
