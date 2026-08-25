@@ -14,7 +14,11 @@ import { uploadReportImage } from '../actions';
 import { ImageCropperDialog } from '../image-grid-component';
 import { isSelectionInTable } from '../utils';
 import { EditorRegistryContext } from './editor-registry-context';
-import { CustomBulletList, sharedExtensions } from './tiptap-extensions';
+import {
+    CustomBulletList,
+    sharedExtensions,
+    handleListAndBlockKeyDown,
+} from './tiptap-extensions';
 
 interface CollaborativeEditorProps {
     reportId: number;
@@ -129,6 +133,7 @@ function CollaborativeEditorInner({
             StarterKit.configure({
                 undoRedo: false,
                 bulletList: false,
+                trailingNode: false,
             }),
             CustomBulletList,
             TableKit.configure({
@@ -173,6 +178,11 @@ function CollaborativeEditorInner({
             }),
         ],
         editable: true,
+        editorProps: {
+            handleKeyDown: (view, event) => {
+                return handleListAndBlockKeyDown(view, event);
+            },
+        },
         onUpdate({ editor }) {
             setTimeout(() => {
                 onUpdateRef.current?.(editor.getHTML());

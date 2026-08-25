@@ -64,6 +64,10 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import {
+    ListAndBlockBackspaceFix,
+    handleListAndBlockKeyDown,
+} from '@/pages/specimens/report-editor/components/tiptap-extensions';
 import ImageGridComponent from '@/pages/specimens/report-editor/image-grid-component';
 
 export const editorStyles = `
@@ -1187,6 +1191,7 @@ const sharedExtensions = [
     TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
     Highlight.configure({ multicolor: true }),
     CustomBulletList,
+    ListAndBlockBackspaceFix,
 ];
 
 function FontSizeDropdown({ editor }: { editor: Editor | null }) {
@@ -2273,6 +2278,7 @@ export function RichTextEditorArea({
         extensions: [
             StarterKit.configure({
                 bulletList: false,
+                trailingNode: false,
             }),
             TableKit.configure({
                 table: { resizable: true },
@@ -2282,6 +2288,11 @@ export function RichTextEditorArea({
         ],
         content,
         editable: true,
+        editorProps: {
+            handleKeyDown: (view, event) => {
+                return handleListAndBlockKeyDown(view, event);
+            },
+        },
         onUpdate({ editor }) {
             onChange(editor.getHTML());
         },
