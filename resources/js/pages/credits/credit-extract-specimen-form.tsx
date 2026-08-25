@@ -41,19 +41,108 @@ interface CreditInvoiceSpecimen {
     total: string | number;
     quantity: number;
     quantity_paid?: number;
+    examination_id?: number;
+    examination_name?: string;
+    examination?: {
+        id?: number;
+        name: string;
+        code?: string;
+    };
     specimen?: {
         id: number;
         sequence_code: string;
         customer_relation?: {
             name: string;
         };
+        customerRelation?: {
+            name: string;
+        };
         type?: {
             name: string;
         };
         examination?: {
+            id?: number;
             name: string;
+            code?: string;
         };
+        examinations?: Array<{
+            id: number;
+            name: string;
+            code?: string;
+        }>;
+        specimen_examinations?: any[];
+        specimenExaminations?: any[];
     };
+}
+
+function extractSpecimenExaminations(
+    spec: any,
+    fallbackCreditItems?: any[],
+): Array<{ id?: number; name: string; code?: string }> {
+    const list: Array<{ id?: number; name: string; code?: string }> = [];
+    const seen = new Set<string>();
+
+    const addExam = (name?: string, id?: number, code?: string) => {
+        if (name && !seen.has(name.trim().toLowerCase())) {
+            seen.add(name.trim().toLowerCase());
+            list.push({ id, name: name.trim(), code });
+        }
+    };
+
+    if (Array.isArray(spec?.examinations) && spec.examinations.length > 0) {
+        spec.examinations.forEach((e: any) => {
+            addExam(e.name, e.id, e.code);
+        });
+    }
+
+    if (
+        Array.isArray(spec?.specimen_examinations) &&
+        spec.specimen_examinations.length > 0
+    ) {
+        spec.specimen_examinations.forEach((se: any) => {
+            const exam = se.examination || se;
+            addExam(exam.name, exam.id || se.examination_id, exam.code);
+        });
+    }
+
+    if (
+        Array.isArray(spec?.specimenExaminations) &&
+        spec.specimenExaminations.length > 0
+    ) {
+        spec.specimenExaminations.forEach((se: any) => {
+            const exam = se.examination || se;
+            addExam(exam.name, exam.id || se.examination_id, exam.code);
+        });
+    }
+
+    if (Array.isArray(fallbackCreditItems) && fallbackCreditItems.length > 0) {
+        fallbackCreditItems.forEach((item: any) => {
+            if (
+                !spec?.id ||
+                !item.specimen_id ||
+                item.specimen_id === spec.id
+            ) {
+                const exam = item.examination || item.specimen?.examination;
+                const examName =
+                    exam?.name || item.examination_name || item.name;
+                addExam(
+                    examName,
+                    item.examination_id || exam?.id,
+                    exam?.code || item.code,
+                );
+            }
+        });
+    }
+
+    if (list.length === 0 && spec?.examination?.name) {
+        addExam(
+            spec.examination.name,
+            spec.examination.id,
+            spec.examination.code,
+        );
+    }
+
+    return list;
 }
 
 interface Credit {
@@ -81,6 +170,20 @@ interface Props {
     onSuccess: () => void;
 }
 
+interface GroupedCreditSpecimen {
+    specimen_id: number;
+    specimen?: any;
+    is_paid: boolean;
+    amount: number;
+    discount: number;
+    subtotal: number;
+    total: number;
+    quantity: number;
+    quantity_paid: number;
+    items: CreditInvoiceSpecimen[];
+    examinations: Array<{ id?: number; name: string; code?: string }>;
+}
+
 export default function CreditExtractSpecimenForm({
     credit,
     onSuccess,
@@ -89,15 +192,99 @@ export default function CreditExtractSpecimenForm({
     const amountPaidVal = parseFloat(String(credit.amount_paid || '0'));
     const remainingVal = parseFloat(String(credit.amount_remaining || '0'));
 
-    const specimensList = useMemo(() => {
-        return (
-            credit.invoice_specimens || credit.credit_invoice_specimens || []
-        );
-    }, [credit.invoice_specimens, credit.credit_invoice_specimens]);
+    const groupedSpecimensList = useMemo(() => {
+        const rawList =
+            credit.invoice_specimens || credit.credit_invoice_specimens || [];
+
+        const groupMap = new Map<number, GroupedCreditSpecimen>();
+
+        rawList.forEach((item) => {
+            const specId = item.specimen_id;
+            if (!specId) return;
+
+            const unitPrice = parseFloat(String(item.amount || '0'));
+            const unitDiscount = parseFloat(String(item.discount || '0'));
+            const qty = item.quantity || 1;
+            const itemTotal =
+                item.total !== undefined && item.total !== null
+                    ? parseFloat(String(item.total))
+                    : (unitPrice - unitDiscount) * qty;
+
+            const itemSubtotal =
+                item.subtotal !== undefined && item.subtotal !== null
+                    ? parseFloat(String(item.subtotal))
+                    : unitPrice * qty;
+
+            const itemDiscount =
+                item.discount !== undefined && item.discount !== null
+                    ? parseFloat(String(item.discount))
+                    : unitDiscount * qty;
+
+            if (!groupMap.has(specId)) {
+                groupMap.set(specId, {
+                    specimen_id: specId,
+                    specimen: item.specimen,
+                    is_paid: Boolean(item.is_paid),
+                    amount: unitPrice,
+                    discount: itemDiscount,
+                    subtotal: itemSubtotal,
+                    total: itemTotal,
+                    quantity: qty,
+                    quantity_paid: item.quantity_paid ?? 0,
+                    items: [item],
+                    examinations: [],
+                });
+            } else {
+                const existing = groupMap.get(specId)!;
+                existing.is_paid = existing.is_paid && Boolean(item.is_paid);
+                existing.total += itemTotal;
+                existing.subtotal += itemSubtotal;
+                existing.discount += itemDiscount;
+                existing.amount += unitPrice;
+                existing.items.push(item);
+                if (!existing.specimen && item.specimen) {
+                    existing.specimen = item.specimen;
+                }
+            }
+        });
+
+        if (groupMap.size === 0 && Array.isArray(credit.group?.specimens)) {
+            credit.group.specimens.forEach((spec: any) => {
+                groupMap.set(spec.id, {
+                    specimen_id: spec.id,
+                    specimen: spec,
+                    is_paid: false,
+                    amount: 0,
+                    discount: 0,
+                    subtotal: 0,
+                    total: 0,
+                    quantity: 1,
+                    quantity_paid: 0,
+                    items: [],
+                    examinations: [],
+                });
+            });
+        }
+
+        const result: GroupedCreditSpecimen[] = [];
+        groupMap.forEach((entry) => {
+            entry.examinations = extractSpecimenExaminations(
+                entry.specimen,
+                entry.items,
+            );
+            result.push(entry);
+        });
+
+        return result;
+    }, [
+        credit.invoice_specimens,
+        credit.credit_invoice_specimens,
+        credit.group,
+    ]);
 
     const unpaidSpecimens = useMemo(() => {
-        return specimensList.filter((item) => !item.is_paid);
-    }, [specimensList]);
+        return groupedSpecimensList.filter((item) => !item.is_paid);
+    }, [groupedSpecimensList]);
 
     const [showConfirm, setShowConfirm] = useState(false);
 
@@ -107,7 +294,9 @@ export default function CreditExtractSpecimenForm({
     });
 
     const handleSpecimenToggle = (specimenId: number) => {
-        const item = specimensList.find((x) => x.specimen_id === specimenId);
+        const item = groupedSpecimensList.find(
+            (x) => x.specimen_id === specimenId,
+        );
 
         if (!item || item.is_paid) {
             return;
@@ -129,8 +318,8 @@ export default function CreditExtractSpecimenForm({
         // If selecting all would select every specimen in the group,
         // leave the last one to enforce the invariant (at least 1 must remain)
         if (
-            unpaidSpecimens.length === specimensList.length &&
-            specimensList.length > 1
+            unpaidSpecimens.length === groupedSpecimensList.length &&
+            groupedSpecimensList.length > 1
         ) {
             const allExceptLast = unpaidSpecimens
                 .slice(0, unpaidSpecimens.length - 1)
@@ -153,24 +342,16 @@ export default function CreditExtractSpecimenForm({
 
     // Calculate extracted values
     const selectedCalculations = useMemo(() => {
-        const selectedItems = specimensList.filter((item) =>
+        const selectedItems = groupedSpecimensList.filter((item) =>
             data.specimen_ids.includes(item.specimen_id),
         );
 
         const extractedTotal = selectedItems.reduce((acc, item) => {
-            const unitPrice = parseFloat(String(item.amount || '0'));
-            const unitDiscount = parseFloat(String(item.discount || '0'));
-            const qty = item.quantity || 1;
-            const itemTotal =
-                item.total !== undefined && item.total !== null
-                    ? parseFloat(String(item.total))
-                    : (unitPrice - unitDiscount) * qty;
-
-            return acc + itemTotal;
+            return acc + item.total;
         }, 0);
 
         const extractedCount = selectedItems.length;
-        const remainingCount = specimensList.length - extractedCount;
+        const remainingCount = groupedSpecimensList.length - extractedCount;
         const newOriginalTotal = Math.max(0, totalCreditVal - extractedTotal);
         const newOriginalRemaining = Math.max(
             0,
@@ -185,7 +366,12 @@ export default function CreditExtractSpecimenForm({
             newOriginalTotal,
             newOriginalRemaining,
         };
-    }, [specimensList, data.specimen_ids, totalCreditVal, amountPaidVal]);
+    }, [
+        groupedSpecimensList,
+        data.specimen_ids,
+        totalCreditVal,
+        amountPaidVal,
+    ]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -197,7 +383,7 @@ export default function CreditExtractSpecimenForm({
             return;
         }
 
-        if (data.specimen_ids.length >= specimensList.length) {
+        if (data.specimen_ids.length >= groupedSpecimensList.length) {
             toast.error(
                 'No se pueden extraer todas las muestras. Debe quedar al menos una muestra en el grupo original.',
             );
@@ -235,17 +421,17 @@ export default function CreditExtractSpecimenForm({
                     <div className="flex justify-between">
                         <span className="text-muted-foreground">Cliente:</span>
                         <span className="font-semibold text-foreground">
-                            {credit.customer?.name}
+                            {credit.customer?.name || 'N/A'}
                         </span>
                     </div>
                     <div className="flex justify-between">
                         <span className="text-muted-foreground">ID / RTN:</span>
                         <span className="font-semibold text-foreground">
-                            {credit.customer?.id_number}
+                            {credit.customer?.id_number || 'N/A'}
                         </span>
                     </div>
-                    {credit.group?.name && (
-                        <div className="flex justify-between">
+                    {credit.group && (
+                        <div className="flex justify-between border-t border-border/50 pt-2">
                             <span className="text-muted-foreground">
                                 Grupo:
                             </span>
@@ -279,61 +465,52 @@ export default function CreditExtractSpecimenForm({
                 </div>
             </div>
 
-            {/* Specimen selection list */}
+            {/* Specimen selection */}
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+                    <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                         Seleccionar Muestras a Extraer (
-                        {data.specimen_ids.length} de {specimensList.length})
-                    </h3>
-                    <div className="flex items-center gap-2">
+                        {data.specimen_ids.length} de{' '}
+                        {groupedSpecimensList.length})
+                    </span>
+                    <div className="flex gap-2 text-xs">
                         <Button
                             type="button"
-                            variant="link"
+                            variant="ghost"
                             size="sm"
                             onClick={handleSelectAllUnpaid}
-                            className="h-auto p-0 text-xs font-semibold text-primary hover:no-underline"
+                            disabled={unpaidSpecimens.length === 0}
+                            className="h-6 px-2 text-xs font-medium text-primary hover:text-primary/80"
                         >
                             Seleccionar pendientes
                         </Button>
-                        <span className="text-xs text-muted-foreground/50">
-                            |
-                        </span>
+                        <span className="text-muted-foreground">|</span>
                         <Button
                             type="button"
-                            variant="link"
+                            variant="ghost"
                             size="sm"
                             onClick={handleSelectNone}
-                            className="h-auto p-0 text-xs font-semibold text-muted-foreground hover:text-foreground hover:no-underline"
+                            disabled={data.specimen_ids.length === 0}
+                            className="h-6 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
                         >
                             Ninguna
                         </Button>
                     </div>
                 </div>
 
-                <div className="max-h-[290px] space-y-2.5 overflow-y-auto rounded-xl border bg-card p-3 shadow-inner">
-                    {specimensList.length === 0 ? (
+                <div className="max-h-[300px] space-y-2.5 overflow-y-auto pr-1">
+                    {groupedSpecimensList.length === 0 ? (
                         <div className="py-6 text-center text-xs text-muted-foreground">
-                            No se encontraron muestras en este crédito grupal.
+                            No hay muestras disponibles en este grupo.
                         </div>
                     ) : (
-                        specimensList.map((item) => {
+                        groupedSpecimensList.map((item) => {
                             const spec = item.specimen;
                             const isPaid = item.is_paid;
                             const isChecked = data.specimen_ids.includes(
                                 item.specimen_id,
                             );
-                            const unitPrice = parseFloat(
-                                String(item.amount || '0'),
-                            );
-                            const unitDiscount = parseFloat(
-                                String(item.discount || '0'),
-                            );
-                            const qty = item.quantity || 1;
-                            const itemTotal =
-                                item.total !== undefined && item.total !== null
-                                    ? parseFloat(String(item.total))
-                                    : (unitPrice - unitDiscount) * qty;
+                            const itemTotal = item.total;
 
                             return (
                                 <div
@@ -372,16 +549,70 @@ export default function CreditExtractSpecimenForm({
                                             <span className="font-mono text-xs font-bold text-foreground">
                                                 {spec?.sequence_code || 'N/A'}
                                             </span>
-                                            <span className="text-xs font-semibold text-muted-foreground">
-                                                Paciente:{' '}
+                                            <span className="text-xs text-muted-foreground">
+                                                <span className="font-semibold text-foreground">
+                                                    Paciente:
+                                                </span>{' '}
                                                 {spec?.customer_relation
-                                                    ?.name || 'N/A'}
+                                                    ?.name ||
+                                                    spec?.customerRelation
+                                                        ?.name ||
+                                                    credit.customer?.name ||
+                                                    'N/A'}
                                             </span>
-                                            <span className="text-[10px] text-muted-foreground/85">
-                                                {spec?.type?.name || 'N/A'}
-                                                {spec?.examination?.name &&
-                                                    ` - ${spec.examination.name}`}
-                                            </span>
+                                            <div className="flex flex-col gap-1 pt-0.5">
+                                                <span className="text-[11px] font-semibold text-foreground">
+                                                    Tipo:{' '}
+                                                    <span className="font-normal text-muted-foreground">
+                                                        {spec?.type?.name ||
+                                                            'N/A'}
+                                                    </span>
+                                                </span>
+                                                {item.examinations.length >
+                                                0 ? (
+                                                    <div className="flex flex-col gap-0.5 pl-1">
+                                                        <span className="text-[10px] font-medium text-muted-foreground">
+                                                            {item.examinations
+                                                                .length > 1
+                                                                ? 'Exámenes:'
+                                                                : 'Examen:'}
+                                                        </span>
+                                                        <div className="flex flex-col gap-0.5">
+                                                            {item.examinations.map(
+                                                                (exam, idx) => (
+                                                                    <div
+                                                                        key={
+                                                                            idx
+                                                                        }
+                                                                        className="flex items-center gap-1.5 text-[11px] font-medium text-foreground"
+                                                                    >
+                                                                        <span className="h-1 w-1 shrink-0 rounded-full bg-primary" />
+                                                                        <span>
+                                                                            {
+                                                                                exam.name
+                                                                            }
+                                                                        </span>
+                                                                        {exam.code && (
+                                                                            <span className="font-mono text-[9px] text-muted-foreground uppercase">
+                                                                                (
+                                                                                {
+                                                                                    exam.code
+                                                                                }
+
+                                                                                )
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                ),
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        Examen: N/A
+                                                    </span>
+                                                )}
+                                            </div>
                                             {isPaid && (
                                                 <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                                                     Muestra pagada (no puede

@@ -39,8 +39,8 @@ export default function InvoiceViewSheet({
 
     const groupedSpecimens = useMemo(() => {
         if (!invoice) {
-return [];
-}
+            return [];
+        }
 
         const rawItems =
             invoice.invoice_specimens ||
@@ -56,8 +56,8 @@ return [];
                 const spec = item.specimen;
 
                 if (!spec) {
-return;
-}
+                    return;
+                }
 
                 const specKey =
                     spec.id || item.specimen_id || spec.sequence_code;
@@ -167,7 +167,7 @@ return;
                     </div>
 
                     {/* Content Grid */}
-                    <div className="grid grid-cols-1 gap-6 px-5 md:grid-cols-2">
+                    <div className="mb-5 grid grid-cols-1 gap-6 px-5 pb-5 md:grid-cols-2">
                         {/* Left Column: Invoice Summary & Totals */}
                         <div className="space-y-6">
                             {/* General Billing Info */}

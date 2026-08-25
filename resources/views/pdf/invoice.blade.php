@@ -619,7 +619,7 @@
                                 @foreach($spec['examinations'] as $exam)
                                     <div>
                                         <div style="font-weight: 500; font-size: 10px; color: #4b5563; line-height: 1.2;">
-                                            {{ $exam['name'] }}
+                                            {{ $exam['name'] }} <span style="font-size: 9px; font-weight: 600; color: #1e3a8a;"> x{{ max(1, (int) ($exam['quantity'] ?? 1)) }}</span>
                                         </div>
                                         @if(!empty($exam['age_discount_type']) && (float)($exam['age_discount_amount'] ?? 0) > 0)
                                             <div style="font-size: 7.5px; color: #059669; margin-top: 1px; font-weight: 500;">

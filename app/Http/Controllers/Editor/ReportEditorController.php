@@ -27,6 +27,7 @@ use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
 use App\Models\UserCommission;
 use App\Models\UserCommissionRule;
+use App\Models\WorkOrderTask;
 use App\Models\WorkOrderType;
 use App\Services\ImageOptimizerService;
 use App\Services\ReportPdfService;
@@ -334,6 +335,8 @@ class ReportEditorController extends Controller
             'customerRelation',
             'type',
             'examination',
+            'examinations',
+            'specimenExaminations.examination',
             'category',
             'referrerRelation',
             'report',
@@ -342,13 +345,19 @@ class ReportEditorController extends Controller
             'group.invoice.caiRange',
             'group.invoice.creditRelation',
             'group.invoice.transferBank',
+            'group.invoice.invoiceSpecimens.examination',
+            'group.specimens.examinations',
+            'group.specimens.specimenExaminations.examination',
             'invoiceRelation.caiRange',
             'invoiceRelation.creditRelation',
             'invoiceRelation.transferBank',
+            'invoiceRelation.invoiceSpecimens.examination',
             'products.prices',
             'cuttings.code',
             'cuttings.prefix',
             'cuttings.responsible',
+            'workOrders.task',
+            'workOrders.users',
         ]);
 
         $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
@@ -369,8 +378,15 @@ class ReportEditorController extends Controller
             ->with('prices')
             ->get();
 
+        $examinationIds = $specimen->examinations()->pluck('specimen_type_examination.id')->toArray();
+        if ($specimen->specimen_type_examination && ! in_array($specimen->specimen_type_examination, $examinationIds)) {
+            $examinationIds[] = $specimen->specimen_type_examination;
+        }
+
         $templates = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)
-            ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+            ->when(! empty($examinationIds), function ($query) use ($examinationIds) {
+                $query->whereIn('specimen_type_examination_id', $examinationIds);
+            })
             ->where(function ($query) {
                 $query->where('user_id', auth()->id())
                     ->orWhereExists(function ($q) {
@@ -412,6 +428,10 @@ class ReportEditorController extends Controller
             return $sequence;
         });
 
+        $usersList = User::where('active', true)->select('id', 'name')->get();
+        $workOrderTypes = WorkOrderType::orderBy('name')->get();
+        $workOrderTasks = WorkOrderTask::orderBy('name')->get();
+
         return Inertia::render('specimens/report-editor/report-editor', [
             'specimen' => $specimen,
             'report' => $specimen->report,
@@ -432,8 +452,11 @@ class ReportEditorController extends Controller
             'products' => $products,
             'cutting_codes' => CuttingCode::orderByRaw('LENGTH(code) asc')->orderBy('code', 'asc')->get(),
             'cutting_prefixes' => CuttingPrefix::orderByRaw('LENGTH(prefix) asc')->orderBy('prefix', 'asc')->get(),
-            'cutting_slide_types' => WorkOrderType::all(),
-            'users' => User::where('active', true)->select('id', 'name')->get(),
+            'cutting_slide_types' => $workOrderTypes,
+            'users' => $usersList,
+            'usersList' => $usersList,
+            'workOrderTypes' => $workOrderTypes,
+            'workOrderTasks' => $workOrderTasks,
             'specimenTypes' => $specimenTypes,
             'examinations' => $examinations,
             'categories' => $categories,
@@ -457,8 +480,15 @@ class ReportEditorController extends Controller
             return redirect()->back()->with('error', 'Esta muestra ya tiene un reporte creado.');
         }
 
+        $examinationIds = $specimen->examinations()->pluck('specimen_type_examination.id')->toArray();
+        if ($specimen->specimen_type_examination && ! in_array($specimen->specimen_type_examination, $examinationIds)) {
+            $examinationIds[] = $specimen->specimen_type_examination;
+        }
+
         $templatesExist = SpecimenTypeTemplate::where('specimen_type_id', $specimen->specimen_type)
-            ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+            ->when(! empty($examinationIds), function ($query) use ($examinationIds) {
+                $query->whereIn('specimen_type_examination_id', $examinationIds);
+            })
             ->where(function ($query) {
                 $query->where('user_id', auth()->id())
                     ->orWhereExists(function ($q) {
@@ -470,22 +500,33 @@ class ReportEditorController extends Controller
             })
             ->exists();
 
-        if ($templatesExist) {
-            $request->validate([
-                'template_id' => 'required|exists:specimen_type_templates,id',
-            ]);
-        } else {
-            $request->validate([
-                'template_id' => 'nullable',
+        $request->validate([
+            'template_id' => 'nullable',
+            'template_ids' => 'nullable|array',
+            'template_ids.*' => 'exists:specimen_type_templates,id',
+        ]);
+
+        $orderedIds = [];
+        if ($request->filled('template_ids') && is_array($request->template_ids)) {
+            $orderedIds = array_values(array_filter($request->template_ids));
+        } elseif ($request->filled('template_id')) {
+            $orderedIds = [$request->template_id];
+        }
+
+        if ($templatesExist && empty($orderedIds)) {
+            throw ValidationException::withMessages([
+                'template_ids' => ['Debe seleccionar al menos una plantilla para continuar.'],
             ]);
         }
 
-        DB::transaction(function () use ($specimen, $request) {
-            $template = null;
-            if ($request->filled('template_id')) {
-                $template = SpecimenTypeTemplate::where('id', $request->template_id)
+        DB::transaction(function () use ($specimen, $orderedIds, $examinationIds) {
+            $orderedTemplates = collect();
+            if (! empty($orderedIds)) {
+                $fetched = SpecimenTypeTemplate::whereIn('id', $orderedIds)
                     ->where('specimen_type_id', $specimen->specimen_type)
-                    ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+                    ->when(! empty($examinationIds), function ($query) use ($examinationIds) {
+                        $query->whereIn('specimen_type_examination_id', $examinationIds);
+                    })
                     ->where(function ($query) {
                         $query->where('user_id', auth()->id())
                             ->orWhereExists(function ($q) {
@@ -495,27 +536,51 @@ class ReportEditorController extends Controller
                                     ->where('user_templates_permissions.shared_with_id', auth()->id());
                             });
                     })
-                    ->first();
+                    ->get()
+                    ->keyBy('id');
 
-                if (! $template) {
+                foreach ($orderedIds as $tId) {
+                    if (isset($fetched[$tId])) {
+                        $orderedTemplates->push($fetched[$tId]);
+                    }
+                }
+
+                if ($orderedTemplates->isEmpty() && ! empty($orderedIds)) {
                     throw ValidationException::withMessages([
-                        'template_id' => ['La plantilla seleccionada no es válida o no tienes permisos para usarla.'],
+                        'template_ids' => ['Las plantillas seleccionadas no son válidas o no tienes permisos para usarlas.'],
                     ]);
                 }
             }
 
+            $concatHtml = function ($templates, $field) {
+                $parts = [];
+                foreach ($templates as $t) {
+                    $content = trim($t->{$field} ?? '');
+                    if ($content !== '' && $content !== '<p></p>' && $content !== '<p></p><p></p>') {
+                        $parts[] = $content;
+                    }
+                }
+
+                return implode('', $parts);
+            };
+
+            $firstTemplate = $orderedTemplates->first();
+
             $report = SpecimenReport::create([
                 'report_date' => now()->format('Y-m-d'),
                 'finalization_date' => now()->format('Y-m-d'),
-                'macroscopy_html' => $template?->macroscopy_html ?? '',
-                'microscopy_html' => $template?->microscopy_html ?? '',
-                'diagnosis_html' => $template?->diagnosis_html ?? '',
-                'clinical_details_html' => $template?->clinical_details_html ?? '',
-                'comments_notes_html' => $template?->comments_notes_html ?? '',
-                'protocols_html' => $template?->protocols_html ?? '',
-                'legend_html' => $template?->legend_html ?? '',
-                'sections_order' => $template?->sections_order ?? null,
-                'headings_toggles' => $template?->headings_toggles ?? null,
+                'macroscopy_html' => $concatHtml($orderedTemplates, 'macroscopy_html'),
+                'microscopy_html' => $concatHtml($orderedTemplates, 'microscopy_html'),
+                'diagnosis_html' => $concatHtml($orderedTemplates, 'diagnosis_html'),
+                'clinical_details_html' => $concatHtml($orderedTemplates, 'clinical_details_html'),
+                'comments_notes_html' => $concatHtml($orderedTemplates, 'comments_notes_html'),
+                'protocols_html' => $concatHtml($orderedTemplates, 'protocols_html'),
+                'legend_html' => $concatHtml($orderedTemplates, 'legend_html'),
+                'open_text_html' => $concatHtml($orderedTemplates, 'open_text_html'),
+                'open_text_label' => $firstTemplate?->open_text_label ?? 'Texto Libre',
+                'addendum_html' => $concatHtml($orderedTemplates, 'addendum_html'),
+                'sections_order' => $firstTemplate?->sections_order ?? null,
+                'headings_toggles' => $firstTemplate?->headings_toggles ?? null,
             ]);
 
             $specimen->update([
@@ -564,7 +629,9 @@ class ReportEditorController extends Controller
         $this->authorizeSpecimenAccess($specimen);
 
         $request->validate([
-            'template_id' => 'required|exists:specimen_type_templates,id',
+            'template_id' => 'nullable|exists:specimen_type_templates,id',
+            'template_ids' => 'nullable|array',
+            'template_ids.*' => 'exists:specimen_type_templates,id',
         ]);
 
         $specimen->load('report');
@@ -583,9 +650,27 @@ class ReportEditorController extends Controller
             return response()->json(['error' => 'No tienes permisos de edición para esta muestra.'], 403);
         }
 
-        $template = SpecimenTypeTemplate::where('id', $request->template_id)
+        $examinationIds = $specimen->examinations()->pluck('specimen_type_examination.id')->toArray();
+        if ($specimen->specimen_type_examination && ! in_array($specimen->specimen_type_examination, $examinationIds)) {
+            $examinationIds[] = $specimen->specimen_type_examination;
+        }
+
+        $orderedIds = [];
+        if ($request->filled('template_ids') && is_array($request->template_ids)) {
+            $orderedIds = array_values(array_filter($request->template_ids));
+        } elseif ($request->filled('template_id')) {
+            $orderedIds = [$request->template_id];
+        }
+
+        if (empty($orderedIds)) {
+            return response()->json(['error' => 'Debe seleccionar al menos una plantilla.'], 422);
+        }
+
+        $fetched = SpecimenTypeTemplate::whereIn('id', $orderedIds)
             ->where('specimen_type_id', $specimen->specimen_type)
-            ->where('specimen_type_examination_id', $specimen->specimen_type_examination)
+            ->when(! empty($examinationIds), function ($query) use ($examinationIds) {
+                $query->whereIn('specimen_type_examination_id', $examinationIds);
+            })
             ->where(function ($query) {
                 $query->where('user_id', auth()->id())
                     ->orWhereExists(function ($q) {
@@ -595,26 +680,66 @@ class ReportEditorController extends Controller
                             ->where('user_templates_permissions.shared_with_id', auth()->id());
                     });
             })
-            ->first();
+            ->get()
+            ->keyBy('id');
 
-        if (! $template) {
-            return response()->json(['error' => 'La plantilla seleccionada no es válida o no tienes permisos para usarla.'], 422);
+        $orderedTemplates = collect();
+        foreach ($orderedIds as $tId) {
+            if (isset($fetched[$tId])) {
+                $orderedTemplates->push($fetched[$tId]);
+            }
         }
+
+        if ($orderedTemplates->isEmpty()) {
+            return response()->json(['error' => 'Las plantillas seleccionadas no son válidas o no tienes permisos para usarlas.'], 422);
+        }
+
+        $concatHtml = function ($templates, $field) {
+            $parts = [];
+            foreach ($templates as $t) {
+                $content = trim($t->{$field} ?? '');
+                if ($content !== '' && $content !== '<p></p>' && $content !== '<p></p><p></p>') {
+                    $parts[] = $content;
+                }
+            }
+
+            return implode('', $parts);
+        };
+
+        $firstTemplate = $orderedTemplates->first();
+
+        $mergedTemplate = (object) [
+            'id' => $firstTemplate->id,
+            'name' => $orderedTemplates->pluck('name')->implode(', '),
+            'user' => $firstTemplate->user,
+            'macroscopy_html' => $concatHtml($orderedTemplates, 'macroscopy_html'),
+            'microscopy_html' => $concatHtml($orderedTemplates, 'microscopy_html'),
+            'diagnosis_html' => $concatHtml($orderedTemplates, 'diagnosis_html'),
+            'clinical_details_html' => $concatHtml($orderedTemplates, 'clinical_details_html'),
+            'comments_notes_html' => $concatHtml($orderedTemplates, 'comments_notes_html'),
+            'protocols_html' => $concatHtml($orderedTemplates, 'protocols_html'),
+            'legend_html' => $concatHtml($orderedTemplates, 'legend_html'),
+            'open_text_html' => $concatHtml($orderedTemplates, 'open_text_html'),
+            'open_text_label' => $firstTemplate->open_text_label ?? 'Texto Libre',
+            'addendum_html' => $concatHtml($orderedTemplates, 'addendum_html'),
+            'sections_order' => $firstTemplate->sections_order ?? null,
+            'headings_toggles' => $firstTemplate->headings_toggles ?? null,
+        ];
 
         // Update database report columns
         $specimen->report->update([
-            'macroscopy_html' => $template->macroscopy_html ?? '',
-            'microscopy_html' => $template->microscopy_html ?? '',
-            'diagnosis_html' => $template->diagnosis_html ?? '',
-            'clinical_details_html' => $template->clinical_details_html ?? '',
-            'comments_notes_html' => $template->comments_notes_html ?? '',
-            'protocols_html' => $template->protocols_html ?? '',
-            'legend_html' => $template->legend_html ?? '',
-            'open_text_html' => $template->open_text_html ?? '',
-            'open_text_label' => $template->open_text_label ?? 'Texto Libre',
-            'addendum_html' => $template->addendum_html ?? '',
-            'sections_order' => $template->sections_order ?? null,
-            'headings_toggles' => $template->headings_toggles ?? null,
+            'macroscopy_html' => $mergedTemplate->macroscopy_html,
+            'microscopy_html' => $mergedTemplate->microscopy_html,
+            'diagnosis_html' => $mergedTemplate->diagnosis_html,
+            'clinical_details_html' => $mergedTemplate->clinical_details_html,
+            'comments_notes_html' => $mergedTemplate->comments_notes_html,
+            'protocols_html' => $mergedTemplate->protocols_html,
+            'legend_html' => $mergedTemplate->legend_html,
+            'open_text_html' => $mergedTemplate->open_text_html,
+            'open_text_label' => $mergedTemplate->open_text_label,
+            'addendum_html' => $mergedTemplate->addendum_html,
+            'sections_order' => $mergedTemplate->sections_order,
+            'headings_toggles' => $mergedTemplate->headings_toggles,
         ]);
 
         DB::table('specimen_reports')->where('id', $specimen->report->id)->update([
@@ -633,7 +758,8 @@ class ReportEditorController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Plantilla aplicada y guardada con éxito.',
-            'template' => $template,
+            'template' => $mergedTemplate,
+            'templates' => $orderedTemplates,
         ]);
     }
 

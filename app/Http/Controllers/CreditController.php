@@ -36,23 +36,35 @@ class CreditController extends Controller
         Gate::authorize('credits.view');
         $query = Credit::with([
             'customer',
+            'invoices.specimen.customerRelation',
             'invoices.specimen.type',
             'invoices.specimen.examination',
+            'invoices.specimen.examinations',
+            'invoices.specimen.specimenExaminations.examination',
             'invoices.specimen.category',
             'invoices.specimen.referrerRelation',
             'invoices.specimen.priority',
             'invoices.caiRange',
-            'specimen',
+            'specimen.customerRelation',
+            'specimen.type',
+            'specimen.examination',
+            'specimen.examinations',
+            'specimen.specimenExaminations.examination',
             'group.invoice',
             'group.specimens.customerRelation',
             'group.specimens.type',
             'group.specimens.examination',
+            'group.specimens.examinations',
+            'group.specimens.specimenExaminations.examination',
             'group.specimens.category',
             'group.specimens.referrerRelation',
             'group.specimens.priority',
+            'creditInvoiceSpecimens.examination',
             'creditInvoiceSpecimens.specimen.customerRelation',
             'creditInvoiceSpecimens.specimen.type',
             'creditInvoiceSpecimens.specimen.examination',
+            'creditInvoiceSpecimens.specimen.examinations',
+            'creditInvoiceSpecimens.specimen.specimenExaminations.examination',
         ]);
 
         // Filter by search query (Customer name, Customer ID/RTN, sequence code, or Credit ID)
@@ -160,23 +172,35 @@ class CreditController extends Controller
         Gate::authorize('credits.view');
         $query = Credit::with([
             'customer',
+            'invoices.specimen.customerRelation',
             'invoices.specimen.type',
             'invoices.specimen.examination',
+            'invoices.specimen.examinations',
+            'invoices.specimen.specimenExaminations.examination',
             'invoices.specimen.category',
             'invoices.specimen.referrerRelation',
             'invoices.specimen.priority',
             'invoices.caiRange',
-            'specimen',
+            'specimen.customerRelation',
+            'specimen.type',
+            'specimen.examination',
+            'specimen.examinations',
+            'specimen.specimenExaminations.examination',
             'group.invoice',
             'group.specimens.customerRelation',
             'group.specimens.type',
             'group.specimens.examination',
+            'group.specimens.examinations',
+            'group.specimens.specimenExaminations.examination',
             'group.specimens.category',
             'group.specimens.referrerRelation',
             'group.specimens.priority',
+            'creditInvoiceSpecimens.examination',
             'creditInvoiceSpecimens.specimen.customerRelation',
             'creditInvoiceSpecimens.specimen.type',
             'creditInvoiceSpecimens.specimen.examination',
+            'creditInvoiceSpecimens.specimen.examinations',
+            'creditInvoiceSpecimens.specimen.specimenExaminations.examination',
         ]);
 
         // Filter by search query (Customer name, Customer ID/RTN, sequence code, or Credit ID)
@@ -676,7 +700,7 @@ class CreditController extends Controller
                 $invoiceUpdateData['full_invoice_number'] = $fullInvoiceNumber;
             }
 
-            // Update specimen group payments if applicable
+            // Update specimen payments in invoice_specimens table
             if ($credit->is_group && ! empty($validated['specimens'])) {
                 foreach ($validated['specimens'] as $item) {
                     $dbRow = DB::table('invoice_specimens')
@@ -695,6 +719,17 @@ class CreditController extends Controller
                             ]);
                     }
                 }
+            } else {
+                DB::table('invoice_specimens')
+                    ->where(function ($q) use ($credit, $originalInvoice) {
+                        $q->where('credit_id', $credit->id)
+                            ->orWhere('invoice_id', $originalInvoice->id);
+                    })
+                    ->update([
+                        'quantity_paid' => DB::raw('quantity'),
+                        'is_paid' => 1,
+                        'updated_at' => now(),
+                    ]);
             }
 
             // Update original invoice details
@@ -911,9 +946,9 @@ class CreditController extends Controller
 
         $allCreditSpecimens = InvoiceSpecimen::where('credit_id', $credit->id)->get();
         if ($allCreditSpecimens->isNotEmpty()) {
-            $allSpecimenIds = $allCreditSpecimens->pluck('specimen_id')->toArray();
+            $allSpecimenIds = $allCreditSpecimens->pluck('specimen_id')->unique()->values()->toArray();
         } else {
-            $allSpecimenIds = $group->specimens->pluck('id')->toArray();
+            $allSpecimenIds = $group->specimens->pluck('id')->unique()->values()->toArray();
         }
 
         foreach ($specimenIdsToExtract as $id) {
@@ -951,8 +986,7 @@ class CreditController extends Controller
         ) {
             $extractedIgs = InvoiceSpecimen::where('invoice_id', $originalInvoice->id)
                 ->whereIn('specimen_id', $specimenIdsToExtract)
-                ->get()
-                ->unique('specimen_id');
+                ->get();
 
             $extractedAmount = (float) $extractedIgs->sum('amount');
             $extractedDiscount = (float) $extractedIgs->sum('discount');
@@ -1065,7 +1099,7 @@ class CreditController extends Controller
                     'updated_at' => now(),
                 ]);
 
-            $remainingIgs = InvoiceSpecimen::where('invoice_id', $originalInvoice->id)->get()->unique('specimen_id');
+            $remainingIgs = InvoiceSpecimen::where('invoice_id', $originalInvoice->id)->get();
 
             $newOriginalAmount = (float) $remainingIgs->sum('amount');
             $newOriginalDiscount = (float) $remainingIgs->sum('discount');
@@ -1089,7 +1123,7 @@ class CreditController extends Controller
                 'isv_15' => $newOriginalIsv15,
                 'isv_18' => $newOriginalIsv18,
                 'total' => $newOriginalTotal,
-                'quantity' => $newOriginalQty ?: $remainingIgs->count(),
+                'quantity' => $newOriginalQty ?: $remainingIgs->unique('specimen_id')->count(),
             ]);
 
             $newRemaining = max(0, $newOriginalTotal - (float) $credit->amount_paid);
@@ -1100,7 +1134,7 @@ class CreditController extends Controller
             ]);
 
             if ($group) {
-                $remainingCount = $remainingIgs->count();
+                $remainingCount = $remainingIgs->unique('specimen_id')->count();
                 $group->update([
                     'name' => ($group->customer ? $group->customer->name : 'Grupo').' - '.$remainingCount.' '.($remainingCount === 1 ? 'Muestra' : 'Muestras'),
                 ]);

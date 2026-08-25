@@ -1547,6 +1547,8 @@ class SpecimenGroupController extends Controller
             'specimens.type',
             'specimens.customerRelation',
             'specimens.examination.prices',
+            'specimens.examinations',
+            'specimens.specimenExaminations.examination',
             'specimens.category',
             'specimens.referrerRelation',
             'specimens.priority',

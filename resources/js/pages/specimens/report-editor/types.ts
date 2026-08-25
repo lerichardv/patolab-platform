@@ -74,8 +74,17 @@ export interface Specimen {
         name: string;
     };
     examination: {
+        id?: number;
         name: string;
+        code?: string;
     };
+    examinations?: Array<{
+        id: number;
+        name: string;
+        code?: string;
+    }>;
+    specimen_examinations?: any[];
+    specimenExaminations?: any[];
     category: {
         name: string;
     };
@@ -88,6 +97,8 @@ export interface Specimen {
     collaborators?: SpecimenUserRelation[];
     products?: any[];
     cuttings?: any[];
+    work_orders?: any[];
+    workOrders?: any[];
 }
 
 export interface ReportEditorAuthUser {
@@ -114,6 +125,9 @@ export interface ReportEditorProps {
     cutting_prefixes: any[];
     cutting_slide_types: any[];
     users: any[];
+    usersList?: any[];
+    workOrderTypes?: any[];
+    workOrderTasks?: any[];
     templates?: any[];
     specimenTypes?: any[];
     examinations?: any[];

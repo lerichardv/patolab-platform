@@ -24,6 +24,7 @@ import {
     Edit,
     MoreVertical,
     UserPlus,
+    ClipboardList,
     // Toolbar icons
     Bold,
     Italic,
@@ -55,7 +56,7 @@ import {
     GripVertical,
 } from 'lucide-react';
 import { Scissors } from 'lucide-react';
-import React, { useState, useEffect, useRef, Fragment } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Fragment } from 'react';
 import { toast } from 'sonner';
 import * as Y from 'yjs';
 import { Button } from '@/components/ui/button';
@@ -98,6 +99,8 @@ import ReferrerSheet from '../../referrers/referrer-sheet';
 import SpecimenPathologistSheet from '../specimen-pathologist-sheet';
 import SpecimenSheet from '../specimen-sheet';
 import SpecimenViewSheet from '../specimen-view-sheet';
+import SpecimenWorkOrdersSheet from '../../my-assignments/specimen-work-orders-sheet';
+import WorkOrderSheet from '../../my-work-orders/work-order-sheet';
 import {
     applyReportTemplate,
     notifyCollaborationRefreshInsumos,
@@ -172,6 +175,9 @@ export default function ReportWorkspace({
     cutting_prefixes = [],
     cutting_slide_types = [],
     users = [],
+    usersList = [],
+    workOrderTypes = [],
+    workOrderTasks = [],
     templates = [],
     specimenTypes = [],
     examinations = [],
@@ -190,10 +196,24 @@ export default function ReportWorkspace({
         useState<boolean>(false);
     const [isEditReferrerOpen, setIsEditReferrerOpen] =
         useState<boolean>(false);
+    const [isWorkOrdersSheetOpen, setIsWorkOrdersSheetOpen] =
+        useState<boolean>(false);
+    const [isCreateWorkOrderOpen, setIsCreateWorkOrderOpen] =
+        useState<boolean>(false);
 
     const canEditSpecimen = auth.permissions?.includes('specimens.edit');
     const canEditCustomer = auth.permissions?.includes('patients.edit');
     const canEditReferrer = auth.permissions?.includes('referrers.edit');
+    const canCreateWorkOrder =
+        auth.user?.role?.slug === 'admin' ||
+        Boolean(auth.permissions?.includes('work_orders.create'));
+    const canViewWorkOrders =
+        auth.user?.role?.slug === 'admin' ||
+        Boolean(
+            auth.permissions?.includes('work_orders.view') ||
+            auth.permissions?.includes('work_orders.admin_view') ||
+            auth.permissions?.includes('my_work_orders.view'),
+        );
     const editorRefs = useRef<Record<string, any>>({});
 
     const registerEditor = (field: string, editor: any) => {
@@ -2069,8 +2089,11 @@ export default function ReportWorkspace({
         auth.user.name,
     ]);
 
-    const handleApplyTemplate = async (templateId: string) => {
-        if (!templateId) {
+    const handleApplyTemplate = async (templateId: string | string[]) => {
+        if (
+            !templateId ||
+            (Array.isArray(templateId) && templateId.length === 0)
+        ) {
             return;
         }
 
@@ -2865,6 +2888,69 @@ export default function ReportWorkspace({
         }
     }, [report, specimen]);
 
+    const specimenExaminationsList = useMemo(() => {
+        const list: Array<{ id?: number; name: string }> = [];
+        const seen = new Set<string>();
+
+        if (
+            Array.isArray(specimen.examinations) &&
+            specimen.examinations.length > 0
+        ) {
+            specimen.examinations.forEach((e: any) => {
+                const name = e.name;
+                if (name && !seen.has(name)) {
+                    seen.add(name);
+                    list.push({ id: e.id, name });
+                }
+            });
+        }
+
+        if (
+            Array.isArray(specimen.specimen_examinations) &&
+            specimen.specimen_examinations.length > 0
+        ) {
+            specimen.specimen_examinations.forEach((se: any) => {
+                const exam = se.examination || se;
+                const name = exam.name;
+                if (name && !seen.has(name)) {
+                    seen.add(name);
+                    list.push({ id: exam.id || se.examination_id, name });
+                }
+            });
+        }
+
+        if (
+            Array.isArray(specimen.specimenExaminations) &&
+            specimen.specimenExaminations.length > 0
+        ) {
+            specimen.specimenExaminations.forEach((se: any) => {
+                const exam = se.examination || se;
+                const name = exam.name;
+                if (name && !seen.has(name)) {
+                    seen.add(name);
+                    list.push({ id: exam.id || se.examination_id, name });
+                }
+            });
+        }
+
+        if (list.length === 0 && specimen.examination?.name) {
+            list.push({
+                id: specimen.examination.id,
+                name: specimen.examination.name,
+            });
+        }
+
+        return list;
+    }, [specimen]);
+
+    const examinationNames = useMemo(() => {
+        return (
+            specimenExaminationsList.map((e: any) => e.name).join(', ') ||
+            specimen.examination?.name ||
+            ''
+        );
+    }, [specimenExaminationsList, specimen]);
+
     const handleUpdateDate = (dateVal: string) => {
         if (!dateVal) {
             return;
@@ -3135,8 +3221,10 @@ export default function ReportWorkspace({
                                                 Editor de Informe
                                             </h1>
                                             <p className="text-xs text-muted-foreground">
-                                                {specimen.type.name} &bull;{' '}
-                                                {specimen.examination.name}
+                                                {specimen.type?.name || ''}
+                                                {examinationNames
+                                                    ? ` • ${examinationNames}`
+                                                    : ''}
                                             </p>
                                         </div>
                                     </div>
@@ -3343,14 +3431,16 @@ export default function ReportWorkspace({
                                         </Button>
                                         {(canEditSpecimen ||
                                             canEditCustomer ||
-                                            canEditReferrer) && (
+                                            canEditReferrer ||
+                                            canViewWorkOrders ||
+                                            canCreateWorkOrder) && (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-7 w-7 cursor-pointer rounded-full text-muted-foreground hover:bg-primary/5 hover:text-primary"
-                                                        title="Acciones de edición"
+                                                        title="Acciones"
                                                     >
                                                         <MoreVertical className="h-4 w-4" />
                                                     </Button>
@@ -3398,6 +3488,38 @@ export default function ReportWorkspace({
                                                             <UserPlus className="mr-2 h-4 w-4" />
                                                             <span>
                                                                 Editar Remitente
+                                                            </span>
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    {canViewWorkOrders && (
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                setIsWorkOrdersSheetOpen(
+                                                                    true,
+                                                                )
+                                                            }
+                                                            className="cursor-pointer"
+                                                        >
+                                                            <ClipboardList className="mr-2 h-4 w-4" />
+                                                            <span>
+                                                                Ver Órdenes de
+                                                                Trabajo
+                                                            </span>
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    {canCreateWorkOrder && (
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                setIsCreateWorkOrderOpen(
+                                                                    true,
+                                                                )
+                                                            }
+                                                            className="cursor-pointer"
+                                                        >
+                                                            <ClipboardList className="mr-2 h-4 w-4" />
+                                                            <span>
+                                                                Crear Orden de
+                                                                Trabajo
                                                             </span>
                                                         </DropdownMenuItem>
                                                     )}
@@ -3458,8 +3580,10 @@ export default function ReportWorkspace({
                                                 Tipo:
                                             </span>{' '}
                                             <strong className="text-card-foreground">
-                                                {specimen.type.name} -{' '}
-                                                {specimen.examination.name}
+                                                {specimen.type?.name || 'N/A'}
+                                                {examinationNames
+                                                    ? ` - ${examinationNames}`
+                                                    : ''}
                                             </strong>
                                         </p>
                                         <p>
@@ -4265,6 +4389,32 @@ export default function ReportWorkspace({
                     onOpenChange={setShowCompleteMicroscopyDialog}
                     tempPdfUrl={tempPdfUrl}
                     onConfirm={() => handleTransitionState('finalized')}
+                />
+
+                <SpecimenWorkOrdersSheet
+                    specimen={specimen}
+                    open={isWorkOrdersSheetOpen}
+                    onOpenChange={setIsWorkOrdersSheetOpen}
+                    workOrderTypes={
+                        workOrderTypes.length
+                            ? workOrderTypes
+                            : cutting_slide_types
+                    }
+                    workOrderTasks={workOrderTasks}
+                    usersList={usersList.length ? usersList : users}
+                />
+
+                <WorkOrderSheet
+                    specimenId={specimen.id}
+                    workOrderTypes={
+                        workOrderTypes.length
+                            ? workOrderTypes
+                            : cutting_slide_types
+                    }
+                    workOrderTasks={workOrderTasks}
+                    usersList={usersList.length ? usersList : users}
+                    open={isCreateWorkOrderOpen}
+                    onOpenChange={setIsCreateWorkOrderOpen}
                 />
             </EditorLayout>
         </EditorRegistryContext.Provider>

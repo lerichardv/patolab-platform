@@ -447,12 +447,53 @@ export default function SpecimenForm({
         specimen_type_examination: specimen?.specimen_type_examination
             ? specimen.specimen_type_examination.toString()
             : '',
-        selected_examination_ids:
-            specimen?.examinations && specimen.examinations.length > 0
-                ? specimen.examinations.map((e: any) => e.id.toString())
-                : specimen?.specimen_type_examination
-                  ? [specimen.specimen_type_examination.toString()]
-                  : ([] as string[]),
+        selected_examination_ids: (() => {
+            if (!specimen) return [] as string[];
+            const ids = new Set<string>();
+            if (
+                Array.isArray(specimen.examinations) &&
+                specimen.examinations.length > 0
+            ) {
+                specimen.examinations.forEach((e: any) => {
+                    if (e?.id) ids.add(String(e.id));
+                });
+            }
+            if (
+                Array.isArray(specimen.specimen_examinations) &&
+                specimen.specimen_examinations.length > 0
+            ) {
+                specimen.specimen_examinations.forEach((se: any) => {
+                    const id = se.examination_id || se.id || se.examination?.id;
+                    if (id) ids.add(String(id));
+                });
+            }
+            if (
+                Array.isArray(specimen.specimenExaminations) &&
+                specimen.specimenExaminations.length > 0
+            ) {
+                specimen.specimenExaminations.forEach((se: any) => {
+                    const id = se.examination_id || se.id || se.examination?.id;
+                    if (id) ids.add(String(id));
+                });
+            }
+            const inv =
+                specimen.invoice_relation ||
+                specimen.invoiceRelation ||
+                specimen.group?.invoice;
+            const invItems = inv?.invoice_specimens || inv?.invoiceSpecimens;
+            if (Array.isArray(invItems) && invItems.length > 0) {
+                invItems.forEach((item: any) => {
+                    if (!item.specimen_id || item.specimen_id === specimen.id) {
+                        const id = item.examination_id || item.examination?.id;
+                        if (id) ids.add(String(id));
+                    }
+                });
+            }
+            if (ids.size === 0 && specimen.specimen_type_examination) {
+                ids.add(String(specimen.specimen_type_examination));
+            }
+            return Array.from(ids);
+        })(),
         examinations: [] as Array<any>,
         specimen_category: specimen?.specimen_category
             ? specimen.specimen_category.toString()
@@ -489,31 +530,44 @@ export default function SpecimenForm({
         regenerate_pdf: true,
         template_id: '',
         proof_of_payment: null as File | null,
-        has_initial_payment: initialInvoice?.credit_payment_id || initialInvoice?.credit_relation || initialInvoice?.creditRelation
-            ? parseFloat(
-                  initialInvoice?.credit_relation?.amount_paid ||
+        has_initial_payment:
+            initialInvoice?.credit_payment_id ||
+            initialInvoice?.credit_relation ||
+            initialInvoice?.creditRelation
+                ? parseFloat(
+                      initialInvoice?.credit_relation?.amount_paid ||
+                          initialInvoice?.creditRelation?.amount_paid ||
+                          '0',
+                  ) > 0
+                : false,
+        initial_payment_amount:
+            initialInvoice?.credit_payment_id ||
+            initialInvoice?.credit_relation ||
+            initialInvoice?.creditRelation
+                ? (
+                      initialInvoice?.credit_relation?.amount_paid ||
                       initialInvoice?.creditRelation?.amount_paid ||
-                      '0',
-              ) > 0
-            : false,
-        initial_payment_amount: initialInvoice?.credit_payment_id || initialInvoice?.credit_relation || initialInvoice?.creditRelation
-            ? (
-                  initialInvoice?.credit_relation?.amount_paid ||
-                  initialInvoice?.creditRelation?.amount_paid ||
-                  ''
-              ).toString()
-            : '',
-        initial_payment_type: initialInvoice?.credit_payment_id || initialInvoice?.credit_relation || initialInvoice?.creditRelation
-            ? initialInvoice?.cash_value && parseFloat(initialInvoice.cash_value) > 0
-                ? 'cash'
-                : initialInvoice?.check_value && parseFloat(initialInvoice.check_value) > 0
-                  ? 'check'
-                  : initialInvoice?.card_value_charged && parseFloat(initialInvoice.card_value_charged) > 0
-                    ? 'credit card'
-                    : initialInvoice?.transfer_value && parseFloat(initialInvoice.transfer_value) > 0
-                      ? 'bank transfer'
-                      : 'cash'
-            : 'cash',
+                      ''
+                  ).toString()
+                : '',
+        initial_payment_type:
+            initialInvoice?.credit_payment_id ||
+            initialInvoice?.credit_relation ||
+            initialInvoice?.creditRelation
+                ? initialInvoice?.cash_value &&
+                  parseFloat(initialInvoice.cash_value) > 0
+                    ? 'cash'
+                    : initialInvoice?.check_value &&
+                        parseFloat(initialInvoice.check_value) > 0
+                      ? 'check'
+                      : initialInvoice?.card_value_charged &&
+                          parseFloat(initialInvoice.card_value_charged) > 0
+                        ? 'credit card'
+                        : initialInvoice?.transfer_value &&
+                            parseFloat(initialInvoice.transfer_value) > 0
+                          ? 'bank transfer'
+                          : 'cash'
+                : 'cash',
 
         // Detailed payment fields
         payment_method_date:
@@ -526,12 +580,9 @@ export default function SpecimenForm({
         card_value_charged:
             initialInvoice?.card_value_charged?.toString() || '',
         card_expiration: initialInvoice?.card_expiration || '',
-        card_authorization_code:
-            initialInvoice?.card_authorization_code || '',
-        transfer_bank_id:
-            initialInvoice?.transfer_bank_id?.toString() || '',
-        transfer_value:
-            initialInvoice?.transfer_value?.toString() || '',
+        card_authorization_code: initialInvoice?.card_authorization_code || '',
+        transfer_bank_id: initialInvoice?.transfer_bank_id?.toString() || '',
+        transfer_value: initialInvoice?.transfer_value?.toString() || '',
         transfer_authorization_code:
             initialInvoice?.transfer_authorization_code || '',
 
@@ -566,18 +617,54 @@ export default function SpecimenForm({
 
     const originalExaminationIdsStr = React.useMemo(() => {
         if (!specimen) {
-return '';
-}
-
-        let ids: string[] = [];
-
-        if (specimen.examinations && specimen.examinations.length > 0) {
-            ids = specimen.examinations.map((e: any) => String(e.id));
-        } else if (specimen.specimen_type_examination) {
-            ids = [String(specimen.specimen_type_examination)];
+            return '';
         }
 
-        return ids.sort().join(',');
+        const ids = new Set<string>();
+        if (
+            Array.isArray(specimen.examinations) &&
+            specimen.examinations.length > 0
+        ) {
+            specimen.examinations.forEach((e: any) => {
+                if (e?.id) ids.add(String(e.id));
+            });
+        }
+        if (
+            Array.isArray(specimen.specimen_examinations) &&
+            specimen.specimen_examinations.length > 0
+        ) {
+            specimen.specimen_examinations.forEach((se: any) => {
+                const id = se.examination_id || se.id || se.examination?.id;
+                if (id) ids.add(String(id));
+            });
+        }
+        if (
+            Array.isArray(specimen.specimenExaminations) &&
+            specimen.specimenExaminations.length > 0
+        ) {
+            specimen.specimenExaminations.forEach((se: any) => {
+                const id = se.examination_id || se.id || se.examination?.id;
+                if (id) ids.add(String(id));
+            });
+        }
+        const inv =
+            specimen.invoice_relation ||
+            specimen.invoiceRelation ||
+            specimen.group?.invoice;
+        const invItems = inv?.invoice_specimens || inv?.invoiceSpecimens;
+        if (Array.isArray(invItems) && invItems.length > 0) {
+            invItems.forEach((item: any) => {
+                if (!item.specimen_id || item.specimen_id === specimen.id) {
+                    const id = item.examination_id || item.examination?.id;
+                    if (id) ids.add(String(id));
+                }
+            });
+        }
+        if (ids.size === 0 && specimen.specimen_type_examination) {
+            ids.add(String(specimen.specimen_type_examination));
+        }
+
+        return Array.from(ids).sort().join(',');
     }, [specimen]);
 
     const currentExaminationIdsStr = React.useMemo(() => {
@@ -590,8 +677,8 @@ return '';
 
     const hasTypeOrExamsChanged = React.useMemo(() => {
         if (!specimen) {
-return false;
-}
+            return false;
+        }
 
         const typeChanged =
             String(data.specimen_type || '') !== originalSpecimenType;
@@ -613,12 +700,15 @@ return false;
         setCurrentStep(2);
 
         const targetInvoice = specimenInvoice;
-        const pType = data.payment_type || targetInvoice?.payment_type || 'cash';
+        const pType =
+            data.payment_type || targetInvoice?.payment_type || 'cash';
         const calcTotal =
             consolidatedTotals?.total ??
             (targetInvoice?.total ? parseFloat(targetInvoice.total) : 0);
         const calcTotalStr =
-            calcTotal > 0 ? calcTotal.toFixed(2) : targetInvoice?.total?.toString() || '0';
+            calcTotal > 0
+                ? calcTotal.toFixed(2)
+                : targetInvoice?.total?.toString() || '0';
 
         const creditRel =
             targetInvoice?.credit_relation || targetInvoice?.creditRelation;
@@ -637,13 +727,16 @@ return false;
                         ? d.cash_value
                         : targetInvoice?.cash_value?.toString() || calcTotalStr;
             } else if (pType === 'check') {
-                next.check_number = d.check_number || targetInvoice?.check_number || '';
+                next.check_number =
+                    d.check_number || targetInvoice?.check_number || '';
                 next.check_value =
                     d.check_value && parseFloat(d.check_value) > 0
                         ? d.check_value
-                        : targetInvoice?.check_value?.toString() || calcTotalStr;
+                        : targetInvoice?.check_value?.toString() ||
+                          calcTotalStr;
             } else if (pType === 'credit card') {
-                next.card_last_4 = d.card_last_4 || targetInvoice?.card_last_4 || '';
+                next.card_last_4 =
+                    d.card_last_4 || targetInvoice?.card_last_4 || '';
                 next.card_expiration =
                     d.card_expiration || targetInvoice?.card_expiration || '';
                 next.card_authorization_code =
@@ -653,10 +746,13 @@ return false;
                 next.card_value_charged =
                     d.card_value_charged && parseFloat(d.card_value_charged) > 0
                         ? d.card_value_charged
-                        : targetInvoice?.card_value_charged?.toString() || calcTotalStr;
+                        : targetInvoice?.card_value_charged?.toString() ||
+                          calcTotalStr;
             } else if (pType === 'bank transfer') {
                 next.transfer_bank_id =
-                    d.transfer_bank_id || targetInvoice?.transfer_bank_id?.toString() || '';
+                    d.transfer_bank_id ||
+                    targetInvoice?.transfer_bank_id?.toString() ||
+                    '';
                 next.transfer_authorization_code =
                     d.transfer_authorization_code ||
                     targetInvoice?.transfer_authorization_code ||
@@ -664,11 +760,13 @@ return false;
                 next.transfer_value =
                     d.transfer_value && parseFloat(d.transfer_value) > 0
                         ? d.transfer_value
-                        : targetInvoice?.transfer_value?.toString() || calcTotalStr;
+                        : targetInvoice?.transfer_value?.toString() ||
+                          calcTotalStr;
             } else if (pType === 'credit') {
-                const hasCredit = targetInvoice?.credit_payment_id || creditRel
-                    ? parseFloat(creditRel?.amount_paid || '0') > 0
-                    : false;
+                const hasCredit =
+                    targetInvoice?.credit_payment_id || creditRel
+                        ? parseFloat(creditRel?.amount_paid || '0') > 0
+                        : false;
                 next.has_initial_payment = d.has_initial_payment ?? hasCredit;
                 next.initial_payment_amount =
                     d.initial_payment_amount ||
@@ -1167,8 +1265,7 @@ return false;
                 }
             }
 
-            const originalPaymentType =
-                specimenInvoice?.payment_type;
+            const originalPaymentType = specimenInvoice?.payment_type;
             const newVal = data.payment_type;
 
             if (
@@ -1364,8 +1461,8 @@ return false;
         const ids = data.selected_examination_ids || [];
 
         if (ids.length === 0) {
-return;
-}
+            return;
+        }
 
         const currentExamConfigs = [...(data.examinations || [])];
         let updated = false;
@@ -2610,8 +2707,7 @@ return;
                                         <Label htmlFor="proof_of_payment">
                                             Comprobante de Pago (PDF o Imagen){' '}
                                             {isProofRequired &&
-                                                !specimenInvoice
-                                                    ?.proof_of_payment && (
+                                                !specimenInvoice?.proof_of_payment && (
                                                     <span className="text-destructive">
                                                         *
                                                     </span>
@@ -4279,10 +4375,10 @@ return;
                     if (specimen) {
                         const originalPaymentType =
                             specimenInvoice?.payment_type;
-                        const hasPayments =
-                            (specimenInvoice?.credit_relation ||
-                                specimenInvoice?.creditRelation)
-                                ?.has_payments;
+                        const hasPayments = (
+                            specimenInvoice?.credit_relation ||
+                            specimenInvoice?.creditRelation
+                        )?.has_payments;
                         const newVal = paymentData.payment_type;
 
                         if (

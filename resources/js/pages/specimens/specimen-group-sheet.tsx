@@ -482,11 +482,32 @@ export default function SpecimenGroupSheet({
                             s.examinations.length > 0
                         ) {
                             examIdsStr = s.examinations
-                                .map((x: any) => x.id)
+                                .map((x: any) =>
+                                    (x.id || x.examination_id).toString(),
+                                )
                                 .join(',');
                             examNamesStr = s.examinations
-                                .map((x: any) => x.name)
+                                .map(
+                                    (x: any) =>
+                                        x.name || x.examination?.name || '',
+                                )
+                                .filter(Boolean)
                                 .join(', ');
+                            itemizedExams = s.examinations.map((x: any) => ({
+                                examination_id: x.id || x.examination_id,
+                                selected_price:
+                                    x.selected_price?.toString() || '0',
+                                custom_specimen_price:
+                                    x.custom_specimen_price?.toString() || '0',
+                                quantity: x.quantity ?? 1,
+                                additional_discount_enabled:
+                                    !!x.additional_discount_enabled,
+                                additional_discount:
+                                    x.additional_discount?.toString() || '0',
+                                age_discount_type: x.age_discount_type || null,
+                                age_discount_amount:
+                                    x.age_discount_amount?.toString() || '0',
+                            }));
                         } else {
                             examIdsStr =
                                 s.specimen_type_examination?.toString() || '';
@@ -752,11 +773,31 @@ export default function SpecimenGroupSheet({
 
     const handleEditNestedSpecimen = (spec: any) => {
         setNestedSpecimenToEditId(spec.client_id);
-        setNestedCustomer(spec.customer.toString());
-        setNestedSpecimenType(spec.specimen_type.toString());
-        setNestedExamination(spec.specimen_type_examination.toString());
-        setNestedCategory(spec.specimen_category.toString());
-        setNestedReferrer(spec.referrer.toString());
+        setNestedCustomer(spec.customer ? spec.customer.toString() : '');
+        setNestedSpecimenType(
+            spec.specimen_type ? spec.specimen_type.toString() : '',
+        );
+
+        let examIdsStr = '';
+        if (
+            spec.specimen_examinations &&
+            spec.specimen_examinations.length > 0
+        ) {
+            examIdsStr = spec.specimen_examinations
+                .map((x: any) => (x.examination_id || x.id).toString())
+                .join(',');
+        } else if (spec.examinations && spec.examinations.length > 0) {
+            examIdsStr = spec.examinations
+                .map((x: any) => (x.examination_id || x.id).toString())
+                .join(',');
+        } else if (spec.specimen_type_examination) {
+            examIdsStr = spec.specimen_type_examination.toString();
+        }
+        setNestedExamination(examIdsStr);
+        setNestedCategory(
+            spec.specimen_category ? spec.specimen_category.toString() : '',
+        );
+        setNestedReferrer(spec.referrer ? spec.referrer.toString() : '');
         setNestedAnatomicSite(spec.anatomic_site || '');
         setNestedDiagnosis(spec.diagnosis || '');
         setNestedClinicalNotes(spec.clinical_notes || '');
@@ -963,8 +1004,8 @@ export default function SpecimenGroupSheet({
             );
 
             if (existingConfig) {
-return existingConfig;
-}
+                return existingConfig;
+            }
 
             const examObj = examinations.find((e) => e.id === examId);
             const prices = examObj?.prices || [];

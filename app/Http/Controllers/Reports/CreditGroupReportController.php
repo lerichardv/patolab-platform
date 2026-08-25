@@ -426,6 +426,8 @@ class CreditGroupReportController extends Controller
             'group.specimens.type',
             'group.specimens.customerRelation',
             'group.specimens.examination.prices',
+            'group.specimens.examinations',
+            'group.specimens.specimenExaminations.examination',
             'group.specimens.category',
             'group.specimens.referrerRelation',
             'group.specimens.priority',

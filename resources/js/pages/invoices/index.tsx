@@ -2449,27 +2449,50 @@ export default function InvoicesIndex({
                                                                             {(() => {
                                                                                 const credit =
                                                                                     invoice.credit_relation;
+                                                                                const rawSpecimens =
+                                                                                    credit?.credit_invoice_specimens ||
+                                                                                    credit?.invoice_specimens ||
+                                                                                    [];
+                                                                                const uniqueSpecimenIds =
+                                                                                    new Set(
+                                                                                        rawSpecimens
+                                                                                            .map(
+                                                                                                (
+                                                                                                    s: any,
+                                                                                                ) =>
+                                                                                                    s.specimen_id ||
+                                                                                                    s.id,
+                                                                                            )
+                                                                                            .filter(
+                                                                                                Boolean,
+                                                                                            ),
+                                                                                    );
                                                                                 const specimensCount =
-                                                                                    credit
-                                                                                        .credit_invoice_specimens
-                                                                                        ?.length ??
-                                                                                    invoice
-                                                                                        .group
-                                                                                        ?.specimens
-                                                                                        ?.length ??
-                                                                                    (invoice.is_group
-                                                                                        ? 2
-                                                                                        : 1);
+                                                                                    uniqueSpecimenIds.size >
+                                                                                    0
+                                                                                        ? uniqueSpecimenIds.size
+                                                                                        : (credit
+                                                                                              ?.group
+                                                                                              ?.specimens
+                                                                                              ?.length ??
+                                                                                          invoice
+                                                                                              .group
+                                                                                              ?.specimens
+                                                                                              ?.length ??
+                                                                                          (invoice.is_group ||
+                                                                                          credit?.is_group
+                                                                                              ? 2
+                                                                                              : 1));
                                                                                 const remaining =
                                                                                     parseFloat(
                                                                                         String(
-                                                                                            credit.amount_remaining ||
+                                                                                            credit?.amount_remaining ||
                                                                                                 '0',
                                                                                         ),
                                                                                     );
                                                                                 const isSingleOrPaid =
                                                                                     (!invoice.is_group &&
-                                                                                        !credit.is_group) ||
+                                                                                        !credit?.is_group) ||
                                                                                     specimensCount <=
                                                                                         1 ||
                                                                                     remaining <=
@@ -2482,7 +2505,15 @@ export default function InvoicesIndex({
                                                                                                 !isSingleOrPaid
                                                                                             ) {
                                                                                                 handleExtractSpecimenClick(
-                                                                                                    credit,
+                                                                                                    {
+                                                                                                        ...credit,
+                                                                                                        customer:
+                                                                                                            credit?.customer ||
+                                                                                                            invoice.customer,
+                                                                                                        group:
+                                                                                                            credit?.group ||
+                                                                                                            invoice.group,
+                                                                                                    },
                                                                                                 );
                                                                                             }
                                                                                         }}

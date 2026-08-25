@@ -498,7 +498,7 @@ export default function GroupInvoiceForm({
     };
 
     return (
-        <form onSubmit={handlePreSubmit} className="space-y-6 px-5 py-2">
+        <form onSubmit={handlePreSubmit} className="mb-5 space-y-6 px-5 py-2">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
                 {/* Left Column: Form Inputs */}
                 <div className="flex flex-col gap-6 lg:col-span-8">

@@ -1498,20 +1498,35 @@ export default function CreditsIndex({
                                                                     </DropdownMenuItem>
                                                                 )}
                                                                 {(() => {
+                                                                    const rawSpecimens =
+                                                                        credit.invoice_specimens ||
+                                                                        credit.credit_invoice_specimens ||
+                                                                        [];
+                                                                    const uniqueSpecimenIds =
+                                                                        new Set(
+                                                                            rawSpecimens
+                                                                                .map(
+                                                                                    (
+                                                                                        s: any,
+                                                                                    ) =>
+                                                                                        s.specimen_id ||
+                                                                                        s.id,
+                                                                                )
+                                                                                .filter(
+                                                                                    Boolean,
+                                                                                ),
+                                                                        );
                                                                     const specimensCount =
-                                                                        credit
-                                                                            .invoice_specimens
-                                                                            ?.length ??
-                                                                        credit
-                                                                            .credit_invoice_specimens
-                                                                            ?.length ??
-                                                                        credit
-                                                                            .group
-                                                                            ?.specimens
-                                                                            ?.length ??
-                                                                        (credit.is_group
-                                                                            ? 2
-                                                                            : 1);
+                                                                        uniqueSpecimenIds.size >
+                                                                        0
+                                                                            ? uniqueSpecimenIds.size
+                                                                            : (credit
+                                                                                  .group
+                                                                                  ?.specimens
+                                                                                  ?.length ??
+                                                                              (credit.is_group
+                                                                                  ? 2
+                                                                                  : 1));
                                                                     const isSingleOrPaid =
                                                                         !credit.is_group ||
                                                                         specimensCount <=
