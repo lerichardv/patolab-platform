@@ -190,6 +190,7 @@ export default function ReportWorkspace({
         useState<boolean>(false);
     const [isCreateWorkOrderOpen, setIsCreateWorkOrderOpen] =
         useState<boolean>(false);
+    const { debugReport } = usePage().props as { debugReport?: boolean };
 
     const canEditSpecimen = auth.permissions?.includes('specimens.edit');
     const canEditCustomer = auth.permissions?.includes('patients.edit');
@@ -1861,7 +1862,6 @@ export default function ReportWorkspace({
             (isFinished && sessionEditingEnabled)) &&
         hasMicroAccess;
     const totalPages = pages.length > 0 ? pages.length : 1;
-    const { debugReport } = usePage().props as { debugReport?: boolean };
 
     const renderPreviewPage = (pageNum: number) => {
         const pageBlocks = pages[pageNum - 1] || [];
@@ -2119,8 +2119,10 @@ export default function ReportWorkspace({
                             </div>
 
                             {/* Sticky Contextual Formatting Toolbar */}
-                            {activeEditor && (
-                                <div className="sticky top-[93px] z-10 bg-background/95 transition-all duration-205">
+                            {activeEditor &&
+                                !activeEditor.isDestroyed &&
+                                activeEditor.view && (
+                                    <div className="sticky top-[93px] z-10 bg-background/95 transition-all duration-205">
                                     <div className="justify-strech flex items-center border-b border-border bg-muted/40 px-6">
                                         <div className="flex min-h-[36px] w-full justify-between overflow-x-auto">
                                             <EditorToolbar

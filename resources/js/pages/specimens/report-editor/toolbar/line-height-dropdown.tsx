@@ -55,8 +55,10 @@ export function LineHeightDropdown({
     };
 
     const currentLineHeight =
-        editor?.getAttributes('paragraph').lineHeight ||
-        editor?.getAttributes('heading').lineHeight;
+        editor && !editor.isDestroyed && editor.view
+            ? editor.getAttributes('paragraph').lineHeight ||
+              editor.getAttributes('heading').lineHeight
+            : undefined;
 
     const options = [
         { label: '0.85 (Muy compacto)', value: '0.85' },

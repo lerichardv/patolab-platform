@@ -438,6 +438,7 @@ export default function SpecimenForm({
         setError,
         clearErrors,
         isDirty,
+        transform,
     } = useForm({
         _method: specimen ? 'PUT' : undefined,
         customer: specimen?.customer ? specimen.customer.toString() : '',
@@ -598,6 +599,20 @@ export default function SpecimenForm({
             prices: any[];
         }>,
     });
+
+    React.useEffect(() => {
+        transform((d: any) => ({
+            ...d,
+            initial_payment_amount:
+                d.payment_type === 'credit' && d.has_initial_payment
+                    ? d.initial_payment_amount
+                    : null,
+            initial_payment_type:
+                d.payment_type === 'credit' && d.has_initial_payment
+                    ? d.initial_payment_type
+                    : null,
+        }));
+    }, [transform]);
 
     const specimenInvoice = React.useMemo(() => {
         if (!specimen) return null;

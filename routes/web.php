@@ -58,6 +58,7 @@ Route::inertia('/', 'welcome', [
 
 Route::get('/dev-login', function () {
     Auth::loginUsingId(7);
+
     return redirect('/specimens/BIO-0010-08-2026/report-editor');
 });
 

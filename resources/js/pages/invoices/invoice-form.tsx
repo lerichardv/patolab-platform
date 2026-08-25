@@ -582,6 +582,10 @@ export default function InvoiceForm({
                             sequence_code: spec?.sequence_code || 'Sin código',
                             patient_name:
                                 spec?.customer_relation?.name ||
+                                spec?.customerRelation?.name ||
+                                (typeof spec?.customer === 'object' &&
+                                    spec?.customer?.name) ||
+                                spec?.customer_name ||
                                 invoice.customer?.name ||
                                 'N/A',
                             type_name: spec?.type?.name || 'N/A',
@@ -678,6 +682,10 @@ export default function InvoiceForm({
                     sequence_code: spec?.sequence_code || 'Sin código',
                     patient_name:
                         spec?.customer_relation?.name ||
+                        spec?.customerRelation?.name ||
+                        (typeof spec?.customer === 'object' &&
+                            spec?.customer?.name) ||
+                        spec?.customer_name ||
                         invoice.customer?.name ||
                         'N/A',
                     type_name: spec?.type?.name || 'N/A',

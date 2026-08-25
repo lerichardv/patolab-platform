@@ -1092,7 +1092,7 @@ class ReportPaginator
                     $width = null;
                     if (preg_match('/style=["\'][^"\']*width:\s*([\d.]+)(px|%)?[^"\']*["\']/i', $colHtml, $styleWidthMatch)) {
                         $width = (float) $styleWidthMatch[1];
-                    } else if (preg_match('/width=["\']([\d.]+)%?["\']/i', $colHtml, $widthAttrMatch)) {
+                    } elseif (preg_match('/width=["\']([\d.]+)%?["\']/i', $colHtml, $widthAttrMatch)) {
                         $width = (float) $widthAttrMatch[1];
                     }
                     $colWidths[] = $width;
@@ -1167,7 +1167,7 @@ class ReportPaginator
         }
 
         $cellPaddingVertical = 2.64; // 1.06mm top + 1.06mm bottom + 0.52mm borders
-        
+
         $colPcts = self::parseColumnPercentages($tableHtml, $colCount);
 
         foreach ($trList as $tr) {
@@ -1191,7 +1191,7 @@ class ReportPaginator
                 if ($cell->hasAttribute('colspan')) {
                     $colSpan = (int) $cell->getAttribute('colspan');
                 }
-                
+
                 $colPct = 0.0;
                 for ($c = 0; $c < $colSpan; $c++) {
                     $colPct += $colPcts[$cellIndex + $c] ?? 0.0;
@@ -1199,7 +1199,7 @@ class ReportPaginator
                 if ($colPct <= 0.0) {
                     $colPct = 100.0 / max(1, $colCount);
                 }
-                
+
                 $colWidthMm = (185.9 * $colPct) / 100.0;
                 $usableCellWidthMm = max(10.0, $colWidthMm - 3.18);
                 $dynamicCharsPerCell = max(8, (int) floor($usableCellWidthMm / 1.33));

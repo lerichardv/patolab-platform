@@ -241,9 +241,16 @@ export default function GroupInvoiceForm({
                         gs.examination_name ||
                         'Análisis',
                     patient_name:
+                        spec.customer_relation?.name ||
                         spec.customerRelation?.name ||
-                        spec.customer?.name ||
+                        (typeof spec.customer === 'object' &&
+                            spec.customer?.name) ||
+                        spec.customer_name ||
+                        spec.patient_name ||
+                        gs.specimen?.customer_relation?.name ||
+                        gs.specimen?.customerRelation?.name ||
                         gs.patient_name ||
+                        invoice.customer?.name ||
                         'Sin nombre',
                     sequence_code: spec.sequence_code || gs.sequence_code || '',
                     available_prices: prices,
