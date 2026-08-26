@@ -48,7 +48,9 @@ use App\Http\Controllers\WorkOrderTaskController;
 use App\Http\Controllers\WorkOrderTypeController;
 use App\Models\Department;
 use App\Models\Specimen;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
 Route::get('/', function () {
