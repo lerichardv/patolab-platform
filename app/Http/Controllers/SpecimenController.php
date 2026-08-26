@@ -1653,6 +1653,8 @@ class SpecimenController extends Controller
         }
 
         try {
+            $specimen->report->ensureValidationQrCode();
+
             app(ReportPdfService::class)->generateAndStoreReport($specimen);
 
             return redirect()->back()->with('success', 'Reporte generado con éxito.');

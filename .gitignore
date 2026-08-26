@@ -31,3 +31,7 @@ yarn-error.log
 package-lock.json
 
 back
+.agents
+.claude
+.codex
+.gemini

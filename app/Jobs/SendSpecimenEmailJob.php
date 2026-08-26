@@ -71,6 +71,12 @@ class SendSpecimenEmailJob implements ShouldQueue
             ])->render();
 
         } elseif ($this->type === 'finalized') {
+            if (! in_array($this->specimen->status, ['finalized', 'delivered'])) {
+                Log::info("SendSpecimenEmailJob: Specimen ID {$this->specimen->id} status is '{$this->specimen->status}' (not finalized/delivered). Skipping delayed email.");
+
+                return;
+            }
+
             $subject = "Reporte Listo — {$this->specimen->sequence_code}";
             $statusUrl = route('specimens.show-public', [
                 'specimen_code' => $this->specimen->sequence_code,

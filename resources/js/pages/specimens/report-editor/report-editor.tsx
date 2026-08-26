@@ -153,7 +153,7 @@ import type {
     Specimen,
     SpecimenReport,
 } from './types';
-import { isSelectionInTable } from './utils';
+import { cleanPastedHtml, isEmptyHtml, isSelectionInTable } from './utils';
 
 export default function ReportWorkspace({
     specimen,
@@ -890,17 +890,24 @@ export default function ReportWorkspace({
             Object.keys(fieldToTemplateKey).forEach((field) => {
                 const editor = editorRefs.current[field];
                 const templateKey = fieldToTemplateKey[field];
-                const templateContent = template[templateKey] || '';
+                const rawTemplateContent = template[templateKey] || '';
 
                 if (editor) {
                     const currentContent = editor.getHTML();
                     const isCurrentEmpty =
                         !currentContent ||
                         currentContent === '<p></p>' ||
-                        currentContent === '<p></p><p></p>';
+                        currentContent === '<p></p><p></p>' ||
+                        isEmptyHtml(currentContent);
+
+                    const cleanedTemplateContent =
+                        cleanPastedHtml(rawTemplateContent);
                     const mergedContent = isCurrentEmpty
-                        ? templateContent
-                        : templateContent + currentContent;
+                        ? cleanedTemplateContent
+                        : cleanPastedHtml(
+                              cleanedTemplateContent + currentContent,
+                          );
+
                     editor.commands.setContent(mergedContent);
                 }
             });
@@ -2123,63 +2130,63 @@ export default function ReportWorkspace({
                                 !activeEditor.isDestroyed &&
                                 activeEditor.view && (
                                     <div className="sticky top-[93px] z-10 bg-background/95 transition-all duration-205">
-                                    <div className="justify-strech flex items-center border-b border-border bg-muted/40 px-6">
-                                        <div className="flex min-h-[36px] w-full justify-between overflow-x-auto">
-                                            <EditorToolbar
-                                                editor={activeEditor}
-                                                specimenSequenceCode={
-                                                    specimen.sequence_code
-                                                }
-                                                reportId={report?.id ?? 0}
-                                                field={activeField}
-                                                isSheetOpen={isAISheetOpen}
-                                                onSheetOpenChange={
-                                                    updateAISheetOpen
-                                                }
-                                                onPopoverOpenChange={
-                                                    updatePopoverOpen
-                                                }
-                                                isDictationSheetOpen={
-                                                    isDictationSheetOpen
-                                                }
-                                                onDictationSheetOpenChange={
-                                                    updateDictationSheetOpen
-                                                }
-                                            />
-                                        </div>
-
-                                        {activeField && (
-                                            <div className="flex h-[36px] items-center">
-                                                <div className="flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs font-semibold">
-                                                    <div
-                                                        className={cn(
-                                                            'h-2 w-2 rounded-full',
-                                                            activeField ===
-                                                                'diagnosis' &&
-                                                                'animate-pulse bg-blue-500',
-                                                            activeField ===
-                                                                'macroscopy' &&
-                                                                'animate-pulse bg-violet-500',
-                                                            activeField ===
-                                                                'microscopy' &&
-                                                                'animate-pulse bg-fuchsia-500',
-                                                        )}
-                                                    />
-                                                    <span className="text-[9px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                        {activeField ===
-                                                        'diagnosis'
-                                                            ? 'Diagnóstico'
-                                                            : activeField ===
-                                                                'macroscopy'
-                                                              ? 'Macroscopía'
-                                                              : 'Microscopía'}
-                                                    </span>
-                                                </div>
+                                        <div className="justify-strech flex items-center border-b border-border bg-muted/40 px-6">
+                                            <div className="flex min-h-[36px] w-full justify-between overflow-x-auto">
+                                                <EditorToolbar
+                                                    editor={activeEditor}
+                                                    specimenSequenceCode={
+                                                        specimen.sequence_code
+                                                    }
+                                                    reportId={report?.id ?? 0}
+                                                    field={activeField}
+                                                    isSheetOpen={isAISheetOpen}
+                                                    onSheetOpenChange={
+                                                        updateAISheetOpen
+                                                    }
+                                                    onPopoverOpenChange={
+                                                        updatePopoverOpen
+                                                    }
+                                                    isDictationSheetOpen={
+                                                        isDictationSheetOpen
+                                                    }
+                                                    onDictationSheetOpenChange={
+                                                        updateDictationSheetOpen
+                                                    }
+                                                />
                                             </div>
-                                        )}
+
+                                            {activeField && (
+                                                <div className="flex h-[36px] items-center">
+                                                    <div className="flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs font-semibold">
+                                                        <div
+                                                            className={cn(
+                                                                'h-2 w-2 rounded-full',
+                                                                activeField ===
+                                                                    'diagnosis' &&
+                                                                    'animate-pulse bg-blue-500',
+                                                                activeField ===
+                                                                    'macroscopy' &&
+                                                                    'animate-pulse bg-violet-500',
+                                                                activeField ===
+                                                                    'microscopy' &&
+                                                                    'animate-pulse bg-fuchsia-500',
+                                                            )}
+                                                        />
+                                                        <span className="text-[9px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                            {activeField ===
+                                                            'diagnosis'
+                                                                ? 'Diagnóstico'
+                                                                : activeField ===
+                                                                    'macroscopy'
+                                                                  ? 'Macroscopía'
+                                                                  : 'Microscopía'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
                             <div className="flex flex-col gap-5 p-6">
                                 {/* Specimen and Customer Summary Card */}
@@ -2280,8 +2287,8 @@ export default function ReportWorkspace({
                                                             >
                                                                 <ClipboardList className="mr-2 h-4 w-4" />
                                                                 <span>
-                                                                    Ver Órdenes de
-                                                                    Trabajo
+                                                                    Ver Órdenes
+                                                                    de Trabajo
                                                                 </span>
                                                             </DropdownMenuItem>
                                                         )}
@@ -2361,7 +2368,8 @@ export default function ReportWorkspace({
                                                     Tipo:
                                                 </span>{' '}
                                                 <strong className="text-card-foreground">
-                                                    {specimen.type?.name || 'N/A'}
+                                                    {specimen.type?.name ||
+                                                        'N/A'}
                                                     {examinationNames
                                                         ? ` - ${examinationNames}`
                                                         : ''}

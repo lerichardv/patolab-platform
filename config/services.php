@@ -42,4 +42,10 @@ return [
         'version' => env('WHATSAPP_VERSION', 'v23.0'),
     ],
 
+    'pdf_signer' => [
+        'cert' => env('PDF_SIGNER_CERT_PATH', storage_path('app/certs/report_signer.crt')),
+        'key' => env('PDF_SIGNER_KEY_PATH', storage_path('app/certs/report_signer.key')),
+        'ca' => env('PDF_SIGNER_CA_PATH', storage_path('app/certs/lab_ca.crt')),
+    ],
+
 ];

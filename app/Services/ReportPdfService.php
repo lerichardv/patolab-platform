@@ -28,6 +28,8 @@ class ReportPdfService
             'report_file' => $pdfPath,
         ]);
 
+        $specimen->report->signDocument();
+
         Storage::disk('public')->deleteDirectory("temp_reports/{$specimen->sequence_code}");
 
         return $pdfPath;

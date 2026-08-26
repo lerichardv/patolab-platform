@@ -5,10 +5,33 @@
         $logoData = base64_encode(file_get_contents($logoPath));
         $logoBase64 = 'data:image/png;base64,' . $logoData;
     }
+
+    $qrCodePath = $specimen->report->report_validation_qr_code ?? null;
+    $qrBase64 = '';
+    if (!empty($qrCodePath)) {
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($qrCodePath)) {
+            $qrData = base64_encode(\Illuminate\Support\Facades\Storage::disk('public')->get($qrCodePath));
+            $mime = \Illuminate\Support\Facades\Storage::disk('public')->mimeType($qrCodePath) ?: 'image/png';
+            $qrBase64 = 'data:' . $mime . ';base64,' . $qrData;
+        } elseif (file_exists(public_path($qrCodePath))) {
+            $qrData = base64_encode(file_get_contents(public_path($qrCodePath)));
+            $qrBase64 = 'data:image/png;base64,' . $qrData;
+        }
+    }
 @endphp
 
 <header class="report-header">
     <div class="header-table">
+        <div class="header-qr-cell">
+            <div class="qr-instruction-text">Escanee para validar la autenticidad del informe</div>
+            @if(!empty($qrBase64))
+                <img class="header-qr-img" src="{{ $qrBase64 }}" alt="QR de Validación">
+            @else
+                <div class="header-qr-placeholder">
+                    <span>QR</span>
+                </div>
+            @endif
+        </div>
         <div class="header-logo-cell">
             @if(!empty($logoBase64))
                 <img class="header-logo-img" src="{{ $logoBase64 }}" alt="Logo PatoLab">

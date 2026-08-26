@@ -141,7 +141,7 @@ test('specimen status update to finalized dispatches the finalized email job', f
         $reflectionSpecimen->setAccessible(true);
         $specimen = $reflectionSpecimen->getValue($job);
 
-        return $type === 'finalized' && $specimen->sequence_code === 'BIO-0002-2026';
+        return $type === 'finalized' && $specimen->sequence_code === 'BIO-0002-2026' && $job->delay !== null;
     });
 });
 

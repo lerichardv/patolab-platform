@@ -17,6 +17,11 @@ import {
     mergeAttributes,
     ReactNodeViewRenderer,
 } from '@tiptap/react';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import {
+    cleanPastedHtml,
+    cleanPastedText,
+} from '@/pages/specimens/report-editor/utils/paste-cleaner';
 import StarterKit from '@tiptap/starter-kit';
 import {
     Bold,
@@ -1176,6 +1181,26 @@ export const ImageGrid = TiptapNode.create<ImageGridOptions>({
     },
 });
 
+export const PasteCleaner = Extension.create({
+    name: 'pasteCleaner',
+    priority: 1000,
+    addProseMirrorPlugins() {
+        return [
+            new Plugin({
+                key: new PluginKey('pasteCleaner'),
+                props: {
+                    transformPastedHTML(html) {
+                        return cleanPastedHtml(html);
+                    },
+                    transformPastedText(text) {
+                        return cleanPastedText(text);
+                    },
+                },
+            }),
+        ];
+    },
+});
+
 const sharedExtensions = [
     TextStyle,
     FontSize,
@@ -1191,6 +1216,7 @@ const sharedExtensions = [
     TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
     Highlight.configure({ multicolor: true }),
     CustomBulletList,
+    PasteCleaner,
     ListAndBlockBackspaceFix,
 ];
 

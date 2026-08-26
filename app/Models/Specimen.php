@@ -57,7 +57,7 @@ class Specimen extends Model
         static::updated(function ($specimen) {
             if ($specimen->wasChanged('status') && $specimen->status === 'finalized') {
                 if (! $specimen->group_id) {
-                    SendSpecimenEmailJob::dispatch($specimen, 'finalized');
+                    SendSpecimenEmailJob::dispatch($specimen, 'finalized')->delay(now()->addHour());
                 }
             }
         });

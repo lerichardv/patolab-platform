@@ -28,6 +28,7 @@ use App\Http\Controllers\Reports\BillingSummaryReportController;
 use App\Http\Controllers\Reports\CreditGroupReportController;
 use App\Http\Controllers\Reports\CuttingsReportController;
 use App\Http\Controllers\Reports\DeliveryReportController;
+use App\Http\Controllers\ReportVerificationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SequenceController;
 use App\Http\Controllers\SettingController;
@@ -50,9 +51,13 @@ use App\Models\Specimen;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
-Route::inertia('/', 'welcome', [
-    'canRegister' => Features::enabled(Features::registration()),
-])->name('home');
+Route::get('/', function () {
+    return Inertia::render('welcome', [
+        'canRegister' => Features::enabled(Features::registration()),
+    ]);
+})->name('home');
+
+Route::get('/v/{report_code}', ReportVerificationController::class)->name('report.verify');
 
 Route::get('/dev-login', function () {
     Auth::loginUsingId(7);
