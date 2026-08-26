@@ -39,7 +39,11 @@ export interface PreviewSpecimen {
     users?: PreviewUser[];
     report?: {
         id?: number;
+        report_code?: string;
+        report_validation_token?: string | null;
+        report_validation_qr_code?: string | null;
         report_date?: string;
         finalization_date?: string;
     } | null;
+    report_validation_qr_code?: string | null;
 }

@@ -4,10 +4,18 @@ namespace App\Models;
 
 use App\Casts\HeadingsTogglesCast;
 use App\Casts\SectionsOrderCast;
+use App\Services\PdfSignerService;
 use App\Traits\Auditable;
+use chillerlan\QRCode\Common\EccLevel;
+use chillerlan\QRCode\Data\QRMatrix;
+use chillerlan\QRCode\Output\QRGdImagePNG;
+use chillerlan\QRCode\QRCode;
+use chillerlan\QRCode\QROptions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class SpecimenReport extends Model
 {
@@ -49,6 +57,9 @@ class SpecimenReport extends Model
      * The yjs_*_state columns store the binary Yjs state vector updates for real-time collaboration.
      */
     protected $fillable = [
+        'report_code',
+        'report_validation_token',
+        'report_validation_qr_code',
         'report_date',
         'finalization_date',
         'generated_at',
@@ -69,6 +80,172 @@ class SpecimenReport extends Model
         'headings_toggles',
         'report_file',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (SpecimenReport $report) {
+            if (empty($report->report_code)) {
+                $report->report_code = static::generateUniqueReportCode();
+            }
+        });
+    }
+
+    /**
+     * Generate a unique 12-character uppercase hexadecimal report code.
+     */
+    public static function generateUniqueReportCode(): string
+    {
+        do {
+            $code = strtoupper(bin2hex(random_bytes(6)));
+        } while (static::where('report_code', $code)->exists());
+
+        return $code;
+    }
+
+    /**
+     * Ensure validation token and QR code exist for this report.
+     *
+     * @return string The relative QR code image path in storage.
+     */
+    public function ensureValidationQrCode(): string
+    {
+        $dirty = false;
+
+        if (empty($this->report_code)) {
+            $this->report_code = static::generateUniqueReportCode();
+            $dirty = true;
+        }
+
+        if (empty($this->report_validation_token)) {
+            $this->report_validation_token = strtoupper(bin2hex(random_bytes(6)));
+            $dirty = true;
+        }
+
+        $qrPath = 'qr_codes/report_'.$this->report_code.'.png';
+
+        if (empty($this->report_validation_qr_code) || ! Storage::disk('public')->exists($qrPath)) {
+            $url = route('report.verify', [
+                'report_code' => $this->report_code,
+                't' => $this->report_validation_token,
+            ]);
+
+            $darkBlue = [30, 58, 138]; // Corporate Dark Blue (#1e3a8a)
+            $bgColor = [255, 255, 255]; // Transparent background base
+
+            $options = new QROptions([
+                'version' => 6,
+                'eccLevel' => EccLevel::H,
+                'addQuietzone' => false,
+                'drawCircularModules' => true,
+                'circleRadius' => 0.45,
+                'drawLightModules' => false,
+                'imageTransparent' => true,
+                'transparencyColor' => $bgColor,
+                'bgColor' => $bgColor,
+                'keepAsSquare' => [
+                    QRMatrix::M_FINDER_DARK,
+                    QRMatrix::M_FINDER_DOT,
+                    QRMatrix::M_ALIGNMENT_DARK,
+                ],
+                'connectPaths' => true,
+                'excludeFromConnect' => [
+                    QRMatrix::M_FINDER_DARK,
+                    QRMatrix::M_FINDER_DOT,
+                    QRMatrix::M_ALIGNMENT_DARK,
+                ],
+                'addLogoSpace' => true,
+                'logoSpaceWidth' => 10,
+                'logoSpaceHeight' => 10,
+                'outputInterface' => QRGdImagePNG::class,
+                'outputBase64' => false,
+                'scale' => 8,
+                'moduleValues' => [
+                    QRMatrix::M_DATA_DARK => $darkBlue,
+                    QRMatrix::M_FINDER_DARK => $darkBlue,
+                    QRMatrix::M_FINDER_DOT => $darkBlue,
+                    QRMatrix::M_ALIGNMENT_DARK => $darkBlue,
+                    QRMatrix::M_TIMING_DARK => $darkBlue,
+                    QRMatrix::M_FORMAT_DARK => $darkBlue,
+                    QRMatrix::M_VERSION_DARK => $darkBlue,
+                    QRMatrix::M_DARKMODULE => $darkBlue,
+                ],
+            ]);
+
+            $qrImageString = (new QRCode($options))->render($url);
+            $qrGd = imagecreatefromstring($qrImageString);
+
+            $logoPath = public_path('images/patolab-isotipo.png');
+            if (file_exists($logoPath)) {
+                $logoGd = imagecreatefrompng($logoPath);
+                if ($logoGd && $qrGd) {
+                    imagealphablending($qrGd, true);
+                    imagesavealpha($qrGd, true);
+                    imagealphablending($logoGd, true);
+                    imagesavealpha($logoGd, true);
+
+                    $qrWidth = imagesx($qrGd);
+                    $qrHeight = imagesy($qrGd);
+                    $logoWidth = imagesx($logoGd);
+                    $logoHeight = imagesy($logoGd);
+
+                    $newLogoWidth = (int) ($qrWidth * 0.20);
+                    $newLogoHeight = (int) ($logoHeight * ($newLogoWidth / $logoWidth));
+
+                    $dstX = (int) (($qrWidth - $newLogoWidth) / 2);
+                    $dstY = (int) (($qrHeight - $newLogoHeight) / 2);
+
+                    imagecopyresampled($qrGd, $logoGd, $dstX, $dstY, 0, 0, $newLogoWidth, $newLogoHeight, $logoWidth, $logoHeight);
+                    imagedestroy($logoGd);
+                }
+            }
+
+            ob_start();
+            imagepng($qrGd);
+            $finalPng = ob_get_clean();
+            imagedestroy($qrGd);
+
+            Storage::disk('public')->put($qrPath, $finalPng);
+            $this->report_validation_qr_code = $qrPath;
+            $dirty = true;
+        }
+
+        if ($dirty) {
+            $this->save();
+        }
+
+        return $this->report_validation_qr_code;
+    }
+
+    /**
+     * Sign the stored PDF report document using PdfSignerService.
+     *
+     * @return bool True if the PDF was signed successfully, false otherwise.
+     */
+    public function signDocument(): bool
+    {
+        if (empty($this->report_file) || ! Storage::disk('public')->exists($this->report_file)) {
+            return false;
+        }
+
+        try {
+            $signer = app(PdfSignerService::class);
+            $absolutePath = Storage::disk('public')->path($this->report_file);
+
+            $signedTempPath = $absolutePath.'.signed.tmp';
+
+            $signer->sign($absolutePath, $signedTempPath);
+
+            if (file_exists($signedTempPath)) {
+                rename($signedTempPath, $absolutePath);
+
+                return true;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo firmar digitalmente el PDF del reporte: '.$e->getMessage());
+        }
+
+        return false;
+    }
 
     protected $casts = [
         'report_date' => 'date',

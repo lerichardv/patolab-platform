@@ -445,11 +445,35 @@ const customWebhookExtension = {
 						isLoaded = true;
 					}
 				} else {
-					isLoaded = true;
+					try {
+						const docJson = TiptapTransformer.fromYdoc(data.document, 'content');
+						const htmlValue = generateHTML(docJson, extensions);
+						const cleanText = htmlValue.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
+						const hasMediaOrTable = /<img|<table/i.test(htmlValue);
+
+						if (cleanText !== '' || hasMediaOrTable) {
+							isLoaded = true;
+						} else {
+							console.log(`[webhook:onLoadDocument] Restored Yjs binary state is empty for ${data.documentName}`);
+						}
+					} catch (err) {
+						isLoaded = true;
+					}
 				}
 			}
 
 			if (!isLoaded) {
+				// Clear any previous Yjs fragment/text content to ensure clean slate
+				data.document.transact(() => {
+					const yxml = data.document.getXmlFragment('content');
+					if (yxml.length > 0) {
+						yxml.delete(0, yxml.length);
+					}
+					const ytext = data.document.getText('content');
+					if (ytext.length > 0) {
+						ytext.delete(0, ytext.length);
+					}
+				});
 
 				// 2. If no binary state exists, fetch the initial HTML/content using the "create" event
 				const response = await fetch(webhookUrl, {
@@ -480,7 +504,12 @@ const customWebhookExtension = {
 					if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-sample_collection_date') || data.documentName.endsWith('-finalization_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
 						// Seed with plain text
 						const ytext = data.document.getText('content');
-						ytext.insert(0, htmlContent);
+						data.document.transact(() => {
+							if (ytext.length > 0) {
+								ytext.delete(0, ytext.length);
+							}
+							ytext.insert(0, htmlContent);
+						});
 					} else {
 						// Parse HTML into ProseMirror JSON using Tiptap
 						const docJson = generateJSON(htmlContent, extensions);

@@ -281,13 +281,24 @@ class ReportEditorController extends Controller
 
         // SCENARIO A: User opens an editor workspace window (Initialization phase)
         if ($event === 'onConnect') {
-            $clientToken = $payload['requestParameters']['token'] ?? null;
+            $htmlVal = $report->$htmlColumn ?? '';
+            $cleanText = trim(strip_tags(str_replace(['&nbsp;', "\xc2\xa0"], ' ', $htmlVal)));
+            $hasMediaOrTable = (bool) preg_match('/<img|<table/i', $htmlVal);
 
-            // Optional: Implement permission checks here using $clientToken
-            // if (!$clientToken || !secureCheck($clientToken)) return response()->json(['error' => 'Forbidden'], 403);
+            // If the field is empty, purge any stale Yjs binary state and return null document
+            if (empty($cleanText) && ! $hasMediaOrTable && $htmlColumn !== 'report_date') {
+                if ($report->$stateColumn) {
+                    DB::table('specimen_reports')
+                        ->where('id', $reportId)
+                        ->update([$stateColumn => null]);
+                }
+
+                return response()->json([
+                    'document' => null,
+                ]);
+            }
 
             return response()->json([
-                // Read binary block timeline data and hand it off safely encoded
                 'document' => $report->$stateColumn ? $report->$stateColumn : null,
             ]);
         }
@@ -301,19 +312,27 @@ class ReportEditorController extends Controller
 
         // SCENARIO B: Typing pause threshold reached (Background automatic save process)
         if ($event === 'onChange') {
+            $htmlValue = $payload['html'] ?? '';
+            $cleanText = trim(strip_tags(str_replace(['&nbsp;', "\xc2\xa0"], ' ', $htmlValue)));
+            $hasMediaOrTable = (bool) preg_match('/<img|<table/i', $htmlValue);
+
             $updateData = [
-                $stateColumn => $payload['document'] ?? null, // Save raw base64 string directly
                 'updated_at' => now(),
             ];
-
-            $htmlValue = $payload['html'] ?? '';
 
             if ($htmlColumn === 'report_date') {
                 if (! empty($htmlValue) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $htmlValue)) {
                     $updateData[$htmlColumn] = $htmlValue;
+                    $updateData[$stateColumn] = $payload['document'] ?? null;
                 }
             } else {
-                $updateData[$htmlColumn] = $htmlValue;
+                if (empty($cleanText) && ! $hasMediaOrTable) {
+                    $updateData[$htmlColumn] = '';
+                    $updateData[$stateColumn] = null; // Clear binary state so no ghost info persists
+                } else {
+                    $updateData[$htmlColumn] = $htmlValue;
+                    $updateData[$stateColumn] = $payload['document'] ?? null;
+                }
             }
 
             DB::table('specimen_reports')
@@ -694,11 +713,32 @@ class ReportEditorController extends Controller
             return response()->json(['error' => 'Las plantillas seleccionadas no son válidas o no tienes permisos para usarlas.'], 422);
         }
 
-        $concatHtml = function ($templates, $field) {
+        $cleanTemplateHtml = function (string $html): string {
+            if (empty($html)) {
+                return '';
+            }
+
+            // Strip Office comments & XML namespaces
+            $clean = preg_replace('/<!--[\s\S]*?-->/i', '', $html);
+            $clean = preg_replace('/<\/?(o|w|m|v|xml):[^>]*>/i', '', $clean);
+            $clean = preg_replace('/<style[\s\S]*?<\/style>/i', '', $clean);
+            $clean = preg_replace('/<script[\s\S]*?<\/script>/i', '', $clean);
+
+            $textOnly = trim(strip_tags(str_replace(['&nbsp;', "\xc2\xa0"], ' ', $clean)));
+            $hasMediaOrTable = (bool) preg_match('/<img|<table/i', $clean);
+
+            if (empty($textOnly) && ! $hasMediaOrTable) {
+                return '';
+            }
+
+            return trim($clean);
+        };
+
+        $concatHtml = function ($templates, $field) use ($cleanTemplateHtml) {
             $parts = [];
             foreach ($templates as $t) {
-                $content = trim($t->{$field} ?? '');
-                if ($content !== '' && $content !== '<p></p>' && $content !== '<p></p><p></p>') {
+                $content = $cleanTemplateHtml($t->{$field} ?? '');
+                if (! empty($content)) {
                     $parts[] = $content;
                 }
             }
@@ -754,6 +794,11 @@ class ReportEditorController extends Controller
             'yjs_open_text_state' => null,
             'yjs_addendum_state' => null,
         ]);
+
+        if (in_array($specimen->status, ['finalized', 'delivered'])) {
+            $specimen->report->ensureValidationQrCode();
+            app(ReportPdfService::class)->generateAndStoreReport($specimen);
+        }
 
         return response()->json([
             'status' => 'success',
@@ -909,10 +954,15 @@ class ReportEditorController extends Controller
             $specimen->report->update($updateData);
         }
 
+        if (in_array($specimen->status, ['finalized', 'delivered'])) {
+            $specimen->report->ensureValidationQrCode();
+            app(ReportPdfService::class)->generateAndStoreReport($specimen);
+        }
+
         return response()->json([
             'status' => 'success',
             'message' => 'Reporte guardado con éxito.',
-            'report' => $specimen->report,
+            'report' => $specimen->report->fresh(),
         ]);
     }
 
@@ -970,6 +1020,8 @@ class ReportEditorController extends Controller
             ]);
 
             if ($status === 'finalized') {
+                $specimen->report->ensureValidationQrCode();
+
                 app(ReportPdfService::class)->generateAndStoreReport($specimen);
 
                 $this->calculateCommissions($specimen);

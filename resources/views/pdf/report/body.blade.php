@@ -101,6 +101,51 @@
 			font-style: italic;
 		}
 
+        .header-qr-cell {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 20mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            overflow: visible;
+        }
+
+        .qr-instruction-text {
+            font-size: 1.75mm;
+            line-height: 2.2mm;
+            color: #6b7280;
+            text-align: center;
+            margin-bottom: 0.8mm;
+            font-weight: 500;
+        }
+
+        .header-qr-img {
+            width: 20mm;
+            height: 20mm;
+            object-fit: contain;
+            border: none;
+			overflow: visible;
+        }
+
+        .header-qr-placeholder {
+            width: 20mm;
+            height: 20mm;
+            border: 0.4mm dashed #9ca3af;
+            border-radius: 1mm;
+            background-color: #f9fafb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2mm;
+            color: #9ca3af;
+            font-weight: 600;
+            line-height: 20mm;
+            text-align: center;
+        }
+
         .header-code-cell {
             position: absolute;
             right: 0;

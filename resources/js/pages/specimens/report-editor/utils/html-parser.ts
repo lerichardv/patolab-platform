@@ -14,14 +14,9 @@ export function isEmptyHtml(html: string | null | undefined): boolean {
             return false;
         }
 
-        const pCount = (html.match(/<p[^>]*>/gi) || []).length;
-        const brCount = (html.match(/<br\s*\/?>/gi) || []).length;
-        if (brCount > 0 || pCount > 1) {
-            return false;
-        }
-
         const cleanStr = html
             .replace(/<[^>]*>/g, '')
+            .replace(/&nbsp;/gi, ' ')
             .replace(/\u00a0/g, ' ')
             .trim();
 
@@ -36,33 +31,12 @@ export function isEmptyHtml(html: string | null | undefined): boolean {
             return false;
         }
 
-        const childNodes = Array.from(body.childNodes);
-        const significantNodes = childNodes.filter((node) => {
-            if (node.nodeType === Node.TEXT_NODE) {
-                return (node.textContent || '').trim().length > 0;
-            }
-            return true;
-        });
+        const cleanStr = (body.textContent || '')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/\u00a0/g, ' ')
+            .trim();
 
-        if (significantNodes.length === 0) {
-            return true;
-        }
-
-        if (significantNodes.length === 1) {
-            const node = significantNodes[0];
-            if (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'P') {
-                const inner = (node as Element).innerHTML.trim();
-                const isBrOnly = /^<br\b[^>]*>$/i.test(inner);
-                return (
-                    inner === '' ||
-                    isBrOnly ||
-                    inner === '&nbsp;' ||
-                    inner === '\u00a0'
-                );
-            }
-        }
-
-        return false;
+        return cleanStr === '';
     } catch {
         if (html.includes('<img') || html.includes('<table')) {
             return false;
@@ -70,6 +44,7 @@ export function isEmptyHtml(html: string | null | undefined): boolean {
 
         const cleanStr = html
             .replace(/<[^>]*>/g, '')
+            .replace(/&nbsp;/gi, ' ')
             .replace(/\u00a0/g, ' ')
             .trim();
 

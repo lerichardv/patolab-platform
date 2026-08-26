@@ -3,11 +3,24 @@ import React from 'react';
 export interface HeaderProps {
     specimen: {
         sequence_code: string;
+        report?: {
+            report_validation_qr_code?: string | null;
+        } | null;
+        report_validation_qr_code?: string | null;
     };
     pageNum?: number;
 }
 
 export default function Header({ specimen, pageNum }: HeaderProps) {
+    const qrCodePath =
+        specimen.report?.report_validation_qr_code ??
+        specimen.report_validation_qr_code;
+    const qrCodeUrl = qrCodePath
+        ? qrCodePath.startsWith('http') || qrCodePath.startsWith('/')
+            ? qrCodePath
+            : `/storage/${qrCodePath}`
+        : null;
+
     return (
         <div
             style={{
@@ -27,6 +40,69 @@ export default function Header({ specimen, pageNum }: HeaderProps) {
                     marginTop: '-4mm',
                 }}
             >
+                {/* Left Side: Authenticity QR Code / Dashed Square Placeholder */}
+                <div
+                    style={{
+                        position: 'absolute',
+                        left: '0mm',
+                        top: '0mm',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        width: '20mm',
+                        overflow: 'visible',
+                    }}
+                >
+                    <span
+                        style={{
+                            fontSize: '1.75mm',
+                            lineHeight: '2.2mm',
+                            color: '#6b7280',
+                            textAlign: 'center',
+                            marginBottom: '0.8mm',
+                            fontWeight: 500,
+                        }}
+                    >
+                        Escanee para validar la autenticidad del informe
+                    </span>
+                    {qrCodeUrl ? (
+                        <img
+                            src={qrCodeUrl}
+                            alt="QR de Validación"
+                            style={{
+                                width: '20mm',
+                                height: '20mm',
+                                objectFit: 'contain',
+                                border: 'none',
+                                overflow: 'visible',
+                            }}
+                        />
+                    ) : (
+                        <div
+                            style={{
+                                width: '20mm',
+                                height: '20mm',
+                                border: '0.4mm dashed #9ca3af',
+                                borderRadius: '1mm',
+                                backgroundColor: '#f9fafb',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                        >
+                            <span
+                                style={{
+                                    fontSize: '2.2mm',
+                                    color: '#9ca3af',
+                                    fontWeight: 600,
+                                }}
+                            >
+                                QR
+                            </span>
+                        </div>
+                    )}
+                </div>
+
                 <div
                     style={{
                         display: 'flex',
