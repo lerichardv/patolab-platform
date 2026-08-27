@@ -10,18 +10,14 @@ import { Image } from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
-import type { Editor } from '@tiptap/react';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
 import {
     useEditor,
     EditorContent,
     mergeAttributes,
     ReactNodeViewRenderer,
 } from '@tiptap/react';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
-import {
-    cleanPastedHtml,
-    cleanPastedText,
-} from '@/pages/specimens/report-editor/utils/paste-cleaner';
+import type { Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import {
     Bold,
@@ -74,6 +70,10 @@ import {
     handleListAndBlockKeyDown,
 } from '@/pages/specimens/report-editor/components/tiptap-extensions';
 import ImageGridComponent from '@/pages/specimens/report-editor/image-grid-component';
+import {
+    cleanPastedHtml,
+    cleanPastedText,
+} from '@/pages/specimens/report-editor/utils/paste-cleaner';
 
 export const editorStyles = `
   /* ── Base ── */

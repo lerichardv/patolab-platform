@@ -958,9 +958,11 @@ const isBlockEmpty = (node: any) => {
     if (!node || !node.isTextblock) {
         return false;
     }
+
     const text = node.textContent
         .replace(/[\u200b\u200c\u200d\ufeff]/g, '')
         .trim();
+
     return node.content.size === 0 || text === '';
 };
 

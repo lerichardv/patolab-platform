@@ -284,7 +284,9 @@ const getCuttingsSummary = (cuttings?: any[]) => {
 };
 
 const getSpecimenExaminations = (specimen: Specimen) => {
-    if (!specimen) return [];
+    if (!specimen) {
+return [];
+}
 
     const examList: Array<{ id?: number; name: string; code?: string }> = [];
     const seenNames = new Set<string>();
@@ -306,6 +308,7 @@ const getSpecimenExaminations = (specimen: Specimen) => {
                 const examObj = item.examination;
                 const examName =
                     examObj?.name || item.examination_name || item.name;
+
                 if (examName && !seenNames.has(examName)) {
                     seenNames.add(examName);
                     examList.push({
@@ -319,9 +322,11 @@ const getSpecimenExaminations = (specimen: Specimen) => {
     }
 
     const specimenExams = (specimen as any).examinations;
+
     if (Array.isArray(specimenExams) && specimenExams.length > 0) {
         specimenExams.forEach((exam: any) => {
             const name = exam.name;
+
             if (name && !seenNames.has(name)) {
                 seenNames.add(name);
                 examList.push({
@@ -334,10 +339,12 @@ const getSpecimenExaminations = (specimen: Specimen) => {
     }
 
     const specimenExamPivots = (specimen as any).specimen_examinations;
+
     if (Array.isArray(specimenExamPivots) && specimenExamPivots.length > 0) {
         specimenExamPivots.forEach((se: any) => {
             const exam = se.examination || se;
             const name = exam.name;
+
             if (name && !seenNames.has(name)) {
                 seenNames.add(name);
                 examList.push({
@@ -1934,6 +1941,7 @@ export default function MyAssignmentsIndex({
                                                                             getSpecimenExaminations(
                                                                                 specimen,
                                                                             );
+
                                                                         if (
                                                                             exams.length ===
                                                                             0

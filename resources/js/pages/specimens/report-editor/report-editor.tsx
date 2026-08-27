@@ -96,12 +96,12 @@ import {
 import EditorLayout from '@/layouts/editor-layout';
 import { cn } from '@/lib/utils';
 import CustomerSheet from '../../customers/customer-sheet';
+import SpecimenWorkOrdersSheet from '../../my-assignments/specimen-work-orders-sheet';
+import WorkOrderSheet from '../../my-work-orders/work-order-sheet';
 import ReferrerSheet from '../../referrers/referrer-sheet';
 import SpecimenPathologistSheet from '../specimen-pathologist-sheet';
 import SpecimenSheet from '../specimen-sheet';
 import SpecimenViewSheet from '../specimen-view-sheet';
-import SpecimenWorkOrdersSheet from '../../my-assignments/specimen-work-orders-sheet';
-import WorkOrderSheet from '../../my-work-orders/work-order-sheet';
 import {
     applyReportTemplate,
     notifyCollaborationRefreshInsumos,
@@ -123,6 +123,7 @@ import {
     CustomBulletList,
     sharedExtensions,
 } from './components/tiptap-extensions';
+import { UnsavedChangesDialog } from './components/unsaved-changes-dialog';
 import ManageCuttingsSheet from './cuttings/manage-cuttings-sheet';
 import {
     useFinalizeReport,
@@ -144,9 +145,9 @@ import {
     OpenTextEditor,
     ProtocolsEditor,
 } from './rich-text-editors';
+import { ReportPaginator } from './services';
 import SpecimenInsumosCard from './specimen-insumos-card';
 import { EditorToolbar } from './toolbar';
-import { ReportPaginator } from './services';
 import type {
     MeasuredBlock,
     ReportEditorProps as Props,
@@ -551,15 +552,25 @@ export default function ReportWorkspace({
     const [sessionEditingEnabled, setSessionEditingEnabled] = useState(false);
 
     const [isManualSaving, setIsManualSaving] = useState(false);
-    const [isSavedRecently, setIsSavedRecently] = useState(false);
-    const [isAutosaving, setIsAutosaving] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(new Date());
     const [timeString, setTimeString] = useState('Justo ahora');
 
     const hasMounted = useRef(false);
-    const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    const isDirtyRef = useRef(false);
+    const httpFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
         null,
     );
+    const isTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+        null,
+    );
+    // Always points to the latest handleManualSave — safe to call from closures
+    const handleManualSaveRef = useRef<() => void>(() => {});
+
+    // Navigation guard state: shadcn dialog shown when user navigates away with unsaved changes
+    const [showNavGuard, setShowNavGuard] = useState(false);
+    const [isSavingForNav, setIsSavingForNav] = useState(false);
+    const pendingNavigationRef = useRef<(() => void) | null>(null);
 
     const [pages, setPages] = useState<MeasuredBlock[][]>([]);
     const useIsomorphicLayoutEffect =
@@ -635,7 +646,9 @@ export default function ReportWorkspace({
         };
     }, []);
 
-    // Detect typing activity and trigger autosave feedback
+    // Fix 1 & 2: Track typing and trigger HTTP fallback autosave.
+    // This replaces the old cosmetic timer that showed "Guardado!" without actually saving.
+    // The real save status is driven exclusively by the save-status Yjs room (handleSaveYjsChange).
     useEffect(() => {
         if (!hasMounted.current) {
             hasMounted.current = true;
@@ -643,25 +656,33 @@ export default function ReportWorkspace({
             return;
         }
 
-        setIsAutosaving(true);
-        setIsSavedRecently(false);
+        isDirtyRef.current = true;
+        setIsTyping(true);
 
-        if (autosaveTimeoutRef.current) {
-            clearTimeout(autosaveTimeoutRef.current);
+        if (isTypingTimeoutRef.current) {
+            clearTimeout(isTypingTimeoutRef.current);
         }
 
-        autosaveTimeoutRef.current = setTimeout(() => {
-            setIsAutosaving(false);
-            setLastSaved(new Date());
-            setIsSavedRecently(true);
-            setTimeout(() => {
-                setIsSavedRecently(false);
-            }, 1300);
-        }, 1000);
+        isTypingTimeoutRef.current = setTimeout(() => setIsTyping(false), 1500);
+
+        if (httpFallbackTimerRef.current) {
+            clearTimeout(httpFallbackTimerRef.current);
+        }
+
+        // HTTP fallback: if WebSocket hasn't confirmed a save within 5s, save directly via HTTP
+        httpFallbackTimerRef.current = setTimeout(() => {
+            if (isDirtyRef.current) {
+                handleManualSaveRef.current();
+            }
+        }, 5000);
 
         return () => {
-            if (autosaveTimeoutRef.current) {
-                clearTimeout(autosaveTimeoutRef.current);
+            if (httpFallbackTimerRef.current) {
+                clearTimeout(httpFallbackTimerRef.current);
+            }
+
+            if (isTypingTimeoutRef.current) {
+                clearTimeout(isTypingTimeoutRef.current);
             }
         };
     }, [
@@ -730,17 +751,6 @@ export default function ReportWorkspace({
         return () => clearInterval(interval);
     }, [lastSaved]);
 
-    const uint8ToBase64 = (arr: Uint8Array): string => {
-        let binary = '';
-        const len = arr.byteLength;
-
-        for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(arr[i]);
-        }
-
-        return window.btoa(binary);
-    };
-
     const [dateDoc, setDateDoc] = useState<Y.Doc | null>(null);
     const [dateProvider, setDateProvider] = useState<HocuspocusProvider | null>(
         null,
@@ -806,7 +816,7 @@ export default function ReportWorkspace({
     const [headingsTogglesProvider, setHeadingsTogglesProvider] =
         useState<HocuspocusProvider | null>(null);
     const [globalSaveState, setGlobalSaveState] = useState<
-        'idle' | 'saving' | 'saved'
+        'idle' | 'saving' | 'saved' | 'error'
     >('idle');
 
     const lastTemplateAppliedTime = useRef<number>(0);
@@ -1002,6 +1012,40 @@ export default function ReportWorkspace({
         finalizationDateRef.current = finalizationDate;
     }, [finalizationDate]);
 
+    /**
+     * Core async save — builds the payload and persists to the server.
+     * Returns a Promise that resolves on success and rejects on failure.
+     * Does NOT update the Yjs status room or show toasts; callers handle those.
+     */
+    const saveReportEditorAsync = (): Promise<void> => {
+        return saveReportEditor(specimen.sequence_code, {
+            report_date: reportDate,
+            sample_collection_date: sampleCollectionDate,
+            finalization_date: finalizationDate,
+            macroscopy_html: macroscopyHtml,
+            microscopy_html: microscopyHtml,
+            diagnosis_html: diagnosisHtml,
+            clinical_details_html: clinicalDetailsHtml,
+            comments_notes_html: commentsNotesHtml,
+            protocols_html: protocolsHtml,
+            legend_html: legendHtml,
+            open_text_html: openTextHtml,
+            open_text_label: openTextLabel,
+            addendum_html: addendumHtml,
+            sections_order: sectionsOrder,
+            headings_toggles: headingsToggles,
+        }).then(() => {
+            isDirtyRef.current = false;
+
+            if (httpFallbackTimerRef.current) {
+                clearTimeout(httpFallbackTimerRef.current);
+                httpFallbackTimerRef.current = null;
+            }
+
+            setLastSaved(new Date());
+        });
+    };
+
     const handleManualSave = () => {
         if (saveStatusDoc) {
             const ytext = saveStatusDoc.getText('content');
@@ -1013,53 +1057,7 @@ export default function ReportWorkspace({
             setIsManualSaving(true);
         }
 
-        const macroscopyBase64 = macroscopyDoc
-            ? uint8ToBase64(Y.encodeStateAsUpdate(macroscopyDoc))
-            : null;
-        const microscopyBase64 = microscopyDoc
-            ? uint8ToBase64(Y.encodeStateAsUpdate(microscopyDoc))
-            : null;
-        const diagnosisBase64 = diagnosisDoc
-            ? uint8ToBase64(Y.encodeStateAsUpdate(diagnosisDoc))
-            : null;
-        const clinicalDetailsBase64 = clinicalDetailsDoc
-            ? uint8ToBase64(Y.encodeStateAsUpdate(clinicalDetailsDoc))
-            : null;
-        const commentsNotesBase64 = commentsNotesDoc
-            ? uint8ToBase64(Y.encodeStateAsUpdate(commentsNotesDoc))
-            : null;
-        const protocolsBase64 = protocolsDoc
-            ? uint8ToBase64(Y.encodeStateAsUpdate(protocolsDoc))
-            : null;
-        const legendBase64 = legendDoc
-            ? uint8ToBase64(Y.encodeStateAsUpdate(legendDoc))
-            : null;
-        const dateBase64 = dateDoc
-            ? uint8ToBase64(Y.encodeStateAsUpdate(dateDoc))
-            : null;
-
-        saveReportEditor(specimen.sequence_code, {
-            report_date: reportDate,
-            sample_collection_date: sampleCollectionDate,
-            finalization_date: finalizationDate,
-            macroscopy_html: macroscopyHtml,
-            microscopy_html: microscopyHtml,
-            diagnosis_html: diagnosisHtml,
-            clinical_details_html: clinicalDetailsHtml,
-            comments_notes_html: commentsNotesHtml,
-            protocols_html: protocolsHtml,
-            legend_html: legendHtml,
-            yjs_macroscopy_state: macroscopyBase64,
-            yjs_microscopy_state: microscopyBase64,
-            yjs_diagnosis_state: diagnosisBase64,
-            yjs_clinical_details_state: clinicalDetailsBase64,
-            yjs_comments_notes_state: commentsNotesBase64,
-            yjs_protocols_state: protocolsBase64,
-            yjs_legend_state: legendBase64,
-            yjs_report_date_state: dateBase64,
-            sections_order: sectionsOrder,
-            headings_toggles: headingsToggles,
-        })
+        saveReportEditorAsync()
             .then(() => {
                 if (saveStatusDoc) {
                     const ytext = saveStatusDoc.getText('content');
@@ -1072,12 +1070,6 @@ export default function ReportWorkspace({
                             ytext.delete(0, ytext.length);
                             ytext.insert(0, 'idle');
                         });
-                    }, 1300);
-                } else {
-                    setLastSaved(new Date());
-                    setIsSavedRecently(true);
-                    setTimeout(() => {
-                        setIsSavedRecently(false);
                     }, 1300);
                 }
 
@@ -1094,14 +1086,19 @@ export default function ReportWorkspace({
                     const ytext = saveStatusDoc.getText('content');
                     saveStatusDoc.transact(() => {
                         ytext.delete(0, ytext.length);
-                        ytext.insert(0, 'idle');
+                        ytext.insert(0, 'error');
                     });
+                } else {
+                    setGlobalSaveState('error');
                 }
             })
             .finally(() => {
                 setIsManualSaving(false);
             });
     };
+
+    // Always keep the ref current so closures (beforeunload, HTTP fallback timer) use the latest version
+    handleManualSaveRef.current = handleManualSave;
 
     useEffect(() => {
         if (!report) {
@@ -1342,6 +1339,15 @@ export default function ReportWorkspace({
             } else if (val === 'saved') {
                 setGlobalSaveState('saved');
                 setLastSaved(new Date());
+                // WebSocket save confirmed — cancel HTTP fallback, clear dirty flag
+                isDirtyRef.current = false;
+
+                if (httpFallbackTimerRef.current) {
+                    clearTimeout(httpFallbackTimerRef.current);
+                    httpFallbackTimerRef.current = null;
+                }
+            } else if (val === 'error') {
+                setGlobalSaveState('error');
             } else {
                 setGlobalSaveState('idle');
             }
@@ -1567,6 +1573,63 @@ export default function ReportWorkspace({
         };
     }, [report?.id]);
 
+    // Fix 5: Warn user on accidental navigation while there are unsaved changes.
+    // Also fires a best-effort save so data is not lost on tab close.
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (!isDirtyRef.current) {
+                return;
+            }
+
+            // Best-effort save — may not complete if browser closes immediately
+            handleManualSaveRef.current();
+
+            e.preventDefault();
+            e.returnValue = '';
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () =>
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, []);
+
+    // In-app navigation guard: intercept Inertia router visits while there are unsaved changes.
+    // (For actual browser close/F5, the native beforeunload dialog above is used.)
+    useEffect(() => {
+        const removeListener = router.on('before', (event: any) => {
+            if (!isDirtyRef.current) {
+                return;
+            }
+
+            const visit = event.detail?.visit;
+
+            // Skip partial data-only reloads (collaboration refresh, post-save reload, etc.)
+            const isPartialReload =
+                Array.isArray(visit?.only) && visit.only.length > 0;
+
+            if (isPartialReload) {
+                return;
+            }
+
+            // Cancel the Inertia navigation and show the guard dialog
+            event.preventDefault();
+
+            pendingNavigationRef.current = () => {
+                router.visit(visit?.url ?? window.location.href, {
+                    method: visit?.method ?? 'get',
+                    data: visit?.data,
+                    preserveState: false,
+                    preserveScroll: false,
+                });
+            };
+
+            setShowNavGuard(true);
+        });
+
+        return removeListener;
+    }, []);
+
     const [statusDoc, setStatusDoc] = useState<Y.Doc | null>(null);
     const [statusProvider, setStatusProvider] =
         useState<HocuspocusProvider | null>(null);
@@ -1670,6 +1733,7 @@ export default function ReportWorkspace({
         ) {
             specimen.examinations.forEach((e: any) => {
                 const name = e.name;
+
                 if (name && !seen.has(name)) {
                     seen.add(name);
                     list.push({ id: e.id, name });
@@ -1684,6 +1748,7 @@ export default function ReportWorkspace({
             specimen.specimen_examinations.forEach((se: any) => {
                 const exam = se.examination || se;
                 const name = exam.name;
+
                 if (name && !seen.has(name)) {
                     seen.add(name);
                     list.push({ id: exam.id || se.examination_id, name });
@@ -1698,6 +1763,7 @@ export default function ReportWorkspace({
             specimen.specimenExaminations.forEach((se: any) => {
                 const exam = se.examination || se;
                 const name = exam.name;
+
                 if (name && !seen.has(name)) {
                     seen.add(name);
                     list.push({ id: exam.id || se.examination_id, name });
@@ -1840,6 +1906,7 @@ export default function ReportWorkspace({
         specimenSequenceCode: specimen.sequence_code,
         onUpdateFinalizationDate: handleUpdateFinalizationDate,
         onTransitionState: handleTransitionState,
+        onBeforeSave: saveReportEditorAsync,
     });
 
     // Loader for 300ms
@@ -1912,19 +1979,25 @@ export default function ReportWorkspace({
                                             Guardando...
                                         </span>
                                     </>
-                                ) : isAutosaving ? (
+                                ) : isTyping ? (
                                     <>
                                         <div className="h-2 w-2 animate-pulse rounded-full bg-indigo-500" />
                                         <span className="animate-pulse font-medium text-indigo-600 dark:text-indigo-500">
                                             Escribiendo...
                                         </span>
                                     </>
-                                ) : globalSaveState === 'saved' ||
-                                  isSavedRecently ? (
+                                ) : globalSaveState === 'saved' ? (
                                     <>
                                         <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
                                         <span className="font-medium text-emerald-600 dark:text-emerald-500">
                                             ¡Guardado!
+                                        </span>
+                                    </>
+                                ) : globalSaveState === 'error' ? (
+                                    <>
+                                        <div className="h-2 w-2 rounded-full bg-red-500" />
+                                        <span className="font-medium text-red-600 dark:text-red-500">
+                                            Error al guardar
                                         </span>
                                     </>
                                 ) : (
@@ -1941,19 +2014,17 @@ export default function ReportWorkspace({
                                 onClick={handleManualSave}
                                 disabled={
                                     globalSaveState === 'saving' ||
-                                    globalSaveState === 'saved' ||
-                                    isSavedRecently ||
-                                    isAutosaving
+                                    isManualSaving
                                 }
                                 className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-emerald-600 px-5 py-2 text-sm font-medium whitespace-nowrap text-white shadow-xs transition-[color,box-shadow] outline-none hover:bg-emerald-600/90 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 has-[>svg]:px-3 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:w-auto dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
                             >
-                                {globalSaveState === 'saving' ? (
+                                {globalSaveState === 'saving' ||
+                                isManualSaving ? (
                                     <>
                                         <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                                         Guardando...
                                     </>
-                                ) : globalSaveState === 'saved' ||
-                                  isSavedRecently ? (
+                                ) : globalSaveState === 'saved' ? (
                                     <>
                                         <Check className="mr-1 h-4 w-4 text-white" />
                                         ¡Guardado!
@@ -3075,6 +3146,7 @@ export default function ReportWorkspace({
                             totalPages={totalPages}
                             renderPreviewPage={renderPreviewPage}
                             pages={pages}
+                            onBeforeDownload={saveReportEditorAsync}
                         />
                     </div>
 
@@ -3180,6 +3252,40 @@ export default function ReportWorkspace({
                         open={showSignatureWarning}
                         onOpenChange={setShowSignatureWarning}
                         unsignedPathologists={unsignedPathologists}
+                    />
+
+                    {/* Navigation guard: prompts to save before leaving with unsaved changes */}
+                    <UnsavedChangesDialog
+                        open={showNavGuard}
+                        isSaving={isSavingForNav}
+                        onCancel={() => {
+                            setShowNavGuard(false);
+                            pendingNavigationRef.current = null;
+                        }}
+                        onLeave={() => {
+                            isDirtyRef.current = false;
+                            setShowNavGuard(false);
+                            pendingNavigationRef.current?.();
+                            pendingNavigationRef.current = null;
+                        }}
+                        onSaveAndLeave={async () => {
+                            setIsSavingForNav(true);
+
+                            try {
+                                await saveReportEditorAsync();
+                                toast.success('Reporte guardado con éxito');
+                            } catch (err: any) {
+                                toast.error(
+                                    err.message ||
+                                        'Error al guardar el reporte',
+                                );
+                            } finally {
+                                setIsSavingForNav(false);
+                                setShowNavGuard(false);
+                                pendingNavigationRef.current?.();
+                                pendingNavigationRef.current = null;
+                            }
+                        }}
                     />
 
                     <CompleteMicroscopyDialog

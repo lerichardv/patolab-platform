@@ -705,6 +705,7 @@ export default function CreditViewSheet({ credit, open, onOpenChange }: Props) {
                                                                         spec,
                                                                         [item],
                                                                     );
+
                                                                 if (
                                                                     exams.length ===
                                                                     0

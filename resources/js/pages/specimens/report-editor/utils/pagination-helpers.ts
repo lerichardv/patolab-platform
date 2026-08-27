@@ -30,16 +30,19 @@ export function parseColumnPercentages(
             const styleWidthMatch = colHtml.match(
                 /style=["'][^"']*width:\s*([\d.]+)(px|%)?[^"']*["']/i,
             );
+
             if (styleWidthMatch) {
                 width = parseFloat(styleWidthMatch[1]);
             } else {
                 const widthAttrMatch = colHtml.match(
                     /width=["']([\d.]+)%?["']/i,
                 );
+
                 if (widthAttrMatch) {
                     width = parseFloat(widthAttrMatch[1]);
                 }
             }
+
             colWidths.push(width);
         }
     }
@@ -47,9 +50,11 @@ export function parseColumnPercentages(
     while (colWidths.length < colCount) {
         colWidths.push(null);
     }
+
     const finalColWidths = colWidths.slice(0, colCount);
 
     const hasExplicitWidth = finalColWidths.some((w) => w !== null && w > 0);
+
     if (!hasExplicitWidth) {
         return Array(colCount).fill(100.0 / colCount);
     }
@@ -193,6 +198,7 @@ export function paginateTable(
         let maxCellTextLen = 0;
 
         let cellIndex = 0;
+
         while ((cellMatch = cellRegex.exec(trHtml)) !== null) {
             const cellTagHtml = cellMatch[0];
             const cellInner = cellMatch[1];
@@ -201,9 +207,11 @@ export function paginateTable(
             const colSpan = colspanMatch ? parseInt(colspanMatch[1], 10) : 1;
 
             let colPct = 0;
+
             for (let c = 0; c < colSpan; c++) {
                 colPct += colPcts[cellIndex + c] || 0;
             }
+
             if (colPct <= 0) {
                 colPct = 100.0 / Math.max(1, colCount);
             }

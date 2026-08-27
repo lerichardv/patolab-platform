@@ -25,6 +25,7 @@ export class TextCaseTransformer {
 
         // 1. Resolve selected ranges (handle CellSelection vs standard TextSelection)
         const ranges: Array<{ from: number; to: number }> = [];
+
         if (typeof (selection as any).forEachCell === 'function') {
             (selection as any).forEachCell((cellNode: any, cellPos: number) => {
                 ranges.push({
@@ -54,11 +55,13 @@ export class TextCaseTransformer {
                 range.to,
                 '\n',
             );
+
             if (!originalText) {
                 return;
             }
 
             let transformedText = '';
+
             if (type === 'uppercase') {
                 transformedText = originalText.toUpperCase();
             } else if (type === 'lowercase') {
@@ -90,6 +93,7 @@ export class TextCaseTransformer {
                         const nodeText = node.text || '';
 
                         let transformedSlice = '';
+
                         for (
                             let offset = localStart;
                             offset < localEnd;
@@ -121,6 +125,7 @@ export class TextCaseTransformer {
                         });
                     }
                 }
+
                 return true;
             });
         });
@@ -141,6 +146,7 @@ export class TextCaseTransformer {
         // Dispatch transaction
         if (tr.docChanged) {
             view.dispatch(tr);
+
             return true;
         }
 

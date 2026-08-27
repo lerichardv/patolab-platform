@@ -226,7 +226,10 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
 
         rawList.forEach((item) => {
             const specId = item.specimen_id;
-            if (!specId) return;
+
+            if (!specId) {
+return;
+}
 
             const unitPrice = parseFloat(String(item.amount || '0'));
             const unitDiscount = parseFloat(String(item.discount || '0'));
@@ -256,6 +259,7 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
                 existing.discount += unitDiscount;
                 existing.total += itemTotal;
                 existing.items.push(item);
+
                 if (!existing.specimen && item.specimen) {
                     existing.specimen = item.specimen;
                 }

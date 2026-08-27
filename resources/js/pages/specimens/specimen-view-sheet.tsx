@@ -123,7 +123,9 @@ export default function SpecimenViewSheet({
     const credit = invoice?.credit_relation || invoice?.creditRelation;
 
     const specimenExaminations = useMemo(() => {
-        if (!specimen) return [];
+        if (!specimen) {
+return [];
+}
 
         const examList: Array<{ id?: number; name: string; code?: string }> =
             [];
@@ -142,6 +144,7 @@ export default function SpecimenViewSheet({
                     const examObj = item.examination;
                     const examName =
                         examObj?.name || item.examination_name || item.name;
+
                     if (examName && !seenNames.has(examName)) {
                         seenNames.add(examName);
                         examList.push({
@@ -160,6 +163,7 @@ export default function SpecimenViewSheet({
         ) {
             specimen.examinations.forEach((exam: any) => {
                 const name = exam.name;
+
                 if (name && !seenNames.has(name)) {
                     seenNames.add(name);
                     examList.push({
@@ -178,6 +182,7 @@ export default function SpecimenViewSheet({
             specimen.specimen_examinations.forEach((se: any) => {
                 const exam = se.examination || se;
                 const name = exam.name;
+
                 if (name && !seenNames.has(name)) {
                     seenNames.add(name);
                     examList.push({
