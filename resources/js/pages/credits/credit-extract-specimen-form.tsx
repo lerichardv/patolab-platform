@@ -202,8 +202,8 @@ export default function CreditExtractSpecimenForm({
             const specId = item.specimen_id;
 
             if (!specId) {
-return;
-}
+                return;
+            }
 
             const unitPrice = parseFloat(String(item.amount || '0'));
             const unitDiscount = parseFloat(String(item.discount || '0'));

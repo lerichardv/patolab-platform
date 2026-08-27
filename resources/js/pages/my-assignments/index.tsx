@@ -285,8 +285,8 @@ const getCuttingsSummary = (cuttings?: any[]) => {
 
 const getSpecimenExaminations = (specimen: Specimen) => {
     if (!specimen) {
-return [];
-}
+        return [];
+    }
 
     const examList: Array<{ id?: number; name: string; code?: string }> = [];
     const seenNames = new Set<string>();

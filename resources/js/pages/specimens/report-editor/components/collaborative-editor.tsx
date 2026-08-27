@@ -184,9 +184,11 @@ function CollaborativeEditorInner({
             },
         },
         onUpdate({ editor }) {
-            setTimeout(() => {
-                onUpdateRef.current?.(editor.getHTML());
-            }, 0);
+            if (provider?.isSynced) {
+                setTimeout(() => {
+                    onUpdateRef.current?.(editor.getHTML());
+                }, 0);
+            }
 
             const isDictating = editor.extensionManager.extensions.find(
                 (ext) => ext.name === 'dictationCursor',
