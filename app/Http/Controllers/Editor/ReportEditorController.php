@@ -827,7 +827,7 @@ class ReportEditorController extends Controller
             'protocols_html' => 'nullable|string',
             'legend_html' => 'nullable|string',
             'open_text_html' => 'nullable|string',
-            'open_text_label' => 'nullable|string',
+            'open_text_label' => 'nullable|string|max:255',
             'addendum_html' => 'nullable|string',
             'sections_order' => 'nullable|array',
             'sections_order.*.key' => 'required|string',
