@@ -124,8 +124,8 @@ export default function SpecimenViewSheet({
 
     const specimenExaminations = useMemo(() => {
         if (!specimen) {
-return [];
-}
+            return [];
+        }
 
         const examList: Array<{ id?: number; name: string; code?: string }> =
             [];

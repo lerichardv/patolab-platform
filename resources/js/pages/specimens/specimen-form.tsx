@@ -453,8 +453,8 @@ export default function SpecimenForm({
             : '',
         selected_examination_ids: (() => {
             if (!specimen) {
-return [] as string[];
-}
+                return [] as string[];
+            }
 
             const ids = new Set<string>();
 
@@ -464,8 +464,8 @@ return [] as string[];
             ) {
                 specimen.examinations.forEach((e: any) => {
                     if (e?.id) {
-ids.add(String(e.id));
-}
+                        ids.add(String(e.id));
+                    }
                 });
             }
 
@@ -477,8 +477,8 @@ ids.add(String(e.id));
                     const id = se.examination_id || se.id || se.examination?.id;
 
                     if (id) {
-ids.add(String(id));
-}
+                        ids.add(String(id));
+                    }
                 });
             }
 
@@ -490,8 +490,8 @@ ids.add(String(id));
                     const id = se.examination_id || se.id || se.examination?.id;
 
                     if (id) {
-ids.add(String(id));
-}
+                        ids.add(String(id));
+                    }
                 });
             }
 
@@ -507,8 +507,8 @@ ids.add(String(id));
                         const id = item.examination_id || item.examination?.id;
 
                         if (id) {
-ids.add(String(id));
-}
+                            ids.add(String(id));
+                        }
                     }
                 });
             }
@@ -640,8 +640,8 @@ ids.add(String(id));
 
     const specimenInvoice = React.useMemo(() => {
         if (!specimen) {
-return null;
-}
+            return null;
+        }
 
         return (
             specimen.invoice_relation ||
@@ -670,8 +670,8 @@ return null;
         ) {
             specimen.examinations.forEach((e: any) => {
                 if (e?.id) {
-ids.add(String(e.id));
-}
+                    ids.add(String(e.id));
+                }
             });
         }
 
@@ -683,8 +683,8 @@ ids.add(String(e.id));
                 const id = se.examination_id || se.id || se.examination?.id;
 
                 if (id) {
-ids.add(String(id));
-}
+                    ids.add(String(id));
+                }
             });
         }
 
@@ -696,8 +696,8 @@ ids.add(String(id));
                 const id = se.examination_id || se.id || se.examination?.id;
 
                 if (id) {
-ids.add(String(id));
-}
+                    ids.add(String(id));
+                }
             });
         }
 
@@ -713,8 +713,8 @@ ids.add(String(id));
                     const id = item.examination_id || item.examination?.id;
 
                     if (id) {
-ids.add(String(id));
-}
+                        ids.add(String(id));
+                    }
                 }
             });
         }

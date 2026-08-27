@@ -7,7 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('specimen report ignores html and blob columns when logging audits on create and update', function () {
+test('specimen report audits html columns but ignores blob columns when logging audits on create and update', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -28,12 +28,24 @@ test('specimen report ignores html and blob columns when logging audits on creat
         ->where('action', 'create')
         ->exists())->toBeTrue();
 
-    // Check that html and yjs/blob columns are NOT audited on create
-    $ignoredColumns = [
+    // Check that html columns are audited on create
+    $htmlColumns = [
         'macroscopy_html',
         'microscopy_html',
         'diagnosis_html',
         'clinical_details_html',
+    ];
+
+    foreach ($htmlColumns as $column) {
+        expect(AuditLog::where('table', 'specimen_reports')
+            ->where('row_id', $report->id)
+            ->where('column', $column)
+            ->where('action', 'create')
+            ->exists())->toBeTrue();
+    }
+
+    // Check that yjs/blob columns are NOT audited on create
+    $ignoredColumns = [
         'yjs_macroscopy_state',
         'yjs_microscopy_state',
     ];
@@ -59,14 +71,16 @@ test('specimen report ignores html and blob columns when logging audits on creat
         ->where('action', 'update')
         ->exists())->toBeTrue();
 
-    // Updated html fields must NOT be audited
+    // Updated html fields must be audited
     expect(AuditLog::where('table', 'specimen_reports')
         ->where('row_id', $report->id)
         ->where('column', 'macroscopy_html')
-        ->exists())->toBeFalse();
+        ->where('action', 'update')
+        ->exists())->toBeTrue();
 
     expect(AuditLog::where('table', 'specimen_reports')
         ->where('row_id', $report->id)
         ->where('column', 'diagnosis_html')
-        ->exists())->toBeFalse();
+        ->where('action', 'update')
+        ->exists())->toBeTrue();
 });

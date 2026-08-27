@@ -1,10 +1,5 @@
-import {
-    DragDropContext,
-    Droppable,
-    Draggable
-    
-} from '@hello-pangea/dnd';
-import type {DropResult} from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import type { DropResult } from '@hello-pangea/dnd';
 import { Head, router } from '@inertiajs/react';
 import {
     Check,
@@ -67,8 +62,8 @@ export function BlankReportScreen({
     // Map selected IDs to template objects in the user-specified order
     const orderedTemplates = useMemo(() => {
         if (!templates || templates.length === 0) {
-return [];
-}
+            return [];
+        }
 
         const templateMap = new Map(templates.map((t) => [String(t.id), t]));
 
@@ -95,8 +90,8 @@ return [];
 
     const handleDragEnd = (result: DropResult) => {
         if (!result.destination) {
-return;
-}
+            return;
+        }
 
         const items = Array.from(selectedTemplateIds);
         const [reorderedItem] = items.splice(result.source.index, 1);
