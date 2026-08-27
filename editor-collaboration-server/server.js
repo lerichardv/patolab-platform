@@ -14,7 +14,7 @@ import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
-import { generateJSON, generateHTML } from '@tiptap/html';
+import { generateJSON, generateHTML } from '@tiptap/html/server';
 import StarterKit from '@tiptap/starter-kit';
 import cors from 'cors';
 import crossws from 'crossws/adapters/node';
@@ -426,6 +426,18 @@ const updateSaveStatus = (instance, reportId, status) => {
 	}
 };
 
+const isPlainTextField = (documentName) => {
+	return documentName.endsWith('-report_date') ||
+		documentName.endsWith('-sample_collection_date') ||
+		documentName.endsWith('-finalization_date') ||
+		documentName.endsWith('-status') ||
+		documentName.endsWith('-save-status') ||
+		documentName.endsWith('-sections_order') ||
+		documentName.endsWith('-open_text_label') ||
+		documentName.endsWith('-headings_toggles') ||
+		documentName.endsWith('-insumos');
+};
+
 // Custom Webhook extension
 const customWebhookExtension = {
 	async onConnect(data) {
@@ -473,9 +485,9 @@ const customWebhookExtension = {
 				const binaryState = Buffer.from(savedStateBase64, 'base64');
 				Y.applyUpdate(data.document, binaryState);
 
-				if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-sample_collection_date') || data.documentName.endsWith('-finalization_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
+				if (isPlainTextField(data.documentName)) {
 					const text = data.document.getText('content').toString();
- 
+
 					if (text && text.trim() !== '') {
 						isLoaded = true;
 					}
@@ -498,29 +510,24 @@ const customWebhookExtension = {
 			}
 
 			if (!isLoaded) {
-			// Determine the correct Yjs shared type for this document.
-			// IMPORTANT: In Yjs, a name can only be registered with ONE constructor.
-			// Calling both getXmlFragment('content') and getText('content') on the
-			// same Y.Doc crashes with "Type with the name content has already been
-			// defined with a different constructor".
-			const isPlainTextField = data.documentName.endsWith('-report_date') || data.documentName.endsWith('-sample_collection_date') || data.documentName.endsWith('-finalization_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles') || data.documentName.endsWith('-insumos');
+				const isPlainText = isPlainTextField(data.documentName);
 
-			// Clear any previous content to ensure clean slate
-			data.document.transact(() => {
-				if (isPlainTextField) {
-					const ytext = data.document.getText('content');
+				// Clear any previous content to ensure clean slate
+				data.document.transact(() => {
+					if (isPlainText) {
+						const ytext = data.document.getText('content');
 
-					if (ytext.length > 0) {
-						ytext.delete(0, ytext.length);
+						if (ytext.length > 0) {
+							ytext.delete(0, ytext.length);
+						}
+					} else {
+						const yxml = data.document.getXmlFragment('content');
+
+						if (yxml.length > 0) {
+							yxml.delete(0, yxml.length);
+						}
 					}
-				} else {
-					const yxml = data.document.getXmlFragment('content');
-
-					if (yxml.length > 0) {
-						yxml.delete(0, yxml.length);
-					}
-				}
-			});
+				});
 
 				// 2. If no binary state exists, fetch the initial HTML/content using the "create" event
 				const response = await fetch(webhookUrl, {
@@ -548,7 +555,7 @@ const customWebhookExtension = {
 				if (htmlContent) {
 					console.log(`[webhook:onLoadDocument] Seeding document with initial content`);
 
-					if (data.documentName.endsWith('-report_date') || data.documentName.endsWith('-sample_collection_date') || data.documentName.endsWith('-finalization_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles')) {
+					if (isPlainText) {
 						// Seed with plain text
 						const ytext = data.document.getText('content');
 						data.document.transact(() => {
@@ -563,8 +570,9 @@ const customWebhookExtension = {
 						const docJson = generateJSON(htmlContent, extensions);
 						// Convert ProseMirror JSON to Yjs Ydoc update
 						const initialYdoc = TiptapTransformer.toYdoc(docJson, 'content', extensions);
-						// Merge it into the document
-						data.document.merge(initialYdoc);
+						// Merge it into the document via Y.applyUpdate
+						const update = Y.encodeStateAsUpdate(initialYdoc);
+						Y.applyUpdate(data.document, update);
 					}
 				} else {
 					console.log(`[webhook:onLoadDocument] Document starts empty`);
@@ -594,13 +602,7 @@ const customWebhookExtension = {
 			let rawText = '';
 			let htmlValue = '';
 
-			if (data.documentName.endsWith('-report_date') || 
-				data.documentName.endsWith('-sample_collection_date') || 
-				data.documentName.endsWith('-finalization_date') || 
-				data.documentName.endsWith('-status') || 
-				data.documentName.endsWith('-sections_order') || 
-				data.documentName.endsWith('-open_text_label') || 
-				data.documentName.endsWith('-headings_toggles')) {
+			if (isPlainTextField(data.documentName)) {
 				rawText = data.document.getText('content').toString();
 				htmlValue = rawText;
 			} else {
