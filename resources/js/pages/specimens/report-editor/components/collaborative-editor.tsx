@@ -127,6 +127,7 @@ function CollaborativeEditorInner({
     onBlurRef.current = onBlur;
     const onUpdateRef = useRef(onUpdate);
     onUpdateRef.current = onUpdate;
+    const hasSeededRef = useRef(false);
 
     const editor = useEditor({
         extensions: [
@@ -184,7 +185,7 @@ function CollaborativeEditorInner({
             },
         },
         onUpdate({ editor }) {
-            if (provider?.isSynced) {
+            if (provider?.isSynced && hasSeededRef.current) {
                 setTimeout(() => {
                     onUpdateRef.current?.(editor.getHTML());
                 }, 0);
@@ -282,6 +283,33 @@ function CollaborativeEditorInner({
             }
 
             setTimeout(() => {
+                const currentHtml = editor.getHTML();
+                const cleanText = editor.getText().trim();
+                const hasMediaOrTable = /<img|<table/i.test(currentHtml);
+                const isEmpty = cleanText === '' && !hasMediaOrTable;
+
+                if (isEmpty && initialContent) {
+                    const initialCleanText = initialContent
+                        .replace(/<[^>]*>/g, '')
+                        .replace(/&nbsp;/gi, ' ')
+                        .trim();
+                    const initialHasMediaOrTable = /<img|<table/i.test(
+                        initialContent,
+                    );
+
+                    if (initialCleanText !== '' || initialHasMediaOrTable) {
+                        console.log(
+                            `[CollaborativeEditor] Seeding empty editor with initialContent for ${field}:`,
+                            initialContent,
+                        );
+                        editor.commands.setContent(initialContent);
+                        hasSeededRef.current = true;
+
+                        return;
+                    }
+                }
+
+                hasSeededRef.current = true;
                 onUpdate(editor.getHTML());
             }, 50);
         };
@@ -291,7 +319,7 @@ function CollaborativeEditorInner({
 
         // Listen to transactions to capture both local & remote collaborative edits
         const handleTransaction = () => {
-            if (!provider.isSynced) {
+            if (!provider.isSynced || !hasSeededRef.current) {
                 return;
             }
 
@@ -308,7 +336,7 @@ function CollaborativeEditorInner({
             provider.off('synced', updateState);
             editor.off('transaction', handleTransaction);
         };
-    }, [editor, provider, onUpdate]);
+    }, [editor, provider, onUpdate, initialContent, field]);
 
     useEffect(() => {
         if (!editor) {
