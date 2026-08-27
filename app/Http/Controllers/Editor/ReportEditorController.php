@@ -829,16 +829,6 @@ class ReportEditorController extends Controller
             'open_text_html' => 'nullable|string',
             'open_text_label' => 'nullable|string',
             'addendum_html' => 'nullable|string',
-            'yjs_macroscopy_state' => 'nullable|string',
-            'yjs_microscopy_state' => 'nullable|string',
-            'yjs_diagnosis_state' => 'nullable|string',
-            'yjs_report_date_state' => 'nullable|string',
-            'yjs_clinical_details_state' => 'nullable|string',
-            'yjs_comments_notes_state' => 'nullable|string',
-            'yjs_protocols_state' => 'nullable|string',
-            'yjs_legend_state' => 'nullable|string',
-            'yjs_open_text_state' => 'nullable|string',
-            'yjs_addendum_state' => 'nullable|string',
             'sections_order' => 'nullable|array',
             'sections_order.*.key' => 'required|string',
             'sections_order.*.order' => 'required|integer',
@@ -917,37 +907,6 @@ class ReportEditorController extends Controller
         }
         if ($request->has('headings_toggles') && $hasGeneralAccess) {
             $updateData['headings_toggles'] = $request->input('headings_toggles');
-        }
-
-        if ($request->filled('yjs_macroscopy_state') && $hasMacroAccess) {
-            $updateData['yjs_macroscopy_state'] = $request->input('yjs_macroscopy_state');
-        }
-        if ($request->filled('yjs_microscopy_state') && $hasMicroAccess) {
-            $updateData['yjs_microscopy_state'] = $request->input('yjs_microscopy_state');
-        }
-        if ($request->filled('yjs_diagnosis_state') && $hasGeneralAccess) {
-            $updateData['yjs_diagnosis_state'] = $request->input('yjs_diagnosis_state');
-        }
-        if ($request->filled('yjs_clinical_details_state') && $hasGeneralAccess) {
-            $updateData['yjs_clinical_details_state'] = $request->input('yjs_clinical_details_state');
-        }
-        if ($request->filled('yjs_comments_notes_state') && $hasGeneralAccess) {
-            $updateData['yjs_comments_notes_state'] = $request->input('yjs_comments_notes_state');
-        }
-        if ($request->filled('yjs_protocols_state') && $hasGeneralAccess) {
-            $updateData['yjs_protocols_state'] = $request->input('yjs_protocols_state');
-        }
-        if ($request->filled('yjs_legend_state') && $hasGeneralAccess) {
-            $updateData['yjs_legend_state'] = $request->input('yjs_legend_state');
-        }
-        if ($request->filled('yjs_open_text_state') && $hasGeneralAccess) {
-            $updateData['yjs_open_text_state'] = $request->input('yjs_open_text_state');
-        }
-        if ($request->filled('yjs_addendum_state') && $hasGeneralAccess) {
-            $updateData['yjs_addendum_state'] = $request->input('yjs_addendum_state');
-        }
-        if ($request->filled('yjs_report_date_state') && $hasGeneralAccess) {
-            $updateData['yjs_report_date_state'] = $request->input('yjs_report_date_state');
         }
 
         if (! empty($updateData)) {

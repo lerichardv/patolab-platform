@@ -1,9 +1,10 @@
 import {
     DragDropContext,
     Droppable,
-    Draggable,
-    type DropResult,
+    Draggable
+    
 } from '@hello-pangea/dnd';
+import type {DropResult} from '@hello-pangea/dnd';
 import { Head, router } from '@inertiajs/react';
 import {
     Check,
@@ -32,8 +33,8 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
 import EditorLayout from '@/layouts/editor-layout';
+import { cn } from '@/lib/utils';
 
 export interface BlankReportScreenProps {
     specimen: {
@@ -65,7 +66,10 @@ export function BlankReportScreen({
 
     // Map selected IDs to template objects in the user-specified order
     const orderedTemplates = useMemo(() => {
-        if (!templates || templates.length === 0) return [];
+        if (!templates || templates.length === 0) {
+return [];
+}
+
         const templateMap = new Map(templates.map((t) => [String(t.id), t]));
 
         return selectedTemplateIds
@@ -90,7 +94,10 @@ export function BlankReportScreen({
     };
 
     const handleDragEnd = (result: DropResult) => {
-        if (!result.destination) return;
+        if (!result.destination) {
+return;
+}
+
         const items = Array.from(selectedTemplateIds);
         const [reorderedItem] = items.splice(result.source.index, 1);
         items.splice(result.destination.index, 0, reorderedItem);

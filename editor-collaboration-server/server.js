@@ -378,6 +378,41 @@ const extensions = [
 
 const webhookUrl = process.env.WEBHOOK_URL || 'http://127.0.0.1:8001/api/collaboration';
 
+/**
+ * Fix 3: Retry a POST to the Laravel webhook up to maxRetries times with linear backoff.
+ * A new AbortSignal.timeout is created per attempt so it is never reused.
+ */
+const fetchWithRetry = async (url, bodyJson, maxRetries = 3) => {
+	let lastError;
+
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			const res = await fetch(url, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				signal: AbortSignal.timeout(8000),
+				body: bodyJson,
+			});
+
+			if (res.ok) {
+				return res;
+			}
+
+			throw new Error(`HTTP ${res.status}`);
+		} catch (err) {
+			lastError = err;
+
+			if (attempt < maxRetries) {
+				const delay = attempt * 1000;
+				console.warn(`[onStoreDocument] Attempt ${attempt} failed, retrying in ${delay}ms...`, err.message);
+				await new Promise(r => setTimeout(r, delay));
+			}
+		}
+	}
+
+	throw lastError;
+};
+
 const updateSaveStatus = (instance, reportId, status) => {
 	const docName = `report-${reportId}-save-status`;
 	const doc = instance.documents.get(docName);
@@ -463,17 +498,29 @@ const customWebhookExtension = {
 			}
 
 			if (!isLoaded) {
-				// Clear any previous Yjs fragment/text content to ensure clean slate
-				data.document.transact(() => {
-					const yxml = data.document.getXmlFragment('content');
-					if (yxml.length > 0) {
-						yxml.delete(0, yxml.length);
-					}
+			// Determine the correct Yjs shared type for this document.
+			// IMPORTANT: In Yjs, a name can only be registered with ONE constructor.
+			// Calling both getXmlFragment('content') and getText('content') on the
+			// same Y.Doc crashes with "Type with the name content has already been
+			// defined with a different constructor".
+			const isPlainTextField = data.documentName.endsWith('-report_date') || data.documentName.endsWith('-sample_collection_date') || data.documentName.endsWith('-finalization_date') || data.documentName.endsWith('-status') || data.documentName.endsWith('-save-status') || data.documentName.endsWith('-sections_order') || data.documentName.endsWith('-open_text_label') || data.documentName.endsWith('-headings_toggles') || data.documentName.endsWith('-insumos');
+
+			// Clear any previous content to ensure clean slate
+			data.document.transact(() => {
+				if (isPlainTextField) {
 					const ytext = data.document.getText('content');
+
 					if (ytext.length > 0) {
 						ytext.delete(0, ytext.length);
 					}
-				});
+				} else {
+					const yxml = data.document.getXmlFragment('content');
+
+					if (yxml.length > 0) {
+						yxml.delete(0, yxml.length);
+					}
+				}
+			});
 
 				// 2. If no binary state exists, fetch the initial HTML/content using the "create" event
 				const response = await fetch(webhookUrl, {
@@ -508,6 +555,7 @@ const customWebhookExtension = {
 							if (ytext.length > 0) {
 								ytext.delete(0, ytext.length);
 							}
+
 							ytext.insert(0, htmlContent);
 						});
 					} else {
@@ -560,30 +608,26 @@ const customWebhookExtension = {
 				htmlValue = generateHTML(docJson, extensions);
 			}
 
-			await fetch(webhookUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				signal: AbortSignal.timeout(8000),
-				body: JSON.stringify({
-					event: 'onChange',
-					payload: {
-						documentName: data.documentName,
-						document: base64State,
-						text: rawText,
-						html: htmlValue,
-					}
-				})
-			});
+			await fetchWithRetry(webhookUrl, JSON.stringify({
+				event: 'onChange',
+				payload: {
+					documentName: data.documentName,
+					document: base64State,
+					text: rawText,
+					html: htmlValue,
+				},
+			}));
 
 			if (reportId) {
 				updateSaveStatus(data.instance, reportId, 'saved');
 				setTimeout(() => updateSaveStatus(data.instance, reportId, 'idle'), 1300);
 			}
 		} catch (error) {
-			console.error(`[webhook:onStoreDocument] Save failed:`, error.message);
+			console.error(`[webhook:onStoreDocument] All retries exhausted:`, error.message);
 
 			if (reportId) {
-				updateSaveStatus(data.instance, reportId, 'idle');
+				// Propagate failure to UI so user knows the save did not succeed
+				updateSaveStatus(data.instance, reportId, 'error');
 			}
 		}
 	}
@@ -593,7 +637,8 @@ const customWebhookExtension = {
 const hocuspocus = new Hocuspocus({
 	debounce: 1000,
 	maxDebounce: 10000,
-	unloadImmediately: true,
+	// Fix 4: Wait for in-flight onStoreDocument calls to finish before destroying the session
+	unloadImmediately: false,
 	extensions: [
 		customWebhookExtension,
 	],

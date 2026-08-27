@@ -452,50 +452,71 @@ export default function SpecimenForm({
             ? specimen.specimen_type_examination.toString()
             : '',
         selected_examination_ids: (() => {
-            if (!specimen) return [] as string[];
+            if (!specimen) {
+return [] as string[];
+}
+
             const ids = new Set<string>();
+
             if (
                 Array.isArray(specimen.examinations) &&
                 specimen.examinations.length > 0
             ) {
                 specimen.examinations.forEach((e: any) => {
-                    if (e?.id) ids.add(String(e.id));
+                    if (e?.id) {
+ids.add(String(e.id));
+}
                 });
             }
+
             if (
                 Array.isArray(specimen.specimen_examinations) &&
                 specimen.specimen_examinations.length > 0
             ) {
                 specimen.specimen_examinations.forEach((se: any) => {
                     const id = se.examination_id || se.id || se.examination?.id;
-                    if (id) ids.add(String(id));
+
+                    if (id) {
+ids.add(String(id));
+}
                 });
             }
+
             if (
                 Array.isArray(specimen.specimenExaminations) &&
                 specimen.specimenExaminations.length > 0
             ) {
                 specimen.specimenExaminations.forEach((se: any) => {
                     const id = se.examination_id || se.id || se.examination?.id;
-                    if (id) ids.add(String(id));
+
+                    if (id) {
+ids.add(String(id));
+}
                 });
             }
+
             const inv =
                 specimen.invoice_relation ||
                 specimen.invoiceRelation ||
                 specimen.group?.invoice;
             const invItems = inv?.invoice_specimens || inv?.invoiceSpecimens;
+
             if (Array.isArray(invItems) && invItems.length > 0) {
                 invItems.forEach((item: any) => {
                     if (!item.specimen_id || item.specimen_id === specimen.id) {
                         const id = item.examination_id || item.examination?.id;
-                        if (id) ids.add(String(id));
+
+                        if (id) {
+ids.add(String(id));
+}
                     }
                 });
             }
+
             if (ids.size === 0 && specimen.specimen_type_examination) {
                 ids.add(String(specimen.specimen_type_examination));
             }
+
             return Array.from(ids);
         })(),
         examinations: [] as Array<any>,
@@ -618,7 +639,10 @@ export default function SpecimenForm({
     }, [transform]);
 
     const specimenInvoice = React.useMemo(() => {
-        if (!specimen) return null;
+        if (!specimen) {
+return null;
+}
+
         return (
             specimen.invoice_relation ||
             specimen.invoiceRelation ||
@@ -639,45 +663,62 @@ export default function SpecimenForm({
         }
 
         const ids = new Set<string>();
+
         if (
             Array.isArray(specimen.examinations) &&
             specimen.examinations.length > 0
         ) {
             specimen.examinations.forEach((e: any) => {
-                if (e?.id) ids.add(String(e.id));
+                if (e?.id) {
+ids.add(String(e.id));
+}
             });
         }
+
         if (
             Array.isArray(specimen.specimen_examinations) &&
             specimen.specimen_examinations.length > 0
         ) {
             specimen.specimen_examinations.forEach((se: any) => {
                 const id = se.examination_id || se.id || se.examination?.id;
-                if (id) ids.add(String(id));
+
+                if (id) {
+ids.add(String(id));
+}
             });
         }
+
         if (
             Array.isArray(specimen.specimenExaminations) &&
             specimen.specimenExaminations.length > 0
         ) {
             specimen.specimenExaminations.forEach((se: any) => {
                 const id = se.examination_id || se.id || se.examination?.id;
-                if (id) ids.add(String(id));
+
+                if (id) {
+ids.add(String(id));
+}
             });
         }
+
         const inv =
             specimen.invoice_relation ||
             specimen.invoiceRelation ||
             specimen.group?.invoice;
         const invItems = inv?.invoice_specimens || inv?.invoiceSpecimens;
+
         if (Array.isArray(invItems) && invItems.length > 0) {
             invItems.forEach((item: any) => {
                 if (!item.specimen_id || item.specimen_id === specimen.id) {
                     const id = item.examination_id || item.examination?.id;
-                    if (id) ids.add(String(id));
+
+                    if (id) {
+ids.add(String(id));
+}
                 }
             });
         }
+
         if (ids.size === 0 && specimen.specimen_type_examination) {
             ids.add(String(specimen.specimen_type_examination));
         }

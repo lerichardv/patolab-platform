@@ -18,6 +18,8 @@ export interface LivePdfPreviewProps {
     totalPages: number;
     renderPreviewPage: (pageNum: number) => React.ReactNode;
     pages?: MeasuredBlock[][];
+    /** Called before opening the PDF so the latest content is saved first. */
+    onBeforeDownload?: () => Promise<void>;
 }
 
 export default function LivePdfPreview({
@@ -27,6 +29,7 @@ export default function LivePdfPreview({
     totalPages,
     renderPreviewPage,
     pages = [],
+    onBeforeDownload,
 }: LivePdfPreviewProps) {
     const [zoomScale, setZoomScale] = useState(1);
     const [zoomMode, setZoomMode] = useState<'fit' | 'manual'>('fit');
@@ -166,17 +169,29 @@ export default function LivePdfPreview({
                         </div>
 
                         {/* Floating Download Button */}
-                        <a
-                            href={`/specimens/${specimen.sequence_code}/report-editor/pdf`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                if (onBeforeDownload) {
+                                    try {
+                                        await onBeforeDownload();
+                                    } catch {
+                                        // Save failed — still allow download so user isn't blocked
+                                    }
+                                }
+
+                                window.open(
+                                    `/specimens/${specimen.sequence_code}/report-editor/pdf`,
+                                    '_blank',
+                                );
+                            }}
                             className="pointer-events-auto inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground shadow-md transition-all hover:scale-[1.02] hover:bg-primary/95 active:scale-[0.98] sm:w-auto"
                         >
                             <Download className="h-3.5 w-3.5" />
                             {isFinished
                                 ? 'Descargar Informe'
                                 : 'Descargar Previsualización'}
-                        </a>
+                        </button>
                     </div>
 
                     {/* Scrollable Preview Pane */}

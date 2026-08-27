@@ -782,6 +782,7 @@ export default function SpecimenGroupSheet({
         );
 
         let examIdsStr = '';
+
         if (
             spec.specimen_examinations &&
             spec.specimen_examinations.length > 0
@@ -796,6 +797,7 @@ export default function SpecimenGroupSheet({
         } else if (spec.specimen_type_examination) {
             examIdsStr = spec.specimen_type_examination.toString();
         }
+
         setNestedExamination(examIdsStr);
         setNestedCategory(
             spec.specimen_category ? spec.specimen_category.toString() : '',

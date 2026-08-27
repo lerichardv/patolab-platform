@@ -298,6 +298,7 @@ function cleanLists(doc: Document): void {
             if (alignMatch) {
                 styleParts.push(`text-align: ${alignMatch[1].toLowerCase()}`);
             }
+
             styleParts.push('font-size: 8pt');
 
             innerP.setAttribute('style', styleParts.join('; ') + ';');
@@ -698,6 +699,7 @@ function cleanInlineStylesAndElements(doc: Document): void {
         if (alignMatch) {
             styleParts.push(`text-align: ${alignMatch[1].toLowerCase()}`);
         }
+
         styleParts.push('font-size: 8pt');
 
         p.setAttribute('style', styleParts.join('; ') + ';');

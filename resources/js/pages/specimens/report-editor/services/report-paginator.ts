@@ -1243,11 +1243,13 @@ export class ReportPaginator {
                                 : '';
                             const isLastOfAll = i + 1 >= listItems.length;
                             let mergedStyle = listData.styleAttr || '';
+
                             if (!isLastOfAll) {
                                 mergedStyle = mergedStyle
                                     ? `${mergedStyle.trim().endsWith(';') ? mergedStyle : mergedStyle + ';'} margin-bottom: 0px !important;`
                                     : 'margin-bottom: 0px !important;';
                             }
+
                             const styleAttr = mergedStyle
                                 ? ` style="${mergedStyle}"`
                                 : '';
@@ -1321,11 +1323,13 @@ export class ReportPaginator {
                                 ? ` data-list-style-type="${listData.listStyleType}"`
                                 : '';
                             let mergedStyle = listData.styleAttr || '';
+
                             if (!isLastOfAll) {
                                 mergedStyle = mergedStyle
                                     ? `${mergedStyle.trim().endsWith(';') ? mergedStyle : mergedStyle + ';'} margin-bottom: 0px !important;`
                                     : 'margin-bottom: 0px !important;';
                             }
+
                             const styleAttr = mergedStyle
                                 ? ` style="${mergedStyle}"`
                                 : '';
@@ -1472,6 +1476,7 @@ export class ReportPaginator {
                         const tableStyle = styleMatch ? styleMatch[1] : '';
 
                         let mergedStyle = tableStyle || '';
+
                         if (!isLastRow) {
                             mergedStyle = mergedStyle
                                 ? `${mergedStyle.trim().endsWith(';') ? mergedStyle : mergedStyle + ';'} margin-bottom: 0px !important;`

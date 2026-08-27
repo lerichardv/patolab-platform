@@ -7,12 +7,15 @@ export interface UseFinalizeReportOptions {
     specimenSequenceCode: string;
     onUpdateFinalizationDate: (dateVal: string) => Promise<any>;
     onTransitionState: (targetStatus: SpecimenStatus) => void;
+    /** Called before the temp PDF is generated so the latest content is persisted first. */
+    onBeforeSave?: () => Promise<void>;
 }
 
 export function useFinalizeReport({
     specimenSequenceCode,
     onUpdateFinalizationDate,
     onTransitionState,
+    onBeforeSave,
 }: UseFinalizeReportOptions) {
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [showCompleteMicroscopyDialog, setShowCompleteMicroscopyDialog] =
@@ -22,6 +25,24 @@ export function useFinalizeReport({
 
     const handleStartMicroscopyFinalization = useCallback(async () => {
         setIsGeneratingPdf(true);
+
+        // Flush pending editor changes to the DB before generating the PDF
+        if (onBeforeSave) {
+            try {
+                await onBeforeSave();
+            } catch (err) {
+                console.error(
+                    '[finalize] Save failed before PDF generation:',
+                    err,
+                );
+                toast.error(
+                    'No se pudo guardar el reporte antes de generar el PDF.',
+                );
+                setIsGeneratingPdf(false);
+
+                return;
+            }
+        }
 
         const d = new Date();
         const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -51,7 +72,7 @@ export function useFinalizeReport({
         } finally {
             setIsGeneratingPdf(false);
         }
-    }, [specimenSequenceCode, onUpdateFinalizationDate]);
+    }, [specimenSequenceCode, onUpdateFinalizationDate, onBeforeSave]);
 
     const handleConfirmFinalization = useCallback(() => {
         onTransitionState('finalized');
