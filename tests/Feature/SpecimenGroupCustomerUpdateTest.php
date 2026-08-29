@@ -184,3 +184,37 @@ test('validates customer_id must exist', function () {
 
     $response->assertSessionHasErrors(['customer_id']);
 });
+
+test('allows updating/re-syncing with the same customer', function () {
+    $invoice = Invoice::create([
+        'customer_id' => $this->oldCustomer->id,
+        'payment_type' => 'credit',
+        'amount' => 500,
+        'subtotal' => 500,
+        'total' => 500,
+        'total_paid' => 0,
+        'is_group' => true,
+        'invoice_file' => '',
+        'proof_of_payment' => '',
+    ]);
+
+    $group = SpecimenGroup::create([
+        'name' => 'Incorrect Group Name',
+        'customer_id' => $this->oldCustomer->id,
+        'invoice_id' => $invoice->id,
+    ]);
+
+    $invoice->update(['group_id' => $group->id]);
+
+    $response = $this->put(route('specimen-groups.update-customer', $group), [
+        'customer_id' => $this->oldCustomer->id,
+    ]);
+
+    $response->assertRedirect()
+        ->assertSessionHas('success', 'Cliente principal del grupo de muestras actualizado con éxito.');
+
+    $group->refresh();
+    expect($group->customer_id)->toBe($this->oldCustomer->id);
+    expect($group->name)->toBe('Hospital Antiguo - 0 Muestras');
+    expect($group->customers()->pluck('customers.id')->toArray())->toContain($this->oldCustomer->id);
+});
