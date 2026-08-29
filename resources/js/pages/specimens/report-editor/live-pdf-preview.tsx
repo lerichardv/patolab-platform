@@ -34,6 +34,7 @@ export default function LivePdfPreview({
     const [zoomScale, setZoomScale] = useState(1);
     const [zoomMode, setZoomMode] = useState<'fit' | 'manual'>('fit');
     const containerRef = useRef<HTMLDivElement>(null);
+    const outerContainerRef = useRef<HTMLDivElement>(null);
 
     const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
     const [fullscreenZoomScale, setFullscreenZoomScale] = useState(1);
@@ -41,34 +42,44 @@ export default function LivePdfPreview({
         'fit' | 'manual'
     >('fit');
     const fullscreenContainerRef = useRef<HTMLDivElement>(null);
+    const fullscreenOuterRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!containerRef.current || zoomMode !== 'fit') {
+        if (!outerContainerRef.current || zoomMode !== 'fit') {
             return;
         }
 
         const handleResize = () => {
-            const parent = containerRef.current;
+            const target = outerContainerRef.current;
 
-            if (parent) {
-                const parentWidth = parent.clientWidth;
-                const scale = (parentWidth - 32) / 800;
+            if (target) {
+                // Reserve 32px (p-4 padding) + 16px (scrollbar gutter) so content never causes horizontal overflow
+                const availableWidth = target.clientWidth - 48;
+                const scale = Math.max(
+                    0.3,
+                    Math.min(availableWidth / 800, 1.2),
+                );
+                const roundedScale = Math.round(scale * 100) / 100;
 
-                setZoomScale(Math.min(scale, 1.2));
+                setZoomScale((prev) =>
+                    Math.abs(prev - roundedScale) >= 0.005
+                        ? roundedScale
+                        : prev,
+                );
             }
         };
 
         handleResize();
         const observer = new ResizeObserver(handleResize);
 
-        observer.observe(containerRef.current);
+        observer.observe(outerContainerRef.current);
 
         return () => observer.disconnect();
     }, [zoomMode, isLoading]);
 
     useEffect(() => {
         if (
-            !fullscreenContainerRef.current ||
+            !fullscreenOuterRef.current ||
             fullscreenZoomMode !== 'fit' ||
             !isFullscreenOpen
         ) {
@@ -76,20 +87,29 @@ export default function LivePdfPreview({
         }
 
         const handleResize = () => {
-            const parent = fullscreenContainerRef.current;
+            const target = fullscreenOuterRef.current;
 
-            if (parent) {
-                const parentWidth = parent.clientWidth;
-                const scale = (parentWidth - 48) / 800;
+            if (target) {
+                // Reserve 48px (p-6 padding) + 16px (scrollbar gutter)
+                const availableWidth = target.clientWidth - 64;
+                const scale = Math.max(
+                    0.3,
+                    Math.min(availableWidth / 800, 1.5),
+                );
+                const roundedScale = Math.round(scale * 100) / 100;
 
-                setFullscreenZoomScale(Math.min(scale, 1.5));
+                setFullscreenZoomScale((prev) =>
+                    Math.abs(prev - roundedScale) >= 0.005
+                        ? roundedScale
+                        : prev,
+                );
             }
         };
 
         handleResize();
         const observer = new ResizeObserver(handleResize);
 
-        observer.observe(fullscreenContainerRef.current);
+        observer.observe(fullscreenOuterRef.current);
 
         return () => observer.disconnect();
     }, [fullscreenZoomMode, isFullscreenOpen, isLoading]);
@@ -98,7 +118,10 @@ export default function LivePdfPreview({
         <>
             {/* RIGHT COLUMN: Live PDF Preview */}
             <div className="left-[50vw] block flex h-[calc(100vh-64px)] min-h-[500px] w-screen flex-col space-y-3 lg:fixed lg:top-[64px] lg:w-[50vw]">
-                <div className="relative flex flex-1 flex-col overflow-hidden bg-slate-200 shadow-xs dark:bg-slate-950/20">
+                <div
+                    ref={outerContainerRef}
+                    className="relative flex flex-1 flex-col overflow-hidden bg-slate-200 shadow-xs dark:bg-slate-950/20"
+                >
                     {/* Floating Controls Overlay */}
                     <div className="pointer-events-none absolute top-4 right-4 left-4 z-20 flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
                         {/* Zoom Controls (Glassmorphism) */}
@@ -108,7 +131,10 @@ export default function LivePdfPreview({
                                 onClick={() => {
                                     setZoomMode('manual');
                                     setZoomScale((prev) =>
-                                        Math.max(0.3, prev - 0.1),
+                                        Math.max(
+                                            0.3,
+                                            Math.round((prev - 0.1) * 10) / 10,
+                                        ),
                                     );
                                 }}
                                 className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -124,7 +150,10 @@ export default function LivePdfPreview({
                                 onClick={() => {
                                     setZoomMode('manual');
                                     setZoomScale((prev) =>
-                                        Math.min(1.5, prev + 0.1),
+                                        Math.min(
+                                            1.5,
+                                            Math.round((prev + 0.1) * 10) / 10,
+                                        ),
                                     );
                                 }}
                                 className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -138,13 +167,18 @@ export default function LivePdfPreview({
                                 onClick={() => {
                                     setZoomMode('fit');
 
-                                    if (containerRef.current) {
-                                        const scale =
-                                            (containerRef.current.clientWidth -
-                                                32) /
-                                            800;
+                                    if (outerContainerRef.current) {
+                                        const availableWidth =
+                                            outerContainerRef.current
+                                                .clientWidth - 48;
+                                        const scale = Math.max(
+                                            0.3,
+                                            Math.min(availableWidth / 800, 1.2),
+                                        );
 
-                                        setZoomScale(Math.min(scale, 1.2));
+                                        setZoomScale(
+                                            Math.round(scale * 100) / 100,
+                                        );
                                     }
                                 }}
                                 className={cn(
@@ -197,7 +231,7 @@ export default function LivePdfPreview({
                     {/* Scrollable Preview Pane */}
                     <div
                         ref={containerRef}
-                        className="flex-1 overflow-x-auto overflow-y-auto p-4 pt-24 sm:pt-16"
+                        className="flex-1 [scrollbar-gutter:stable] overflow-x-auto overflow-y-auto p-4 pt-24 sm:pt-16"
                     >
                         <div
                             style={{
@@ -232,6 +266,7 @@ export default function LivePdfPreview({
             {/* Fullscreen Preview Sheet */}
             <Sheet open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
                 <SheetContent
+                    ref={fullscreenOuterRef}
                     side="bottom"
                     className="mx-auto flex h-[96vh] w-[98vw] max-w-none flex-col justify-start overflow-hidden rounded-t-2xl border-t bg-slate-200 p-0 dark:bg-slate-950/20 [&>button]:top-4 [&>button]:right-6 [&>button]:h-8 [&>button]:w-8 [&>button]:rounded-full [&>button]:border [&>button]:bg-background/80 [&>button]:shadow-xs [&>button]:backdrop-blur-xs"
                 >
@@ -256,7 +291,10 @@ export default function LivePdfPreview({
                                 onClick={() => {
                                     setFullscreenZoomMode('manual');
                                     setFullscreenZoomScale((prev) =>
-                                        Math.max(0.3, prev - 0.1),
+                                        Math.max(
+                                            0.3,
+                                            Math.round((prev - 0.1) * 10) / 10,
+                                        ),
                                     );
                                 }}
                                 className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -272,7 +310,10 @@ export default function LivePdfPreview({
                                 onClick={() => {
                                     setFullscreenZoomMode('manual');
                                     setFullscreenZoomScale((prev) =>
-                                        Math.min(2.0, prev + 0.1),
+                                        Math.min(
+                                            2.0,
+                                            Math.round((prev + 0.1) * 10) / 10,
+                                        ),
                                     );
                                 }}
                                 className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -286,15 +327,17 @@ export default function LivePdfPreview({
                                 onClick={() => {
                                     setFullscreenZoomMode('fit');
 
-                                    if (fullscreenContainerRef.current) {
-                                        const scale =
-                                            (fullscreenContainerRef.current
-                                                .clientWidth -
-                                                48) /
-                                            800;
+                                    if (fullscreenOuterRef.current) {
+                                        const availableWidth =
+                                            fullscreenOuterRef.current
+                                                .clientWidth - 64;
+                                        const scale = Math.max(
+                                            0.3,
+                                            Math.min(availableWidth / 800, 1.5),
+                                        );
 
                                         setFullscreenZoomScale(
-                                            Math.min(scale, 1.5),
+                                            Math.round(scale * 100) / 100,
                                         );
                                     }
                                 }}
@@ -312,7 +355,7 @@ export default function LivePdfPreview({
                     {/* Scrollable Preview Pane inside Sheet */}
                     <div
                         ref={fullscreenContainerRef}
-                        className="flex flex-1 justify-center overflow-x-auto overflow-y-auto bg-slate-200 p-6 dark:bg-slate-950/20"
+                        className="flex flex-1 [scrollbar-gutter:stable] justify-center overflow-x-auto overflow-y-auto bg-slate-200 p-6 dark:bg-slate-950/20"
                     >
                         <div
                             style={{

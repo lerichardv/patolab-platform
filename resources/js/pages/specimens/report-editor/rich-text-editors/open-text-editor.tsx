@@ -54,6 +54,7 @@ export function OpenTextEditor({
                             onChange={(e) =>
                                 onOpenTextLabelChange(e.target.value)
                             }
+                            maxLength={255}
                             className="w-full border-b border-transparent bg-transparent px-1 py-0.5 text-base font-bold tracking-tight text-slate-800 hover:border-slate-300 focus:border-primary focus:outline-hidden dark:text-slate-200"
                             placeholder="Texto Libre"
                             onClick={(e) => e.stopPropagation()}

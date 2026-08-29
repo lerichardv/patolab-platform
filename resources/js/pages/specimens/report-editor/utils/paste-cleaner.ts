@@ -87,11 +87,33 @@ function cleanTables(doc: Document): void {
         const newTable = doc.createElement('table');
         newTable.setAttribute('style', `min-width: ${maxCols * 25}px;`);
 
+        const originalColgroup = table.querySelector('colgroup');
+        const originalCols = originalColgroup
+            ? Array.from(originalColgroup.querySelectorAll('col'))
+            : [];
         const colgroup = doc.createElement('colgroup');
 
         for (let i = 0; i < maxCols; i++) {
             const col = doc.createElement('col');
-            col.setAttribute('style', 'min-width: 25px;');
+
+            if (originalCols[i]) {
+                const style = originalCols[i].getAttribute('style');
+                const width = originalCols[i].getAttribute('width');
+
+                if (style) {
+                    col.setAttribute('style', style);
+                } else if (width) {
+                    col.setAttribute(
+                        'style',
+                        `width: ${width}; min-width: 25px;`,
+                    );
+                } else {
+                    col.setAttribute('style', 'min-width: 25px;');
+                }
+            } else {
+                col.setAttribute('style', 'min-width: 25px;');
+            }
+
             colgroup.appendChild(col);
         }
 
@@ -109,11 +131,14 @@ function cleanTables(doc: Document): void {
             }
 
             const newRow = doc.createElement('tr');
-            // The first row is always the header row (<th>), matching TipTap tool
-            const isHeaderRow = rowIndex === 0;
+            const isFirstRow = rowIndex === 0;
 
             for (const cell of cells) {
-                const cellTag = isHeaderRow ? 'th' : 'td';
+                const isHeader =
+                    cell.tagName.toLowerCase() === 'th' ||
+                    row.closest('thead') !== null ||
+                    (isFirstRow && table.querySelector('th') !== null);
+                const cellTag = isHeader ? 'th' : 'td';
                 const newCell = doc.createElement(cellTag);
 
                 // Preserve colspan / rowspan if valid integer > 1
@@ -129,30 +154,105 @@ function cleanTables(doc: Document): void {
                     rowspan && parseInt(rowspan, 10) > 1 ? rowspan : '1',
                 );
 
-                // Extract clean text content of cell, discarding all legacy styles & formatting
-                const cellText = cell.textContent?.trim() || '';
+                // Extract alignment from cell
+                const cellStyle = cell.getAttribute('style') || '';
+                const cellAlign = cell.getAttribute('align') || '';
+                let cellTextAlign: string | null = null;
+                const cellAlignMatch = cellStyle.match(
+                    /text-align:\s*(left|center|right|justify)/i,
+                );
 
-                if (cellText) {
-                    // Check if cell had multiple lines / paragraphs
-                    const paragraphs = Array.from(
-                        cell.querySelectorAll('p, div'),
+                if (cellAlignMatch) {
+                    cellTextAlign = cellAlignMatch[1].toLowerCase();
+                } else if (
+                    cellAlign &&
+                    ['left', 'center', 'right', 'justify'].includes(
+                        cellAlign.toLowerCase(),
                     )
-                        .map((p) => p.textContent?.trim())
-                        .filter(Boolean) as string[];
+                ) {
+                    cellTextAlign = cellAlign.toLowerCase();
+                }
 
-                    if (paragraphs.length > 1) {
-                        for (const pText of paragraphs) {
-                            const p = doc.createElement('p');
-                            p.textContent = pText;
-                            newCell.appendChild(p);
+                if (cellTextAlign) {
+                    newCell.setAttribute(
+                        'style',
+                        `text-align: ${cellTextAlign};`,
+                    );
+                }
+
+                // Check for block children (p, div, headings) inside the cell
+                const topBlockChildren: HTMLElement[] = [];
+
+                for (const child of Array.from(cell.children)) {
+                    const tag = child.tagName.toLowerCase();
+
+                    if (
+                        [
+                            'p',
+                            'div',
+                            'h1',
+                            'h2',
+                            'h3',
+                            'h4',
+                            'h5',
+                            'h6',
+                        ].includes(tag)
+                    ) {
+                        topBlockChildren.push(child as HTMLElement);
+                    }
+                }
+
+                if (topBlockChildren.length > 0) {
+                    for (const block of topBlockChildren) {
+                        const blockStyle = block.getAttribute('style') || '';
+                        const blockAlign = block.getAttribute('align') || '';
+                        let pTextAlign: string | null = null;
+                        const blockAlignMatch = blockStyle.match(
+                            /text-align:\s*(left|center|right|justify)/i,
+                        );
+
+                        if (blockAlignMatch) {
+                            pTextAlign = blockAlignMatch[1].toLowerCase();
+                        } else if (
+                            blockAlign &&
+                            ['left', 'center', 'right', 'justify'].includes(
+                                blockAlign.toLowerCase(),
+                            )
+                        ) {
+                            pTextAlign = blockAlign.toLowerCase();
+                        } else {
+                            pTextAlign = cellTextAlign;
                         }
-                    } else {
+
                         const p = doc.createElement('p');
-                        p.textContent = cellText;
+
+                        if (pTextAlign) {
+                            p.setAttribute(
+                                'style',
+                                `text-align: ${pTextAlign};`,
+                            );
+                        }
+
+                        while (block.firstChild) {
+                            p.appendChild(block.firstChild);
+                        }
+
                         newCell.appendChild(p);
                     }
                 } else {
                     const p = doc.createElement('p');
+
+                    if (cellTextAlign) {
+                        p.setAttribute(
+                            'style',
+                            `text-align: ${cellTextAlign};`,
+                        );
+                    }
+
+                    while (cell.firstChild) {
+                        p.appendChild(cell.firstChild);
+                    }
+
                     newCell.appendChild(p);
                 }
 

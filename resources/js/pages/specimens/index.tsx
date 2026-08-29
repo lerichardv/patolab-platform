@@ -101,6 +101,7 @@ export interface Specimen {
     id: number;
     priority_id: number;
     sample_collection_date?: string;
+    sample_collection_date_na?: boolean;
     specimen_type?: number;
     specimen_type_examination?: number;
     customer_relation: any;
@@ -383,11 +384,11 @@ export default function SpecimensIndex({
 
     const handleLoadMore = (priorityId: number) => {
         setVisibleCounts((prev) => {
-            const current = prev[priorityId] || 50;
+            const current = prev[priorityId] || 25;
 
             return {
                 ...prev,
-                [priorityId]: current + 50,
+                [priorityId]: current + 25,
             };
         });
     };

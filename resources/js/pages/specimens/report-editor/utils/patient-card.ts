@@ -17,19 +17,19 @@ export function estimatePatientCardHeight(
     const referrerNotes = referrer?.notes || '';
     const anatomicSite = specimen.anatomic_site || '';
 
-    // Left column
-    const left1 = Math.ceil((8 + customerName.length) / 60);
+    // Left column (50% width ≈ 93mm)
+    const left1 = Math.ceil((8 + customerName.length) / 46);
     const left2 = 1; // age/gender
-    const left3 = Math.ceil((18 + referrerName.length) / 60);
-    const left4 = Math.ceil((21 + specimenDiagnosis.length) / 60);
+    const left3 = Math.ceil((11 + referrerName.length) / 46);
+    const left4 = Math.ceil((18 + referrerNotes.length) / 46);
     const leftLines = left1 + left2 + left3 + left4;
 
-    // Right column
-    const right1 = Math.ceil((18 + referrerNotes.length) / 50);
-    const right2 = Math.ceil((29 + anatomicSite.length) / 50);
-    const rightLines = right1 + right2 + 2;
+    // Right column (50% width ≈ 93mm)
+    const right1 = Math.ceil((21 + specimenDiagnosis.length) / 46);
+    const right2 = Math.ceil((17 + anatomicSite.length) / 46);
+    const rightLines = right1 + right2 + 2; // + 2 for sample_collection_date and report_date
 
-    const totalLines = Math.max(leftLines, rightLines) + 2;
+    const totalLines = Math.max(leftLines, rightLines) + 1;
 
-    return totalLines * 3.97;
+    return totalLines * 4.8;
 }

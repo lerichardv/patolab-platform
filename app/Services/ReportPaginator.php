@@ -466,21 +466,21 @@ class ReportPaginator
         $referrerNotes = $referrer->notes ?? '';
         $anatomicSite = $specimen->anatomic_site ?? '';
 
-        // Left column
-        $left1 = (int) ceil((8 + mb_strlen($customerName)) / 60);
+        // Left column (50% width ≈ 93mm)
+        $left1 = (int) ceil((8 + mb_strlen($customerName)) / 46);
         $left2 = 1; // age/gender
-        $left3 = (int) ceil((18 + mb_strlen($referrerName)) / 60);
-        $left4 = (int) ceil((21 + mb_strlen($specimenDiagnosis)) / 60);
+        $left3 = (int) ceil((11 + mb_strlen($referrerName)) / 46);
+        $left4 = (int) ceil((18 + mb_strlen($referrerNotes)) / 46);
         $leftLines = $left1 + $left2 + $left3 + $left4;
 
-        // Right column
-        $right1 = (int) ceil((18 + mb_strlen($referrerNotes)) / 50);
-        $right2 = (int) ceil((29 + mb_strlen($anatomicSite)) / 50);
-        $rightLines = $right1 + $right2 + 2;
+        // Right column (50% width ≈ 93mm)
+        $right1 = (int) ceil((21 + mb_strlen($specimenDiagnosis)) / 46);
+        $right2 = (int) ceil((17 + mb_strlen($anatomicSite)) / 46);
+        $rightLines = $right1 + $right2 + 2; // + 2 for sample_collection_date and report_date
 
-        $totalLines = max($leftLines, $rightLines) + 2;
+        $totalLines = max($leftLines, $rightLines) + 1;
 
-        return $totalLines * 3.97;
+        return $totalLines * 4.80;
     }
 
     public static function parseHtmlToBlocks(string $html): array

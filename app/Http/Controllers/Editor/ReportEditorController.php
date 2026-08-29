@@ -217,6 +217,9 @@ class ReportEditorController extends Controller
             }
             if ($event === 'onChange') {
                 $htmlValue = $payload['html'] ?? 'Texto Libre';
+                if (preg_match('/^(Texto\s*Libre){2,}$/i', trim($htmlValue))) {
+                    $htmlValue = 'Texto Libre';
+                }
                 DB::table('specimen_reports')
                     ->where('id', $reportId)
                     ->update([
@@ -489,6 +492,44 @@ class ReportEditorController extends Controller
     }
 
     /**
+     * Ensure a specimen has an associated report row, creating one if not present.
+     */
+    protected function ensureReport(Specimen $specimen): SpecimenReport
+    {
+        $specimen->load('report');
+        if ($specimen->report) {
+            return $specimen->report;
+        }
+
+        $report = SpecimenReport::create([
+            'report_date' => now()->format('Y-m-d'),
+            'finalization_date' => now()->format('Y-m-d'),
+            'macroscopy_html' => '',
+            'microscopy_html' => '',
+            'diagnosis_html' => '',
+            'clinical_details_html' => '',
+            'comments_notes_html' => '',
+            'protocols_html' => '',
+            'legend_html' => '',
+            'open_text_html' => '',
+            'open_text_label' => 'Texto Libre',
+            'addendum_html' => '',
+            'sections_order' => null,
+            'headings_toggles' => null,
+        ]);
+
+        $updateData = ['report_id' => $report->id];
+        if (in_array($specimen->status, ['registered', 'received', 'pending'])) {
+            $updateData['status'] = 'macroscopic_review';
+        }
+
+        $specimen->update($updateData);
+        $specimen->setRelation('report', $report);
+
+        return $report;
+    }
+
+    /**
      * Create a new specimen report row and update specimen state to macroscopic_review.
      */
     public function store(Request $request, Specimen $specimen)
@@ -496,6 +537,14 @@ class ReportEditorController extends Controller
         $this->authorizeSpecimenAccess($specimen);
 
         if ($specimen->report_id) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Esta muestra ya tiene un reporte creado.',
+                    'report' => $specimen->report,
+                ]);
+            }
+
             return redirect()->back()->with('error', 'Esta muestra ya tiene un reporte creado.');
         }
 
@@ -538,7 +587,9 @@ class ReportEditorController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($specimen, $orderedIds, $examinationIds) {
+        $createdReport = null;
+
+        DB::transaction(function () use ($specimen, $orderedIds, $examinationIds, &$createdReport) {
             $orderedTemplates = collect();
             if (! empty($orderedIds)) {
                 $fetched = SpecimenTypeTemplate::whereIn('id', $orderedIds)
@@ -606,7 +657,17 @@ class ReportEditorController extends Controller
                 'report_id' => $report->id,
                 'status' => 'macroscopic_review',
             ]);
+
+            $createdReport = $report;
         });
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Reporte creado y estado de muestra actualizado a revisión macroscópica.',
+                'report' => $createdReport ?? $specimen->report,
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Reporte creado y estado de muestra actualizado a revisión macroscópica.');
     }
@@ -628,12 +689,9 @@ class ReportEditorController extends Controller
             return redirect()->back()->with('error', 'No tienes permisos de edición para esta muestra.');
         }
 
-        $specimen->load('report');
-        if (! $specimen->report) {
-            return redirect()->back()->with('error', 'No hay reporte asociado a esta muestra.');
-        }
+        $report = $this->ensureReport($specimen);
 
-        $specimen->report->update([
+        $report->update([
             'report_date' => $request->report_date,
         ]);
 
@@ -653,10 +711,7 @@ class ReportEditorController extends Controller
             'template_ids.*' => 'exists:specimen_type_templates,id',
         ]);
 
-        $specimen->load('report');
-        if (! $specimen->report) {
-            return response()->json(['error' => 'No hay reporte asociado a esta muestra.'], 404);
-        }
+        $this->ensureReport($specimen);
 
         // When report is finalized, changing templates is forbidden.
         if (in_array($specimen->status, ['finalized', 'delivered'])) {
@@ -818,7 +873,9 @@ class ReportEditorController extends Controller
         $request->validate([
             'report_date' => 'nullable|string',
             'sample_collection_date' => 'nullable|string',
+            'sample_collection_date_na' => 'nullable|boolean',
             'finalization_date' => 'nullable|string',
+            'auto_finalization_date' => 'nullable|boolean',
             'macroscopy_html' => 'nullable|string',
             'microscopy_html' => 'nullable|string',
             'diagnosis_html' => 'nullable|string',
@@ -837,10 +894,7 @@ class ReportEditorController extends Controller
             'headings_toggles.*' => 'boolean',
         ]);
 
-        $specimen->load('report');
-        if (! $specimen->report) {
-            return response()->json(['error' => 'No hay reporte asociado a esta muestra.'], 404);
-        }
+        $report = $this->ensureReport($specimen);
 
         [$hasMacroAccess, $hasMicroAccess] = $this->getUserAccess($specimen);
 
@@ -865,11 +919,19 @@ class ReportEditorController extends Controller
             }
         }
 
+        if ($request->has('sample_collection_date_na')) {
+            $specimen->update(['sample_collection_date_na' => $request->boolean('sample_collection_date_na')]);
+        }
+
         if ($request->has('finalization_date')) {
             $finalizationDate = $request->input('finalization_date');
             if (! empty($finalizationDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $finalizationDate)) {
                 $updateData['finalization_date'] = $finalizationDate;
             }
+        }
+
+        if ($request->has('auto_finalization_date')) {
+            $updateData['auto_finalization_date'] = $request->boolean('auto_finalization_date');
         }
 
         if ($request->has('macroscopy_html') && $hasMacroAccess) {
@@ -897,7 +959,11 @@ class ReportEditorController extends Controller
             $updateData['open_text_html'] = $request->input('open_text_html') ?? '';
         }
         if ($request->has('open_text_label') && $hasGeneralAccess) {
-            $updateData['open_text_label'] = $request->input('open_text_label') ?? '';
+            $rawLabel = $request->input('open_text_label') ?? '';
+            if (preg_match('/^(Texto\s*Libre){2,}$/i', trim($rawLabel))) {
+                $rawLabel = 'Texto Libre';
+            }
+            $updateData['open_text_label'] = $rawLabel;
         }
         if ($request->has('addendum_html') && $hasGeneralAccess) {
             $updateData['addendum_html'] = $request->input('addendum_html') ?? '';
@@ -910,18 +976,18 @@ class ReportEditorController extends Controller
         }
 
         if (! empty($updateData)) {
-            $specimen->report->update($updateData);
+            $report->update($updateData);
         }
 
         if (in_array($specimen->status, ['finalized', 'delivered'])) {
-            $specimen->report->ensureValidationQrCode();
+            $report->ensureValidationQrCode();
             app(ReportPdfService::class)->generateAndStoreReport($specimen);
         }
 
         return response()->json([
             'status' => 'success',
             'message' => 'Reporte guardado con éxito.',
-            'report' => $specimen->report->fresh(),
+            'report' => $report->fresh(),
         ]);
     }
 
@@ -936,10 +1002,7 @@ class ReportEditorController extends Controller
             'status' => 'required|string|in:macroscopic_review,processing,microscopic_review,finalized',
         ]);
 
-        $specimen->load('report');
-        if (! $specimen->report) {
-            return redirect()->back()->with('error', 'No hay reporte asociado a esta muestra.');
-        }
+        $report = $this->ensureReport($specimen);
 
         $status = $request->status;
 
@@ -965,21 +1028,22 @@ class ReportEditorController extends Controller
             $reportData['microscopy_finalization_datetime'] = now();
         } elseif ($status === 'finalized') {
             $reportData['report_finalization_datetime'] = now();
-            if (empty($specimen->report->finalization_date)) {
+            if ($report->auto_finalization_date || empty($report->finalization_date)) {
                 $reportData['finalization_date'] = now()->format('Y-m-d');
             }
+            $reportData['auto_finalization_date'] = false;
         }
 
-        DB::transaction(function () use ($specimen, $status, $reportData) {
+        DB::transaction(function () use ($specimen, $report, $status, $reportData) {
             if (! empty($reportData)) {
-                $specimen->report->update($reportData);
+                $report->update($reportData);
             }
             $specimen->update([
                 'status' => $status,
             ]);
 
             if ($status === 'finalized') {
-                $specimen->report->ensureValidationQrCode();
+                $report->ensureValidationQrCode();
 
                 app(ReportPdfService::class)->generateAndStoreReport($specimen);
 
@@ -1141,10 +1205,7 @@ class ReportEditorController extends Controller
             return response()->json(['error' => 'No tienes permisos de edición para esta muestra.'], 403);
         }
 
-        $specimen->load('report');
-        if (! $specimen->report) {
-            return response()->json(['error' => 'No hay reporte asociado a esta muestra.'], 404);
-        }
+        $this->ensureReport($specimen);
 
         // Generate the PDF and return computed pages
         $pages = [];
@@ -1170,16 +1231,13 @@ class ReportEditorController extends Controller
     {
         $this->authorizeSpecimenAccess($specimen);
 
-        $specimen->load('report');
-        if (! $specimen->report) {
-            abort(404, 'No hay reporte asociado a esta muestra.');
-        }
+        $report = $this->ensureReport($specimen);
 
         $isFinalized = in_array($specimen->status, ['finalized', 'delivered']);
 
-        if ($isFinalized && $specimen->report->report_file && Storage::disk('public')->exists($specimen->report->report_file)) {
+        if ($isFinalized && $report->report_file && Storage::disk('public')->exists($report->report_file)) {
             return Storage::disk('public')->download(
-                $specimen->report->report_file,
+                $report->report_file,
                 "reporte_{$specimen->sequence_code}.pdf"
             );
         }

@@ -18,6 +18,7 @@ export interface SpecimenReport {
     id: number;
     report_date: string;
     finalization_date?: string;
+    auto_finalization_date?: boolean;
     macroscopy_html: string | null;
     microscopy_html: string | null;
     diagnosis_html: string | null;
@@ -64,6 +65,7 @@ export interface Specimen {
     id: number;
     sequence_code: string;
     sample_collection_date?: string;
+    sample_collection_date_na?: boolean;
     anatomic_site: string;
     diagnosis: string | null;
     clinical_notes: string | null;

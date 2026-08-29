@@ -82,6 +82,11 @@ interface CuttingReportItem {
         examination: {
             name: string;
         } | null;
+        customer_relation?: {
+            id?: number;
+            name?: string;
+            id_number?: string;
+        } | null;
     } | null;
     number_of_cassettes: number;
     cassettes_range: string;
@@ -869,7 +874,7 @@ export default function CuttingsReportIndex({
                         <div className="relative w-full">
                             <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Buscar por código muestra, médico responsable o comentarios..."
+                                placeholder="Buscar por código de muestra, paciente, ID/RTN, médico o comentarios..."
                                 className="w-full pl-8"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -1374,10 +1379,13 @@ export default function CuttingsReportIndex({
                                 </TableRow>
                             ) : (
                                 groupedBySpecimen.map(
-                                    ({
-                                        specimen,
-                                        cuttings: specimenCuttings,
-                                    }) => {
+                                    (
+                                        {
+                                            specimen,
+                                            cuttings: specimenCuttings,
+                                        },
+                                        specimenIdx,
+                                    ) => {
                                         const groups =
                                             groupCuttings(specimenCuttings);
                                         const specimenCode =
@@ -1427,8 +1435,8 @@ export default function CuttingsReportIndex({
                                         return (
                                             <React.Fragment
                                                 key={
-                                                    specimen?.id ||
-                                                    Math.random()
+                                                    specimen?.id ??
+                                                    `specimen-${specimenIdx}`
                                                 }
                                             >
                                                 {/* Specimen Header Row */}
@@ -1450,7 +1458,7 @@ export default function CuttingsReportIndex({
                                                         colSpan={15}
                                                         className="border-y border-border px-4 py-2.5 font-semibold text-foreground"
                                                     >
-                                                        <div className="flex items-center gap-3">
+                                                        <div className="flex flex-wrap items-center gap-3">
                                                             {specimen &&
                                                                 (isSpecimenExpanded ? (
                                                                     <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -1486,17 +1494,7 @@ export default function CuttingsReportIndex({
                                                                     }
                                                                 </span>
                                                             )}
-                                                            <span className="text-muted-foreground">
-                                                                |
-                                                            </span>
-                                                            <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                                                Tipo/Examen:
-                                                            </span>
-                                                            <span className="text-sm font-medium">
-                                                                {
-                                                                    specimenTypeExam
-                                                                }
-                                                            </span>
+
                                                             {cuttingsRange && (
                                                                 <>
                                                                     <span className="text-muted-foreground">
@@ -1513,6 +1511,41 @@ export default function CuttingsReportIndex({
                                                                     </span>
                                                                 </>
                                                             )}
+                                                            <span className="text-muted-foreground">
+                                                                |
+                                                            </span>
+                                                            <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                                                Paciente:
+                                                            </span>
+                                                            <span className="text-sm font-medium">
+                                                                {specimen
+                                                                    ?.customer_relation
+                                                                    ?.name ||
+                                                                    'N/A'}
+                                                            </span>
+                                                            <span className="text-muted-foreground">
+                                                                |
+                                                            </span>
+                                                            <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                                                ID / RTN:
+                                                            </span>
+                                                            <span className="font-mono text-sm font-medium">
+                                                                {specimen
+                                                                    ?.customer_relation
+                                                                    ?.id_number ||
+                                                                    'N/A'}
+                                                            </span>
+                                                            <span className="text-muted-foreground">
+                                                                |
+                                                            </span>
+                                                            <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                                                                Tipo/Examen:
+                                                            </span>
+                                                            <span className="text-sm font-medium">
+                                                                {
+                                                                    specimenTypeExam
+                                                                }
+                                                            </span>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>

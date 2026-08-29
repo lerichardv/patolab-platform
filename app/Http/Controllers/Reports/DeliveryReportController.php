@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\Role;
+use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
+use App\Models\User;
 use App\Services\DateFilterService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -43,7 +46,7 @@ class DeliveryReportController extends Controller
         $internalDateTo = $request->get('internal_date_to');
 
         // Build base query
-        $query = Specimen::with(['customerRelation', 'type', 'examination', 'category'])
+        $query = Specimen::with(['customerRelation', 'type', 'examination', 'category', 'users'])
             ->where('status', '!=', 'cancelled');
 
         // Apply filters in database
@@ -85,6 +88,21 @@ class DeliveryReportController extends Controller
                 $query->whereRaw('1 = 0');
             } else {
                 $query->whereIn('specimen_type_examination', $examIds);
+            }
+        }
+
+        if ($request->has('pathologist_id') && $request->get('pathologist_id') !== 'all') {
+            $pathologistIds = $request->get('pathologist_id');
+            if (! is_array($pathologistIds)) {
+                $pathologistIds = [$pathologistIds];
+            }
+            $pathologistIds = array_values(array_filter(array_map('strval', $pathologistIds), fn ($v) => $v !== '' && $v !== 'all'));
+            if (empty($pathologistIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereHas('users', function ($uq) use ($pathologistIds) {
+                    $uq->whereIn('users.id', $pathologistIds);
+                });
             }
         }
 
@@ -186,11 +204,25 @@ class DeliveryReportController extends Controller
         $specimenTypes = SpecimenType::where('active', true)->orderBy('name', 'asc')->get();
         $examinations = SpecimenTypeExamination::where('active', true)->get();
 
+        $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
+        $pathologistRoleIds = [];
+        if ($pathologistRoleId) {
+            $assistantRole = Role::where('slug', 'assistant_pathologist')->first();
+            $pathologistRoleIds = array_filter([$pathologistRoleId, $assistantRole?->id]);
+        } else {
+            $pathologistRoleIds = Role::whereIn('slug', ['pathologist', 'assistant_pathologist'])->pluck('id')->toArray();
+        }
+
+        $pathologists = User::where('active', true)
+            ->when(! empty($pathologistRoleIds), fn ($q) => $q->whereIn('role_id', $pathologistRoleIds))
+            ->orderBy('name', 'asc')
+            ->get(['id', 'name']);
+
         return Inertia::render('reports/delivery/index', [
             'specimens' => $paginated,
             'summary' => $summary,
             'filters' => array_merge(
-                $request->only(['search', 'customer_id', 'specimen_type_id', 'examination_id', 'internal_date_from', 'internal_date_to']),
+                $request->only(['search', 'customer_id', 'specimen_type_id', 'examination_id', 'pathologist_id', 'internal_date_from', 'internal_date_to']),
                 [
                     'date_from' => $dateFrom,
                     'date_to' => $dateTo,
@@ -199,6 +231,7 @@ class DeliveryReportController extends Controller
             'selectedCustomer' => $selectedCustomer,
             'specimenTypes' => $specimenTypes,
             'examinations' => $examinations,
+            'pathologists' => $pathologists,
         ]);
     }
 
@@ -223,7 +256,7 @@ class DeliveryReportController extends Controller
         $internalDateTo = $request->get('internal_date_to');
 
         // Build query
-        $query = Specimen::with(['customerRelation', 'type', 'examination', 'category'])
+        $query = Specimen::with(['customerRelation', 'type', 'examination', 'category', 'users'])
             ->where('status', '!=', 'cancelled');
 
         if ($request->filled('search')) {
@@ -264,6 +297,21 @@ class DeliveryReportController extends Controller
                 $query->whereRaw('1 = 0');
             } else {
                 $query->whereIn('specimen_type_examination', $examIds);
+            }
+        }
+
+        if ($request->has('pathologist_id') && $request->get('pathologist_id') !== 'all') {
+            $pathologistIds = $request->get('pathologist_id');
+            if (! is_array($pathologistIds)) {
+                $pathologistIds = [$pathologistIds];
+            }
+            $pathologistIds = array_values(array_filter(array_map('strval', $pathologistIds), fn ($v) => $v !== '' && $v !== 'all'));
+            if (empty($pathologistIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereHas('users', function ($uq) use ($pathologistIds) {
+                    $uq->whereIn('users.id', $pathologistIds);
+                });
             }
         }
 
@@ -339,12 +387,13 @@ class DeliveryReportController extends Controller
             'C' => 32,
             'D' => 24,
             'E' => 22,
-            'F' => 18,
+            'F' => 24,
             'G' => 18,
-            'H' => 24,
-            'I' => 26,
-            'J' => 22,
-            'K' => 10,
+            'H' => 18,
+            'I' => 24,
+            'J' => 26,
+            'K' => 22,
+            'L' => 10,
         ];
         foreach ($columnWidths as $col => $width) {
             $sheet->getColumnDimension($col)->setWidth($width);
@@ -386,13 +435,13 @@ class DeliveryReportController extends Controller
         }
 
         // Title (Row 5)
-        $sheet->mergeCells('A5:K5');
+        $sheet->mergeCells('A5:L5');
         $sheet->setCellValue('A5', 'PATOLAB - HOJA DE ENTREGA DE MUESTRAS');
         $sheet->getStyle('A5')->getFont()->setBold(true)->setSize(16)->setName('Calibri');
         $sheet->getStyle('A5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
         // Subtitle (Row 6)
-        $sheet->mergeCells('A6:K6');
+        $sheet->mergeCells('A6:L6');
         $sheet->setCellValue('A6', $dateSubtitle);
         $sheet->getStyle('A6')->getFont()->setBold(true)->setSize(14)->setName('Calibri');
         $sheet->getStyle('A6')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -413,6 +462,7 @@ class DeliveryReportController extends Controller
             'Tipo de Muestra-Análisis',
             'Categoría',
             'Código de la Muestra',
+            'Patólogos',
             'Estado',
             'Fecha de Finalización',
             'Fecha de Ingreso',
@@ -465,46 +515,50 @@ class DeliveryReportController extends Controller
                 ? $specimen->finalized_at->format('d/m/Y')
                 : 'N/A';
             $statusName = $statusLabels[$specimen->status] ?? $specimen->status;
+            $pathologists = $specimen->users && $specimen->users->isNotEmpty()
+                ? $specimen->users->pluck('name')->join(', ')
+                : 'Sin asignar';
 
             $sheet->setCellValue('A'.$currentRow, $specimen->customerRelation?->name ?? 'N/A');
             $sheet->setCellValue('B'.$currentRow, $specimen->customerRelation?->id_number ?? 'N/A');
             $sheet->setCellValue('C'.$currentRow, $service);
             $sheet->setCellValue('D'.$currentRow, $specimen->category?->name ?? 'N/A');
             $sheet->setCellValue('E'.$currentRow, $specimen->sequence_code ?? 'N/A');
-            $sheet->setCellValue('F'.$currentRow, $statusName);
-            $sheet->setCellValue('G'.$currentRow, $finalizedAt);
-            $sheet->setCellValue('H'.$currentRow, $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A');
-            $sheet->setCellValue('I'.$currentRow, $expectedInternal);
-            $sheet->setCellValue('J'.$currentRow, $expectedDelivery);
-            $sheet->setCellValue('K'.$currentRow, 1);
+            $sheet->setCellValue('F'.$currentRow, $pathologists);
+            $sheet->setCellValue('G'.$currentRow, $statusName);
+            $sheet->setCellValue('H'.$currentRow, $finalizedAt);
+            $sheet->setCellValue('I'.$currentRow, $specimen->created_at ? $specimen->created_at->format('d/m/Y') : 'N/A');
+            $sheet->setCellValue('J'.$currentRow, $expectedInternal);
+            $sheet->setCellValue('K'.$currentRow, $expectedDelivery);
+            $sheet->setCellValue('L'.$currentRow, 1);
 
             // Styles for details row
             $sheet->getStyle("A{$currentRow}:D{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("E{$currentRow}:J{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("K{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("E{$currentRow}:K{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("L{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            $sheet->getStyle("A{$currentRow}:K{$currentRow}")->getFont()->setSize(10)->setName('Calibri');
+            $sheet->getStyle("A{$currentRow}:L{$currentRow}")->getFont()->setSize(10)->setName('Calibri');
 
-            // Accent yellow highlight on estimated delivery date column cell (Column J)
-            $sheet->getStyle('J'.$currentRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFE0');
+            // Accent yellow highlight on estimated delivery date column cell (Column K)
+            $sheet->getStyle('K'.$currentRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFE0');
 
             $currentRow++;
         }
 
         // Totals Row (at bottom of details list)
         $sheet->getRowDimension($currentRow)->setRowHeight(24);
-        $sheet->mergeCells("A{$currentRow}:J{$currentRow}");
+        $sheet->mergeCells("A{$currentRow}:K{$currentRow}");
         $sheet->setCellValue("A{$currentRow}", 'Total');
         $sheet->getStyle("A{$currentRow}")->getFont()->setBold(true)->setSize(10)->setName('Calibri');
         $sheet->getStyle("A{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-        $sheet->setCellValue("K{$currentRow}", '=SUM(K9:K'.($currentRow - 1).')');
-        $sheet->getStyle("K{$currentRow}")->getFont()->setBold(true)->setSize(10)->setName('Calibri');
-        $sheet->getStyle("K{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        $sheet->setCellValue("L{$currentRow}", '=SUM(L9:L'.($currentRow - 1).')');
+        $sheet->getStyle("L{$currentRow}")->getFont()->setBold(true)->setSize(10)->setName('Calibri');
+        $sheet->getStyle("L{$currentRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
         // Double borders for total row
-        $sheet->getStyle("A{$currentRow}:K{$currentRow}")->getBorders()->getTop()->setBorderStyle(Border::BORDER_THIN);
-        $sheet->getStyle("A{$currentRow}:K{$currentRow}")->getBorders()->getBottom()->setBorderStyle(Border::BORDER_DOUBLE);
+        $sheet->getStyle("A{$currentRow}:L{$currentRow}")->getBorders()->getTop()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle("A{$currentRow}:L{$currentRow}")->getBorders()->getBottom()->setBorderStyle(Border::BORDER_DOUBLE);
 
         // Dynamic Space
         $currentRow += 3;

@@ -30,6 +30,7 @@ interface Props {
     products: any[];
     banks: any[];
     showPaymentMethodEdition?: boolean;
+    readOnlySampleCollectionDate?: boolean;
 }
 
 export default function SpecimenSheet({
@@ -49,6 +50,7 @@ export default function SpecimenSheet({
     products,
     banks,
     showPaymentMethodEdition,
+    readOnlySampleCollectionDate,
 }: Props) {
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -113,6 +115,7 @@ export default function SpecimenSheet({
                         products={products}
                         banks={banks}
                         showPaymentMethodEdition={showPaymentMethodEdition}
+                        readOnlySampleCollectionDate={readOnlySampleCollectionDate}
                     />
                 </SheetContent>
             </Sheet>
