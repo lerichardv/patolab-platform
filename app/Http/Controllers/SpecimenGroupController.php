@@ -21,6 +21,7 @@ use App\Models\SpecimenGroupCustomer;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Services\InvoiceCalculationService;
+use App\Services\InvoicePdfService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\File;
 use Illuminate\Http\Request;
@@ -1560,5 +1561,102 @@ class SpecimenGroupController extends Controller
         ]);
 
         return response()->json($group);
+    }
+
+    public function customerInfo(SpecimenGroup $group)
+    {
+        $group->load([
+            'customer',
+            'invoice.creditRelation',
+            'specimens:id,group_id,sequence_code,customer',
+        ]);
+
+        $invoice = $group->invoice;
+        $credit = $invoice?->creditRelation ?? Credit::where('group_id', $group->id)->first();
+
+        return response()->json([
+            'id' => $group->id,
+            'name' => $group->name,
+            'customer_id' => $group->customer_id,
+            'customer' => $group->customer ? [
+                'id' => $group->customer->id,
+                'name' => $group->customer->name,
+                'id_number' => $group->customer->id_number,
+                'type' => $group->customer->type,
+                'phone' => $group->customer->phone,
+                'email' => $group->customer->email,
+            ] : null,
+            'specimens_count' => $group->specimens->count(),
+            'invoice' => $invoice ? [
+                'id' => $invoice->id,
+                'full_invoice_number' => $invoice->full_invoice_number ?? 'Sin número',
+                'payment_type' => $invoice->payment_type,
+                'total' => (float) $invoice->total,
+            ] : null,
+            'credit' => $credit ? [
+                'id' => $credit->id,
+                'amount_remaining' => (float) $credit->amount_remaining,
+                'credit_amount' => (float) $credit->credit_amount,
+                'status' => $credit->status,
+            ] : null,
+        ]);
+    }
+
+    public function updateCustomer(Request $request, SpecimenGroup $group)
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+        ]);
+
+        $newCustomer = Customer::findOrFail($validated['customer_id']);
+
+        DB::transaction(function () use ($group, $newCustomer) {
+            $group->load(['specimens', 'invoice']);
+
+            $specimenCount = $group->specimens->count();
+            $newGroupName = $newCustomer->name.' - '.$specimenCount.' '.($specimenCount === 1 ? 'Muestra' : 'Muestras');
+
+            // 1. Update SpecimenGroup
+            $group->update([
+                'customer_id' => $newCustomer->id,
+                'name' => $newGroupName,
+            ]);
+
+            // 2. Update SpecimenGroupCustomer pivot
+            $group->customers()->sync([$newCustomer->id]);
+
+            // 3. Update primary Invoice and any other invoices linked to the group
+            Invoice::where('group_id', $group->id)->update([
+                'customer_id' => $newCustomer->id,
+            ]);
+
+            if ($group->invoice_id) {
+                $primaryInvoice = Invoice::find($group->invoice_id);
+                if ($primaryInvoice) {
+                    $primaryInvoice->update(['customer_id' => $newCustomer->id]);
+
+                    try {
+                        app(InvoicePdfService::class)->generateAndStoreInvoice($primaryInvoice);
+                    } catch (\Throwable $e) {
+                        Log::warning('Error regenerating invoice PDF on group customer update: '.$e->getMessage());
+                    }
+                }
+            }
+
+            // 4. Update Credit and related credit payment invoices
+            $credit = Credit::where('group_id', $group->id)
+                ->orWhere('id', $group->invoice?->credit_payment_id)
+                ->first();
+
+            if ($credit) {
+                $credit->update(['customer_id' => $newCustomer->id]);
+
+                Invoice::where('credit_payment_id', $credit->id)->update([
+                    'customer_id' => $newCustomer->id,
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Cliente principal del grupo de muestras actualizado con éxito.');
     }
 }

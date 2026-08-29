@@ -24,6 +24,7 @@ import {
     Receipt,
     Upload,
     X,
+    UserCheck,
 } from 'lucide-react';
 import * as React from 'react';
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -83,6 +84,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
+import SpecimenGroupCustomerSheet from '../specimens/specimen-group-customer-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 import CreditEditSheet from './credit-edit-sheet';
 import CreditExtractSpecimenSheet from './credit-extract-specimen-sheet';
@@ -313,6 +315,9 @@ export default function CreditsIndex({
         selectedCreditForExtractSpecimen,
         setSelectedCreditForExtractSpecimen,
     ] = useState<Credit | null>(null);
+    const [isGroupCustomerSheetOpen, setIsGroupCustomerSheetOpen] = useState(false);
+    const [selectedGroupIdForCustomerChange, setSelectedGroupIdForCustomerChange] =
+        useState<number | null>(null);
     const [search, setSearch] = useState(filters.search || '');
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
@@ -1575,6 +1580,42 @@ export default function CreditsIndex({
                                                                         configuración
                                                                     </span>
                                                                 </DropdownMenuItem>
+                                                                {canManage &&
+                                                                    Boolean(
+                                                                        credit.is_group ||
+                                                                            credit.group_id ||
+                                                                            credit
+                                                                                .group
+                                                                                ?.id,
+                                                                    ) && (
+                                                                        <DropdownMenuItem
+                                                                            onClick={() => {
+                                                                                const grpId =
+                                                                                    credit.group_id ||
+                                                                                    credit
+                                                                                        .group
+                                                                                        ?.id;
+                                                                                if (
+                                                                                    grpId
+                                                                                ) {
+                                                                                    setSelectedGroupIdForCustomerChange(
+                                                                                        grpId,
+                                                                                    );
+                                                                                    setIsGroupCustomerSheetOpen(
+                                                                                        true,
+                                                                                    );
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <UserCheck className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                            <span>
+                                                                                Cambiar
+                                                                                cliente
+                                                                                del
+                                                                                grupo
+                                                                            </span>
+                                                                        </DropdownMenuItem>
+                                                                    )}
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </div>
@@ -1631,6 +1672,17 @@ export default function CreditsIndex({
                 credit={selectedCreditForView as any}
                 open={isCreditViewSheetOpen}
                 onOpenChange={setIsCreditViewSheetOpen}
+            />
+
+            <SpecimenGroupCustomerSheet
+                groupId={selectedGroupIdForCustomerChange}
+                open={isGroupCustomerSheetOpen}
+                onOpenChange={(open) => {
+                    setIsGroupCustomerSheetOpen(open);
+                    if (!open) {
+                        setSelectedGroupIdForCustomerChange(null);
+                    }
+                }}
             />
 
             <SpecimenGroupViewSheet

@@ -103,6 +103,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimen-groups/{group}/add-specimens', [SpecimenGroupController::class, 'addSpecimens'])->name('specimen-groups.add-specimens');
     Route::get('specimen-groups/search', [SpecimenGroupController::class, 'search'])->name('specimen-groups.search');
     Route::get('specimen-groups/{group}/details', [SpecimenGroupController::class, 'details'])->name('specimen-groups.details');
+    Route::get('specimen-groups/{group}/customer-info', [SpecimenGroupController::class, 'customerInfo'])->name('specimen-groups.customer-info');
+    Route::put('specimen-groups/{group}/customer', [SpecimenGroupController::class, 'updateCustomer'])->name('specimen-groups.update-customer');
 
     // Specimen Report Editor routes
     Route::get('specimens/templates/available', [ReportEditorController::class, 'getAvailableTemplates'])->name('specimens.templates.available');
