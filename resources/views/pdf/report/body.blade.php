@@ -247,8 +247,8 @@
         .patient-card td {
             padding: 1.32mm 2.12mm;
             vertical-align: top;
-            font-size: 2.91mm;
-            line-height: 4.23mm;
+            font-size: 3.44mm;
+            line-height: 4.80mm;
         }
 
         .patient-card strong {
@@ -478,7 +478,6 @@
         .section-content table p {
             margin: 0 !important;
             line-height: inherit !important;
-            text-align: inherit !important;
             font-size: inherit !important;
         }
 
@@ -632,16 +631,16 @@
                     @if($block['type'] === 'patient-card')
                         <table class="patient-card">
                             <tr>
-                                <td style="width: 55%;">
+                                <td style="width: 50%;">
                                     <strong>Nombre:</strong> {{ $customer->name ?? 'N/A' }}<br>
                                     <strong>Edad:</strong> {{ $customer->age ?? 'N/A' }} {{ $customer->age && $customer->age > 0 ? 'años' : '' }} &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ in_array(strtolower($customer->gender ?? ''), ['m', 'masculino', 'hombre']) ? 'M' : (in_array(strtolower($customer->gender ?? ''), ['f', 'femenino', 'mujer']) ? 'F' : (in_array(strtolower($customer->gender ?? ''), ['o', 'otro']) ? 'O' : 'N/A')) }}<br>
-                                    <strong>Médico Remitente:</strong> {{ $referrer->name ?? 'N/A' }}<br>
+                                    <strong>Remitente:</strong> {{ $referrer->name ?? 'N/A' }}<br>
                                     <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? '' }}
                                 </td>
-                                <td style="width: 45%; padding-left: 12px;">
-                                    <strong>Diagnóstico Clínicos:</strong> {{ $specimen->diagnosis ?? '' }}<br>
+                                <td style="width: 50%; padding-left: 12px;">
+                                    <strong>Diagnóstico:</strong> {{ $specimen->diagnosis ?? '' }}<br>
                                     <strong>Sitio Anatómico:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}<br>
-									<strong>Fecha de la toma:</strong> {{ $specimen->sample_collection_date ? \Carbon\Carbon::parse($specimen->sample_collection_date)->format('d/m/Y') : 'N/A' }}<br>
+									<strong>Fecha de la toma:</strong> {{ $specimen->sample_collection_date_na ? 'N/A' : ($specimen->sample_collection_date ? \Carbon\Carbon::parse($specimen->sample_collection_date)->format('d/m/Y') : 'N/A') }}<br>
 									<strong>Fecha de Recepción:</strong> {{ $report->report_date ? \Carbon\Carbon::parse($report->report_date)->format('d/m/Y') : 'N/A' }}
                                 </td>
                             </tr>

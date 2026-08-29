@@ -97,9 +97,9 @@ export function KanbanColumn({
     handleLoadMore,
 }: KanbanColumnProps) {
     const totalSpecimens = priority.specimens.length;
-    const isPaginated = totalSpecimens > 50;
+    const isPaginated = totalSpecimens > 25;
     const visibleLimit = isPaginated
-        ? visibleCounts[priority.id] || 50
+        ? visibleCounts[priority.id] || 25
         : totalSpecimens;
     const visibleSpecimens = isPaginated
         ? priority.specimens.slice(0, visibleLimit)

@@ -29,9 +29,10 @@ import {
     UserPlus,
     ArrowUp,
     ArrowDown,
+    Loader2,
 } from 'lucide-react';
 import { Scissors } from 'lucide-react';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import {
     DateRangePicker,
@@ -283,6 +284,75 @@ const getCuttingsSummary = (cuttings?: any[]) => {
     };
 };
 
+const CUTTING_STATUS_CONFIG: Record<
+    string,
+    { label: string; className: string }
+> = {
+    macroscopy: {
+        label: 'Macroscopía',
+        className:
+            'border-blue-200 bg-blue-50 text-[10px] font-semibold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-400',
+    },
+    processing: {
+        label: 'Procesamiento',
+        className:
+            'border-amber-200 bg-amber-50 text-[10px] font-semibold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400',
+    },
+    delivered: {
+        label: 'Entregado',
+        className:
+            'border-emerald-200 bg-emerald-50 text-[10px] font-semibold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400',
+    },
+};
+
+const getCuttingsStatusSummary = (cuttings?: any[]) => {
+    if (!cuttings || cuttings.length === 0) {
+        return null;
+    }
+
+    const counts: Record<string, number> = {};
+
+    for (const cutting of cuttings) {
+        const status = cutting.status || 'macroscopy';
+        counts[status] = (counts[status] || 0) + 1;
+    }
+
+    const order = ['macroscopy', 'processing', 'delivered'];
+    const sortedStatuses = Object.keys(counts).sort((a, b) => {
+        const indexA = order.indexOf(a);
+        const indexB = order.indexOf(b);
+
+        if (indexA !== -1 && indexB !== -1) {
+            return indexA - indexB;
+        }
+
+        if (indexA !== -1) {
+            return -1;
+        }
+
+        if (indexB !== -1) {
+            return 1;
+        }
+
+        return a.localeCompare(b);
+    });
+
+    return sortedStatuses.map((status) => {
+        const config = CUTTING_STATUS_CONFIG[status] || {
+            label: status.charAt(0).toUpperCase() + status.slice(1),
+            className:
+                'border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300',
+        };
+
+        return {
+            status,
+            label: config.label,
+            className: config.className,
+            count: counts[status],
+        };
+    });
+};
+
 const getSpecimenExaminations = (specimen: Specimen) => {
     if (!specimen) {
         return [];
@@ -399,6 +469,67 @@ function CopyButton({ text }: { text: string }) {
         </Button>
     );
 }
+
+const AssignmentTableSentinel = ({
+    priorityId,
+    totalCount,
+    visibleCount,
+    onLoadMore,
+    colSpan,
+}: {
+    priorityId: number;
+    totalCount: number;
+    visibleCount: number;
+    onLoadMore: (priorityId: number) => void;
+    colSpan: number;
+}) => {
+    const sentinelRef = useRef<HTMLTableRowElement | null>(null);
+
+    useEffect(() => {
+        const node = sentinelRef.current;
+
+        if (!node || visibleCount >= totalCount) {
+            return;
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    onLoadMore(priorityId);
+                }
+            },
+            { rootMargin: '300px' },
+        );
+
+        observer.observe(node);
+
+        return () => {
+            observer.unobserve(node);
+        };
+    }, [priorityId, totalCount, visibleCount, onLoadMore]);
+
+    return (
+        <TableRow ref={sentinelRef} className="hover:bg-transparent">
+            <TableCell colSpan={colSpan} className="p-3">
+                <div className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/10">
+                    <div className="flex items-center gap-2 font-medium text-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                        <span>
+                            Mostrando {visibleCount} de {totalCount} muestras
+                        </span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => onLoadMore(priorityId)}
+                        className="mt-0.5 text-[11px] font-semibold text-primary hover:underline"
+                    >
+                        Cargar más muestras
+                    </button>
+                </div>
+            </TableCell>
+        </TableRow>
+    );
+};
 
 export default function MyAssignmentsIndex({
     specimens,
@@ -524,6 +655,20 @@ export default function MyAssignmentsIndex({
     const [dueDateSortOrder, setDueDateSortOrder] = useState<'asc' | 'desc'>(
         'desc',
     );
+    const [visibleCounts, setVisibleCounts] = useState<Record<number, number>>(
+        {},
+    );
+
+    const handleLoadMore = (priorityId: number) => {
+        setVisibleCounts((prev) => {
+            const current = prev[priorityId] || 10;
+
+            return {
+                ...prev,
+                [priorityId]: current + 10,
+            };
+        });
+    };
     const parseInitialIds = (rawFilter: any, allItems: any[]): string[] => {
         if (
             rawFilter === 'none' ||
@@ -875,6 +1020,20 @@ export default function MyAssignmentsIndex({
             );
         }
     }, [filters, specimenTypes, examinations]);
+
+    useEffect(() => {
+        setVisibleCounts({});
+    }, [
+        searchQuery,
+        selectedStatuses,
+        dateRange,
+        selectedSpecimenTypeIds,
+        selectedExaminationIds,
+        showCuttingsOnly,
+        cuttingsDateRange,
+        showExpiredOnly,
+        dueDateSortOrder,
+    ]);
 
     const handleViewSpecimen = (specimen: Specimen) => {
         setSelectedSpecimen(specimen);
@@ -1515,6 +1674,14 @@ export default function MyAssignmentsIndex({
                 <div className="flex flex-col gap-8">
                     {priorities.map((priority) => {
                         const list = groupedSpecimens[priority.id] || [];
+                        const totalSpecimens = list.length;
+                        const isPaginated = totalSpecimens > 10;
+                        const visibleLimit = isPaginated
+                            ? visibleCounts[priority.id] || 10
+                            : totalSpecimens;
+                        const visibleList = isPaginated
+                            ? list.slice(0, visibleLimit)
+                            : list;
                         const priorityColor = priority.color || '#cbd5e1';
                         const tableBg = `${priorityColor}05`; // subtle ~2% opacity
                         const tableBorder = `${priorityColor}15`; // subtle border
@@ -1631,554 +1798,618 @@ export default function MyAssignmentsIndex({
                                                     <TableHead className="min-w-[160px] font-semibold">
                                                         Cortes
                                                     </TableHead>
-                                                    <TableHead className="w-[100px] text-right font-semibold">
+                                                    <TableHead className="min-w-[160px] font-semibold">
+                                                        Estado de Cortes
+                                                    </TableHead>
+                                                    <TableHead className="sticky right-0 z-10 w-[100px] min-w-[100px] border-l border-border bg-card text-right font-semibold">
                                                         Acciones
                                                     </TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {list.length > 0 ? (
-                                                    list.map((specimen) => {
-                                                        const dueDate =
-                                                            getDueDate(
-                                                                specimen,
-                                                            );
-                                                        const statusName =
-                                                            STATUS_LABELS[
-                                                                specimen.status
-                                                            ] ||
-                                                            specimen.status;
+                                                {visibleList.length > 0 ? (
+                                                    visibleList.map(
+                                                        (specimen) => {
+                                                            const dueDate =
+                                                                getDueDate(
+                                                                    specimen,
+                                                                );
+                                                            const statusName =
+                                                                STATUS_LABELS[
+                                                                    specimen
+                                                                        .status
+                                                                ] ||
+                                                                specimen.status;
 
-                                                        return (
-                                                            <TableRow
-                                                                key={
-                                                                    specimen.id
-                                                                }
-                                                                className={cn(
-                                                                    'group cursor-pointer border-border/40 transition-colors hover:bg-muted/30',
-                                                                    selectedIds.includes(
-                                                                        specimen.id,
-                                                                    ) &&
-                                                                        'border-primary/20 bg-primary/[0.04] hover:bg-primary/[0.06]',
-                                                                )}
-                                                                onClick={(
-                                                                    e,
-                                                                ) => {
-                                                                    if (
-                                                                        isSelectionMode
-                                                                    ) {
-                                                                        e.stopPropagation();
-                                                                        toggleSelectSpecimen(
-                                                                            specimen.id,
-                                                                        );
-                                                                    } else if (
-                                                                        hasReportEditorPermission
-                                                                    ) {
-                                                                        router.get(
-                                                                            `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
-                                                                        );
+                                                            return (
+                                                                <TableRow
+                                                                    key={
+                                                                        specimen.id
                                                                     }
-                                                                }}
-                                                            >
-                                                                {isSelectionMode && (
+                                                                    className={cn(
+                                                                        'group cursor-pointer border-border/40 transition-colors hover:bg-muted/30',
+                                                                        selectedIds.includes(
+                                                                            specimen.id,
+                                                                        ) &&
+                                                                            'border-primary/20 bg-primary/[0.04] hover:bg-primary/[0.06]',
+                                                                    )}
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) => {
+                                                                        if (
+                                                                            isSelectionMode
+                                                                        ) {
+                                                                            e.stopPropagation();
+                                                                            toggleSelectSpecimen(
+                                                                                specimen.id,
+                                                                            );
+                                                                        } else if (
+                                                                            hasReportEditorPermission
+                                                                        ) {
+                                                                            router.get(
+                                                                                `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    {isSelectionMode && (
+                                                                        <TableCell
+                                                                            className="w-[50px] py-2.5 text-center"
+                                                                            onClick={(
+                                                                                e,
+                                                                            ) =>
+                                                                                e.stopPropagation()
+                                                                            }
+                                                                        >
+                                                                            <Checkbox
+                                                                                checked={selectedIds.includes(
+                                                                                    specimen.id,
+                                                                                )}
+                                                                                onCheckedChange={() =>
+                                                                                    toggleSelectSpecimen(
+                                                                                        specimen.id,
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </TableCell>
+                                                                    )}
+                                                                    <TableCell className="font-mono text-xs font-semibold text-primary">
+                                                                        <div className="flex flex-col gap-1 py-1">
+                                                                            {(() => {
+                                                                                const isPathologist =
+                                                                                    specimen.users?.some(
+                                                                                        (
+                                                                                            u: any,
+                                                                                        ) =>
+                                                                                            u.id ===
+                                                                                            props
+                                                                                                .auth
+                                                                                                ?.user
+                                                                                                ?.id,
+                                                                                    );
+                                                                                const isCollaborator =
+                                                                                    specimen.collaborators?.some(
+                                                                                        (
+                                                                                            c: any,
+                                                                                        ) =>
+                                                                                            c.id ===
+                                                                                            props
+                                                                                                .auth
+                                                                                                ?.user
+                                                                                                ?.id,
+                                                                                    );
+
+                                                                                if (
+                                                                                    !isPathologist &&
+                                                                                    !isCollaborator
+                                                                                ) {
+                                                                                    return null;
+                                                                                }
+
+                                                                                return (
+                                                                                    <div className="flex flex-wrap gap-1">
+                                                                                        {isPathologist && (
+                                                                                            <Badge
+                                                                                                variant="outline"
+                                                                                                className="border-blue-500/20 bg-blue-500/10 px-1 py-0 text-[8px] font-semibold text-blue-500 uppercase"
+                                                                                            >
+                                                                                                Patólogo
+                                                                                            </Badge>
+                                                                                        )}
+                                                                                        {isCollaborator && (
+                                                                                            <Badge
+                                                                                                variant="outline"
+                                                                                                className="border-emerald-500/20 bg-emerald-500/10 px-1 py-0 text-[8px] font-semibold text-emerald-500 uppercase"
+                                                                                            >
+                                                                                                Colaborador
+                                                                                            </Badge>
+                                                                                        )}
+                                                                                    </div>
+                                                                                );
+                                                                            })()}
+                                                                            <div className="flex min-h-[24px] flex-wrap items-center gap-1">
+                                                                                <span>
+                                                                                    {specimen.sequence_code ||
+                                                                                        `#${specimen.id}`}
+                                                                                </span>
+                                                                                <CopyButton
+                                                                                    text={
+                                                                                        specimen.sequence_code ||
+                                                                                        `#${specimen.id}`
+                                                                                    }
+                                                                                />
+                                                                                {specimen.work_orders &&
+                                                                                    specimen
+                                                                                        .work_orders
+                                                                                        .length >
+                                                                                        0 && (
+                                                                                        <Badge
+                                                                                            variant="secondary"
+                                                                                            className="animate-in cursor-pointer rounded-full border bg-primary/5 px-1.5 py-0.5 text-[10px] font-bold text-primary select-none fade-in hover:bg-primary/10"
+                                                                                            onClick={(
+                                                                                                e,
+                                                                                            ) => {
+                                                                                                e.stopPropagation();
+                                                                                                setSelectedSpecimenForWorkOrdersList(
+                                                                                                    specimen,
+                                                                                                );
+                                                                                            }}
+                                                                                            title={`${specimen.work_orders.length} órdenes de trabajo creadas. Haga clic para ver detalles.`}
+                                                                                        >
+                                                                                            <Layers className="mr-0.5 h-3 w-3 text-primary" />
+                                                                                            {
+                                                                                                specimen
+                                                                                                    .work_orders
+                                                                                                    .length
+                                                                                            }
+                                                                                        </Badge>
+                                                                                    )}
+                                                                                {specimen.cuttings &&
+                                                                                    specimen
+                                                                                        .cuttings
+                                                                                        .length >
+                                                                                        0 && (
+                                                                                        <Badge
+                                                                                            variant="secondary"
+                                                                                            className="animate-in cursor-pointer rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700 select-none fade-in hover:bg-violet-100 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-400"
+                                                                                            onClick={(
+                                                                                                e,
+                                                                                            ) => {
+                                                                                                e.stopPropagation();
+                                                                                                setSpecimenForCuttings(
+                                                                                                    specimen,
+                                                                                                );
+                                                                                                setIsManageCuttingsOpen(
+                                                                                                    true,
+                                                                                                );
+                                                                                            }}
+                                                                                            title={`${specimen.cuttings.length} cortes registrados. Haga clic para administrar.`}
+                                                                                        >
+                                                                                            <Scissors className="mr-0.5 h-3.5 w-3.5 shrink-0 fill-violet-600/10 text-violet-600" />
+
+                                                                                            x
+                                                                                            {
+                                                                                                specimen
+                                                                                                    .cuttings
+                                                                                                    .length
+                                                                                            }
+                                                                                        </Badge>
+                                                                                    )}
+                                                                            </div>
+                                                                            <div className="font-sans text-[10px] font-normal text-muted-foreground">
+                                                                                {specimen.created_at
+                                                                                    ? format(
+                                                                                          new Date(
+                                                                                              specimen.created_at,
+                                                                                          ),
+                                                                                          'dd/MM/yyyy h:mm a',
+                                                                                      )
+                                                                                    : 'N/A'}
+                                                                            </div>
+                                                                        </div>
+                                                                    </TableCell>
+                                                                    {/* Visual Day Calendar Tear-off Widget + Inline Status Badge */}
+                                                                    <TableCell className="py-2.5">
+                                                                        <div className="flex items-center gap-2">
+                                                                            {(() => {
+                                                                                const isLight =
+                                                                                    [
+                                                                                        'yellow',
+                                                                                        '#ffff00',
+                                                                                        '#facc15',
+                                                                                        '#eab308',
+                                                                                        '#ffeb3b',
+                                                                                    ].includes(
+                                                                                        priorityColor
+                                                                                            .toLowerCase()
+                                                                                            .trim(),
+                                                                                    );
+
+                                                                                return (
+                                                                                    <div className="flex max-w-[62px] min-w-[62px] flex-col items-center justify-center overflow-hidden rounded-md border border-muted-foreground/20 bg-background text-center shadow-xs">
+                                                                                        <div
+                                                                                            className={`w-full py-0.5 text-[8.5px] leading-none font-bold tracking-wider uppercase ${isLight ? 'text-neutral-900' : 'text-white'}`}
+                                                                                            style={{
+                                                                                                backgroundColor:
+                                                                                                    priorityColor,
+                                                                                            }}
+                                                                                        >
+                                                                                            {format(
+                                                                                                dueDate,
+                                                                                                'MMM',
+                                                                                                {
+                                                                                                    locale: es,
+                                                                                                },
+                                                                                            )}
+                                                                                        </div>
+                                                                                        <div className="mt-0.5 px-1.5 py-0.5 text-base leading-none font-black text-foreground">
+                                                                                            {format(
+                                                                                                dueDate,
+                                                                                                'dd',
+                                                                                            )}
+                                                                                        </div>
+                                                                                        <div className="mt-0.5 pb-1 text-[8.5px] leading-none text-muted-foreground">
+                                                                                            {format(
+                                                                                                dueDate,
+                                                                                                'h:mm a',
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })()}
+                                                                            {(() => {
+                                                                                const dueInfo =
+                                                                                    getDueDateInfo(
+                                                                                        specimen,
+                                                                                    );
+
+                                                                                if (
+                                                                                    !dueInfo ||
+                                                                                    [
+                                                                                        'finalized',
+                                                                                        'delivered',
+                                                                                        'cancelled',
+                                                                                    ].includes(
+                                                                                        specimen.status,
+                                                                                    )
+                                                                                ) {
+                                                                                    return null;
+                                                                                }
+
+                                                                                return (
+                                                                                    <div
+                                                                                        className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${dueInfo.colorClass}`}
+                                                                                        title={`Vencimiento Interno: ${dueInfo.fullDueDate}`}
+                                                                                    >
+                                                                                        <CalendarClock className="h-3 w-3 shrink-0" />
+                                                                                        <span>
+                                                                                            {dueInfo.isExpired
+                                                                                                ? 'Vencida:'
+                                                                                                : 'Est:'}{' '}
+                                                                                            {
+                                                                                                dueInfo.dueDateFormatted
+                                                                                            }
+                                                                                        </span>
+                                                                                    </div>
+                                                                                );
+                                                                            })()}
+                                                                        </div>
+                                                                    </TableCell>
+                                                                    <TableCell className="font-medium text-foreground">
+                                                                        {specimen
+                                                                            .customer_relation
+                                                                            ?.name ||
+                                                                            'N/A'}
+                                                                    </TableCell>
+                                                                    <TableCell className="text-sm text-muted-foreground">
+                                                                        <div className="font-medium text-foreground">
+                                                                            {specimen
+                                                                                .type
+                                                                                ?.name ||
+                                                                                'N/A'}
+                                                                        </div>
+                                                                        {(() => {
+                                                                            const exams =
+                                                                                getSpecimenExaminations(
+                                                                                    specimen,
+                                                                                );
+
+                                                                            if (
+                                                                                exams.length ===
+                                                                                0
+                                                                            ) {
+                                                                                return (
+                                                                                    <div className="mt-0.5 text-xs text-muted-foreground">
+                                                                                        N/A
+                                                                                    </div>
+                                                                                );
+                                                                            }
+
+                                                                            return (
+                                                                                <div className="mt-1 flex flex-col gap-0.5">
+                                                                                    {exams.map(
+                                                                                        (
+                                                                                            exam,
+                                                                                            idx,
+                                                                                        ) => (
+                                                                                            <div
+                                                                                                key={
+                                                                                                    idx
+                                                                                                }
+                                                                                                className="text-xs font-medium text-muted-foreground"
+                                                                                            >
+                                                                                                {exams.length >
+                                                                                                1
+                                                                                                    ? '•'
+                                                                                                    : ''}{' '}
+                                                                                                {
+                                                                                                    exam.name
+                                                                                                }
+                                                                                            </div>
+                                                                                        ),
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        {(() => {
+                                                                            const color =
+                                                                                specimen.status_color ||
+                                                                                '#cbd5e1';
+
+                                                                            return (
+                                                                                <Badge
+                                                                                    variant="outline"
+                                                                                    className="font-regular rounded-full px-2.5 py-0.5 text-xs"
+                                                                                    style={{
+                                                                                        backgroundColor: `${color}15`,
+                                                                                        color: color,
+                                                                                        borderColor: `${color}30`,
+                                                                                    }}
+                                                                                >
+                                                                                    {
+                                                                                        statusName
+                                                                                    }
+                                                                                </Badge>
+                                                                            );
+                                                                        })()}
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        {(() => {
+                                                                            const summary =
+                                                                                getCuttingsSummary(
+                                                                                    specimen.cuttings,
+                                                                                );
+
+                                                                            if (
+                                                                                !summary
+                                                                            ) {
+                                                                                return (
+                                                                                    <span className="text-xs text-muted-foreground italic">
+                                                                                        N/A
+                                                                                    </span>
+                                                                                );
+                                                                            }
+
+                                                                            return (
+                                                                                <div className="flex flex-wrap gap-1">
+                                                                                    <Badge
+                                                                                        variant="outline"
+                                                                                        className="border-amber-200 bg-amber-50 text-[10px] font-semibold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400"
+                                                                                    >
+                                                                                        {
+                                                                                            summary.range
+                                                                                        }
+                                                                                    </Badge>
+                                                                                    <Badge
+                                                                                        variant="outline"
+                                                                                        className="border-blue-200 bg-blue-50 text-[10px] font-semibold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-400"
+                                                                                    >
+                                                                                        {
+                                                                                            summary.totalCassettes
+                                                                                        }{' '}
+                                                                                        {summary.totalCassettes ===
+                                                                                        1
+                                                                                            ? 'casete'
+                                                                                            : 'casetes'}
+                                                                                    </Badge>
+                                                                                    <Badge
+                                                                                        variant="outline"
+                                                                                        className="border-purple-200 bg-purple-50 text-[10px] font-semibold text-purple-700 dark:border-purple-900/50 dark:bg-purple-950/30 dark:text-purple-400"
+                                                                                    >
+                                                                                        {
+                                                                                            summary.totalSlides
+                                                                                        }{' '}
+                                                                                        {summary.totalSlides ===
+                                                                                        1
+                                                                                            ? 'lámina'
+                                                                                            : 'láminas'}
+                                                                                    </Badge>
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        {(() => {
+                                                                            const statusSummary =
+                                                                                getCuttingsStatusSummary(
+                                                                                    specimen.cuttings,
+                                                                                );
+
+                                                                            if (
+                                                                                !statusSummary
+                                                                            ) {
+                                                                                return (
+                                                                                    <span className="text-xs text-muted-foreground italic">
+                                                                                        N/A
+                                                                                    </span>
+                                                                                );
+                                                                            }
+
+                                                                            return (
+                                                                                <div className="flex flex-wrap gap-1">
+                                                                                    {statusSummary.map(
+                                                                                        (
+                                                                                            item,
+                                                                                        ) => (
+                                                                                            <Badge
+                                                                                                key={
+                                                                                                    item.status
+                                                                                                }
+                                                                                                variant="outline"
+                                                                                                className={
+                                                                                                    item.className
+                                                                                                }
+                                                                                            >
+                                                                                                {
+                                                                                                    item.label
+                                                                                                }{' '}
+                                                                                                x
+                                                                                                {
+                                                                                                    item.count
+                                                                                                }
+                                                                                            </Badge>
+                                                                                        ),
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                    </TableCell>
+
                                                                     <TableCell
-                                                                        className="w-[50px] py-2.5 text-center"
+                                                                        className={cn(
+                                                                            'sticky right-0 z-10 w-[100px] min-w-[100px] border-l border-border bg-card text-right transition-colors group-hover:bg-muted/30',
+                                                                            selectedIds.includes(
+                                                                                specimen.id,
+                                                                            ) &&
+                                                                                'bg-card group-hover:bg-primary/[0.06]',
+                                                                        )}
                                                                         onClick={(
                                                                             e,
                                                                         ) =>
                                                                             e.stopPropagation()
                                                                         }
                                                                     >
-                                                                        <Checkbox
-                                                                            checked={selectedIds.includes(
-                                                                                specimen.id,
-                                                                            )}
-                                                                            onCheckedChange={() =>
-                                                                                toggleSelectSpecimen(
-                                                                                    specimen.id,
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                    </TableCell>
-                                                                )}
-                                                                <TableCell className="font-mono text-xs font-semibold text-primary">
-                                                                    <div className="flex flex-col gap-1 py-1">
-                                                                        {(() => {
-                                                                            const isPathologist =
-                                                                                specimen.users?.some(
-                                                                                    (
-                                                                                        u: any,
-                                                                                    ) =>
-                                                                                        u.id ===
-                                                                                        props
-                                                                                            .auth
-                                                                                            ?.user
-                                                                                            ?.id,
-                                                                                );
-                                                                            const isCollaborator =
-                                                                                specimen.collaborators?.some(
-                                                                                    (
-                                                                                        c: any,
-                                                                                    ) =>
-                                                                                        c.id ===
-                                                                                        props
-                                                                                            .auth
-                                                                                            ?.user
-                                                                                            ?.id,
-                                                                                );
-
-                                                                            if (
-                                                                                !isPathologist &&
-                                                                                !isCollaborator
-                                                                            ) {
-                                                                                return null;
-                                                                            }
-
-                                                                            return (
-                                                                                <div className="flex flex-wrap gap-1">
-                                                                                    {isPathologist && (
-                                                                                        <Badge
-                                                                                            variant="outline"
-                                                                                            className="border-blue-500/20 bg-blue-500/10 px-1 py-0 text-[8px] font-semibold text-blue-500 uppercase"
-                                                                                        >
-                                                                                            Patólogo
-                                                                                        </Badge>
-                                                                                    )}
-                                                                                    {isCollaborator && (
-                                                                                        <Badge
-                                                                                            variant="outline"
-                                                                                            className="border-emerald-500/20 bg-emerald-500/10 px-1 py-0 text-[8px] font-semibold text-emerald-500 uppercase"
-                                                                                        >
-                                                                                            Colaborador
-                                                                                        </Badge>
-                                                                                    )}
-                                                                                </div>
-                                                                            );
-                                                                        })()}
-                                                                        <div className="flex min-h-[24px] flex-wrap items-center gap-1">
-                                                                            <span>
-                                                                                {specimen.sequence_code ||
-                                                                                    `#${specimen.id}`}
-                                                                            </span>
-                                                                            <CopyButton
-                                                                                text={
-                                                                                    specimen.sequence_code ||
-                                                                                    `#${specimen.id}`
-                                                                                }
-                                                                            />
-                                                                            {specimen.work_orders &&
-                                                                                specimen
-                                                                                    .work_orders
-                                                                                    .length >
-                                                                                    0 && (
-                                                                                    <Badge
-                                                                                        variant="secondary"
-                                                                                        className="animate-in cursor-pointer rounded-full border bg-primary/5 px-1.5 py-0.5 text-[10px] font-bold text-primary select-none fade-in hover:bg-primary/10"
-                                                                                        onClick={(
-                                                                                            e,
-                                                                                        ) => {
-                                                                                            e.stopPropagation();
-                                                                                            setSelectedSpecimenForWorkOrdersList(
-                                                                                                specimen,
-                                                                                            );
-                                                                                        }}
-                                                                                        title={`${specimen.work_orders.length} órdenes de trabajo creadas. Haga clic para ver detalles.`}
-                                                                                    >
-                                                                                        <Layers className="mr-0.5 h-3 w-3 text-primary" />
-                                                                                        {
-                                                                                            specimen
-                                                                                                .work_orders
-                                                                                                .length
-                                                                                        }
-                                                                                    </Badge>
-                                                                                )}
-                                                                            {specimen.cuttings &&
-                                                                                specimen
-                                                                                    .cuttings
-                                                                                    .length >
-                                                                                    0 && (
-                                                                                    <Badge
-                                                                                        variant="secondary"
-                                                                                        className="animate-in cursor-pointer rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700 select-none fade-in hover:bg-violet-100 dark:border-violet-900/50 dark:bg-violet-950/30 dark:text-violet-400"
-                                                                                        onClick={(
-                                                                                            e,
-                                                                                        ) => {
-                                                                                            e.stopPropagation();
-                                                                                            setSpecimenForCuttings(
-                                                                                                specimen,
-                                                                                            );
-                                                                                            setIsManageCuttingsOpen(
-                                                                                                true,
-                                                                                            );
-                                                                                        }}
-                                                                                        title={`${specimen.cuttings.length} cortes registrados. Haga clic para administrar.`}
-                                                                                    >
-                                                                                        <Scissors className="mr-0.5 h-3.5 w-3.5 shrink-0 fill-violet-600/10 text-violet-600" />
-
-                                                                                        x
-                                                                                        {
-                                                                                            specimen
-                                                                                                .cuttings
-                                                                                                .length
-                                                                                        }
-                                                                                    </Badge>
-                                                                                )}
-                                                                        </div>
-                                                                        <div className="font-sans text-[10px] font-normal text-muted-foreground">
-                                                                            {specimen.created_at
-                                                                                ? format(
-                                                                                      new Date(
-                                                                                          specimen.created_at,
-                                                                                      ),
-                                                                                      'dd/MM/yyyy h:mm a',
-                                                                                  )
-                                                                                : 'N/A'}
-                                                                        </div>
-                                                                    </div>
-                                                                </TableCell>
-                                                                {/* Visual Day Calendar Tear-off Widget + Inline Status Badge */}
-                                                                <TableCell className="py-2.5">
-                                                                    <div className="flex items-center gap-2">
-                                                                        {(() => {
-                                                                            const isLight =
-                                                                                [
-                                                                                    'yellow',
-                                                                                    '#ffff00',
-                                                                                    '#facc15',
-                                                                                    '#eab308',
-                                                                                    '#ffeb3b',
-                                                                                ].includes(
-                                                                                    priorityColor
-                                                                                        .toLowerCase()
-                                                                                        .trim(),
-                                                                                );
-
-                                                                            return (
-                                                                                <div className="flex max-w-[62px] min-w-[62px] flex-col items-center justify-center overflow-hidden rounded-md border border-muted-foreground/20 bg-background text-center shadow-xs">
-                                                                                    <div
-                                                                                        className={`w-full py-0.5 text-[8.5px] leading-none font-bold tracking-wider uppercase ${isLight ? 'text-neutral-900' : 'text-white'}`}
-                                                                                        style={{
-                                                                                            backgroundColor:
-                                                                                                priorityColor,
-                                                                                        }}
-                                                                                    >
-                                                                                        {format(
-                                                                                            dueDate,
-                                                                                            'MMM',
-                                                                                            {
-                                                                                                locale: es,
-                                                                                            },
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div className="mt-0.5 px-1.5 py-0.5 text-base leading-none font-black text-foreground">
-                                                                                        {format(
-                                                                                            dueDate,
-                                                                                            'dd',
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div className="mt-0.5 pb-1 text-[8.5px] leading-none text-muted-foreground">
-                                                                                        {format(
-                                                                                            dueDate,
-                                                                                            'h:mm a',
-                                                                                        )}
-                                                                                    </div>
-                                                                                </div>
-                                                                            );
-                                                                        })()}
-                                                                        {(() => {
-                                                                            const dueInfo =
-                                                                                getDueDateInfo(
-                                                                                    specimen,
-                                                                                );
-
-                                                                            if (
-                                                                                !dueInfo ||
-                                                                                [
-                                                                                    'finalized',
-                                                                                    'delivered',
-                                                                                    'cancelled',
-                                                                                ].includes(
-                                                                                    specimen.status,
-                                                                                )
-                                                                            ) {
-                                                                                return null;
-                                                                            }
-
-                                                                            return (
-                                                                                <div
-                                                                                    className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${dueInfo.colorClass}`}
-                                                                                    title={`Vencimiento Interno: ${dueInfo.fullDueDate}`}
-                                                                                >
-                                                                                    <CalendarClock className="h-3 w-3 shrink-0" />
-                                                                                    <span>
-                                                                                        {dueInfo.isExpired
-                                                                                            ? 'Vencida:'
-                                                                                            : 'Est:'}{' '}
-                                                                                        {
-                                                                                            dueInfo.dueDateFormatted
-                                                                                        }
-                                                                                    </span>
-                                                                                </div>
-                                                                            );
-                                                                        })()}
-                                                                    </div>
-                                                                </TableCell>
-                                                                <TableCell className="font-medium text-foreground">
-                                                                    {specimen
-                                                                        .customer_relation
-                                                                        ?.name ||
-                                                                        'N/A'}
-                                                                </TableCell>
-                                                                <TableCell className="text-sm text-muted-foreground">
-                                                                    <div className="font-medium text-foreground">
-                                                                        {specimen
-                                                                            .type
-                                                                            ?.name ||
-                                                                            'N/A'}
-                                                                    </div>
-                                                                    {(() => {
-                                                                        const exams =
-                                                                            getSpecimenExaminations(
-                                                                                specimen,
-                                                                            );
-
-                                                                        if (
-                                                                            exams.length ===
-                                                                            0
-                                                                        ) {
-                                                                            return (
-                                                                                <div className="mt-0.5 text-xs text-muted-foreground">
-                                                                                    N/A
-                                                                                </div>
-                                                                            );
-                                                                        }
-
-                                                                        return (
-                                                                            <div className="mt-1 flex flex-col gap-0.5">
-                                                                                {exams.map(
-                                                                                    (
-                                                                                        exam,
-                                                                                        idx,
-                                                                                    ) => (
-                                                                                        <div
-                                                                                            key={
-                                                                                                idx
-                                                                                            }
-                                                                                            className="text-xs font-medium text-muted-foreground"
-                                                                                        >
-                                                                                            {exams.length >
-                                                                                            1
-                                                                                                ? '•'
-                                                                                                : ''}{' '}
-                                                                                            {
-                                                                                                exam.name
-                                                                                            }
-                                                                                        </div>
-                                                                                    ),
-                                                                                )}
-                                                                            </div>
-                                                                        );
-                                                                    })()}
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    {(() => {
-                                                                        const color =
-                                                                            specimen.status_color ||
-                                                                            '#cbd5e1';
-
-                                                                        return (
-                                                                            <Badge
-                                                                                variant="outline"
-                                                                                className="font-regular rounded-full px-2.5 py-0.5 text-xs"
-                                                                                style={{
-                                                                                    backgroundColor: `${color}15`,
-                                                                                    color: color,
-                                                                                    borderColor: `${color}30`,
-                                                                                }}
-                                                                            >
-                                                                                {
-                                                                                    statusName
-                                                                                }
-                                                                            </Badge>
-                                                                        );
-                                                                    })()}
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    {(() => {
-                                                                        const summary =
-                                                                            getCuttingsSummary(
-                                                                                specimen.cuttings,
-                                                                            );
-
-                                                                        if (
-                                                                            !summary
-                                                                        ) {
-                                                                            return (
-                                                                                <span className="text-xs text-muted-foreground italic">
-                                                                                    N/A
-                                                                                </span>
-                                                                            );
-                                                                        }
-
-                                                                        return (
-                                                                            <div className="flex flex-wrap gap-1">
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="border-amber-200 bg-amber-50 text-[10px] font-semibold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400"
-                                                                                >
-                                                                                    {
-                                                                                        summary.range
-                                                                                    }
-                                                                                </Badge>
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="border-blue-200 bg-blue-50 text-[10px] font-semibold text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-400"
-                                                                                >
-                                                                                    {
-                                                                                        summary.totalCassettes
-                                                                                    }{' '}
-                                                                                    {summary.totalCassettes ===
-                                                                                    1
-                                                                                        ? 'casete'
-                                                                                        : 'casetes'}
-                                                                                </Badge>
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="border-purple-200 bg-purple-50 text-[10px] font-semibold text-purple-700 dark:border-purple-900/50 dark:bg-purple-950/30 dark:text-purple-400"
-                                                                                >
-                                                                                    {
-                                                                                        summary.totalSlides
-                                                                                    }{' '}
-                                                                                    {summary.totalSlides ===
-                                                                                    1
-                                                                                        ? 'lámina'
-                                                                                        : 'láminas'}
-                                                                                </Badge>
-                                                                            </div>
-                                                                        );
-                                                                    })()}
-                                                                </TableCell>
-
-                                                                <TableCell
-                                                                    className="flex items-center justify-end gap-1 text-right"
-                                                                    onClick={(
-                                                                        e,
-                                                                    ) =>
-                                                                        e.stopPropagation()
-                                                                    }
-                                                                >
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 hover:bg-accent hover:text-accent-foreground"
-                                                                        onClick={() => {
-                                                                            handleViewSpecimen(
-                                                                                specimen,
-                                                                            );
-                                                                        }}
-                                                                        title="Ver detalles"
-                                                                    >
-                                                                        <Eye className="h-4 w-4" />
-                                                                    </Button>
-                                                                    <DropdownMenu>
-                                                                        <DropdownMenuTrigger
-                                                                            asChild
-                                                                        >
+                                                                        <div className="flex items-center justify-end gap-1">
                                                                             <Button
                                                                                 variant="ghost"
                                                                                 size="icon"
                                                                                 className="h-8 w-8 hover:bg-accent hover:text-accent-foreground"
-                                                                                title="Acciones"
-                                                                            >
-                                                                                <EllipsisVertical className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </DropdownMenuTrigger>
-                                                                        <DropdownMenuContent
-                                                                            align="end"
-                                                                            className="w-52"
-                                                                        >
-                                                                            {hasReportEditorPermission && (
-                                                                                <DropdownMenuItem
-                                                                                    onClick={() => {
-                                                                                        router.get(
-                                                                                            `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
-                                                                                        );
-                                                                                    }}
-                                                                                    className="group cursor-pointer"
-                                                                                >
-                                                                                    <FileText className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
-                                                                                    <span>
-                                                                                        Editor
-                                                                                        de
-                                                                                        Reporte
-                                                                                    </span>
-                                                                                </DropdownMenuItem>
-                                                                            )}
-                                                                            {hasCuttingsPermission && (
-                                                                                <DropdownMenuItem
-                                                                                    onClick={() => {
-                                                                                        setSpecimenForCuttings(
-                                                                                            specimen,
-                                                                                        );
-                                                                                        setIsManageCuttingsOpen(
-                                                                                            true,
-                                                                                        );
-                                                                                    }}
-                                                                                    className="group cursor-pointer"
-                                                                                >
-                                                                                    <Scissors className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
-                                                                                    <span>
-                                                                                        Gestionar
-                                                                                        Cortes
-                                                                                    </span>
-                                                                                </DropdownMenuItem>
-                                                                            )}
-                                                                            <DropdownMenuItem
                                                                                 onClick={() => {
-                                                                                    setSelectedSpecimenForWorkOrder(
-                                                                                        specimen.id,
-                                                                                    );
-                                                                                    setIsWorkOrderSheetOpen(
-                                                                                        true,
-                                                                                    );
-                                                                                }}
-                                                                                className="group cursor-pointer"
-                                                                            >
-                                                                                <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
-                                                                                <span>
-                                                                                    Crear
-                                                                                    Orden
-                                                                                    de
-                                                                                    Trabajo
-                                                                                </span>
-                                                                            </DropdownMenuItem>
-                                                                            <DropdownMenuItem
-                                                                                onClick={() => {
-                                                                                    setSelectedSpecimenForCollaborator(
+                                                                                    handleViewSpecimen(
                                                                                         specimen,
                                                                                     );
-                                                                                    setIsCollaboratorSheetOpen(
-                                                                                        true,
-                                                                                    );
                                                                                 }}
-                                                                                className="group cursor-pointer"
+                                                                                title="Ver detalles"
                                                                             >
-                                                                                <UserPlus className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
-                                                                                <span>
-                                                                                    Asignar
-                                                                                    Colaboradores
-                                                                                </span>
-                                                                            </DropdownMenuItem>
-                                                                        </DropdownMenuContent>
-                                                                    </DropdownMenu>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        );
-                                                    })
+                                                                                <Eye className="h-4 w-4" />
+                                                                            </Button>
+                                                                            <DropdownMenu>
+                                                                                <DropdownMenuTrigger
+                                                                                    asChild
+                                                                                >
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="h-8 w-8 hover:bg-accent hover:text-accent-foreground"
+                                                                                        title="Acciones"
+                                                                                    >
+                                                                                        <EllipsisVertical className="h-4 w-4" />
+                                                                                    </Button>
+                                                                                </DropdownMenuTrigger>
+                                                                                <DropdownMenuContent
+                                                                                    align="end"
+                                                                                    className="w-52"
+                                                                                >
+                                                                                    {hasReportEditorPermission && (
+                                                                                        <DropdownMenuItem
+                                                                                            onClick={() => {
+                                                                                                router.get(
+                                                                                                    `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
+                                                                                                );
+                                                                                            }}
+                                                                                            className="group cursor-pointer"
+                                                                                        >
+                                                                                            <FileText className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                                                                            <span>
+                                                                                                Editor
+                                                                                                de
+                                                                                                Reporte
+                                                                                            </span>
+                                                                                        </DropdownMenuItem>
+                                                                                    )}
+                                                                                    {hasCuttingsPermission && (
+                                                                                        <DropdownMenuItem
+                                                                                            onClick={() => {
+                                                                                                setSpecimenForCuttings(
+                                                                                                    specimen,
+                                                                                                );
+                                                                                                setIsManageCuttingsOpen(
+                                                                                                    true,
+                                                                                                );
+                                                                                            }}
+                                                                                            className="group cursor-pointer"
+                                                                                        >
+                                                                                            <Scissors className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                                                                            <span>
+                                                                                                Gestionar
+                                                                                                Cortes
+                                                                                            </span>
+                                                                                        </DropdownMenuItem>
+                                                                                    )}
+                                                                                    <DropdownMenuItem
+                                                                                        onClick={() => {
+                                                                                            setSelectedSpecimenForWorkOrder(
+                                                                                                specimen.id,
+                                                                                            );
+                                                                                            setIsWorkOrderSheetOpen(
+                                                                                                true,
+                                                                                            );
+                                                                                        }}
+                                                                                        className="group cursor-pointer"
+                                                                                    >
+                                                                                        <ClipboardList className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                                                                        <span>
+                                                                                            Crear
+                                                                                            Orden
+                                                                                            de
+                                                                                            Trabajo
+                                                                                        </span>
+                                                                                    </DropdownMenuItem>
+                                                                                    <DropdownMenuItem
+                                                                                        onClick={() => {
+                                                                                            setSelectedSpecimenForCollaborator(
+                                                                                                specimen,
+                                                                                            );
+                                                                                            setIsCollaboratorSheetOpen(
+                                                                                                true,
+                                                                                            );
+                                                                                        }}
+                                                                                        className="group cursor-pointer"
+                                                                                    >
+                                                                                        <UserPlus className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                                                                        <span>
+                                                                                            Asignar
+                                                                                            Colaboradores
+                                                                                        </span>
+                                                                                    </DropdownMenuItem>
+                                                                                </DropdownMenuContent>
+                                                                            </DropdownMenu>
+                                                                        </div>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            );
+                                                        },
+                                                    )
                                                 ) : (
                                                     <TableRow>
                                                         <TableCell
-                                                            colSpan={8}
+                                                            colSpan={
+                                                                isSelectionMode
+                                                                    ? 9
+                                                                    : 8
+                                                            }
                                                             className="h-20 text-center text-sm text-muted-foreground/60"
                                                         >
                                                             No hay muestras
@@ -2188,6 +2419,29 @@ export default function MyAssignmentsIndex({
                                                         </TableCell>
                                                     </TableRow>
                                                 )}
+                                                {isPaginated &&
+                                                    visibleLimit <
+                                                        totalSpecimens && (
+                                                        <AssignmentTableSentinel
+                                                            priorityId={
+                                                                priority.id
+                                                            }
+                                                            totalCount={
+                                                                totalSpecimens
+                                                            }
+                                                            visibleCount={
+                                                                visibleLimit
+                                                            }
+                                                            onLoadMore={
+                                                                handleLoadMore
+                                                            }
+                                                            colSpan={
+                                                                isSelectionMode
+                                                                    ? 9
+                                                                    : 8
+                                                            }
+                                                        />
+                                                    )}
                                             </TableBody>
                                         </Table>
                                     </div>

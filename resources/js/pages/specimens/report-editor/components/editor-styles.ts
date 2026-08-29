@@ -434,7 +434,6 @@ export const editorStyles = `
   .tiptap table p {
     margin: 0 !important;
     line-height: inherit !important;
-    text-align: inherit !important;
     font-size: inherit !important;
   }
   .tiptap table th {

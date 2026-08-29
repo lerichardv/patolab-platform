@@ -106,11 +106,13 @@ class Specimen extends Model
         'cancelled_at',
         'cancelled_by_id',
         'sample_collection_date',
+        'sample_collection_date_na',
     ];
 
     protected $casts = [
         'active' => 'boolean',
         'is_group' => 'boolean',
+        'sample_collection_date_na' => 'boolean',
         'received_at' => 'datetime',
         'macroscopic_review_at' => 'datetime',
         'processing_at' => 'datetime',

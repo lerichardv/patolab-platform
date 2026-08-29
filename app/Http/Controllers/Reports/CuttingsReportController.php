@@ -107,6 +107,11 @@ class CuttingsReportController extends Controller
                     'sequence_code' => $specimen->sequence_code,
                     'type' => $specimen->type ? ['name' => $specimen->type->name] : null,
                     'examination' => $specimen->examination ? ['name' => $specimen->examination->name] : null,
+                    'customer_relation' => $specimen->customerRelation ? [
+                        'id' => $specimen->customerRelation->id,
+                        'name' => $specimen->customerRelation->name,
+                        'id_number' => $specimen->customerRelation->id_number,
+                    ] : null,
                 ] : null,
                 'number_of_cassettes' => $numberOfCassettes,
                 'cassettes_range' => $range ?: 'N/A',
@@ -446,17 +451,22 @@ class CuttingsReportController extends Controller
             'responsible.role',
             'specimen.type',
             'specimen.examination',
+            'specimen.customerRelation',
             'specimen.cuttings.code',
             'prefix',
         ]);
 
-        // Search spec code, comments, or doctor name
+        // Search spec code, comments, doctor name, or patient name/id/rtn
         if ($request->filled('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
                 $q->where('comments', 'like', "%{$search}%")
                     ->orWhereHas('specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
+                        $sq->where('sequence_code', 'like', "%{$search}%")
+                            ->orWhereHas('customerRelation', function ($cq) use ($search) {
+                                $cq->where('name', 'like', "%{$search}%")
+                                    ->orWhere('id_number', 'like', "%{$search}%");
+                            });
                     })
                     ->orWhereHas('responsible', function ($uq) use ($search) {
                         $uq->where('name', 'like', "%{$search}%");

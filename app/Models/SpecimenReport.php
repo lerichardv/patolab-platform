@@ -53,6 +53,7 @@ class SpecimenReport extends Model
         'report_validation_qr_code',
         'report_date',
         'finalization_date',
+        'auto_finalization_date',
         'generated_at',
         'macroscopy_html',
         'macroscopy_finalization_datetime',
@@ -241,6 +242,7 @@ class SpecimenReport extends Model
     protected $casts = [
         'report_date' => 'date',
         'finalization_date' => 'date',
+        'auto_finalization_date' => 'boolean',
         'generated_at' => 'datetime',
         'macroscopy_finalization_datetime' => 'datetime',
         'microscopy_finalization_datetime' => 'datetime',

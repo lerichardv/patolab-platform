@@ -119,6 +119,7 @@ interface Props {
     products?: any[];
     banks?: any[];
     showPaymentMethodEdition?: boolean;
+    readOnlySampleCollectionDate?: boolean;
 }
 
 function FormCombobox({
@@ -248,6 +249,7 @@ export default function SpecimenForm({
     products = [],
     banks = [],
     showPaymentMethodEdition = true,
+    readOnlySampleCollectionDate = false,
 }: Props) {
     const { props: pageProps } = usePage<any>();
     const flash = pageProps.flash as Record<string, any> | undefined;
@@ -625,17 +627,28 @@ export default function SpecimenForm({
     });
 
     React.useEffect(() => {
-        transform((d: any) => ({
-            ...d,
-            initial_payment_amount:
-                d.payment_type === 'credit' && d.has_initial_payment
-                    ? d.initial_payment_amount
-                    : null,
-            initial_payment_type:
-                d.payment_type === 'credit' && d.has_initial_payment
-                    ? d.initial_payment_type
-                    : null,
-        }));
+        transform((d: any) => {
+            const transformed = {
+                ...d,
+                initial_payment_amount:
+                    d.payment_type === 'credit' && d.has_initial_payment
+                        ? d.initial_payment_amount
+                        : null,
+                initial_payment_type:
+                    d.payment_type === 'credit' && d.has_initial_payment
+                        ? d.initial_payment_type
+                        : null,
+            };
+
+            // When opened from the report editor, do not send
+            // sample_collection_date so the form never overwrites the
+            // value the user set inside the report editor header.
+            if (readOnlySampleCollectionDate && specimen) {
+                delete transformed.sample_collection_date;
+            }
+
+            return transformed;
+        });
     }, [transform]);
 
     const specimenInvoice = React.useMemo(() => {
@@ -2510,7 +2523,14 @@ export default function SpecimenForm({
                                     onChange={(v) =>
                                         setData('sample_collection_date', v)
                                     }
+                                    disabled={readOnlySampleCollectionDate && !!specimen}
                                 />
+                                {readOnlySampleCollectionDate && !!specimen && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Para modificar esta fecha, edítela
+                                        desde el editor de reporte.
+                                    </p>
+                                )}
                                 {errors.sample_collection_date && (
                                     <p className="text-sm text-destructive">
                                         {errors.sample_collection_date}

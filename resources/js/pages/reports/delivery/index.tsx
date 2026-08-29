@@ -10,6 +10,7 @@ import {
     Microscope,
     FileText,
     ChevronDown,
+    User,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
@@ -64,6 +65,15 @@ interface SpecimenReportRow {
     category?: {
         name: string;
     };
+    users?: {
+        id: number;
+        name: string;
+        email?: string;
+        pivot?: {
+            macroscopy_access?: boolean;
+            microscopy_access?: boolean;
+        };
+    }[];
     created_at: string;
     expected_internal_finalization_date: string | null;
     expected_finalization_date: string | null;
@@ -100,6 +110,7 @@ interface Props {
         customer_id?: string;
         specimen_type_id?: string;
         examination_id?: string;
+        pathologist_id?: string;
         date_from?: string;
         date_to?: string;
         internal_date_from?: string;
@@ -114,6 +125,10 @@ interface Props {
         name: string;
     }[];
     examinations: any[];
+    pathologists: {
+        id: number;
+        name: string;
+    }[];
 }
 
 const statusLabels: Record<string, string> = {
@@ -150,6 +165,7 @@ export default function DeliveryReportIndex({
     selectedCustomer,
     specimenTypes,
     examinations,
+    pathologists = [],
 }: Props) {
     const { props } = usePage() as any;
     const { auth } = props;
@@ -193,6 +209,10 @@ export default function DeliveryReportIndex({
         string[]
     >(() => parseInitialIds(filters.examination_id, examinations));
 
+    const [selectedPathologistIds, setSelectedPathologistIds] = useState<
+        string[]
+    >(() => parseInitialIds(filters.pathologist_id, pathologists));
+
     useEffect(() => {
         if (filters.specimen_type_id !== undefined) {
             setSelectedSpecimenTypeIds(
@@ -205,12 +225,41 @@ export default function DeliveryReportIndex({
                 parseInitialIds(filters.examination_id, examinations),
             );
         }
+
+        if (filters.pathologist_id !== undefined) {
+            setSelectedPathologistIds(
+                parseInitialIds(filters.pathologist_id, pathologists),
+            );
+        }
     }, [
         filters.specimen_type_id,
         filters.examination_id,
+        filters.pathologist_id,
         specimenTypes,
         examinations,
+        pathologists,
     ]);
+
+    const handlePathologistSelectionChange = (nextPathologistIds: string[]) => {
+        setSelectedPathologistIds(nextPathologistIds);
+
+        const pathParam =
+            nextPathologistIds.length === pathologists.length
+                ? 'all'
+                : nextPathologistIds.length === 0
+                  ? 'none'
+                  : nextPathologistIds;
+
+        const newFilters: any = {
+            ...filters,
+            pathologist_id: pathParam,
+        };
+
+        router.get(deliveryReportIndex().url, newFilters, {
+            preserveState: true,
+            replace: true,
+        });
+    };
 
     const getSpecimenTypeId = (exam: any): string | null => {
         const typeId =
@@ -567,7 +616,7 @@ export default function DeliveryReportIndex({
                     </div>
 
                     {/* Row 2: Advanced filters */}
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         {/* Customer */}
                         <div className="flex flex-col gap-1.5">
                             <span className="text-xs font-semibold text-muted-foreground">
@@ -582,6 +631,120 @@ export default function DeliveryReportIndex({
                                 initialCustomer={selectedCustomer || undefined}
                                 allowClear
                             />
+                        </div>
+
+                        {/* Pathologist */}
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                Patólogo
+                            </span>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
+                                    >
+                                        <div className="flex items-center gap-2 truncate">
+                                            <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <span>
+                                                Patólogos (
+                                                {selectedPathologistIds.length})
+                                            </span>
+                                        </div>
+                                        <ChevronDown className="h-4 w-4 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    className="w-64 p-2"
+                                    align="start"
+                                >
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+                                            <span>Filtrar por patólogo</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const areAllSelected =
+                                                        pathologists.length >
+                                                            0 &&
+                                                        pathologists.every(
+                                                            (p) =>
+                                                                selectedPathologistIds.includes(
+                                                                    p.id.toString(),
+                                                                ),
+                                                        );
+                                                    const nextPaths =
+                                                        areAllSelected
+                                                            ? []
+                                                            : pathologists.map(
+                                                                  (p) =>
+                                                                      p.id.toString(),
+                                                              );
+
+                                                    handlePathologistSelectionChange(
+                                                        nextPaths,
+                                                    );
+                                                }}
+                                                className="cursor-pointer font-medium transition-colors hover:text-primary"
+                                            >
+                                                {pathologists.length > 0 &&
+                                                pathologists.every((p) =>
+                                                    selectedPathologistIds.includes(
+                                                        p.id.toString(),
+                                                    ),
+                                                )
+                                                    ? 'Ninguno'
+                                                    : 'Todos'}
+                                            </button>
+                                        </div>
+                                        <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
+                                            {pathologists.map((pathologist) => {
+                                                const isChecked =
+                                                    selectedPathologistIds.includes(
+                                                        pathologist.id.toString(),
+                                                    );
+
+                                                return (
+                                                    <div
+                                                        key={pathologist.id}
+                                                        className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+                                                        onClick={() => {
+                                                            const pathIdStr =
+                                                                pathologist.id.toString();
+                                                            const nextPaths =
+                                                                isChecked
+                                                                    ? selectedPathologistIds.filter(
+                                                                          (
+                                                                              id,
+                                                                          ) =>
+                                                                              id !==
+                                                                              pathIdStr,
+                                                                      )
+                                                                    : [
+                                                                          ...selectedPathologistIds,
+                                                                          pathIdStr,
+                                                                      ];
+
+                                                            handlePathologistSelectionChange(
+                                                                nextPaths,
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Checkbox
+                                                            checked={isChecked}
+                                                            className="pointer-events-none"
+                                                            onCheckedChange={() => {}}
+                                                        />
+                                                        <span className="truncate">
+                                                            {pathologist.name}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                         </div>
 
                         {/* Specimen Type */}
@@ -845,6 +1008,9 @@ export default function DeliveryReportIndex({
                                     <TableHead className="min-w-[140px] text-center font-mono text-xs">
                                         Código de la Muestra
                                     </TableHead>
+                                    <TableHead className="min-w-[150px] text-center">
+                                        Patólogos
+                                    </TableHead>
                                     <TableHead className="min-w-[130px] text-center">
                                         Estado
                                     </TableHead>
@@ -872,7 +1038,7 @@ export default function DeliveryReportIndex({
                                 {specimens.data.length === 0 ? (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={12}
+                                            colSpan={13}
                                             className="h-24 text-center text-muted-foreground"
                                         >
                                             No se encontraron muestras.
@@ -930,6 +1096,97 @@ export default function DeliveryReportIndex({
                                                 </TableCell>
                                                 <TableCell className="text-center font-mono text-xs font-semibold">
                                                     {row.sequence_code}
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    {row.users &&
+                                                    row.users.length > 0 ? (
+                                                        <div className="flex flex-wrap items-center justify-center gap-1">
+                                                            {row.users
+                                                                .slice(0, 2)
+                                                                .map((user) => (
+                                                                    <Badge
+                                                                        key={
+                                                                            user.id
+                                                                        }
+                                                                        variant="outline"
+                                                                        className="max-w-[140px] truncate rounded-md border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-400"
+                                                                        title={
+                                                                            user.name
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            user.name
+                                                                        }
+                                                                    </Badge>
+                                                                ))}
+                                                            {row.users.length >
+                                                                2 && (
+                                                                <Popover>
+                                                                    <PopoverTrigger
+                                                                        asChild
+                                                                    >
+                                                                        <Badge
+                                                                            variant="outline"
+                                                                            className="cursor-pointer rounded-md border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                                                                        >
+                                                                            +
+                                                                            {row
+                                                                                .users
+                                                                                .length -
+                                                                                2}
+                                                                        </Badge>
+                                                                    </PopoverTrigger>
+                                                                    <PopoverContent
+                                                                        className="w-auto p-2"
+                                                                        align="center"
+                                                                    >
+                                                                        <div className="space-y-1">
+                                                                            <div className="border-b pb-1 text-xs font-semibold text-muted-foreground">
+                                                                                Patólogos
+                                                                                Asignados
+                                                                                (
+                                                                                {
+                                                                                    row
+                                                                                        .users
+                                                                                        .length
+                                                                                }
+
+                                                                                )
+                                                                            </div>
+                                                                            <div className="flex flex-col gap-1 pt-1">
+                                                                                {row.users.map(
+                                                                                    (
+                                                                                        user,
+                                                                                    ) => (
+                                                                                        <div
+                                                                                            key={
+                                                                                                user.id
+                                                                                            }
+                                                                                            className="flex items-center gap-1.5 text-xs font-medium"
+                                                                                        >
+                                                                                            <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                                                                                            <span>
+                                                                                                {
+                                                                                                    user.name
+                                                                                                }
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    ),
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </PopoverContent>
+                                                                </Popover>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-dashed py-0.5 text-[10px] font-normal text-muted-foreground"
+                                                        >
+                                                            Sin asignar
+                                                        </Badge>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     <Badge

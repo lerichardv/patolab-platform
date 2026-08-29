@@ -178,3 +178,96 @@ test('assigned user can create a report with multiple templates in ordered conca
         ->and($this->specimen->report->diagnosis_html)->toBe('<p>Diagnóstico 1</p><p>Diagnóstico 2</p>')
         ->and($this->specimen->report->addendum_html)->toBe('<p>Addendum 1</p><p>Addendum 2</p>');
 });
+
+test('applying template with aligned table cells preserves table structure and alignment', function () {
+    $this->actingAs($this->assignedUser);
+
+    // Initialize report
+    $this->post(route('specimens.report-editor.store', $this->specimen->sequence_code), []);
+    $this->specimen->refresh();
+
+    $tableHtml = '<table><colgroup><col style="min-width: 25px;"><col style="min-width: 25px;"></colgroup><tbody><tr><th style="text-align: center;"><p style="text-align: center;">Encabezado 1</p></th><th style="text-align: right;"><p style="text-align: right;">Encabezado 2</p></th></tr><tr><td style="text-align: center;"><p style="text-align: center;">Dato 1</p></td><td style="text-align: right;"><p style="text-align: right;">100.00</p></td></tr></tbody></table>';
+
+    $template = SpecimenTypeTemplate::create([
+        'name' => 'Plantilla con Tabla Alineada',
+        'specimen_type_id' => $this->specimenType->id,
+        'specimen_type_examination_id' => $this->examination->id,
+        'user_id' => $this->assignedUser->id,
+        'macroscopy_html' => '<p>Macroscopía</p>',
+        'microscopy_html' => '<p>Microscopía</p>',
+        'diagnosis_html' => $tableHtml,
+        'addendum_html' => null,
+    ]);
+
+    $response = $this->postJson(route('specimens.report-editor.apply-template', $this->specimen->sequence_code), [
+        'template_id' => $template->id,
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'status' => 'success',
+        ]);
+
+    $this->specimen->refresh();
+    expect($this->specimen->report->diagnosis_html)->toContain('text-align: center')
+        ->and($this->specimen->report->diagnosis_html)->toContain('text-align: right')
+        ->and($this->specimen->report->diagnosis_html)->toContain('Encabezado 1')
+        ->and($this->specimen->report->diagnosis_html)->toContain('100.00');
+});
+
+test('applying template auto-creates report row if specimen has no report yet', function () {
+    $this->actingAs($this->assignedUser);
+
+    // Specimen has no report initially
+    expect($this->specimen->report)->toBeNull()
+        ->and($this->specimen->report_id)->toBeNull();
+
+    $template = SpecimenTypeTemplate::create([
+        'name' => 'Plantilla Inicial',
+        'specimen_type_id' => $this->specimenType->id,
+        'specimen_type_examination_id' => $this->examination->id,
+        'user_id' => $this->assignedUser->id,
+        'macroscopy_html' => '<p>Macroscopía Inicial</p>',
+        'microscopy_html' => '<p>Microscopía Inicial</p>',
+        'diagnosis_html' => '<p>Diagnóstico Inicial</p>',
+        'addendum_html' => null,
+    ]);
+
+    $response = $this->postJson(route('specimens.report-editor.apply-template', $this->specimen->sequence_code), [
+        'template_id' => $template->id,
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'status' => 'success',
+        ]);
+
+    $this->specimen->refresh();
+    expect($this->specimen->report_id)->not->toBeNull()
+        ->and($this->specimen->report)->not->toBeNull()
+        ->and($this->specimen->status)->toBe('macroscopic_review')
+        ->and($this->specimen->report->diagnosis_html)->toBe('<p>Diagnóstico Inicial</p>');
+});
+
+test('saving report editor auto-creates report row if specimen has no report yet', function () {
+    $this->actingAs($this->assignedUser);
+
+    // Specimen has no report initially
+    expect($this->specimen->report)->toBeNull()
+        ->and($this->specimen->report_id)->toBeNull();
+
+    $response = $this->postJson(route('specimens.report-editor.save', $this->specimen->sequence_code), [
+        'diagnosis_html' => '<p>Diagnóstico Directo</p>',
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'status' => 'success',
+        ]);
+
+    $this->specimen->refresh();
+    expect($this->specimen->report_id)->not->toBeNull()
+        ->and($this->specimen->report)->not->toBeNull()
+        ->and($this->specimen->status)->toBe('macroscopic_review')
+        ->and($this->specimen->report->diagnosis_html)->toBe('<p>Diagnóstico Directo</p>');
+});

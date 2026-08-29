@@ -174,3 +174,19 @@ test('save endpoint persists open_text_html and addendum_html', function () {
         ->and($this->report->addendum_html)->toBe('<p>Addendum content</p>')
         ->and($this->report->open_text_label)->toBe('Notas');
 });
+
+test('save endpoint validates that open_text_label does not exceed 255 characters', function () {
+    $this->actingAs($this->user);
+
+    $tooLongLabel = str_repeat('a', 256);
+
+    $response = $this->postJson(
+        route('specimens.report-editor.save', $this->specimen->sequence_code),
+        [
+            'open_text_label' => $tooLongLabel,
+        ]
+    );
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['open_text_label']);
+});

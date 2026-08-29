@@ -9,6 +9,8 @@ export interface UseFinalizeReportOptions {
     onTransitionState: (targetStatus: SpecimenStatus) => void;
     /** Called before the temp PDF is generated so the latest content is persisted first. */
     onBeforeSave?: () => Promise<void>;
+    autoFinalizationDate?: boolean;
+    finalizationDate?: string;
 }
 
 export function useFinalizeReport({
@@ -16,6 +18,8 @@ export function useFinalizeReport({
     onUpdateFinalizationDate,
     onTransitionState,
     onBeforeSave,
+    autoFinalizationDate = true,
+    finalizationDate = '',
 }: UseFinalizeReportOptions) {
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [showCompleteMicroscopyDialog, setShowCompleteMicroscopyDialog] =
@@ -44,10 +48,11 @@ export function useFinalizeReport({
             }
         }
 
-        const d = new Date();
-        const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-        await onUpdateFinalizationDate(todayStr);
+        if (autoFinalizationDate || !finalizationDate) {
+            const d = new Date();
+            const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            await onUpdateFinalizationDate(todayStr);
+        }
 
         try {
             const data = await generateTempPdf(specimenSequenceCode);
@@ -72,7 +77,13 @@ export function useFinalizeReport({
         } finally {
             setIsGeneratingPdf(false);
         }
-    }, [specimenSequenceCode, onUpdateFinalizationDate, onBeforeSave]);
+    }, [
+        specimenSequenceCode,
+        onUpdateFinalizationDate,
+        onBeforeSave,
+        autoFinalizationDate,
+        finalizationDate,
+    ]);
 
     const handleConfirmFinalization = useCallback(() => {
         onTransitionState('finalized');

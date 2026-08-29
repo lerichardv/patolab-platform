@@ -14,6 +14,7 @@ export interface PreviewSpecimen {
     id: number;
     sequence_code: string;
     sample_collection_date?: string;
+    sample_collection_date_na?: boolean;
     anatomic_site: string;
     diagnosis: string | null;
     clinical_notes?: string | null;

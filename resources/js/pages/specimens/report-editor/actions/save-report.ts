@@ -3,7 +3,9 @@ import { postJson } from './client';
 export interface ReportEditorSavePayload {
     report_date?: string | null;
     sample_collection_date?: string | null;
+    sample_collection_date_na?: boolean;
     finalization_date?: string | null;
+    auto_finalization_date?: boolean;
     macroscopy_html?: string;
     microscopy_html?: string;
     diagnosis_html?: string;

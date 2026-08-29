@@ -762,6 +762,9 @@ export default function TemplateForm({
                                                                                             .value,
                                                                                     )
                                                                                 }
+                                                                                maxLength={
+                                                                                    255
+                                                                                }
                                                                                 className="w-full border-b border-slate-300 bg-transparent px-1 py-0.5 text-sm font-bold tracking-tight text-slate-800 focus:border-primary focus:outline-hidden dark:text-slate-200"
                                                                                 placeholder="Texto Libre"
                                                                             />
