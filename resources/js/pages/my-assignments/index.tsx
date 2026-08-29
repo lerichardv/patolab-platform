@@ -661,11 +661,11 @@ export default function MyAssignmentsIndex({
 
     const handleLoadMore = (priorityId: number) => {
         setVisibleCounts((prev) => {
-            const current = prev[priorityId] || 10;
+            const current = prev[priorityId] || 20;
 
             return {
                 ...prev,
-                [priorityId]: current + 10,
+                [priorityId]: current + 20,
             };
         });
     };
@@ -1675,9 +1675,9 @@ export default function MyAssignmentsIndex({
                     {priorities.map((priority) => {
                         const list = groupedSpecimens[priority.id] || [];
                         const totalSpecimens = list.length;
-                        const isPaginated = totalSpecimens > 10;
+                        const isPaginated = totalSpecimens > 20;
                         const visibleLimit = isPaginated
-                            ? visibleCounts[priority.id] || 10
+                            ? visibleCounts[priority.id] || 20
                             : totalSpecimens;
                         const visibleList = isPaginated
                             ? list.slice(0, visibleLimit)
