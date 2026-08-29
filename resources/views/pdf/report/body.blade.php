@@ -188,7 +188,7 @@
             bottom: 5mm;
             left: 15mm;
             right: 15mm;
-            height: 20.11mm;
+            height: 24mm;
         }
 
         .footer-divider {
@@ -200,10 +200,10 @@
 
         .confidentiality-notice {
             text-align: center;
-            font-size: 2.12mm;
+            font-size: 3.18mm;
             font-weight: 600;
             color: #374151;
-            margin-bottom: 1.32mm;
+            margin-bottom: 1.59mm;
         }
 
         .footer-contact-table {
@@ -214,12 +214,12 @@
         .contact-col {
             width: 25%;
             vertical-align: middle;
-            font-size: 2.12mm;
+            font-size: 3.18mm;
             color: #4b5563;
         }
 
         .contact-icon {
-            font-size: 2.65mm;
+            font-size: 3.70mm;
             margin-right: 0.79mm;
             color: #1e3a8a;
         }
@@ -228,7 +228,7 @@
             position: absolute;
             bottom: 4mm;
             left: 0mm;
-            font-size: 2.12mm;
+            font-size: 3.18mm;
             font-weight: 600;
             color: #4b5563;
         }

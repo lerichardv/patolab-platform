@@ -14,7 +14,7 @@ export default function Footer({ pageNum, totalPages }: FooterProps) {
                 bottom: '5mm',
                 left: '15mm',
                 right: '15mm',
-                height: '20.11mm',
+                height: '24mm',
             }}
         >
             <div
@@ -28,10 +28,10 @@ export default function Footer({ pageNum, totalPages }: FooterProps) {
             <div
                 style={{
                     textAlign: 'center',
-                    fontSize: '2.12mm',
+                    fontSize: '3.18mm',
                     fontWeight: 600,
                     color: '#374151',
-                    marginBottom: '1.32mm',
+                    marginBottom: '1.59mm',
                 }}
             >
                 Este reporte contiene información médica confidencial. Consulte
@@ -51,7 +51,7 @@ export default function Footer({ pageNum, totalPages }: FooterProps) {
                             style={{
                                 width: '30%',
                                 verticalAlign: 'middle',
-                                fontSize: '2.12mm',
+                                fontSize: '3.18mm',
                                 color: '#4b5563',
                                 border: 'none',
                                 padding: '0mm',
@@ -62,8 +62,8 @@ export default function Footer({ pageNum, totalPages }: FooterProps) {
                                     display: 'inline-block',
                                     marginRight: '0.79mm',
                                     color: '#1e3a8a',
-                                    width: '2.65mm',
-                                    height: '2.65mm',
+                                    width: '3.70mm',
+                                    height: '3.70mm',
                                     verticalAlign: 'middle',
                                 }}
                             />
@@ -73,7 +73,7 @@ export default function Footer({ pageNum, totalPages }: FooterProps) {
                             style={{
                                 width: '30%',
                                 verticalAlign: 'middle',
-                                fontSize: '2.12mm',
+                                fontSize: '3.18mm',
                                 color: '#4b5563',
                                 border: 'none',
                                 padding: '0mm',
@@ -84,8 +84,8 @@ export default function Footer({ pageNum, totalPages }: FooterProps) {
                                     display: 'inline-block',
                                     marginRight: '0.79mm',
                                     color: '#1e3a8a',
-                                    width: '2.65mm',
-                                    height: '2.65mm',
+                                    width: '3.70mm',
+                                    height: '3.70mm',
                                     verticalAlign: 'middle',
                                 }}
                             />
@@ -95,7 +95,7 @@ export default function Footer({ pageNum, totalPages }: FooterProps) {
                             style={{
                                 width: '40%',
                                 verticalAlign: 'middle',
-                                fontSize: '2.12mm',
+                                fontSize: '3.18mm',
                                 color: '#4b5563',
                                 border: 'none',
                                 padding: '0mm',
@@ -114,15 +114,15 @@ export default function Footer({ pageNum, totalPages }: FooterProps) {
                                         display: 'inline-block',
                                         marginRight: '0.79mm',
                                         color: '#1e3a8a',
-                                        width: '2.65mm',
-                                        height: '2.65mm',
+                                        width: '3.70mm',
+                                        height: '3.70mm',
                                         verticalAlign: 'top',
                                         marginTop: '0.2mm',
                                     }}
                                 />
                                 <span
                                     style={{
-                                        fontSize: '1.5mm',
+                                        fontSize: '2.65mm',
                                         lineHeight: '1.15',
                                         display: 'inline-block',
                                         verticalAlign: 'top',
@@ -144,7 +144,7 @@ export default function Footer({ pageNum, totalPages }: FooterProps) {
                     position: 'absolute',
                     bottom: '4mm',
                     left: '0mm',
-                    fontSize: '2.12mm',
+                    fontSize: '3.18mm',
                     fontWeight: 600,
                     color: '#4b5563',
                 }}
