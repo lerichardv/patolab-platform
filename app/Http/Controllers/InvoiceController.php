@@ -711,7 +711,7 @@ class InvoiceController extends Controller
             'group_specimens' => 'nullable|array',
             'group_specimens.*.id' => 'required|integer|exists:invoice_specimens,id',
             'group_specimens.*.selected_price' => 'required|string',
-            'group_specimens.*.custom_specimen_price' => 'required|numeric|min:0',
+            'group_specimens.*.custom_specimen_price' => 'nullable|numeric|min:0',
             'group_specimens.*.quantity' => 'required|integer|min:1',
             'group_specimens.*.age_discount_type' => 'nullable|string|in:third,fourth',
             'group_specimens.*.age_discount_amount' => 'nullable|numeric|min:0',
