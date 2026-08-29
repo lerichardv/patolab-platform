@@ -32,6 +32,7 @@ import {
     AlertOctagon,
     Ban,
     FolderMinus,
+    UserCheck,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
@@ -110,6 +111,7 @@ import CreditExtractSpecimenSheet from '../credits/credit-extract-specimen-sheet
 import CreditFinalPaymentSheet from '../credits/credit-final-payment-sheet';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import SpecimenGroupSheet from '../specimens/specimen-group-sheet';
+import SpecimenGroupCustomerSheet from '../specimens/specimen-group-customer-sheet';
 import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
 import SpecimenSheet from '../specimens/specimen-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
@@ -730,6 +732,9 @@ export default function InvoicesIndex({
     const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
     const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
+    const [isGroupCustomerSheetOpen, setIsGroupCustomerSheetOpen] = useState(false);
+    const [selectedGroupIdForCustomerChange, setSelectedGroupIdForCustomerChange] =
+        useState<number | null>(null);
     const [specimenSearchQuery, setSpecimenSearchQuery] = useState('');
     const [isSelectGroupDialogOpen, setIsSelectGroupDialogOpen] =
         useState(false);
@@ -2852,6 +2857,41 @@ export default function InvoicesIndex({
                                                                             </DropdownMenuItem>
                                                                         );
                                                                     })()}
+                                                                {canManageInvoices &&
+                                                                    Boolean(
+                                                                        invoice.group_id ||
+                                                                            invoice
+                                                                                .group
+                                                                                ?.id,
+                                                                    ) && (
+                                                                        <DropdownMenuItem
+                                                                            onClick={() => {
+                                                                                const grpId =
+                                                                                    invoice.group_id ||
+                                                                                    invoice
+                                                                                        .group
+                                                                                        ?.id;
+                                                                                if (
+                                                                                    grpId
+                                                                                ) {
+                                                                                    setSelectedGroupIdForCustomerChange(
+                                                                                        grpId,
+                                                                                    );
+                                                                                    setIsGroupCustomerSheetOpen(
+                                                                                        true,
+                                                                                    );
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <UserCheck className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                            <span>
+                                                                                Cambiar
+                                                                                cliente
+                                                                                del
+                                                                                grupo
+                                                                            </span>
+                                                                        </DropdownMenuItem>
+                                                                    )}
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     )}
@@ -3056,6 +3096,17 @@ export default function InvoicesIndex({
                 onConfirm={(groupDetails) => {
                     setSelectedGroup(groupDetails);
                     setIsGroupSheetOpen(true);
+                }}
+            />
+
+            <SpecimenGroupCustomerSheet
+                groupId={selectedGroupIdForCustomerChange}
+                open={isGroupCustomerSheetOpen}
+                onOpenChange={(open) => {
+                    setIsGroupCustomerSheetOpen(open);
+                    if (!open) {
+                        setSelectedGroupIdForCustomerChange(null);
+                    }
                 }}
             />
 
