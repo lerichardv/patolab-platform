@@ -402,9 +402,11 @@ export default function ReportWorkspace({
     );
     const [openTextLabel, setOpenTextLabel] = useState(() => {
         const raw = report?.open_text_label || 'Texto Libre';
+
         if (/^(Texto\s*Libre){2,}$/i.test(raw.trim())) {
             return 'Texto Libre';
         }
+
         return raw;
     });
     const [addendumHtml, setAddendumHtml] = useState(
@@ -1925,6 +1927,7 @@ export default function ReportWorkspace({
 
     const handleToggleAutoFinalizationDate = (checked: boolean) => {
         setAutoFinalizationDate(checked);
+
         if (report) {
             report.auto_finalization_date = checked;
         }

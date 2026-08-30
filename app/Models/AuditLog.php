@@ -13,6 +13,8 @@ class AuditLog extends Model
 {
     use HasFactory;
 
+    public static string $currentOrigin = 'system';
+
     protected $table = 'audit_log';
 
     protected $fillable = [
@@ -24,6 +26,7 @@ class AuditLog extends Model
         'old_value',
         'new_value',
         'user',
+        'origin',
     ];
 
     public function userRelation(): BelongsTo

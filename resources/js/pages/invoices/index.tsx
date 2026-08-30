@@ -33,6 +33,7 @@ import {
     Ban,
     FolderMinus,
     UserCheck,
+    History,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import * as React from 'react';
@@ -110,11 +111,12 @@ import { cn } from '@/lib/utils';
 import CreditExtractSpecimenSheet from '../credits/credit-extract-specimen-sheet';
 import CreditFinalPaymentSheet from '../credits/credit-final-payment-sheet';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
-import SpecimenGroupSheet from '../specimens/specimen-group-sheet';
 import SpecimenGroupCustomerSheet from '../specimens/specimen-group-customer-sheet';
+import SpecimenGroupSheet from '../specimens/specimen-group-sheet';
 import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
 import SpecimenSheet from '../specimens/specimen-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
+import InvoiceAuditSheet from './invoice-audit-sheet';
 import InvoiceSheet from './invoice-sheet';
 import InvoiceViewSheet from './invoice-view-sheet';
 
@@ -756,6 +758,11 @@ export default function InvoicesIndex({
         selectedSpecimenIdsForWorkOrder,
         setSelectedSpecimenIdsForWorkOrder,
     ] = useState<number[] | null>(null);
+
+    const [selectedInvoiceForAudit, setSelectedInvoiceForAudit] = useState<
+        any | null
+    >(null);
+    const [isAuditSheetOpen, setIsAuditSheetOpen] = useState(false);
     const [groupSpecimenSelections, setGroupSpecimenSelections] = useState<
         Record<number, number[]>
     >({});
@@ -881,6 +888,7 @@ export default function InvoicesIndex({
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const editSpecimenCode = urlParams.get('edit_specimen');
+
         if (editSpecimenCode && invoices.data && invoices.data.length > 0) {
             let foundSpecimen: any = null;
             let foundInvoice: any = null;
@@ -894,16 +902,20 @@ export default function InvoicesIndex({
                     foundInvoice = inv;
                     break;
                 }
+
                 const groupSpecs =
                     inv.group?.specimens || inv.group_specimens || [];
+
                 for (const gs of groupSpecs) {
                     const spec = gs.specimen || gs;
+
                     if (spec && spec.sequence_code === editSpecimenCode) {
                         foundSpecimen = spec;
                         foundInvoice = inv;
                         break;
                     }
                 }
+
                 if (foundSpecimen) {
                     break;
                 }
@@ -2933,6 +2945,7 @@ export default function InvoicesIndex({
                                                                                     invoice
                                                                                         .group
                                                                                         ?.id;
+
                                                                                 if (
                                                                                     grpId
                                                                                 ) {
@@ -2954,6 +2967,28 @@ export default function InvoicesIndex({
                                                                             </span>
                                                                         </DropdownMenuItem>
                                                                     )}
+
+                                                                {auth.permissions?.includes(
+                                                                    'invoices.view',
+                                                                ) && (
+                                                                    <DropdownMenuItem
+                                                                        onClick={() => {
+                                                                            setSelectedInvoiceForAudit(
+                                                                                invoice,
+                                                                            );
+                                                                            setIsAuditSheetOpen(
+                                                                                true,
+                                                                            );
+                                                                        }}
+                                                                    >
+                                                                        <History className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                        <span>
+                                                                            Historial
+                                                                            de
+                                                                            cambios
+                                                                        </span>
+                                                                    </DropdownMenuItem>
+                                                                )}
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     )}
@@ -3046,6 +3081,13 @@ export default function InvoicesIndex({
                 invoice={selectedInvoice}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
+            />
+
+            {/* Changes History Sheet */}
+            <InvoiceAuditSheet
+                invoice={selectedInvoiceForAudit}
+                open={isAuditSheetOpen}
+                onOpenChange={setIsAuditSheetOpen}
             />
 
             {/* Invoice Editor Sheet */}
@@ -3166,6 +3208,7 @@ export default function InvoicesIndex({
                 open={isGroupCustomerSheetOpen}
                 onOpenChange={(open) => {
                     setIsGroupCustomerSheetOpen(open);
+
                     if (!open) {
                         setSelectedGroupIdForCustomerChange(null);
                     }

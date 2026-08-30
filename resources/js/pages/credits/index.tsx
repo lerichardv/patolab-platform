@@ -83,8 +83,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
 import SpecimenGroupCustomerSheet from '../specimens/specimen-group-customer-sheet';
+import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 import CreditEditSheet from './credit-edit-sheet';
 import CreditExtractSpecimenSheet from './credit-extract-specimen-sheet';
@@ -1598,6 +1598,7 @@ export default function CreditsIndex({
                                                                                     credit
                                                                                         .group
                                                                                         ?.id;
+
                                                                                 if (
                                                                                     grpId
                                                                                 ) {
@@ -1682,6 +1683,7 @@ export default function CreditsIndex({
                 open={isGroupCustomerSheetOpen}
                 onOpenChange={(open) => {
                     setIsGroupCustomerSheetOpen(open);
+
                     if (!open) {
                         setSelectedGroupIdForCustomerChange(null);
                     }
