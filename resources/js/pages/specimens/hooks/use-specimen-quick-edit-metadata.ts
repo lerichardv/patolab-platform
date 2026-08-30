@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useState, useEffect } from 'react';
 
 export interface Referrer {
     id: number;
@@ -34,6 +34,7 @@ export function useSpecimenQuickEditMetadata(enabled: boolean = true) {
         if (!enabled) {
             return;
         }
+
         let isMounted = true;
         setLoading(true);
         axios
@@ -50,6 +51,7 @@ export function useSpecimenQuickEditMetadata(enabled: boolean = true) {
                     setLoading(false);
                 }
             });
+
         return () => {
             isMounted = false;
         };

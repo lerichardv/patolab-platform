@@ -50,8 +50,6 @@ use App\Models\Department;
 use App\Models\Specimen;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
-use Laravel\Fortify\Features;
 
 Route::get('/', function () {
     return view('welcome');
@@ -132,6 +130,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimens/{specimen}/quick-update', [SpecimenController::class, 'quickUpdate'])->name('specimens.quick-update');
     Route::resource('specimens', SpecimenController::class);
     Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');
+    Route::get('invoices/{invoice}/audit-history', [InvoiceController::class, 'auditHistory'])->name('invoices.audit-history');
+    Route::post('invoices/{invoice}/restore-audit-change', [InvoiceController::class, 'restoreAuditChange'])->name('invoices.restore-audit-change');
     Route::resource('invoices', InvoiceController::class)->only(['index', 'update']);
     Route::get('reports/credit-group/export', [CreditGroupReportController::class, 'export'])->name('reports.credit-group.export');
     Route::get('reports/credit-group', [CreditGroupReportController::class, 'index'])->name('reports.credit-group.index');

@@ -50,6 +50,7 @@ trait Auditable
                     'old_value' => null,
                     'new_value' => $this->castValueToString($value),
                     'user' => $userId,
+                    'origin' => AuditLog::$currentOrigin,
                 ]);
             }
         } elseif ($action === 'update') {
@@ -68,6 +69,7 @@ trait Auditable
                     'old_value' => $this->castValueToString($oldValue),
                     'new_value' => $this->castValueToString($newValue),
                     'user' => $userId,
+                    'origin' => AuditLog::$currentOrigin,
                 ]);
             }
         }
@@ -100,6 +102,7 @@ trait Auditable
             'old_value' => 'active',
             'new_value' => 'deleted',
             'user' => $userId,
+            'origin' => AuditLog::$currentOrigin,
         ]);
     }
 

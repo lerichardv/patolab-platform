@@ -18,6 +18,14 @@ import React, { useEffect } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import {
@@ -34,15 +42,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command';
-import { QuickEditMetadata } from './hooks/use-specimen-quick-edit-metadata';
+import type { QuickEditMetadata } from './hooks/use-specimen-quick-edit-metadata';
 
 interface Props {
     specimen: any;
@@ -607,13 +607,16 @@ export default function SpecimenQuickEditForm({
                                 accept=".pdf,image/*"
                                 onChange={(e) => {
                                     const file = e.target.files?.[0] || null;
+
                                     if (file && file.size > 50 * 1024 * 1024) {
                                         toast.error(
                                             'El archivo de Orden Médica no debe exceder los 50MB.',
                                         );
                                         e.target.value = '';
+
                                         return;
                                     }
+
                                     setData('medical_order_file', file);
                                 }}
                             />

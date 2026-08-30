@@ -12,8 +12,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import SpecimenQuickEditForm from './specimen-quick-edit-form';
 import { useSpecimenQuickEditMetadata } from './hooks/use-specimen-quick-edit-metadata';
+import SpecimenQuickEditForm from './specimen-quick-edit-form';
 
 interface Props {
     specimen: any | null;
@@ -130,6 +130,7 @@ export default function SpecimenQuickEditSheet({
             if (open && isFormDirty) {
                 e.preventDefault();
                 e.returnValue = '';
+
                 return '';
             }
         };
@@ -144,9 +145,11 @@ export default function SpecimenQuickEditSheet({
         if (!newOpen) {
             if (isFormDirty) {
                 setShowCloseConfirm(true);
+
                 return;
             }
         }
+
         onOpenChange(newOpen);
     };
 

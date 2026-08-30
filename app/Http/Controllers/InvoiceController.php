@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Bank;
 use App\Models\CaiRange;
 use App\Models\Credit;
@@ -27,6 +28,7 @@ use App\Services\DateFilterService;
 use App\Services\InvoiceCalculationService;
 use App\Services\InvoicePdfService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -918,5 +920,119 @@ class InvoiceController extends Controller
         }
 
         return '';
+    }
+
+    public function auditHistory(Invoice $invoice)
+    {
+        Gate::authorize('invoices.view');
+
+        $logs = DB::table('audit_log as al')
+            ->join('invoice_specimens as ivs', function ($join) {
+                $join->on('al.row_id', '=', 'ivs.id')
+                    ->whereIn('al.table', ['invoice_specimens', 'invoice_specimen']);
+            })
+            ->leftJoin('specimen as s', 'ivs.specimen_id', '=', 's.id')
+            ->leftJoin('users as u', 'al.user', '=', 'u.id')
+            ->select(
+                'al.audit_session_code',
+                'u.name as user_name',
+                'al.action',
+                'al.row_id as invoice_specimen_id',
+                'ivs.invoice_id',
+                'ivs.specimen_id',
+                's.sequence_code as specimen_sequence_code',
+                'al.created_at as date',
+                'al.column',
+                'al.old_value',
+                'al.new_value'
+            )
+            ->whereIn('al.table', ['invoice_specimens', 'invoice_specimen'])
+            ->where('ivs.invoice_id', $invoice->id)
+            ->whereNotIn('al.column', [
+                'id',
+                'full_invoice_number',
+                'invoice_number',
+                'cai_range_id',
+                'customer_id',
+                'specimen_id',
+                'rental_id',
+                'payment_type',
+                'payment_method_date',
+                'invoice_id',
+                'examination_id',
+                'is_group',
+                'group_id',
+                'credit_id',
+                'is_paid',
+                'created_at',
+                'updated_at',
+                'deleted_at',
+            ])
+            ->orderByDesc('date')
+            ->orderBy('al.action')
+            ->get();
+
+        $invoiceSpecimens = InvoiceSpecimen::where('invoice_id', $invoice->id)->get()->keyBy('id');
+
+        $history = $logs->groupBy(function ($item) {
+            return $item->audit_session_code.'_'.$item->invoice_specimen_id;
+        })->map(function ($group) use ($invoiceSpecimens) {
+            $first = $group->first();
+            $specimenRecord = $invoiceSpecimens->get($first->invoice_specimen_id);
+
+            $changes = $group->map(function ($log) use ($specimenRecord) {
+                $currentVal = $specimenRecord ? $specimenRecord->getAttribute($log->column) : null;
+
+                return [
+                    'column' => $log->column,
+                    'old' => $log->old_value,
+                    'new' => $log->new_value,
+                    'current' => $currentVal !== null ? (string) $currentVal : null,
+                ];
+            })->values()->toArray();
+
+            return [
+                'audit_session_code' => $first->audit_session_code,
+                'user_name' => $first->user_name ?? 'Sistema',
+                'action' => $first->action,
+                'invoice_specimen_id' => $first->invoice_specimen_id,
+                'invoice_id' => $first->invoice_id,
+                'specimen_id' => $first->specimen_id,
+                'specimen_sequence_code' => $first->specimen_sequence_code,
+                'date' => $first->date,
+                'changes_made' => $changes,
+            ];
+        })->values()->toArray();
+
+        return response()->json($history);
+    }
+
+    public function restoreAuditChange(Request $request, Invoice $invoice)
+    {
+        Gate::authorize('invoices.manage');
+
+        $validated = $request->validate([
+            'invoice_specimen_id' => 'required|exists:invoice_specimens,id',
+            'column' => 'required|string',
+            'value' => 'nullable',
+        ]);
+
+        $invoiceSpecimen = InvoiceSpecimen::findOrFail($validated['invoice_specimen_id']);
+
+        if ($invoiceSpecimen->invoice_id !== $invoice->id) {
+            abort(403, 'Acción no autorizada para esta factura.');
+        }
+
+        AuditLog::$currentOrigin = 'changes history';
+
+        DB::transaction(function () use ($invoiceSpecimen, $validated) {
+            $invoiceSpecimen->update([
+                $validated['column'] => $validated['value'],
+            ]);
+        });
+
+        AuditLog::$currentOrigin = 'system';
+
+        return response()->json(['message' => 'Cambio restaurado con éxito']);
     }
 }

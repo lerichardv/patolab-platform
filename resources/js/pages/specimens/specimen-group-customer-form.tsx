@@ -15,9 +15,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import AsyncCustomerCombobox, {
-    CustomerOption,
-} from '@/components/async-customer-combobox';
+import type { CustomerOption } from '@/components/async-customer-combobox';
+import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -92,17 +91,21 @@ export default function SpecimenGroupCustomerForm({
                 if (!isMounted) {
                     return;
                 }
+
                 setGroupInfo(data);
+
                 if (data.customer) {
                     setSelectedCustomer(data.customer);
                     setSelectedCustomerId(String(data.customer.id));
                 }
+
                 setIsDirty?.(false);
             })
             .catch((err) => {
                 if (!isMounted) {
                     return;
                 }
+
                 toast.error(
                     err.message ||
                         'No se pudo cargar la información del grupo de muestras.',
@@ -131,6 +134,7 @@ export default function SpecimenGroupCustomerForm({
         if (!groupInfo) {
             return '';
         }
+
         const count = groupInfo.specimens_count || 0;
         const targetName = selectedCustomer?.name || 'Cliente';
         const suffix = count === 1 ? 'Muestra' : 'Muestras';
@@ -154,6 +158,7 @@ export default function SpecimenGroupCustomerForm({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
         if (!selectedCustomer) {
             return;
         }

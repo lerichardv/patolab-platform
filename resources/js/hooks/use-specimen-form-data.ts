@@ -59,9 +59,11 @@ export function useSpecimenFormData({
         setError(null);
 
         const params: Record<string, string> = {};
+
         if (specimenId) {
             params.specimen_id = specimenId.toString();
         }
+
         if (groupId) {
             params.group_id = groupId.toString();
         }
