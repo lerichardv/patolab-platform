@@ -90,7 +90,8 @@ export default function SpecimenGroupCustomerSheet({
                             ¿Estás seguro de salir?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Ha seleccionado un cliente diferente para el grupo. Si sale sin guardar, los cambios se perderán.
+                            Ha seleccionado un cliente diferente para el grupo.
+                            Si sale sin guardar, los cambios se perderán.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

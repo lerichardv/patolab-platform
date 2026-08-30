@@ -81,7 +81,9 @@ export default function SpecimenGroupCustomerForm({
         })
             .then((res) => {
                 if (!res.ok) {
-                    throw new Error('Error al cargar la información del grupo.');
+                    throw new Error(
+                        'Error al cargar la información del grupo.',
+                    );
                 }
 
                 return res.json();
@@ -207,7 +209,7 @@ export default function SpecimenGroupCustomerForm({
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6 py-4 px-5">
+        <form onSubmit={handleSubmit} className="space-y-6 px-5 py-4">
             {/* Group Meta Header */}
             <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -228,7 +230,10 @@ export default function SpecimenGroupCustomerForm({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant="secondary" className="gap-1 font-mono text-xs">
+                        <Badge
+                            variant="secondary"
+                            className="gap-1 font-mono text-xs"
+                        >
                             <Users className="h-3 w-3" />
                             {groupInfo.specimens_count}{' '}
                             {groupInfo.specimens_count === 1
@@ -326,7 +331,8 @@ export default function SpecimenGroupCustomerForm({
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <label className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                        Cliente Principal Seleccionado <span className="text-destructive">*</span>
+                        Cliente Principal Seleccionado{' '}
+                        <span className="text-destructive">*</span>
                     </label>
                     {isCustomerChanged ? (
                         <Badge
@@ -420,22 +426,22 @@ export default function SpecimenGroupCustomerForm({
 
                     <div className="space-y-2 text-xs">
                         <div className="flex items-start gap-2">
-                            <span className="font-semibold text-muted-foreground min-w-[130px]">
+                            <span className="min-w-[130px] font-semibold text-muted-foreground">
                                 Nombre del Grupo:
                             </span>
-                            <div className="flex flex-col gap-1 min-w-0 flex-1">
+                            <div className="flex min-w-0 flex-1 flex-col gap-1">
                                 {isCustomerChanged ? (
                                     <>
-                                        <span className="line-through text-muted-foreground truncate">
+                                        <span className="truncate text-muted-foreground line-through">
                                             {groupInfo.name}
                                         </span>
-                                        <span className="font-semibold text-primary truncate flex items-center gap-1">
+                                        <span className="flex items-center gap-1 truncate font-semibold text-primary">
                                             <ArrowRight className="h-3 w-3 shrink-0" />
                                             {computedNewGroupName}
                                         </span>
                                     </>
                                 ) : (
-                                    <span className="font-semibold text-foreground truncate">
+                                    <span className="truncate font-semibold text-foreground">
                                         {computedNewGroupName}
                                     </span>
                                 )}
@@ -443,13 +449,14 @@ export default function SpecimenGroupCustomerForm({
                         </div>
 
                         <div className="flex items-start gap-2">
-                            <span className="font-semibold text-muted-foreground min-w-[130px]">
+                            <span className="min-w-[130px] font-semibold text-muted-foreground">
                                 Factura & Crédito:
                             </span>
-                            <span className="text-foreground flex-1">
+                            <span className="flex-1 text-foreground">
                                 {isCustomerChanged ? (
                                     <>
-                                        Se actualizará el cliente de facturación a{' '}
+                                        Se actualizará el cliente de facturación
+                                        a{' '}
                                         <strong className="text-foreground">
                                             {selectedCustomer?.name}
                                         </strong>
@@ -457,7 +464,8 @@ export default function SpecimenGroupCustomerForm({
                                     </>
                                 ) : (
                                     <>
-                                        Se re-sincronizará el cliente de facturación y crédito con{' '}
+                                        Se re-sincronizará el cliente de
+                                        facturación y crédito con{' '}
                                         <strong className="text-foreground">
                                             {selectedCustomer?.name}
                                         </strong>
@@ -469,9 +477,12 @@ export default function SpecimenGroupCustomerForm({
                     </div>
 
                     <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/10 p-3 text-[11px] text-blue-800 dark:text-blue-300">
-                        <AlertCircle className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
                         <span>
-                            <strong>Nota:</strong> Los pacientes asignados a cada muestra individual dentro del grupo se mantendrán sin modificaciones para preservar su historial clínico.
+                            <strong>Nota:</strong> Los pacientes asignados a
+                            cada muestra individual dentro del grupo se
+                            mantendrán sin modificaciones para preservar su
+                            historial clínico.
                         </span>
                     </div>
                 </div>

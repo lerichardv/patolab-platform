@@ -2523,12 +2523,15 @@ export default function SpecimenForm({
                                     onChange={(v) =>
                                         setData('sample_collection_date', v)
                                     }
-                                    disabled={readOnlySampleCollectionDate && !!specimen}
+                                    disabled={
+                                        readOnlySampleCollectionDate &&
+                                        !!specimen
+                                    }
                                 />
                                 {readOnlySampleCollectionDate && !!specimen && (
                                     <p className="text-xs text-muted-foreground">
-                                        Para modificar esta fecha, edítela
-                                        desde el editor de reporte.
+                                        Para modificar esta fecha, edítela desde
+                                        el editor de reporte.
                                     </p>
                                 )}
                                 {errors.sample_collection_date && (

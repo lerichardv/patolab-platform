@@ -1664,4 +1664,82 @@ class SpecimenController extends Controller
             return redirect()->back()->with('error', 'Error al generar el reporte: '.$e->getMessage());
         }
     }
+
+    public function quickEditMetadata()
+    {
+        Gate::authorize('specimens.edit');
+
+        return response()->json([
+            'referrers' => Referrer::orderBy('name')->get(),
+            'categories' => SpecimenCategory::orderBy('name')->get(),
+            'priorities' => Priority::orderBy('order', 'desc')->get(),
+        ]);
+    }
+
+    public function quickUpdate(Request $request, Specimen $specimen)
+    {
+        Gate::authorize('specimens.edit');
+
+        $validated = $request->validate([
+            'referrer' => 'required|exists:referrers,id',
+            'specimen_category' => 'required|exists:specimen_category,id',
+            'priority_id' => 'required|exists:priorities,id',
+            'sample_collection_date' => 'nullable|date',
+            'status' => 'required|string|in:received,macroscopic_review,processing,microscopic_review,finalized,delivered,cancelled',
+            'diagnosis' => 'nullable|string',
+            'anatomic_site' => 'nullable|string|max:255',
+            'clinical_notes' => 'nullable|string',
+            'medical_order_file' => [
+                'nullable',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp,gif',
+                function ($attribute, $value, $fail) {
+                    if ($value instanceof UploadedFile) {
+                        $mime = $value->getMimeType();
+                        $isImage = str_starts_with($mime, 'image/');
+                        $sizeInKb = $value->getSize() / 1024;
+                        if ($isImage) {
+                            if ($sizeInKb > 10240) {
+                                $fail('El archivo de imagen no debe superar los 10 MB.');
+                            }
+                        } else {
+                            if ($sizeInKb > 30720) {
+                                $fail('El archivo de orden médica no debe superar los 30 MB.');
+                            }
+                        }
+                    }
+                },
+            ],
+        ]);
+
+        if ($request->hasFile('medical_order_file')) {
+            if ($specimen->medical_order_file) {
+                Storage::disk('public')->delete($specimen->medical_order_file);
+            }
+            $path = $this->storeMedicalOrder($request->file('medical_order_file'));
+            $validated['medical_order_file'] = $path;
+        } else {
+            unset($validated['medical_order_file']);
+        }
+
+        $oldPriorityId = $specimen->priority_id;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($specimen, $validated, $oldPriorityId) {
+            $specimen->update($validated);
+
+            if ($oldPriorityId != $validated['priority_id']) {
+                PrioritySpecimenOrder::where('specimen_id', $specimen->id)
+                    ->where('priority_id', '!=', $validated['priority_id'])
+                    ->delete();
+
+                $maxOrder = PrioritySpecimenOrder::where('priority_id', $validated['priority_id'])->max('order') ?? 0;
+                PrioritySpecimenOrder::updateOrCreate(
+                    ['priority_id' => $validated['priority_id'], 'specimen_id' => $specimen->id],
+                    ['order' => $maxOrder + 1]
+                );
+            }
+        });
+
+        return redirect()->back()->with('success', 'Muestra actualizada correctamente.');
+    }
 }

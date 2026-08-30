@@ -315,9 +315,12 @@ export default function CreditsIndex({
         selectedCreditForExtractSpecimen,
         setSelectedCreditForExtractSpecimen,
     ] = useState<Credit | null>(null);
-    const [isGroupCustomerSheetOpen, setIsGroupCustomerSheetOpen] = useState(false);
-    const [selectedGroupIdForCustomerChange, setSelectedGroupIdForCustomerChange] =
-        useState<number | null>(null);
+    const [isGroupCustomerSheetOpen, setIsGroupCustomerSheetOpen] =
+        useState(false);
+    const [
+        selectedGroupIdForCustomerChange,
+        setSelectedGroupIdForCustomerChange,
+    ] = useState<number | null>(null);
     const [search, setSearch] = useState(filters.search || '');
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
@@ -1583,10 +1586,10 @@ export default function CreditsIndex({
                                                                 {canManage &&
                                                                     Boolean(
                                                                         credit.is_group ||
-                                                                            credit.group_id ||
-                                                                            credit
-                                                                                .group
-                                                                                ?.id,
+                                                                        credit.group_id ||
+                                                                        credit
+                                                                            .group
+                                                                            ?.id,
                                                                     ) && (
                                                                         <DropdownMenuItem
                                                                             onClick={() => {

@@ -54,9 +54,7 @@ use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
 Route::get('/', function () {
-    return Inertia::render('welcome', [
-        'canRegister' => Features::enabled(Features::registration()),
-    ]);
+    return view('welcome');
 })->name('home');
 
 Route::get('/v/{report_code}', ReportVerificationController::class)->name('report.verify');
@@ -130,6 +128,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('cutting-codes', CuttingCodeController::class);
     Route::resource('cutting-prefixes', CuttingPrefixController::class);
     Route::post('specimens/{specimen:sequence_code}/generate-report', [SpecimenController::class, 'generateReport'])->name('specimens.generate-report');
+    Route::get('specimens/quick-edit-metadata', [SpecimenController::class, 'quickEditMetadata'])->name('specimens.quick-edit-metadata');
+    Route::post('specimens/{specimen}/quick-update', [SpecimenController::class, 'quickUpdate'])->name('specimens.quick-update');
     Route::resource('specimens', SpecimenController::class);
     Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');
     Route::resource('invoices', InvoiceController::class)->only(['index', 'update']);
