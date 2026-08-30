@@ -8,8 +8,11 @@ import {
     RotateCcw,
     Loader2,
     AlertCircle,
+    Check,
+    ChevronsUpDown,
+    Filter,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import HeadingSheet from '@/components/heading-sheet';
 import {
@@ -24,12 +27,31 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 
 interface Props {
     invoice: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+}
+
+interface SpecimenOption {
+    sequence_code: string;
+    patient_name: string;
 }
 
 const IGNORED_COLUMNS = new Set([
@@ -70,6 +92,125 @@ const COLUMN_LABELS: Record<string, string> = {
     custom_specimen_price: 'Precio Personalizado',
 };
 
+function SpecimenComboboxFilter({
+    options,
+    value,
+    onChange,
+}: {
+    options: SpecimenOption[];
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const [open, setOpen] = useState(false);
+
+    const selectedOption = options.find((opt) => opt.sequence_code === value);
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background/80 px-3 py-1.5 text-left text-xs shadow-2xs transition-colors hover:bg-accent/50 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring sm:w-[320px]"
+                >
+                    <div className="flex min-w-0 items-center gap-2 truncate">
+                        <Filter className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+                        {value === 'all' || !selectedOption ? (
+                            <span className="truncate font-medium text-foreground">
+                                Todas las muestras ({options.length})
+                            </span>
+                        ) : (
+                            <div className="flex min-w-0 items-center gap-1.5 truncate">
+                                <span className="font-mono font-semibold text-primary">
+                                    {selectedOption.sequence_code}
+                                </span>
+                                <span className="truncate text-muted-foreground">
+                                    - {selectedOption.patient_name}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                    <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent className="z-[120] w-[320px] p-0" align="start">
+                <Command>
+                    <CommandInput placeholder="Buscar por código o paciente..." />
+                    <CommandList>
+                        <CommandEmpty>No se encontraron muestras.</CommandEmpty>
+                        <CommandGroup>
+                            <CommandItem
+                                value="all todas las muestras"
+                                onSelect={() => {
+                                    onChange('all');
+                                    setOpen(false);
+                                }}
+                                className="group flex cursor-pointer items-center justify-between aria-selected:bg-primary aria-selected:text-white data-[selected=true]:bg-primary data-[selected=true]:text-white"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Check
+                                        className={cn(
+                                            'h-4 w-4 shrink-0 text-current',
+                                            value === 'all'
+                                                ? 'opacity-100'
+                                                : 'opacity-0',
+                                        )}
+                                    />
+                                    <span className="font-medium text-foreground group-aria-selected:text-white group-data-[selected=true]:text-white">
+                                        Todas las muestras
+                                    </span>
+                                </div>
+                                <Badge
+                                    variant="secondary"
+                                    className="h-4 px-1.5 text-[10px] group-aria-selected:bg-white/20 group-aria-selected:text-white group-data-[selected=true]:bg-white/20 group-data-[selected=true]:text-white"
+                                >
+                                    {options.length}
+                                </Badge>
+                            </CommandItem>
+                            {options.map((option) => {
+                                const isSelected =
+                                    value === option.sequence_code;
+
+                                return (
+                                    <CommandItem
+                                        key={option.sequence_code}
+                                        value={`${option.sequence_code} ${option.patient_name}`}
+                                        onSelect={() => {
+                                            onChange(option.sequence_code);
+                                            setOpen(false);
+                                        }}
+                                        className="group flex cursor-pointer items-center justify-between py-2 aria-selected:bg-primary aria-selected:text-white data-[selected=true]:bg-primary data-[selected=true]:text-white"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-2">
+                                            <Check
+                                                className={cn(
+                                                    'h-4 w-4 shrink-0 text-current',
+                                                    isSelected
+                                                        ? 'opacity-100'
+                                                        : 'opacity-0',
+                                                )}
+                                            />
+                                            <div className="flex min-w-0 flex-col">
+                                                <span className="font-mono text-xs font-semibold text-foreground group-aria-selected:text-white group-data-[selected=true]:text-white">
+                                                    {option.sequence_code}
+                                                </span>
+                                                <span className="truncate text-[11px] text-muted-foreground group-aria-selected:text-white/85 group-data-[selected=true]:text-white/85">
+                                                    {option.patient_name}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </CommandItem>
+                                );
+                            })}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
 export default function InvoiceAuditSheet({
     invoice,
     open,
@@ -80,6 +221,7 @@ export default function InvoiceAuditSheet({
     const [loading, setLoading] = useState(true);
     const [history, setHistory] = useState<any[]>([]);
     const [restoring, setRestoring] = useState(false);
+    const [specimenFilter, setSpecimenFilter] = useState<string>('all');
 
     const [changeToRestore, setChangeToRestore] = useState<{
         invoice_specimen_id: number;
@@ -110,6 +252,7 @@ export default function InvoiceAuditSheet({
 
     useEffect(() => {
         if (open && invoice) {
+            setSpecimenFilter('all');
             fetchHistory();
         }
     }, [open, invoice]);
@@ -154,7 +297,32 @@ export default function InvoiceAuditSheet({
         }
     };
 
+    // Extract unique specimens from history
+    const specimenOptions = useMemo(() => {
+        const map = new Map<string, SpecimenOption>();
+
+        history.forEach((session) => {
+            if (session.specimen_sequence_code) {
+                if (!map.has(session.specimen_sequence_code)) {
+                    map.set(session.specimen_sequence_code, {
+                        sequence_code: session.specimen_sequence_code,
+                        patient_name:
+                            session.patient_name || 'Sin paciente asignado',
+                    });
+                }
+            }
+        });
+
+        return Array.from(map.values());
+    }, [history]);
+
     const filteredHistory = history
+        .filter((session) => {
+            if (specimenFilter === 'all') {
+                return true;
+            }
+            return session.specimen_sequence_code === specimenFilter;
+        })
         .map((session) => ({
             ...session,
             changes_made: session.changes_made.filter(
@@ -171,6 +339,32 @@ export default function InvoiceAuditSheet({
                         title="Historial de Cambios"
                         description={`Verifique las modificaciones realizadas en el desglose de muestras de la factura ${invoice?.full_invoice_number || ''}.`}
                     />
+
+                    {/* Filter by Specimen */}
+                    {!loading && specimenOptions.length > 0 && (
+                        <div className="mx-5 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 p-2.5 px-3">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                                <span className="text-xs font-semibold text-foreground/80">
+                                    Muestra:
+                                </span>
+                                <SpecimenComboboxFilter
+                                    options={specimenOptions}
+                                    value={specimenFilter}
+                                    onChange={setSpecimenFilter}
+                                />
+                            </div>
+                            {specimenFilter !== 'all' && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                                    onClick={() => setSpecimenFilter('all')}
+                                >
+                                    Limpiar filtro
+                                </Button>
+                            )}
+                        </div>
+                    )}
 
                     {loading ? (
                         <div className="flex h-[350px] flex-col items-center justify-center gap-3">
@@ -189,13 +383,14 @@ export default function InvoiceAuditSheet({
                                     Sin cambios registrados
                                 </h3>
                                 <p className="text-xs text-muted-foreground">
-                                    No se han detectado modificaciones auditadas
-                                    en las muestras de esta factura.
+                                    {specimenFilter !== 'all'
+                                        ? 'No se encontraron modificaciones para la muestra seleccionada.'
+                                        : 'No se han detectado modificaciones auditadas en las muestras de esta factura.'}
                                 </p>
                             </div>
                         </div>
                     ) : (
-                        <div className="mt-6 space-y-4 px-5 pb-12">
+                        <div className="space-y-4 px-5 pb-12">
                             {filteredHistory.map((session, index) => (
                                 <div
                                     key={`${session.audit_session_code}_${session.invoice_specimen_id}_${index}`}
@@ -204,9 +399,12 @@ export default function InvoiceAuditSheet({
                                     {/* Session Header */}
                                     <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
                                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                            {/* Patient Name */}
                                             <div className="flex items-center gap-1.5 font-medium text-foreground">
                                                 <User className="h-3.5 w-3.5 text-primary/70" />
-                                                <span>{session.user_name}</span>
+                                                <span className="font-semibold text-foreground">
+                                                    {session.patient_name}
+                                                </span>
                                             </div>
                                             <span className="text-muted-foreground/30">
                                                 •
