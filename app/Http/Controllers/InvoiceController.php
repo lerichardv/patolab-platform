@@ -932,10 +932,12 @@ class InvoiceController extends Controller
                     ->whereIn('al.table', ['invoice_specimens', 'invoice_specimen']);
             })
             ->leftJoin('specimen as s', 'ivs.specimen_id', '=', 's.id')
+            ->leftJoin('customers as c', 's.customer', '=', 'c.id')
             ->leftJoin('users as u', 'al.user', '=', 'u.id')
             ->select(
                 'al.audit_session_code',
                 'u.name as user_name',
+                'c.name as patient_name',
                 'al.action',
                 'al.row_id as invoice_specimen_id',
                 'ivs.invoice_id',
@@ -976,7 +978,7 @@ class InvoiceController extends Controller
 
         $history = $logs->groupBy(function ($item) {
             return $item->audit_session_code.'_'.$item->invoice_specimen_id;
-        })->map(function ($group) use ($invoiceSpecimens) {
+        })->map(function ($group) use ($invoiceSpecimens, $invoice) {
             $first = $group->first();
             $specimenRecord = $invoiceSpecimens->get($first->invoice_specimen_id);
 
@@ -994,6 +996,7 @@ class InvoiceController extends Controller
             return [
                 'audit_session_code' => $first->audit_session_code,
                 'user_name' => $first->user_name ?? 'Sistema',
+                'patient_name' => $first->patient_name ?? $invoice->customer?->name ?? 'Sin paciente asignado',
                 'action' => $first->action,
                 'invoice_specimen_id' => $first->invoice_specimen_id,
                 'invoice_id' => $first->invoice_id,
