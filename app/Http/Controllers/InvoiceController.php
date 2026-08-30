@@ -970,6 +970,7 @@ class InvoiceController extends Controller
                 'updated_at',
                 'deleted_at',
             ])
+            ->orderBy('s.sequence_code')
             ->orderByDesc('date')
             ->orderBy('al.action')
             ->get();

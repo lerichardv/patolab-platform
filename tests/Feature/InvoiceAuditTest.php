@@ -212,3 +212,42 @@ test('it denies restoring specimen from another invoice', function () {
 
     $response->assertStatus(403);
 });
+
+test('it returns audit logs ordered by specimen sequence code', function () {
+    $specimenB = Specimen::create([
+        'sequence_code' => 'BIO-0002-08-2026',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    $invoiceSpecimenB = InvoiceSpecimen::create([
+        'invoice_id' => $this->invoice1->id,
+        'specimen_id' => $specimenB->id,
+        'is_group' => false,
+        'quantity' => 1,
+        'amount' => 400.00,
+        'discount' => 0.00,
+        'subtotal' => 400.00,
+        'exempt_amount' => 400.00,
+        'total' => 400.00,
+    ]);
+
+    $this->actingAs($this->user);
+
+    // Update specimen B first, then specimen 1
+    $invoiceSpecimenB->update(['amount' => 450.00]);
+    $this->invoiceSpecimen1->update(['amount' => 550.00]);
+
+    $response = $this->getJson(route('invoices.audit-history', $this->invoice1->id));
+    $response->assertStatus(200);
+
+    $data = $response->json();
+    expect($data)->toHaveCount(2);
+    expect($data[0]['specimen_sequence_code'])->toBe('BIO-0001-08-2026');
+    expect($data[1]['specimen_sequence_code'])->toBe('BIO-0002-08-2026');
+});

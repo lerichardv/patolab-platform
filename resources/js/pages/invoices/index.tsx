@@ -3088,6 +3088,11 @@ export default function InvoicesIndex({
                 invoice={selectedInvoiceForAudit}
                 open={isAuditSheetOpen}
                 onOpenChange={setIsAuditSheetOpen}
+                onEditInvoice={(inv) => {
+                    const latest =
+                        invoices.data.find((i: any) => i.id === inv.id) || inv;
+                    handleEditDetails(latest);
+                }}
             />
 
             {/* Invoice Editor Sheet */}
