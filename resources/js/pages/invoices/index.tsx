@@ -732,9 +732,12 @@ export default function InvoicesIndex({
     const [isGroupFilterOpen, setIsGroupFilterOpen] = useState(false);
     const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
-    const [isGroupCustomerSheetOpen, setIsGroupCustomerSheetOpen] = useState(false);
-    const [selectedGroupIdForCustomerChange, setSelectedGroupIdForCustomerChange] =
-        useState<number | null>(null);
+    const [isGroupCustomerSheetOpen, setIsGroupCustomerSheetOpen] =
+        useState(false);
+    const [
+        selectedGroupIdForCustomerChange,
+        setSelectedGroupIdForCustomerChange,
+    ] = useState<number | null>(null);
     const [specimenSearchQuery, setSpecimenSearchQuery] = useState('');
     const [isSelectGroupDialogOpen, setIsSelectGroupDialogOpen] =
         useState(false);
@@ -874,6 +877,65 @@ export default function InvoicesIndex({
             }
         }
     }, [flash.new_specimen_id, invoices.data]);
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const editSpecimenCode = urlParams.get('edit_specimen');
+        if (editSpecimenCode && invoices.data && invoices.data.length > 0) {
+            let foundSpecimen: any = null;
+            let foundInvoice: any = null;
+
+            for (const inv of invoices.data) {
+                if (
+                    inv.specimen &&
+                    inv.specimen.sequence_code === editSpecimenCode
+                ) {
+                    foundSpecimen = inv.specimen;
+                    foundInvoice = inv;
+                    break;
+                }
+                const groupSpecs =
+                    inv.group?.specimens || inv.group_specimens || [];
+                for (const gs of groupSpecs) {
+                    const spec = gs.specimen || gs;
+                    if (spec && spec.sequence_code === editSpecimenCode) {
+                        foundSpecimen = spec;
+                        foundInvoice = inv;
+                        break;
+                    }
+                }
+                if (foundSpecimen) {
+                    break;
+                }
+            }
+
+            if (foundSpecimen && foundInvoice) {
+                const specimenWithInvoice = {
+                    ...foundSpecimen,
+                    customerRelation:
+                        foundSpecimen.customer_relation ||
+                        foundSpecimen.customerRelation ||
+                        foundInvoice.customer,
+                    customer_relation:
+                        foundSpecimen.customer_relation ||
+                        foundSpecimen.customerRelation ||
+                        foundInvoice.customer,
+                    invoice_relation: {
+                        ...foundInvoice,
+                        specimen: undefined,
+                    },
+                };
+                setSelectedSpecimen(specimenWithInvoice);
+                setIsSpecimenSheetOpen(true);
+
+                const cleanSearch = window.location.search
+                    .replace(/([?&])edit_specimen=[^&]+&?/, '$1')
+                    .replace(/[?&]$/, '');
+                const newUrl = window.location.pathname + cleanSearch;
+                window.history.replaceState({}, '', newUrl);
+            }
+        }
+    }, [invoices.data]);
 
     useEffect(() => {
         if (flash.new_invoice_url) {
@@ -2860,9 +2922,9 @@ export default function InvoicesIndex({
                                                                 {canManageInvoices &&
                                                                     Boolean(
                                                                         invoice.group_id ||
-                                                                            invoice
-                                                                                .group
-                                                                                ?.id,
+                                                                        invoice
+                                                                            .group
+                                                                            ?.id,
                                                                     ) && (
                                                                         <DropdownMenuItem
                                                                             onClick={() => {

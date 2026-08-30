@@ -115,7 +115,9 @@ export default function SpecimenSheet({
                         products={products}
                         banks={banks}
                         showPaymentMethodEdition={showPaymentMethodEdition}
-                        readOnlySampleCollectionDate={readOnlySampleCollectionDate}
+                        readOnlySampleCollectionDate={
+                            readOnlySampleCollectionDate
+                        }
                     />
                 </SheetContent>
             </Sheet>
