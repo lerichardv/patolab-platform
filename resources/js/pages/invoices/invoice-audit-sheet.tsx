@@ -1,7 +1,6 @@
-import { router, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import axios from 'axios';
 import {
-    History,
     User,
     Calendar,
     ArrowRight,
@@ -11,6 +10,7 @@ import {
     Check,
     ChevronsUpDown,
     Filter,
+    Edit,
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -47,6 +47,7 @@ interface Props {
     invoice: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onEditInvoice?: (invoice: any) => void;
 }
 
 interface SpecimenOption {
@@ -215,13 +216,14 @@ export default function InvoiceAuditSheet({
     invoice,
     open,
     onOpenChange,
+    onEditInvoice,
 }: Props) {
-    const { auth } = usePage<any>().props;
-
     const [loading, setLoading] = useState(true);
     const [history, setHistory] = useState<any[]>([]);
     const [restoring, setRestoring] = useState(false);
     const [specimenFilter, setSpecimenFilter] = useState<string>('all');
+    const [hasRestoredAny, setHasRestoredAny] = useState(false);
+    const [showPostRestoreDialog, setShowPostRestoreDialog] = useState(false);
 
     const [changeToRestore, setChangeToRestore] = useState<{
         invoice_specimen_id: number;
@@ -252,6 +254,7 @@ export default function InvoiceAuditSheet({
 
     useEffect(() => {
         if (open && invoice) {
+            setHasRestoredAny(false);
             setSpecimenFilter('all');
             fetchHistory();
         }
@@ -275,6 +278,7 @@ export default function InvoiceAuditSheet({
                     `Columna '${changeToRestore.columnName}' restaurada con éxito`,
                 );
                 setChangeToRestore(null);
+                setHasRestoredAny(true);
                 fetchHistory();
                 router.reload();
             })
@@ -287,6 +291,18 @@ export default function InvoiceAuditSheet({
             .finally(() => {
                 setRestoring(false);
             });
+    };
+
+    const handleSheetOpenChange = (newOpen: boolean) => {
+        if (!newOpen) {
+            if (hasRestoredAny) {
+                onOpenChange(false);
+                setShowPostRestoreDialog(true);
+                return;
+            }
+        }
+
+        onOpenChange(newOpen);
     };
 
     const formatDate = (dateStr: string) => {
@@ -313,27 +329,50 @@ export default function InvoiceAuditSheet({
             }
         });
 
-        return Array.from(map.values());
+        return Array.from(map.values()).sort((a, b) =>
+            (a.sequence_code || '').localeCompare(
+                b.sequence_code || '',
+                undefined,
+                { numeric: true, sensitivity: 'base' },
+            ),
+        );
     }, [history]);
 
-    const filteredHistory = history
-        .filter((session) => {
-            if (specimenFilter === 'all') {
-                return true;
-            }
-            return session.specimen_sequence_code === specimenFilter;
-        })
-        .map((session) => ({
-            ...session,
-            changes_made: session.changes_made.filter(
-                (change: any) => !IGNORED_COLUMNS.has(change.column),
-            ),
-        }))
-        .filter((session) => session.changes_made.length > 0);
+    const filteredHistory = useMemo(() => {
+        return history
+            .filter((session) => {
+                if (specimenFilter === 'all') {
+                    return true;
+                }
+
+                return session.specimen_sequence_code === specimenFilter;
+            })
+            .map((session) => ({
+                ...session,
+                changes_made: session.changes_made.filter(
+                    (change: any) => !IGNORED_COLUMNS.has(change.column),
+                ),
+            }))
+            .filter((session) => session.changes_made.length > 0)
+            .sort((a, b) => {
+                const codeA = a.specimen_sequence_code || '';
+                const codeB = b.specimen_sequence_code || '';
+                const codeCompare = codeA.localeCompare(codeB, undefined, {
+                    numeric: true,
+                    sensitivity: 'base',
+                });
+
+                if (codeCompare !== 0) {
+                    return codeCompare;
+                }
+
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+            });
+    }, [history, specimenFilter]);
 
     return (
         <>
-            <Sheet open={open} onOpenChange={onOpenChange}>
+            <Sheet open={open} onOpenChange={handleSheetOpenChange}>
                 <SheetContent className="w-full overflow-y-auto bg-background sm:max-w-[80vw] md:max-w-[750px] lg:max-w-[900px]">
                     <HeadingSheet
                         title="Historial de Cambios"
@@ -701,6 +740,63 @@ export default function InvoiceAuditSheet({
                             ) : (
                                 'Sí, restaurar'
                             )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Post-Restore Guidance Dialog */}
+            <AlertDialog
+                open={showPostRestoreDialog}
+                onOpenChange={(open) => {
+                    setShowPostRestoreDialog(open);
+                    if (!open) {
+                        setHasRestoredAny(false);
+                    }
+                }}
+            >
+                <AlertDialogContent className="p-6 sm:max-w-[560px]">
+                    <AlertDialogHeader className="space-y-3">
+                        <AlertDialogTitle className="flex items-center gap-2.5 text-base font-semibold text-foreground sm:text-lg">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                <AlertCircle className="h-5 w-5" />
+                            </div>
+                            <span>Actualización de Factura Requerida</span>
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-3.5 pt-1 text-sm leading-relaxed text-muted-foreground">
+                            <p>
+                                Ha restaurado información en el desglose de
+                                muestras de la factura{' '}
+                                <strong className="font-semibold text-foreground">
+                                    {invoice?.full_invoice_number || ''}
+                                </strong>
+                                .
+                            </p>
+                            <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3.5 text-xs leading-relaxed text-amber-950 sm:text-sm dark:text-amber-200">
+                                Para garantizar que todos los cálculos
+                                (subtotales, descuentos, impuestos y totales) se
+                                sincronicen correctamente y se regenere el
+                                archivo PDF de la factura con los nuevos datos,
+                                es necesario ingresar al formulario de edición y
+                                hacer clic en{' '}
+                                <strong className="font-bold">"Guardar"</strong>
+                                .
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="mt-2 sm:justify-end">
+                        <AlertDialogAction
+                            onClick={() => {
+                                setShowPostRestoreDialog(false);
+                                setHasRestoredAny(false);
+                                if (invoice && onEditInvoice) {
+                                    onEditInvoice(invoice);
+                                }
+                            }}
+                            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 sm:w-auto"
+                        >
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar Factura
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
