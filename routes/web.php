@@ -103,6 +103,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('specimen-groups/{group}/customer', [SpecimenGroupController::class, 'updateCustomer'])->name('specimen-groups.update-customer');
 
     // Specimen Report Editor routes
+    Route::get('specimens/can-finalize', [ReportEditorController::class, 'canFinalize'])->name('specimens.can-finalize');
     Route::get('specimens/templates/available', [ReportEditorController::class, 'getAvailableTemplates'])->name('specimens.templates.available');
     Route::get('specimens/{specimen:sequence_code}/report-editor', [ReportEditorController::class, 'show'])->name('specimens.report-editor');
     Route::post('specimens/{specimen:sequence_code}/report-editor', [ReportEditorController::class, 'store'])->name('specimens.report-editor.store');

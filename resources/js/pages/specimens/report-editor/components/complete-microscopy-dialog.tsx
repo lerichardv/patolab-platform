@@ -5,7 +5,7 @@ import type {
     ScrollCapability,
     UICapability,
 } from '@embedpdf/react-pdf-viewer';
-import { ArrowDown, Unlock, Lock } from 'lucide-react';
+import { ArrowDown, Unlock, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
     AlertDialog,
@@ -70,13 +70,56 @@ export const CompleteMicroscopyDialog: React.FC<
     const [scrollPercentage, setScrollPercentage] = useState(0);
     const [hasScrolledToEnd, setHasScrolledToEnd] = useState(false);
     const [isPdfLoaded, setIsPdfLoaded] = useState(false);
+    const [canFinalize, setCanFinalize] = useState<boolean | null>(null);
+    const isLoadingPermission = open && canFinalize === null;
     const registryRef = useRef<PluginRegistry | null>(null);
     const cleanupsRef = useRef<(() => void)[]>([]);
+
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        let isMounted = true;
+
+        fetch('/specimens/can-finalize', {
+            headers: {
+                Accept: 'application/json',
+            },
+        })
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error('Error al consultar permisos');
+                }
+
+                return res.json();
+            })
+            .then((data) => {
+                if (isMounted) {
+                    setCanFinalize(Boolean(data.can_finalize));
+                }
+            })
+            .catch((err) => {
+                console.error(
+                    'Error al verificar permiso para finalizar muestra:',
+                    err,
+                );
+
+                if (isMounted) {
+                    setCanFinalize(false);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [open]);
 
     const resetDialogState = () => {
         setIsPdfLoaded(false);
         setScrollPercentage(0);
         setHasScrolledToEnd(false);
+        setCanFinalize(null);
         cleanupsRef.current.forEach((cleanup) => cleanup());
         cleanupsRef.current = [];
         registryRef.current = null;
@@ -359,35 +402,73 @@ export const CompleteMicroscopyDialog: React.FC<
                     )}
                 </div>
 
-                <AlertDialogFooter className="mt-4 flex-none">
-                    <AlertDialogCancel onClick={() => handleOpenChange(false)}>
-                        Cancelar
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                        onClick={() => {
-                            handleOpenChange(false);
-                            onConfirm();
-                        }}
-                        disabled={!hasScrolledToEnd}
-                        className={cn(
-                            'cursor-pointer gap-2 transition-all duration-300',
-                            hasScrolledToEnd
-                                ? 'bg-fuchsia-600 text-white shadow-md shadow-fuchsia-500/25 hover:bg-fuchsia-700 active:scale-[0.98]'
-                                : 'pointer-events-none cursor-not-allowed bg-slate-200 text-slate-400 opacity-50 dark:bg-slate-800 dark:text-slate-500',
+                <AlertDialogFooter className="mt-4 flex flex-none flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-2 text-xs">
+                        {isLoadingPermission && (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Verificando permisos...
+                            </span>
                         )}
-                    >
-                        {hasScrolledToEnd ? (
-                            <>
-                                <Unlock className="h-4 w-4" />
-                                <span>Finalizar Reporte</span>
-                            </>
-                        ) : (
-                            <>
-                                <Lock className="h-4 w-4" />
-                                <span>Finalizar Reporte</span>
-                            </>
+                        {!isLoadingPermission && canFinalize === false && (
+                            <div className="flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                <span>
+                                    Tu rol no tiene permiso para finalizar el
+                                    reporte de esta muestra.
+                                </span>
+                            </div>
                         )}
-                    </AlertDialogAction>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2">
+                        <AlertDialogCancel
+                            onClick={() => handleOpenChange(false)}
+                        >
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (
+                                    !hasScrolledToEnd ||
+                                    canFinalize !== true ||
+                                    isLoadingPermission
+                                ) {
+                                    return;
+                                }
+
+                                handleOpenChange(false);
+                                onConfirm();
+                            }}
+                            disabled={
+                                !hasScrolledToEnd ||
+                                canFinalize !== true ||
+                                isLoadingPermission
+                            }
+                            className={cn(
+                                'cursor-pointer gap-2 transition-all duration-300',
+                                hasScrolledToEnd &&
+                                    canFinalize === true &&
+                                    !isLoadingPermission
+                                    ? 'bg-fuchsia-600 text-white shadow-md shadow-fuchsia-500/25 hover:bg-fuchsia-700 active:scale-[0.98]'
+                                    : 'pointer-events-none cursor-not-allowed bg-slate-200 text-slate-400 opacity-50 dark:bg-slate-800 dark:text-slate-500',
+                            )}
+                        >
+                            {hasScrolledToEnd &&
+                            canFinalize === true &&
+                            !isLoadingPermission ? (
+                                <>
+                                    <Unlock className="h-4 w-4" />
+                                    <span>Finalizar Reporte</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Lock className="h-4 w-4" />
+                                    <span>Finalizar Reporte</span>
+                                </>
+                            )}
+                        </AlertDialogAction>
+                    </div>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
