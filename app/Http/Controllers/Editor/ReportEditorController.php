@@ -32,6 +32,7 @@ use App\Models\WorkOrderType;
 use App\Services\ImageOptimizerService;
 use App\Services\ReportPdfService;
 use App\Services\WhatsAppService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -1007,6 +1008,12 @@ class ReportEditorController extends Controller
         $status = $request->status;
 
         if ($status === 'finalized') {
+            if (! $request->user()?->can('specimens.finalize')) {
+                return redirect()->back()->withErrors([
+                    'error' => 'No tienes permiso para finalizar el reporte de esta muestra.',
+                ]);
+            }
+
             $unsignedUsers = $specimen->users()->where(function ($q) {
                 $q->whereNull('user_signature')->orWhere('user_signature', '');
             })->get();
@@ -1468,6 +1475,16 @@ class ReportEditorController extends Controller
             ->get();
 
         return response()->json($templates);
+    }
+
+    /**
+     * Check if the authenticated user has permission to finalize specimens.
+     */
+    public function canFinalize(Request $request): JsonResponse
+    {
+        return response()->json([
+            'can_finalize' => $request->user()?->can('specimens.finalize') ?? false,
+        ]);
     }
 
     /**

@@ -180,6 +180,15 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Finalizar Muestras',
+        description:
+            'Permite finalizar el reporte diagnóstico y completar el flujo de la muestra desde la revisión microscópica.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            manage: 'specimens.finalize',
+        },
+    },
+    {
         label: 'Gestionar Cortes',
         description:
             'Permite gestionar los bloques de casetes, cortes generados y láminas de las muestras.',
