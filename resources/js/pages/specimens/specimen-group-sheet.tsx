@@ -90,6 +90,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { findInaccessibleFile } from '@/lib/file-utils';
 import { cn } from '@/lib/utils';
 import {
     calculateInvoiceItem,
@@ -1653,7 +1654,25 @@ export default function SpecimenGroupSheet({
         setShowConfirm(true);
     };
 
-    const submitGroupForm = () => {
+    const submitGroupForm = async () => {
+        // Collect files to check accessibility before sending
+        const filesToCheck: (File | null | undefined)[] = [proofOfPayment];
+        specimens.forEach((s) => {
+            if (s.medical_order_file instanceof File) {
+                filesToCheck.push(s.medical_order_file);
+            }
+        });
+
+        const inaccessibleFileName = await findInaccessibleFile(filesToCheck);
+
+        if (inaccessibleFileName) {
+            toast.error(
+                `El archivo "${inaccessibleFileName}" ya no se encuentra accesible en su equipo (pudo haber sido movido o eliminado). Por favor selecciónelo nuevamente.`,
+            );
+
+            return;
+        }
+
         setProcessing(true);
 
         // Build request payload using Inertia router POST
@@ -1750,6 +1769,18 @@ export default function SpecimenGroupSheet({
                           ? 'Error al actualizar el grupo de muestras'
                           : 'Error al registrar el grupo de muestras',
                 );
+            },
+            onNetworkError: (err) => {
+                setProcessing(false);
+                console.error('Error de red al registrar grupo:', err);
+                toast.error(
+                    'Error de conexión de red o internet. Por favor verifique su conexión e intente de nuevo más tarde.',
+                );
+
+                return false;
+            },
+            onFinish: () => {
+                setProcessing(false);
             },
         });
     };

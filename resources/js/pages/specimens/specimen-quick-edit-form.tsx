@@ -41,6 +41,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { findInaccessibleFile } from '@/lib/file-utils';
 import { cn } from '@/lib/utils';
 import type { QuickEditMetadata } from './hooks/use-specimen-quick-edit-metadata';
 
@@ -194,8 +195,20 @@ export default function SpecimenQuickEditForm({
         setIsDirty?.(isDirty);
     }, [isDirty, setIsDirty]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        const inaccessibleFileName = await findInaccessibleFile([
+            data.medical_order_file,
+        ]);
+
+        if (inaccessibleFileName) {
+            toast.error(
+                `El archivo "${inaccessibleFileName}" ya no se encuentra accesible en su equipo (pudo haber sido movido o eliminado). Por favor selecciónelo nuevamente.`,
+            );
+
+            return;
+        }
 
         // Standard Laravel Inertia POST to specimens/{specimen}/quick-update
         // with custom method spoofing since we are uploading files.
@@ -208,6 +221,14 @@ export default function SpecimenQuickEditForm({
             onError: (errs) => {
                 toast.error('Error al actualizar la muestra');
                 console.error(errs);
+            },
+            onNetworkError: (err) => {
+                console.error('Error de red al actualizar muestra:', err);
+                toast.error(
+                    'Error de conexión de red o internet. Por favor verifique su conexión e intente de nuevo más tarde.',
+                );
+
+                return false;
             },
         });
     };
