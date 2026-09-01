@@ -9,6 +9,7 @@ import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
+import { CharacterCount } from '@tiptap/extensions';
 import { Plugin, PluginKey, Selection } from '@tiptap/pm/state';
 import { canJoin } from '@tiptap/pm/transform';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
@@ -1442,4 +1443,8 @@ export const sharedExtensions = [
     ImageGrid,
     PasteCleaner,
     ListAndBlockBackspaceFix,
+    CharacterCount.configure({
+        limit: 65535,
+        autoTrim: false,
+    }),
 ];

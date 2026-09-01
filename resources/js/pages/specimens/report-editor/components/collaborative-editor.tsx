@@ -116,6 +116,7 @@ function CollaborativeEditorInner({
     }, [provider]);
 
     const [isFocused, setIsFocused] = useState(false);
+    const [characterCount, setCharacterCount] = useState(0);
     const [individualCroppingImage, setIndividualCroppingImage] = useState<{
         src: string;
         pos: number;
@@ -184,7 +185,11 @@ function CollaborativeEditorInner({
                 return handleListAndBlockKeyDown(view, event);
             },
         },
+        onCreate({ editor }) {
+            setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
+        },
         onUpdate({ editor }) {
+            setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
             if (provider?.isSynced && hasSeededRef.current) {
                 setTimeout(() => {
                     onUpdateRef.current?.(editor.getHTML());
@@ -210,6 +215,24 @@ function CollaborativeEditorInner({
             onBlurRef.current?.();
         },
     });
+
+    useEffect(() => {
+        if (!editor) {
+            return;
+        }
+
+        const updateCharCount = () => {
+            setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
+        };
+
+        editor.on('update', updateCharCount);
+        editor.on('transaction', updateCharCount);
+
+        return () => {
+            editor.off('update', updateCharCount);
+            editor.off('transaction', updateCharCount);
+        };
+    }, [editor]);
 
     useEffect(() => {
         if (editor) {
@@ -460,7 +483,20 @@ function CollaborativeEditorInner({
                     className="min-h-[160px] p-4 focus:outline-hidden"
                 />
             </div>
-            <div className="flex justify-end pt-1">
+            <div className="flex items-center justify-between pt-1">
+                <span
+                    className={cn(
+                        'text-[10px] tracking-tight transition-colors',
+                        characterCount >= 65535
+                            ? 'font-bold text-destructive'
+                            : characterCount >= 60000
+                              ? 'font-semibold text-amber-600 dark:text-amber-400'
+                              : 'font-medium text-muted-foreground',
+                    )}
+                >
+                    {characterCount.toLocaleString()} / 65,535 caracteres
+                    {characterCount >= 65535 && ' (Límite alcanzado)'}
+                </span>
                 <span className="flex items-center gap-1 rounded border border-emerald-500/10 bg-emerald-500/5 px-2 py-0.5 text-[9px] font-bold tracking-wider text-emerald-600 uppercase">
                     <Check className="h-3.5 w-3.5" /> Editable colaborativo
                 </span>

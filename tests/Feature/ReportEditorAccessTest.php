@@ -179,6 +179,17 @@ test('assigned user can create a report with multiple templates in ordered conca
         ->and($this->specimen->report->addendum_html)->toBe('<p>Addendum 1</p><p>Addendum 2</p>');
 });
 
+test('creating a report via Inertia request returns redirect and does not return plain JSON', function () {
+    $this->actingAs($this->assignedUser);
+
+    $response = $this->withHeaders([
+        'X-Inertia' => 'true',
+        'X-Requested-With' => 'XMLHttpRequest',
+    ])->post(route('specimens.report-editor.store', $this->specimen->sequence_code), []);
+
+    $response->assertRedirect();
+});
+
 test('applying template with aligned table cells preserves table structure and alignment', function () {
     $this->actingAs($this->assignedUser);
 

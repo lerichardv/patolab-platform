@@ -585,6 +585,8 @@ export default function ReportWorkspace({
     const [timeString, setTimeString] = useState('Justo ahora');
 
     const hasMounted = useRef(false);
+    const lastReportIdRef = useRef<number | null>(report?.id ?? null);
+    const isInitialReportLoadRef = useRef(true);
     const isDirtyRef = useRef(false);
     const httpFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
         null,
@@ -678,8 +680,17 @@ export default function ReportWorkspace({
     // This replaces the old cosmetic timer that showed "Guardado!" without actually saving.
     // The real save status is driven exclusively by the save-status Yjs room (handleSaveYjsChange).
     useEffect(() => {
-        if (!hasMounted.current) {
-            hasMounted.current = true;
+        if (!report) {
+            return;
+        }
+
+        if (
+            isInitialReportLoadRef.current ||
+            report.id !== lastReportIdRef.current
+        ) {
+            isInitialReportLoadRef.current = false;
+            lastReportIdRef.current = report.id;
+            isDirtyRef.current = false;
 
             return;
         }
@@ -1644,6 +1655,19 @@ export default function ReportWorkspace({
                 return;
             }
 
+            // Skip mutations targeting the report editor itself (creating report, saving, etc.)
+            const isReportEditorAction =
+                typeof visit?.url === 'string' &&
+                visit.url.includes(
+                    `/specimens/${specimen.sequence_code}/report-editor`,
+                ) &&
+                visit?.method &&
+                visit.method.toLowerCase() !== 'get';
+
+            if (isReportEditorAction) {
+                return;
+            }
+
             // Cancel the Inertia navigation and show the guard dialog
             event.preventDefault();
 
@@ -1666,6 +1690,7 @@ export default function ReportWorkspace({
     const [statusProvider, setStatusProvider] =
         useState<HocuspocusProvider | null>(null);
     const specimenStatusRef = useRef(specimen.status);
+    specimenStatusRef.current = specimen.status;
 
     useEffect(() => {
         specimenStatusRef.current = specimen.status;
@@ -1706,7 +1731,9 @@ export default function ReportWorkspace({
                 toast.info(
                     `El estado de la muestra ha cambiado a: ${statusName}`,
                 );
-                router.reload();
+                router.reload({
+                    only: ['specimen', 'report'],
+                });
             }
         };
         ytext.observe(handleYjsChange);

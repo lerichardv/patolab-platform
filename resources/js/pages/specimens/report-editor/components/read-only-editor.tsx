@@ -28,6 +28,9 @@ export function ReadOnlyEditor({ content }: ReadOnlyEditorProps) {
         [content],
     );
 
+    const characterCount =
+        editor?.storage.characterCount?.characters() ?? 0;
+
     return (
         <div className="space-y-1">
             <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
@@ -39,7 +42,10 @@ export function ReadOnlyEditor({ content }: ReadOnlyEditorProps) {
                     className="min-h-[160px] p-4 focus:outline-hidden"
                 />
             </div>
-            <div className="flex justify-end pt-1">
+            <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] font-medium tracking-tight text-muted-foreground">
+                    {characterCount.toLocaleString()} / 65,535 caracteres
+                </span>
                 <span className="flex items-center gap-1 rounded border border-slate-500/10 bg-slate-500/5 px-2 py-0.5 text-[9px] font-bold tracking-wider text-slate-500 uppercase">
                     <Lock className="h-3.5 w-3.5" /> Solo lectura
                 </span>

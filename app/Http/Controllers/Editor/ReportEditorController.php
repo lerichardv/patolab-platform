@@ -538,7 +538,7 @@ class ReportEditorController extends Controller
         $this->authorizeSpecimenAccess($specimen);
 
         if ($specimen->report_id) {
-            if ($request->wantsJson() || $request->ajax()) {
+            if (! $request->header('X-Inertia') && ($request->wantsJson() || $request->ajax())) {
                 return response()->json([
                     'status' => 'success',
                     'message' => 'Esta muestra ya tiene un reporte creado.',
@@ -662,7 +662,7 @@ class ReportEditorController extends Controller
             $createdReport = $report;
         });
 
-        if ($request->wantsJson() || $request->ajax()) {
+        if (! $request->header('X-Inertia') && ($request->wantsJson() || $request->ajax())) {
             return response()->json([
                 'status' => 'success',
                 'message' => 'Reporte creado y estado de muestra actualizado a revisión macroscópica.',

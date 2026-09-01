@@ -10,6 +10,7 @@ import { Image } from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
+import { CharacterCount } from '@tiptap/extensions';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import {
     useEditor,
@@ -1218,6 +1219,10 @@ const sharedExtensions = [
     CustomBulletList,
     PasteCleaner,
     ListAndBlockBackspaceFix,
+    CharacterCount.configure({
+        limit: 65535,
+        autoTrim: false,
+    }),
 ];
 
 function FontSizeDropdown({ editor }: { editor: Editor | null }) {
@@ -2299,6 +2304,7 @@ export function RichTextEditorArea({
     editorRef,
 }: RichTextEditorAreaProps) {
     const [isFocused, setIsFocused] = useState(false);
+    const [characterCount, setCharacterCount] = useState(0);
 
     const editor = useEditor({
         extensions: [
@@ -2319,7 +2325,11 @@ export function RichTextEditorArea({
                 return handleListAndBlockKeyDown(view, event);
             },
         },
+        onCreate({ editor }) {
+            setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
+        },
         onUpdate({ editor }) {
+            setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
             onChange(editor.getHTML());
         },
         onFocus({ editor }) {
@@ -2331,6 +2341,24 @@ export function RichTextEditorArea({
             onBlur();
         },
     });
+
+    useEffect(() => {
+        if (!editor) {
+            return;
+        }
+
+        const updateCharCount = () => {
+            setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
+        };
+
+        editor.on('update', updateCharCount);
+        editor.on('transaction', updateCharCount);
+
+        return () => {
+            editor.off('update', updateCharCount);
+            editor.off('transaction', updateCharCount);
+        };
+    }, [editor]);
 
     // Keep editor reference in sync for parent
     useEffect(() => {
@@ -2349,6 +2377,7 @@ export function RichTextEditorArea({
     useEffect(() => {
         if (editor && content !== editor.getHTML() && !editor.isFocused) {
             editor.commands.setContent(content);
+            setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
         }
     }, [content, editor]);
 
@@ -2392,6 +2421,21 @@ export function RichTextEditorArea({
                     editor={editor}
                     className="min-h-[160px] p-4 focus:outline-hidden"
                 />
+            </div>
+            <div className="flex items-center justify-between pt-1">
+                <span
+                    className={cn(
+                        'text-[10px] tracking-tight transition-colors',
+                        characterCount >= 65535
+                            ? 'font-bold text-destructive'
+                            : characterCount >= 60000
+                              ? 'font-semibold text-amber-600 dark:text-amber-400'
+                              : 'font-medium text-muted-foreground',
+                    )}
+                >
+                    {characterCount.toLocaleString()} / 65,535 caracteres
+                    {characterCount >= 65535 && ' (Límite alcanzado)'}
+                </span>
             </div>
         </div>
     );
