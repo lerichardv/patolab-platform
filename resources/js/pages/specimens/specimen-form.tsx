@@ -86,6 +86,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { findInaccessibleFile } from '@/lib/file-utils';
 import { cn } from '@/lib/utils';
 import {
     calculateInvoiceItem,
@@ -1400,7 +1401,20 @@ export default function SpecimenForm({
         }
     };
 
-    const submitForm = () => {
+    const submitForm = async () => {
+        const inaccessibleFileName = await findInaccessibleFile([
+            data.medical_order_file,
+            data.proof_of_payment,
+        ]);
+
+        if (inaccessibleFileName) {
+            toast.error(
+                `El archivo "${inaccessibleFileName}" ya no se encuentra accesible en su equipo (pudo haber sido movido o eliminado). Por favor selecciónelo nuevamente.`,
+            );
+
+            return;
+        }
+
         const options = {
             onBefore: () => {
                 if (!specimen) {
@@ -1430,6 +1444,18 @@ export default function SpecimenForm({
                         'Hubo un error al procesar la solicitud. Por favor verifique los campos.',
                     );
                 }
+            },
+            onNetworkError: (error: any) => {
+                setIsFacturating(false);
+                console.error('Error de red al guardar la muestra:', error);
+                toast.error(
+                    'Error de conexión de red o internet. Por favor verifique su conexión e intente de nuevo más tarde.',
+                );
+
+                return false;
+            },
+            onFinish: () => {
+                setIsFacturating(false);
             },
         };
 
