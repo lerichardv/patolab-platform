@@ -111,6 +111,7 @@ import { cn } from '@/lib/utils';
 import CreditExtractSpecimenSheet from '../credits/credit-extract-specimen-sheet';
 import CreditFinalPaymentSheet from '../credits/credit-final-payment-sheet';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
+import RentalPaymentSheet from '../rentals/rental-payment-sheet';
 import SpecimenGroupCustomerSheet from '../specimens/specimen-group-customer-sheet';
 import SpecimenGroupSheet from '../specimens/specimen-group-sheet';
 import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
@@ -684,10 +685,13 @@ export default function InvoicesIndex({
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
+    const [isRentalEditSheetOpen, setIsRentalEditSheetOpen] = useState(false);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(
         null,
     );
     const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null);
+    const [selectedRentalInvoiceForEdit, setSelectedRentalInvoiceForEdit] =
+        useState<Invoice | null>(null);
     const [isFinalPaymentSheetOpen, setIsFinalPaymentSheetOpen] =
         useState(false);
     const [selectedCreditForFinalPayment, setSelectedCreditForFinalPayment] =
@@ -1120,8 +1124,18 @@ export default function InvoicesIndex({
     };
 
     const handleEditDetails = (invoice: Invoice) => {
-        setInvoiceToEdit(invoice);
-        setIsEditSheetOpen(true);
+        const isRental =
+            invoice.invoice_type === 'rental' ||
+            Boolean(invoice.rental_id) ||
+            Boolean(invoice.rental);
+
+        if (isRental) {
+            setSelectedRentalInvoiceForEdit(invoice);
+            setIsRentalEditSheetOpen(true);
+        } else {
+            setInvoiceToEdit(invoice);
+            setIsEditSheetOpen(true);
+        }
     };
 
     const getPaymentTypeLabel = (type: string) => {
@@ -1782,7 +1796,10 @@ export default function InvoicesIndex({
                                                         '-'}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="min-w-[300px] pl-5">
+                                            <TableCell
+                                                className="min-w-[300px] pl-5"
+                                                suppressHydrationWarning
+                                            >
                                                 <div className="flex flex-col gap-1">
                                                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[10px]">
                                                         <div className="text-left">
@@ -3103,6 +3120,16 @@ export default function InvoicesIndex({
                 banks={banks}
                 specimenTypes={specimenTypes}
                 settings={settings}
+            />
+
+            {/* Rental / Otros Cobros Invoice Editor Sheet */}
+            <RentalPaymentSheet
+                invoice={selectedRentalInvoiceForEdit}
+                open={isRentalEditSheetOpen}
+                onOpenChange={setIsRentalEditSheetOpen}
+                onSuccess={() => {
+                    router.reload({ only: ['invoices'] });
+                }}
             />
 
             <CreditFinalPaymentSheet

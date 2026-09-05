@@ -333,6 +333,14 @@ class Specimen extends Model
     }
 
     /**
+     * Get all invoice breakdown records for this specimen.
+     */
+    public function invoiceSpecimens(): HasMany
+    {
+        return $this->hasMany(InvoiceSpecimen::class, 'specimen_id');
+    }
+
+    /**
      * Obtiene las órdenes de trabajo asociadas al espécimen.
      */
     public function workOrders(): HasMany

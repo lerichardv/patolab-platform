@@ -1,961 +1,279 @@
-import { useForm, usePage } from '@inertiajs/react';
-import { FileText, Upload, X, Plus } from 'lucide-react';
-import type { FormEventHandler } from 'react';
+import { usePage } from '@inertiajs/react';
 import * as React from 'react';
 import { useEffect, useState, useMemo } from 'react';
-import { toast } from 'sonner';
-import { pay as payRental } from '@/actions/App/Http/Controllers/RentalController';
-import AsyncCustomerCombobox from '@/components/async-customer-combobox';
-import type { CustomerOption } from '@/components/async-customer-combobox';
 import HeadingSheet from '@/components/heading-sheet';
-import InputError from '@/components/input-error';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { NumberPicker } from '@/components/ui/number-picker';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
-import CustomerSheet from '../customers/customer-sheet';
-import {
-    PaymentMethodSheet,
-    PaymentResume,
-    getPaymentTypeLabel,
-} from '../invoices/payment-method-sheet';
-import RentalSheet from './rental-sheet';
+import { Skeleton } from '@/components/ui/skeleton';
+import RentalPaymentForm from './rental-payment-form';
+import type { Bank, Rental, Invoice } from './rental-payment-form';
 
-interface Bank {
-    id: number;
-    name: string;
-}
+export type { Bank, Rental, Invoice };
 
-interface Rental {
-    id: number;
-    name: string;
-    description: string;
-}
-
-interface Props {
-    rental: Rental | null;
+export interface RentalPaymentSheetProps {
+    rental?: Rental | null;
+    invoice?: Invoice | null;
+    invoiceId?: number | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    banks: Bank[];
-    rentals: Rental[];
+    banks?: Bank[];
+    rentals?: Rental[];
+    onSuccess?: () => void;
+}
+
+function RentalPaymentFormSkeleton() {
+    return (
+        <div
+            className="mt-6 space-y-6 px-5 pb-10"
+            data-testid="rental-payment-skeleton"
+        >
+            {/* Section 1 Skeleton: Rental & Customer */}
+            <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                <Skeleton className="h-4 w-48" />
+                <div className="grid gap-2">
+                    <div className="flex justify-between">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 w-16" />
+                    </div>
+                    <Skeleton className="h-9 w-full rounded-md" />
+                </div>
+                <div className="space-y-2 pt-2">
+                    <div className="flex justify-between">
+                        <Skeleton className="h-4 w-36" />
+                        <Skeleton className="h-4 w-16" />
+                    </div>
+                    <Skeleton className="h-9 w-full rounded-md" />
+                </div>
+            </div>
+
+            {/* Section 2 Skeleton: Concepts & Amounts */}
+            <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                <Skeleton className="h-4 w-40" />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-9 w-full rounded-md" />
+                    </div>
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-9 w-full rounded-md" />
+                    </div>
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-9 w-full rounded-md" />
+                    </div>
+                </div>
+
+                {/* Additional Discount Toggle Skeleton */}
+                <div className="flex items-center justify-between rounded-lg border bg-card p-3">
+                    <div className="space-y-1">
+                        <Skeleton className="h-3.5 w-32" />
+                        <Skeleton className="h-2.5 w-48" />
+                    </div>
+                    <Skeleton className="h-5 w-9 rounded-full" />
+                </div>
+
+                {/* Custom Extra Charge Toggle Skeleton */}
+                <div className="flex items-center justify-between rounded-lg border bg-card p-3">
+                    <div className="space-y-1">
+                        <Skeleton className="h-3.5 w-44" />
+                        <Skeleton className="h-2.5 w-40" />
+                    </div>
+                    <Skeleton className="h-5 w-9 rounded-full" />
+                </div>
+
+                {/* ISV Switch Skeleton */}
+                <div className="flex items-center justify-between rounded-lg border bg-card p-3">
+                    <div className="space-y-1">
+                        <Skeleton className="h-3.5 w-32" />
+                        <Skeleton className="h-2.5 w-56" />
+                    </div>
+                    <Skeleton className="h-5 w-9 rounded-full" />
+                </div>
+            </div>
+
+            {/* Section 3 Skeleton: Payment Method */}
+            <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                <Skeleton className="h-4 w-40" />
+                <div className="flex items-center justify-between rounded-lg border bg-card p-4">
+                    <div className="flex items-center gap-2">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                    <Skeleton className="h-8 w-44 rounded-md" />
+                </div>
+            </div>
+
+            {/* Section 4 Skeleton: Billing Resume */}
+            <div className="space-y-3 rounded-lg border bg-muted/40 p-4">
+                <div className="flex justify-between">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-4 w-20" />
+                </div>
+                <div className="flex justify-between">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-4 w-20" />
+                </div>
+                <div className="flex justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-16" />
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-5 w-24" />
+                </div>
+            </div>
+
+            {/* Actions Skeleton */}
+            <div className="flex justify-end gap-3 border-t pt-4">
+                <Skeleton className="h-9 w-24 rounded-md" />
+                <Skeleton className="h-9 w-36 rounded-md" />
+            </div>
+        </div>
+    );
 }
 
 export default function RentalPaymentSheet({
     rental,
+    invoice,
+    invoiceId,
     open,
     onOpenChange,
     banks,
     rentals,
-}: Props) {
+    onSuccess,
+}: RentalPaymentSheetProps) {
     const { props } = usePage() as any;
-    const settings = props.settings || {};
-    const flash = props.flash || {};
 
-    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false);
-    const [isNewRentalSheetOpen, setIsNewRentalSheetOpen] = useState(false);
-    const [baseAmount, setBaseAmount] = useState('0.00');
+    // Lazy load state for options & invoice
+    const [fetchedRentals, setFetchedRentals] = useState<Rental[]>([]);
+    const [fetchedBanks, setFetchedBanks] = useState<Bank[]>([]);
+    const [fetchedSettings, setFetchedSettings] = useState<
+        Record<string, string>
+    >({});
+    const [fetchedInvoice, setFetchedInvoice] = useState<Invoice | null>(null);
+    const [isLoadingOptions, setIsLoadingOptions] = useState(false);
 
-    const [isPaymentMethodSheetOpen, setIsPaymentMethodSheetOpen] =
-        useState(false);
+    const isEditMode = Boolean(invoice || invoiceId);
+    const currentInvoice = invoice || fetchedInvoice;
 
-    const { data, setData, post, processing, errors, reset } = useForm({
-        rental_id: rental ? rental.id.toString() : '',
-        customer_id: '',
-        quantity: 1,
-        amount: '0.00',
-        discount: '0.00',
-        payment_type: '',
-        pay_isv: true,
-        has_initial_payment: false,
-        initial_payment_amount: '',
-        initial_payment_type: 'cash',
-        custom_amount_enabled: false,
-        custom_amount: '0.00',
-        custom_amount_reason: '',
-        age_discount_type: null as string | null,
-        age_discount_amount: '0.00',
-        payment_method_date: '',
-        cash_value: '',
-        check_number: '',
-        check_value: '',
-        card_last_4: '',
-        card_value_charged: '',
-        card_expiration: '',
-        card_authorization_code: '',
-        transfer_bank_id: '',
-        transfer_value: '',
-        transfer_authorization_code: '',
-        proof_of_payment: null as File | null,
-        description: '',
-    });
+    const resolvedRentals =
+        rentals && rentals.length > 0 ? rentals : fetchedRentals;
+    const resolvedBanks = banks && banks.length > 0 ? banks : fetchedBanks;
 
+    const resolvedSettings = useMemo(() => {
+        return {
+            ...(props.settings || {}),
+            ...fetchedSettings,
+        };
+    }, [props.settings, fetchedSettings]);
+
+    // Lazy load rentals, banks, settings, invoice if needed
     useEffect(() => {
-        if (flash.new_rental_id) {
-            setData('rental_id', flash.new_rental_id.toString());
-        }
-    }, [flash.new_rental_id, setData]);
-
-    // Reset form on open/change
-    useEffect(() => {
-        if (open) {
-            reset();
-
-            if (rental) {
-                setData('rental_id', rental.id.toString());
-            } else {
-                setData('rental_id', '');
-            }
-
+        if (!open) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
-            setBaseAmount('0.00');
-        }
-    }, [open, rental]);
-
-    // Age discounts
-    const thirdAgePercent = parseFloat(settings?.third_age_discount || '30');
-    const fourthAgePercent = parseFloat(settings?.fourth_age_discount || '40');
-
-    const quantityVal = data.quantity ?? 1;
-
-    // Calculate age discount
-    const ageDiscountVal = useMemo(() => {
-        const base = parseFloat(baseAmount) || 0;
-
-        if (data.age_discount_type === 'third') {
-            return ((base * thirdAgePercent) / 100) * quantityVal;
-        } else if (data.age_discount_type === 'fourth') {
-            return ((base * fourthAgePercent) / 100) * quantityVal;
-        }
-
-        return 0;
-    }, [
-        baseAmount,
-        data.age_discount_type,
-        thirdAgePercent,
-        fourthAgePercent,
-        quantityVal,
-    ]);
-
-    // Update form age discount amount
-    useEffect(() => {
-        setData('age_discount_amount', ageDiscountVal.toString());
-    }, [ageDiscountVal, setData]);
-
-    // Update total amount: base amount * quantity + custom amount
-    const totalBaseAmount = useMemo(() => {
-        const base = parseFloat(baseAmount) || 0;
-        const custom = data.custom_amount_enabled
-            ? parseFloat(data.custom_amount) || 0
-            : 0;
-
-        return base * quantityVal + custom;
-    }, [
-        baseAmount,
-        quantityVal,
-        data.custom_amount_enabled,
-        data.custom_amount,
-    ]);
-
-    useEffect(() => {
-        setData('amount', totalBaseAmount.toString());
-    }, [totalBaseAmount, setData]);
-
-    // Total calculations
-    const customAmountVal = data.custom_amount_enabled
-        ? parseFloat(data.custom_amount) || 0
-        : 0;
-    const [additionalDiscount, setAdditionalDiscount] = useState('0.00');
-    const [additionalDiscountEnabled, setAdditionalDiscountEnabled] =
-        useState(false);
-
-    // Compute actual discount value
-    const finalDiscountVal = useMemo(() => {
-        const addDisc = additionalDiscountEnabled
-            ? parseFloat(additionalDiscount) || 0
-            : 0;
-
-        return ageDiscountVal + addDisc;
-    }, [ageDiscountVal, additionalDiscount, additionalDiscountEnabled]);
-
-    useEffect(() => {
-        setData('discount', finalDiscountVal.toString());
-    }, [finalDiscountVal, setData]);
-
-    // Calculate the rental subtotal (base rental price minus final discounts, excluding custom extra charge).
-    // This is the taxable portion.
-    const rentalSubtotalVal = useMemo(() => {
-        const base = parseFloat(baseAmount) || 0;
-        const totalBase = base * quantityVal;
-
-        return Math.max(0, totalBase - finalDiscountVal);
-    }, [baseAmount, quantityVal, finalDiscountVal]);
-
-    // Calculate 15% ISV on the rental subtotal.
-    // Business Rule: This 15% ISV is stored in the database's `isv_15` column.
-    const isv15Val = useMemo(() => {
-        return data.pay_isv ? rentalSubtotalVal * 0.15 : 0;
-    }, [rentalSubtotalVal, data.pay_isv]);
-
-    // Subtotal includes the rental subtotal and the custom amount.
-    const subtotalVal = useMemo(() => {
-        return rentalSubtotalVal + customAmountVal;
-    }, [rentalSubtotalVal, customAmountVal]);
-
-    // Total includes the subtotal plus the calculated 15% ISV.
-    const totalVal = useMemo(() => {
-        return subtotalVal + isv15Val;
-    }, [subtotalVal, isv15Val]);
-
-    // Proof file required validator
-    const isProofRequired = useMemo(() => {
-        if (data.payment_type === 'cash') {
-            return false;
-        }
-
-        if (data.payment_type === 'credit') {
-            if (data.has_initial_payment) {
-                return data.initial_payment_type !== 'cash';
-            }
-
-            return false;
-        }
-
-        return true;
-    }, [
-        data.payment_type,
-        data.has_initial_payment,
-        data.initial_payment_type,
-    ]);
-
-    const [selectedCustomer, setSelectedCustomer] =
-        useState<CustomerOption | null>(null);
-
-    const submit: FormEventHandler = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (!data.rental_id) {
-            toast.error('Debe seleccionar o crear un cobro');
+            setFetchedInvoice(null);
 
             return;
         }
 
-        if (!data.payment_type) {
-            toast.error('Debe seleccionar un método de pago');
+        const needsRentals = !rentals || rentals.length === 0;
+        const needsBanks = !banks || banks.length === 0;
+        const needsInvoice = Boolean(invoiceId && !invoice);
 
-            return;
+        if (needsRentals || needsBanks || needsInvoice) {
+            setIsLoadingOptions(true);
+            const targetUrl =
+                typeof (window as any).route === 'function'
+                    ? (window as any).route('rentals.options', {
+                          invoice_id: invoiceId || invoice?.id,
+                      })
+                    : `/rentals/options?invoice_id=${invoiceId || invoice?.id || ''}`;
+
+            fetch(targetUrl, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
+                .then((res) => {
+                    if (!res.ok) {
+                        throw new Error('Error al cargar opciones');
+                    }
+
+                    return res.json();
+                })
+                .then((resData) => {
+                    if (resData.rentals) {
+                        setFetchedRentals(resData.rentals);
+                    }
+
+                    if (resData.banks) {
+                        setFetchedBanks(resData.banks);
+                    }
+
+                    if (resData.settings) {
+                        setFetchedSettings(resData.settings);
+                    }
+
+                    if (resData.invoice) {
+                        setFetchedInvoice(resData.invoice);
+                    }
+                })
+                .catch((err) => {
+                    console.error('Error fetching rental options:', err);
+                })
+                .finally(() => {
+                    setIsLoadingOptions(false);
+                });
         }
+    }, [open, rentals, banks, invoiceId, invoice]);
 
-        if (data.payment_type === 'credit' && !data.customer_id) {
-            toast.error('Debe seleccionar un cliente para ventas al crédito');
+    const needsInvoiceLoading = isEditMode && !currentInvoice;
+    const needsRentalsLoading = resolvedRentals.length === 0;
+    const needsBanksLoading = resolvedBanks.length === 0;
 
-            return;
-        }
-
-        if (parseFloat(baseAmount) <= 0) {
-            toast.error('El importe base debe ser mayor a cero');
-
-            return;
-        }
-
-        if (additionalDiscountEnabled) {
-            const addDisc = parseFloat(additionalDiscount) || 0;
-            const totalBase =
-                (parseFloat(baseAmount) || 0) * (data.quantity ?? 1);
-
-            if (addDisc > totalBase - ageDiscountVal) {
-                toast.error(
-                    `El descuento adicional no puede superar el subtotal (L. ${(totalBase - ageDiscountVal).toFixed(2)}).`,
-                );
-
-                return;
-            }
-        }
-
-        if (isProofRequired && !data.proof_of_payment) {
-            toast.error(
-                'El comprobante de pago es requerido para este método de pago',
-            );
-
-            return;
-        }
-
-        post(payRental(parseInt(data.rental_id)).url, {
-            onSuccess: () => {
-                toast.success('Pago de otro cobro registrado con éxito');
-                onOpenChange(false);
-            },
-            onError: (errs) => {
-                const firstError = Object.values(errs)[0];
-                toast.error(
-                    firstError || 'Ocurrió un error al procesar el pago.',
-                );
-            },
-        });
-    };
+    const isLoading =
+        isLoadingOptions ||
+        needsInvoiceLoading ||
+        needsRentalsLoading ||
+        needsBanksLoading;
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="z-[100] w-full overflow-y-auto sm:max-w-[750px]">
                 <HeadingSheet
-                    title="Registrar Pago de Otro Cobro"
-                    description="Configure el cobro, el cliente, e ingrese los datos de facturación y forma de pago."
+                    title={
+                        isEditMode
+                            ? 'Editar Factura de Otro Cobro'
+                            : 'Registrar Pago de Otro Cobro'
+                    }
+                    description={
+                        isEditMode
+                            ? 'Modifique la información del cobro, cliente, forma de pago y montos de la factura.'
+                            : 'Configure el cobro, el cliente, e ingrese los datos de facturación y forma de pago.'
+                    }
                 />
 
-                <form onSubmit={submit} className="mt-6 space-y-6 px-5 pb-10">
-                    {/* SECTION 1: RENTAL & CUSTOMER */}
-                    <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
-                        <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                            Información del Cobro y Cliente
-                        </h3>
-
-                        {/* Rental Selection */}
-                        <div className="grid gap-2">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="rental_id">
-                                    Cobro Seleccionado *
-                                </Label>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setIsNewRentalSheetOpen(true)
-                                    }
-                                    className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                >
-                                    <Plus className="h-3 w-3" /> Nuevo
-                                </button>
-                            </div>
-                            <Select
-                                value={data.rental_id}
-                                onValueChange={(value) =>
-                                    setData('rental_id', value)
-                                }
-                            >
-                                <SelectTrigger
-                                    id="rental_id"
-                                    className="w-full"
-                                >
-                                    <SelectValue placeholder="Seleccione un cobro existente" />
-                                </SelectTrigger>
-                                <SelectContent className="z-[110]">
-                                    {rentals.map((r) => (
-                                        <SelectItem
-                                            key={r.id}
-                                            value={r.id.toString()}
-                                        >
-                                            {r.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <InputError message={errors.rental_id} />
-                        </div>
-
-                        {/* Customer selection */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="customer_id">
-                                        Cliente Facturación{' '}
-                                        {data.payment_type === 'credit'
-                                            ? '*'
-                                            : '(Opcional)'}
-                                    </Label>
-                                    {selectedCustomer && (
-                                        <span
-                                            className={cn(
-                                                'rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase',
-                                                selectedCustomer.type ===
-                                                    'empresa'
-                                                    ? 'border border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                                                    : 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-                                            )}
-                                        >
-                                            {selectedCustomer.type === 'empresa'
-                                                ? 'Empresa'
-                                                : 'Individual'}
-                                        </span>
-                                    )}
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCustomerSheetOpen(true)}
-                                    className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                >
-                                    <Plus className="h-3 w-3" /> Nuevo
-                                </button>
-                            </div>
-
-                            <AsyncCustomerCombobox
-                                value={data.customer_id}
-                                onChange={(id, customer) => {
-                                    setData('customer_id', id);
-                                    setSelectedCustomer(customer ?? null);
-                                }}
-                                placeholder="Seleccione un cliente"
-                            />
-
-                            {selectedCustomer && (
-                                <div className="grid grid-cols-1 gap-4 border-t border-border/50 pt-3 text-xs sm:grid-cols-3">
-                                    <div className="flex flex-col gap-1 text-left">
-                                        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                            RTN / Identidad
-                                        </span>
-                                        <span className="font-mono font-medium text-foreground">
-                                            {selectedCustomer.id_number ||
-                                                'N/A'}
-                                        </span>
-                                    </div>
-                                    <div className="flex flex-col gap-1 text-left">
-                                        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                            Correo Electrónico
-                                        </span>
-                                        <span className="font-medium break-all text-foreground">
-                                            {selectedCustomer.email ||
-                                                'Sin correo'}
-                                        </span>
-                                    </div>
-                                    {selectedCustomer.type !== 'empresa' && (
-                                        <div className="flex flex-col gap-1 text-left">
-                                            <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                                Edad
-                                            </span>
-                                            <span className="font-medium text-foreground">
-                                                {selectedCustomer.age
-                                                    ? `${selectedCustomer.age} años`
-                                                    : 'N/A'}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            <InputError message={errors.customer_id} />
-                        </div>
-                    </div>
-
-                    {/* SECTION 2: BILLING FIELDS */}
-                    <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
-                        <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                            Conceptos e Importes
-                        </h3>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="base_amount">
-                                    Importe / Precio Base (L.) *
-                                </Label>
-                                <Input
-                                    id="base_amount"
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    value={baseAmount}
-                                    onChange={(e) =>
-                                        setBaseAmount(e.target.value)
-                                    }
-                                    placeholder="0.00"
-                                    required
-                                />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="quantity">Cantidad *</Label>
-                                <NumberPicker
-                                    value={data.quantity}
-                                    onChange={(val) => setData('quantity', val)}
-                                    min={1}
-                                />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="discount_read">
-                                    Descuento Total (L.)
-                                </Label>
-                                <Input
-                                    id="discount_read"
-                                    type="number"
-                                    value={parseFloat(data.discount).toFixed(2)}
-                                    readOnly
-                                    disabled
-                                    className="bg-muted font-mono font-semibold text-emerald-600 dark:text-emerald-400"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Additional Discount Switch */}
-                        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex flex-col">
-                                    <Label className="cursor-pointer text-xs font-semibold">
-                                        Descuento Adicional
-                                    </Label>
-                                    <span className="text-[10px] text-muted-foreground">
-                                        Aplica un descuento adicional manual
-                                    </span>
-                                </div>
-                                <Switch
-                                    checked={additionalDiscountEnabled}
-                                    onCheckedChange={(checked) => {
-                                        setAdditionalDiscountEnabled(checked);
-
-                                        if (!checked) {
-                                            setAdditionalDiscount('0.00');
-                                        }
-                                    }}
-                                />
-                            </div>
-                            {additionalDiscountEnabled && (
-                                <div className="grid gap-1.5 border-t pt-2">
-                                    <Label
-                                        htmlFor="additional_discount"
-                                        className="text-xs"
-                                    >
-                                        Monto Descuento Adicional (L.) *
-                                    </Label>
-                                    <Input
-                                        id="additional_discount"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={additionalDiscount}
-                                        onChange={(e) =>
-                                            setAdditionalDiscount(
-                                                e.target.value,
-                                            )
-                                        }
-                                        required
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Custom Extra Charge */}
-                        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex flex-col">
-                                    <Label className="cursor-pointer text-xs font-semibold">
-                                        Cobrar cargo adicional personalizado
-                                    </Label>
-                                    <span className="text-[10px] text-muted-foreground">
-                                        Agregar conceptos extraordinarios
-                                    </span>
-                                </div>
-                                <Switch
-                                    checked={data.custom_amount_enabled}
-                                    onCheckedChange={(checked) => {
-                                        setData((d) => ({
-                                            ...d,
-                                            custom_amount_enabled: checked,
-                                            custom_amount: checked
-                                                ? d.custom_amount
-                                                : '0.00',
-                                            custom_amount_reason: checked
-                                                ? d.custom_amount_reason
-                                                : '',
-                                        }));
-                                    }}
-                                />
-                            </div>
-                            {data.custom_amount_enabled && (
-                                <div className="grid gap-3 border-t pt-2">
-                                    <div className="grid gap-1.5">
-                                        <Label
-                                            htmlFor="custom_amount"
-                                            className="text-xs"
-                                        >
-                                            Monto Cargo Adicional (L.) *
-                                        </Label>
-                                        <Input
-                                            id="custom_amount"
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={data.custom_amount}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'custom_amount',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                        <InputError
-                                            message={errors.custom_amount}
-                                        />
-                                    </div>
-                                    <div className="grid gap-1.5">
-                                        <Label
-                                            htmlFor="custom_amount_reason"
-                                            className="text-xs"
-                                        >
-                                            Concepto / Razón *
-                                        </Label>
-                                        <Input
-                                            id="custom_amount_reason"
-                                            value={data.custom_amount_reason}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'custom_amount_reason',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Ej. Gastos de envío, limpieza especial, etc."
-                                            required
-                                        />
-                                        <InputError
-                                            message={
-                                                errors.custom_amount_reason
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Age discounts */}
-                        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
-                            <div className="flex flex-col gap-1 border-b pb-2">
-                                <Label className="text-xs font-bold text-muted-foreground uppercase">
-                                    Descuentos por Edad
-                                </Label>
-                                <span className="text-[10px] text-muted-foreground">
-                                    Aplica descuento de tercera (
-                                    {thirdAgePercent}%) o cuarta (
-                                    {fourthAgePercent}%) edad
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="age_third" className="text-xs">
-                                    Tercera Edad
-                                </Label>
-                                <Switch
-                                    id="age_third"
-                                    checked={data.age_discount_type === 'third'}
-                                    onCheckedChange={(checked) =>
-                                        setData(
-                                            'age_discount_type',
-                                            checked ? 'third' : null,
-                                        )
-                                    }
-                                />
-                            </div>
-                            <div className="flex items-center justify-between border-t pt-2">
-                                <Label htmlFor="age_fourth" className="text-xs">
-                                    Cuarta Edad
-                                </Label>
-                                <Switch
-                                    id="age_fourth"
-                                    checked={
-                                        data.age_discount_type === 'fourth'
-                                    }
-                                    onCheckedChange={(checked) =>
-                                        setData(
-                                            'age_discount_type',
-                                            checked ? 'fourth' : null,
-                                        )
-                                    }
-                                />
-                            </div>
-                        </div>
-
-                        {/* ISV Switch */}
-                        <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex flex-col">
-                                    <Label
-                                        className="cursor-pointer text-xs font-semibold"
-                                        htmlFor="pay_isv"
-                                    >
-                                        Calcular ISV (15%)
-                                    </Label>
-                                    <span className="text-[10px] text-muted-foreground">
-                                        Activar o desactivar el cálculo de
-                                        impuesto sobre ventas
-                                    </span>
-                                </div>
-                                <Switch
-                                    id="pay_isv"
-                                    checked={data.pay_isv}
-                                    onCheckedChange={(checked) => {
-                                        setData('pay_isv', checked);
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* SECTION 3: PAYMENT METHOD */}
-                    <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
-                        <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                            Método y Forma de Pago
-                        </h3>
-
-                        <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-xs font-semibold">
-                                        Método de pago:
-                                    </span>
-                                    <span className="ml-2 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary capitalize">
-                                        {getPaymentTypeLabel(data.payment_type)}
-                                    </span>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        setIsPaymentMethodSheetOpen(true)
-                                    }
-                                    className="h-8 font-semibold"
-                                >
-                                    {data.payment_type
-                                        ? 'Cambiar método de Pago'
-                                        : 'Seleccionar método de pago'}
-                                </Button>
-                            </div>
-
-                            {data.payment_type ? (
-                                <PaymentResume data={data} banks={banks} />
-                            ) : (
-                                <div className="mt-2 border-t pt-2.5 text-[11px] text-muted-foreground italic">
-                                    Por favor, configure los detalles del método
-                                    de pago.
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Proof of Payment File upload */}
-                        {isProofRequired && (
-                            <div className="space-y-2">
-                                <Label htmlFor="proof_of_payment">
-                                    Comprobante de Pago (PDF o Imagen){' '}
-                                    <span className="text-destructive">*</span>
-                                </Label>
-                                {data.proof_of_payment ? (
-                                    <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-50/50 p-3 dark:bg-emerald-950/20">
-                                        <div className="flex items-center gap-3">
-                                            <div className="rounded-md bg-emerald-100 p-2 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400">
-                                                <FileText className="h-5 w-5" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="max-w-[200px] truncate text-xs font-semibold text-foreground">
-                                                    {data.proof_of_payment.name}
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    {(
-                                                        data.proof_of_payment
-                                                            .size /
-                                                        1024 /
-                                                        1024
-                                                    ).toFixed(2)}{' '}
-                                                    MB
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() =>
-                                                setData(
-                                                    'proof_of_payment',
-                                                    null,
-                                                )
-                                            }
-                                            className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <div className="group relative">
-                                        <input
-                                            type="file"
-                                            id="proof_of_payment"
-                                            className="hidden"
-                                            accept=".pdf,image/*"
-                                            onChange={(e) => {
-                                                const file =
-                                                    e.target.files?.[0] || null;
-                                                setData(
-                                                    'proof_of_payment',
-                                                    file,
-                                                );
-                                            }}
-                                        />
-                                        <label
-                                            htmlFor="proof_of_payment"
-                                            className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-5 transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
-                                        >
-                                            <div className="mb-2 rounded-full bg-secondary p-2.5 text-secondary-foreground">
-                                                <Upload className="h-4 w-4" />
-                                            </div>
-                                            <span className="text-xs font-semibold text-foreground">
-                                                Subir Comprobante
-                                            </span>
-                                            <span className="mt-1 text-[10px] text-muted-foreground">
-                                                PDF o Imagen hasta 30MB
-                                            </span>
-                                        </label>
-                                    </div>
-                                )}
-                                <InputError message={errors.proof_of_payment} />
-                            </div>
-                        )}
-
-                        {/* Description / Reason */}
-                        <div className="grid gap-2">
-                            <Label htmlFor="payment_description">
-                                Razón o descripción (opcional)
-                            </Label>
-                            <Textarea
-                                id="payment_description"
-                                value={data.description}
-                                onChange={(e) =>
-                                    setData('description', e.target.value)
-                                }
-                                placeholder="Ej. Cobro de sala de reuniones, período mensual, etc."
-                                rows={3}
-                                className="resize-none"
-                            />
-                            <InputError message={errors.description} />
-                        </div>
-                    </div>
-
-                    {/* BILLING RESUME */}
-                    <div className="space-y-2 rounded-lg border bg-muted/40 p-4 text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                                Importe Base:
-                            </span>
-                            <span className="font-semibold">
-                                {quantityVal > 1 ? (
-                                    <span>
-                                        L.{' '}
-                                        {(parseFloat(baseAmount) || 0).toFixed(
-                                            2,
-                                        )}{' '}
-                                        x {quantityVal} (L.{' '}
-                                        {(
-                                            (parseFloat(baseAmount) || 0) *
-                                            quantityVal
-                                        ).toFixed(2)}
-                                        )
-                                    </span>
-                                ) : (
-                                    <span>
-                                        L.{' '}
-                                        {(parseFloat(baseAmount) || 0).toFixed(
-                                            2,
-                                        )}
-                                    </span>
-                                )}
-                            </span>
-                        </div>
-                        {finalDiscountVal > 0 && (
-                            <div className="flex justify-between pl-3 text-xs text-emerald-600 dark:text-emerald-400">
-                                <span>- Descuento total aplicado:</span>
-                                <span>L. {finalDiscountVal.toFixed(2)}</span>
-                            </div>
-                        )}
-                        <div className="flex justify-between border-t pt-1 text-xs">
-                            <span className="text-muted-foreground">
-                                {data.pay_isv
-                                    ? 'Subtotal Gravado (15%):'
-                                    : 'Subtotal Exento:'}
-                            </span>
-                            <span>L. {rentalSubtotalVal.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                            {/* Note: This 15% ISV is calculated only on the rental base amount and is stored in the isv_15 column */}
-                            <span className="text-muted-foreground">
-                                ISV (15%):
-                            </span>
-                            <span className="font-semibold">
-                                L. {isv15Val.toFixed(2)}
-                            </span>
-                        </div>
-                        {data.custom_amount_enabled && (
-                            <div className="flex justify-between pl-3 text-xs text-muted-foreground">
-                                <span>
-                                    +{' '}
-                                    {data.custom_amount_reason ||
-                                        'Cargo Adicional'}
-                                    :
-                                </span>
-                                <span>L. {customAmountVal.toFixed(2)}</span>
-                            </div>
-                        )}
-                        <div className="flex justify-between border-t pt-2 text-base font-bold">
-                            <span className="text-primary">Total Factura:</span>
-                            <span className="text-primary">
-                                L. {totalVal.toFixed(2)}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* ACTION BUTTONS */}
-                    <div className="flex justify-end gap-3 border-t pt-4">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                            disabled={processing}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button type="submit" disabled={processing}>
-                            {processing
-                                ? 'Registrando...'
-                                : 'Confirmar y Facturar'}
-                        </Button>
-                    </div>
-                </form>
+                {isLoading ? (
+                    <RentalPaymentFormSkeleton />
+                ) : (
+                    <RentalPaymentForm
+                        key={
+                            currentInvoice
+                                ? `edit-${currentInvoice.id}`
+                                : `new-${rental?.id || 'default'}`
+                        }
+                        rental={rental}
+                        invoice={currentInvoice}
+                        isEditMode={isEditMode}
+                        banks={resolvedBanks}
+                        rentals={resolvedRentals}
+                        settings={resolvedSettings}
+                        onSuccess={onSuccess}
+                        onClose={() => onOpenChange(false)}
+                    />
+                )}
             </SheetContent>
-
-            {/* Inline Customer creation sub-sheet */}
-            <CustomerSheet
-                open={isCustomerSheetOpen}
-                onOpenChange={setIsCustomerSheetOpen}
-                className="z-[110]"
-                overlayClassName="z-[105]"
-            />
-
-            {/* Inline Rental creation sub-sheet */}
-            <RentalSheet
-                open={isNewRentalSheetOpen}
-                onOpenChange={setIsNewRentalSheetOpen}
-                className="z-[110]"
-                overlayClassName="z-[105]"
-            />
-
-            {/* Sub-sheet UI for configuring payment method details */}
-            <PaymentMethodSheet
-                open={isPaymentMethodSheetOpen}
-                onOpenChange={setIsPaymentMethodSheetOpen}
-                banks={banks}
-                totalAmount={totalVal}
-                paymentData={data}
-                onSave={(paymentData) => {
-                    setData((d) => ({
-                        ...d,
-                        ...paymentData,
-                    }));
-                    setIsPaymentMethodSheetOpen(false);
-                }}
-                className="z-[110]"
-                overlayClassName="z-[105]"
-            />
         </Sheet>
     );
 }

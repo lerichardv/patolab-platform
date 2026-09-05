@@ -10,8 +10,12 @@ class InvoiceCalculationService
     /**
      * Calculate item breakdown values for a single examination line item.
      */
-    public static function calculateItem(array $itemData, ?SpecimenTypeExamination $examination = null, ?array $settings = null): array
-    {
+    public static function calculateItem(
+        array $itemData,
+        ?SpecimenTypeExamination $examination = null,
+        ?array $settings = null,
+        bool $payIsv = false
+    ): array {
         if ($settings === null) {
             $settings = Setting::all()->pluck('setting_value', 'setting_key')->toArray();
         }
@@ -59,7 +63,8 @@ class InvoiceCalculationService
         $totalDiscountVal = $totalDiscountPerUnit * $qty;
 
         $subtotalVal = max(0.0, ($maxPrice - $totalDiscountPerUnit) * $qty);
-        $totalVal = $subtotalVal;
+        $isv15Val = $payIsv ? round($subtotalVal * 0.15, 2) : 0.0;
+        $totalVal = $subtotalVal + $isv15Val;
 
         return [
             'examination_id' => $examination?->id ?? ($itemData['examination_id'] ?? null),
@@ -67,10 +72,10 @@ class InvoiceCalculationService
             'amount' => $basePrice,
             'discount' => $totalDiscountVal,
             'subtotal' => $subtotalVal,
-            'exempt_amount' => $totalVal,
-            'taxable_amount_15' => 0.0,
+            'exempt_amount' => $payIsv ? 0.0 : $subtotalVal,
+            'taxable_amount_15' => $payIsv ? $subtotalVal : 0.0,
             'taxable_amount_18' => 0.0,
-            'isv_15' => 0.0,
+            'isv_15' => $isv15Val,
             'isv_18' => 0.0,
             'total' => $totalVal,
             'selected_price' => $selectedPrice,
@@ -85,8 +90,12 @@ class InvoiceCalculationService
     /**
      * Calculate consolidated invoice totals from an array of calculated items.
      */
-    public static function calculateConsolidatedTotals(array $calculatedItems, float $insumosTotal = 0.0, float $customAmount = 0.0): array
-    {
+    public static function calculateConsolidatedTotals(
+        array $calculatedItems,
+        float $insumosTotal = 0.0,
+        float $customAmount = 0.0,
+        bool $payIsv = false
+    ): array {
         $totalQty = 0;
         $totalAmount = 0.0;
         $totalDiscount = 0.0;
@@ -99,20 +108,63 @@ class InvoiceCalculationService
             $totalSubtotal += (float) ($item['subtotal'] ?? 0.0);
         }
 
-        $grandSubtotal = $totalSubtotal + $insumosTotal + $customAmount;
-        $grandTotal = $grandSubtotal;
+        $taxableBase = $totalSubtotal + $insumosTotal;
+        $isv15 = $payIsv ? round($taxableBase * 0.15, 2) : 0.0;
+        $grandSubtotal = $taxableBase + $customAmount;
+        $grandTotal = $grandSubtotal + $isv15;
 
         return [
             'quantity' => $totalQty,
             'amount' => $totalAmount + $customAmount,
             'discount' => $totalDiscount,
             'subtotal' => $grandSubtotal,
-            'exempt_amount' => $grandTotal,
-            'taxable_amount_15' => 0.0,
+            'exempt_amount' => $payIsv ? 0.0 : $taxableBase,
+            'tax_exempt_amount' => $customAmount,
+            'taxable_amount_15' => $payIsv ? $taxableBase : 0.0,
             'taxable_amount_18' => 0.0,
-            'isv_15' => 0.0,
+            'isv_15' => $isv15,
             'isv_18' => 0.0,
             'total' => $grandTotal,
+        ];
+    }
+
+    /**
+     * Calculate invoice values for a rental / "otro cobro" invoice.
+     *
+     * @param  array  $data  Expected keys: amount, quantity, discount, custom_amount, custom_amount_enabled
+     * @param  bool  $payIsv  Whether to calculate 15% ISV on the rental subtotal (default false)
+     */
+    public static function calculateRental(array $data, bool $payIsv = false): array
+    {
+        $qty = max(1, (int) ($data['quantity'] ?? 1));
+        $isCustomAmount = ! empty($data['custom_amount_enabled']) && (float) ($data['custom_amount'] ?? 0) > 0;
+        $customAmountVal = $isCustomAmount ? (float) $data['custom_amount'] : 0.00;
+        $discountVal = max(0.00, (float) ($data['discount'] ?? 0.00));
+
+        $unitPrice = (float) ($data['amount'] ?? 0.00);
+        $rentalBaseAmount = $unitPrice * $qty;
+
+        $rentalSubtotal = max(0.00, $rentalBaseAmount - $discountVal);
+        $isv15 = $payIsv ? round($rentalSubtotal * 0.15, 2) : 0.00;
+        $subtotal = $rentalSubtotal + $customAmountVal;
+        $total = $subtotal + $isv15;
+
+        return [
+            'quantity' => $qty,
+            'unit_price' => $unitPrice,
+            'amount' => $unitPrice,
+            'discount' => $discountVal,
+            'rental_subtotal' => $rentalSubtotal,
+            'custom_amount' => $customAmountVal,
+            'subtotal' => $subtotal,
+            'pay_isv' => $payIsv,
+            'tax_exempt_amount' => $customAmountVal,
+            'taxable_amount_15' => $payIsv ? $rentalSubtotal : 0.00,
+            'taxable_amount_18' => 0.00,
+            'exempt_amount' => $payIsv ? 0.00 : $rentalSubtotal,
+            'isv_15' => $isv15,
+            'isv_18' => 0.00,
+            'total' => $total,
         ];
     }
 }
