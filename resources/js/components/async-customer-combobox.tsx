@@ -76,6 +76,7 @@ export default function AsyncCustomerCombobox({
             return;
         }
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setKnownCustomers((prev) => {
             const current = prev.get(initialCustomer.id);
 
@@ -124,7 +125,8 @@ export default function AsyncCustomerCombobox({
     }, [open]);
 
     const selectedCustomer = value
-        ? (knownCustomers.get(Number(value)) ?? null)
+        ? (knownCustomers.get(Number(value)) ??
+          (initialCustomer?.id === Number(value) ? initialCustomer : null))
         : null;
 
     // Input shows the query while typing, otherwise the selected name, otherwise empty
@@ -184,6 +186,25 @@ export default function AsyncCustomerCombobox({
         },
         [],
     );
+
+    const attemptedIdsRef = React.useRef<Set<number>>(new Set());
+
+    // Auto-fetch customer if value is provided but not yet present in knownCustomers
+    React.useEffect(() => {
+        const numId = Number(value);
+
+        if (
+            value &&
+            !isNaN(numId) &&
+            numId > 0 &&
+            !knownCustomers.has(numId) &&
+            initialCustomer?.id !== numId &&
+            !attemptedIdsRef.current.has(numId)
+        ) {
+            attemptedIdsRef.current.add(numId);
+            fetchCustomers('', numId);
+        }
+    }, [value, knownCustomers, initialCustomer, fetchCustomers]);
 
     const handleQueryChange = React.useCallback(
         (q: string) => {
