@@ -694,6 +694,9 @@ class InvoiceController extends Controller
             'exempt_amount' => 'required|numeric|min:0',
             'total' => 'required|numeric|min:0',
             'total_paid' => 'required|numeric|min:0',
+            'rental_id' => 'nullable|exists:rentals,id',
+            'description' => 'nullable|string|max:1000',
+            'custom_amount_enabled' => 'nullable|boolean',
             'custom_amount' => 'nullable|numeric|min:0',
             'custom_amount_reason' => 'nullable|string|max:255',
             'age_discount_type' => 'nullable|string|in:third,fourth',
@@ -755,15 +758,21 @@ class InvoiceController extends Controller
 
         // Calculate tax/exempt fields based on invoice type
         if ($invoice->invoice_type === 'rental' || $invoice->rental_id) {
-            $payIsv = filter_var($request->input('pay_isv', $invoice->pay_isv ?? true), FILTER_VALIDATE_BOOLEAN);
-            $validated['pay_isv'] = $payIsv;
-            $validated['tax_exempt_amount'] = (float) ($validated['custom_amount'] ?? 0.00);
-            $validated['taxable_amount_15'] = $payIsv ? (float) $validated['subtotal'] : 0.00;
+            $payIsv = filter_var($request->input('pay_isv', $invoice->pay_isv ?? false), FILTER_VALIDATE_BOOLEAN);
+            $calc = InvoiceCalculationService::calculateRental($validated, $payIsv);
+
+            $validated['amount'] = $calc['amount'];
+            $validated['quantity'] = $calc['quantity'];
+            $validated['discount'] = $calc['discount'];
+            $validated['subtotal'] = $calc['subtotal'];
+            $validated['pay_isv'] = $calc['pay_isv'];
+            $validated['tax_exempt_amount'] = $calc['tax_exempt_amount'];
+            $validated['taxable_amount_15'] = $calc['taxable_amount_15'];
             $validated['taxable_amount_18'] = 0.00;
-            $validated['exempt_amount'] = $payIsv ? 0.00 : (float) $validated['subtotal'];
-            $validated['isv_15'] = $payIsv ? round((float) $validated['subtotal'] * 0.15, 2) : 0.00;
+            $validated['exempt_amount'] = $calc['exempt_amount'];
+            $validated['isv_15'] = $calc['isv_15'];
             $validated['isv_18'] = 0.00;
-            $validated['total'] = (float) $validated['subtotal'] + $validated['isv_15'] + $validated['tax_exempt_amount'];
+            $validated['total'] = $calc['total'];
         } else {
             $validated['tax_exempt_amount'] = (float) $validated['subtotal'];
             $validated['taxable_amount_15'] = 0.00;

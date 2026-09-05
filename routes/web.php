@@ -149,6 +149,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('credits/{credit}/mark-as-paid', [CreditController::class, 'markAsPaid'])->name('credits.mark-as-paid');
     Route::post('credits/{credit}/extract-specimens', [CreditController::class, 'extractSpecimens'])->name('credits.extract-specimens');
 
+    Route::get('rentals/options', [RentalController::class, 'options'])->name('rentals.options');
     Route::resource('rentals', RentalController::class)->only(['index', 'store', 'update']);
     Route::post('rentals/{rental}/pay', [RentalController::class, 'pay'])->name('rentals.pay');
     Route::post('specimen-type-templates/upload-image', [SpecimenTypeTemplateController::class, 'uploadImage'])->name('specimen-type-templates.upload-image');

@@ -476,7 +476,10 @@ export default function RentalsIndex({
                                                     </span>
                                                 )}
                                             </TableCell>
-                                            <TableCell className="min-w-[150px] text-xs text-muted-foreground">
+                                            <TableCell
+                                                className="min-w-[150px] text-xs text-muted-foreground"
+                                                suppressHydrationWarning
+                                            >
                                                 {rentalItem.created_at
                                                     ? format(
                                                           new Date(

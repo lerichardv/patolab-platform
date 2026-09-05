@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Location;
+use App\Models\Rental;
 use App\Models\Setting;
 use App\Models\SpecimenTypeExamination;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +24,7 @@ class InvoicePdfService
             'creditRelation',
             'customer',
             'caiRange',
+            'rental',
             'groupSpecimens.specimen.examination',
             'groupSpecimens.specimen.customerRelation',
             'groupSpecimens.specimen.examination.prices',
@@ -36,19 +39,42 @@ class InvoicePdfService
         $location = $caiRange
             ? Location::find($caiRange->location_id)
             : ($invoice->specimen?->location_id ? Location::find($invoice->specimen->location_id) : ($defaultLocationId ? Location::find($defaultLocationId) : Location::first()));
-        $examination = null;
-        if ($invoice->specimen) {
-            $examination = SpecimenTypeExamination::find($invoice->specimen->specimen_type_examination);
+
+        $isRental = ($invoice->invoice_type === 'rental' || $invoice->rental_id);
+
+        if ($isRental) {
+            $rental = $invoice->rental ?? ($invoice->rental_id ? Rental::find($invoice->rental_id) : null);
+            if (! $rental) {
+                $rental = new Rental([
+                    'name' => 'Otro Cobro',
+                    'description' => $invoice->description ?? '',
+                ]);
+            }
+            if (! $customer) {
+                $customer = new Customer([
+                    'name' => 'Consumidor Final',
+                    'id_number' => 'N/A',
+                    'phone' => 'N/A',
+                    'email' => '',
+                ]);
+            }
+            $htmlContent = view('pdf.rental_invoice', compact('invoice', 'caiRange', 'customer', 'location', 'totalWords', 'rental'))->render();
+            $filename = 'rental_invoice_'.$invoice->id.'_'.time().'.pdf';
+        } else {
+            $examination = null;
+            if ($invoice->specimen) {
+                $examination = SpecimenTypeExamination::find($invoice->specimen->specimen_type_examination);
+            }
+
+            $htmlContent = view('pdf.invoice', compact('invoice', 'caiRange', 'customer', 'examination', 'location', 'totalWords'))->render();
+            $filename = 'invoice_'.$invoice->id.'_'.time().'.pdf';
         }
 
-        $htmlContent = view('pdf.invoice', compact('invoice', 'caiRange', 'customer', 'examination', 'location', 'totalWords'))->render();
+        $pdfPath = 'invoices/'.$filename;
 
         if ($invoice->invoice_file && Storage::disk('public')->exists($invoice->invoice_file)) {
             Storage::disk('public')->delete($invoice->invoice_file);
         }
-
-        $filename = 'invoice_'.$invoice->id.'_'.time().'.pdf';
-        $pdfPath = 'invoices/'.$filename;
 
         $browsershot = Browsershot::html($htmlContent);
 

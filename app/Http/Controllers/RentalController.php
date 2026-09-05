@@ -7,9 +7,11 @@ use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\Location;
 use App\Models\Rental;
+use App\Models\Setting;
 use App\Services\DateFilterService;
+use App\Services\InvoiceCalculationService;
+use App\Services\InvoicePdfService;
 use Illuminate\Http\File;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -19,7 +21,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Spatie\Browsershot\Browsershot;
 
 /**
  * This class manages Otros Cobros actions, at the begining was called Rentals, but was renamed to be Otros Cobros to suppor other use cases
@@ -132,6 +133,32 @@ class RentalController extends Controller
             ),
             'selectedCustomer' => $selectedCustomer,
             'banks' => $banks,
+        ]);
+    }
+
+    /**
+     * Get options for rentals (rentals list, banks, settings, and optionally invoice data) for lazy-loading.
+     */
+    public function options(Request $request)
+    {
+        if (! $request->user()?->can('rentals.view') && ! $request->user()?->can('invoices.manage')) {
+            abort(403);
+        }
+
+        $settings = Setting::whereIn('setting_key', ['third_age_discount', 'fourth_age_discount'])
+            ->pluck('setting_value', 'setting_key')
+            ->toArray();
+
+        $invoice = null;
+        if ($request->filled('invoice_id')) {
+            $invoice = Invoice::with(['customer', 'rental', 'creditRelation'])->find($request->invoice_id);
+        }
+
+        return response()->json([
+            'rentals' => Rental::orderBy('name', 'asc')->get(['id', 'name', 'description']),
+            'banks' => Bank::orderBy('name', 'asc')->get(['id', 'name']),
+            'settings' => $settings,
+            'invoice' => $invoice,
         ]);
     }
 
@@ -271,28 +298,9 @@ class RentalController extends Controller
             $customAmountVal = $isCustomAmount ? (float) $validated['custom_amount'] : 0.00;
             $customAmountReasonVal = $isCustomAmount ? ($validated['custom_amount_reason'] ?? null) : null;
 
-            $amount = (float) $validated['amount'];
-            $discount = (float) $validated['discount'];
-
-            $qty = (int) ($validated['quantity'] ?? 1);
-            if ($qty <= 0) {
-                $qty = 1;
-            }
-
-            // Business Rule: A 15% ISV rate is optionally applied to the rental subtotal
-            // (rental base amount minus discount, excluding the custom extra charge).
-            // This tax is stored in the database's `isv_15` column.
-            $payIsv = $request->boolean('pay_isv', true);
-            $rentalBaseAmount = $amount - $customAmountVal;
-            $unitPrice = $rentalBaseAmount / $qty;
-            $rentalSubtotal = max(0.00, $rentalBaseAmount - $discount);
-            $isv15 = $payIsv ? ($rentalSubtotal * 0.15) : 0.00;
-
-            // Invoice subtotal is rental subtotal plus custom amount (net amount before tax)
-            $subtotal = $rentalSubtotal + $customAmountVal;
-
-            // Total invoice amount is subtotal plus calculated tax
-            $total = $subtotal + $isv15;
+            $payIsv = $request->boolean('pay_isv', false);
+            $calc = InvoiceCalculationService::calculateRental($validated, $payIsv);
+            $total = $calc['total'];
 
             if ($request->boolean('has_initial_payment') && (float) $validated['initial_payment_amount'] > $total) {
                 throw ValidationException::withMessages([
@@ -327,17 +335,17 @@ class RentalController extends Controller
                 'payment_type' => $validated['payment_type'],
                 'invoice_date' => ($validated['payment_type'] !== 'credit' && $fullInvoiceNumber) ? now() : null,
                 'credit_payment_id' => $creditId,
-                'quantity' => $qty,
-                'amount' => $unitPrice,
-                'discount' => $discount,
-                'subtotal' => $subtotal,
-                'exempt_amount' => $payIsv ? 0.00 : $rentalSubtotal,
-                'tax_exempt_amount' => $customAmountVal, // custom amount is exempt from ISV
-                'taxable_amount_15' => $payIsv ? $rentalSubtotal : 0.00, // rental subtotal subject to ISV
+                'quantity' => $calc['quantity'],
+                'amount' => $calc['amount'],
+                'discount' => $calc['discount'],
+                'subtotal' => $calc['subtotal'],
+                'exempt_amount' => $calc['exempt_amount'],
+                'tax_exempt_amount' => $calc['tax_exempt_amount'],
+                'taxable_amount_15' => $calc['taxable_amount_15'],
                 'taxable_amount_18' => 0.00,
-                'isv_15' => $isv15, // store the calculated 15% ISV here
+                'isv_15' => $calc['isv_15'],
                 'isv_18' => 0.00,
-                'total' => $total,
+                'total' => $calc['total'],
                 'total_paid' => $totalPaid,
                 'proof_of_payment' => $proofOfPaymentPath,
                 'invoice_file' => '',
@@ -359,7 +367,7 @@ class RentalController extends Controller
                 'invoice_type' => 'rental',
                 'rental_id' => $rentalId,
                 'description' => $validated['description'] ?? null,
-                'pay_isv' => $payIsv,
+                'pay_isv' => $calc['pay_isv'],
             ]);
 
             // Increment CAI Range last used number
@@ -369,45 +377,7 @@ class RentalController extends Controller
             }
 
             // PDF Generation
-            $totalWords = $this->numberToSpanishWords($invoice->total);
-            if (! empty($validated['customer_id'])) {
-                $customer = Customer::findOrFail($validated['customer_id']);
-            } else {
-                $customer = new Customer([
-                    'name' => 'Consumidor Final',
-                    'id_number' => 'N/A',
-                    'phone' => 'N/A',
-                    'email' => '',
-                ]);
-            }
-            $location = Location::findOrFail($caiRange->location_id);
-
-            $htmlContent = view('pdf.rental_invoice', compact('invoice', 'caiRange', 'customer', 'location', 'totalWords', 'rental'))->render();
-
-            $filename = 'rental_invoice_'.$invoice->id.'_'.time().'.pdf';
-            $pdfPath = 'invoices/'.$filename;
-
-            $browsershot = Browsershot::html($htmlContent);
-
-            if (app()->environment('production')) {
-                $browsershot->setIncludePath(env('BROWSERSHOT_INCLUDE_PATH', '$PATH:/usr/local/bin:/usr/bin'))
-                    ->setNodeBinary(env('BROWSERSHOT_NODE_BINARY', '/usr/local/bin/node'))
-                    ->setNpmBinary(env('BROWSERSHOT_NPM_BINARY', '/usr/local/bin/npm'))
-                    ->setChromePath(env('BROWSERSHOT_CHROME_PATH', '/usr/bin/google-chrome-stable'));
-            }
-
-            $pdfContent = $browsershot->addChromiumArguments([
-                'disable-crash-reporter',
-                'disable-dev-shm-usage',
-                'no-sandbox',
-            ])
-                ->noSandbox()
-                ->margins(10, 10, 10, 10)
-                ->format('A4')
-                ->pdf();
-
-            Storage::disk('public')->put($pdfPath, $pdfContent);
-            $invoice->update(['invoice_file' => $pdfPath]);
+            app(InvoicePdfService::class)->generateAndStoreInvoice($invoice);
         });
 
         return redirect()->back()->with([

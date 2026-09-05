@@ -833,22 +833,27 @@ export default function InvoiceForm({
     const totalDiscountVal = consolidatedTotals.discount;
 
     useEffect(() => {
-        const amtStr = consolidatedTotals.amount.toFixed(2);
+        const isStandalone = calculatedLineItems.length === 0;
+        const amtStr = isStandalone
+            ? data.amount
+            : consolidatedTotals.amount.toFixed(2);
+        const qtyVal = isStandalone
+            ? data.quantity
+            : consolidatedTotals.quantity;
         const discStr = consolidatedTotals.discount.toFixed(2);
         const subStr = consolidatedTotals.subtotal.toFixed(2);
         const totStr = consolidatedTotals.total.toFixed(2);
 
         if (
-            data.amount !== amtStr ||
+            (!isStandalone &&
+                (data.amount !== amtStr || data.quantity !== qtyVal)) ||
             data.discount !== discStr ||
             data.subtotal !== subStr ||
-            data.total !== totStr ||
-            data.quantity !== consolidatedTotals.quantity
+            data.total !== totStr
         ) {
             setData((d: any) => ({
                 ...d,
-                quantity: consolidatedTotals.quantity,
-                amount: amtStr,
+                ...(isStandalone ? {} : { amount: amtStr, quantity: qtyVal }),
                 discount: discStr,
                 subtotal: subStr,
                 total: totStr,
@@ -856,6 +861,7 @@ export default function InvoiceForm({
             }));
         }
     }, [
+        calculatedLineItems.length,
         consolidatedTotals,
         data.amount,
         data.discount,
@@ -2561,7 +2567,10 @@ export default function InvoiceForm({
 
             {/* Confirmation AlertDialog with prompt for PDF regeneration */}
             <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
-                <AlertDialogContent className="max-w-[550px]">
+                <AlertDialogContent
+                    className="z-[120] max-w-[550px]"
+                    overlayClassName="z-[115]"
+                >
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-lg font-bold text-foreground">
                             Confirmar Actualización
