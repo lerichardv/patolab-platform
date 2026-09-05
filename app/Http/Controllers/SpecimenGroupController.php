@@ -39,6 +39,13 @@ class SpecimenGroupController extends Controller
 {
     public function store(Request $request)
     {
+        if ($request->has('specimens') && is_string($request->input('specimens'))) {
+            $decoded = json_decode($request->input('specimens'), true);
+            if (is_array($decoded)) {
+                $request->merge(['specimens' => $decoded]);
+            }
+        }
+
         $validated = $request->validate([
             'global_customer_id' => 'required|exists:customers,id',
             'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
@@ -368,8 +375,14 @@ class SpecimenGroupController extends Controller
                 // Handle medical order file if present
                 $medOrderPath = null;
                 $fileKey = "specimens.{$index}.medical_order_file";
-                if ($request->hasFile($fileKey)) {
-                    $medOrderPath = $this->storeUploadedFile($request->file($fileKey), 'medical_orders');
+                $underscoreKey = "specimens_{$index}_medical_order_file";
+                $uploadedFile = $request->file($fileKey)
+                    ?? ($request->allFiles()[$fileKey] ?? null)
+                    ?? ($request->file($underscoreKey) ?? null)
+                    ?? ($request->allFiles()[$underscoreKey] ?? null)
+                    ?? ($specData['medical_order_file'] ?? null);
+                if ($uploadedFile instanceof UploadedFile) {
+                    $medOrderPath = $this->storeUploadedFile($uploadedFile, 'medical_orders');
                 }
 
                 $examItems = ! empty($specData['examinations']) && is_array($specData['examinations']) ? $specData['examinations'] : [];
@@ -642,6 +655,13 @@ class SpecimenGroupController extends Controller
 
     public function addSpecimens(Request $request, SpecimenGroup $group)
     {
+        if ($request->has('specimens') && is_string($request->input('specimens'))) {
+            $decoded = json_decode($request->input('specimens'), true);
+            if (is_array($decoded)) {
+                $request->merge(['specimens' => $decoded]);
+            }
+        }
+
         $validated = $request->validate([
             'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
             'has_initial_payment' => 'nullable|boolean',
@@ -1001,8 +1021,14 @@ class SpecimenGroupController extends Controller
 
                     $medOrderPath = null;
                     $fileKey = "specimens.{$index}.medical_order_file";
-                    if ($request->hasFile($fileKey)) {
-                        $medOrderPath = $this->storeUploadedFile($request->file($fileKey), 'medical_orders');
+                    $underscoreKey = "specimens_{$index}_medical_order_file";
+                    $uploadedFile = $request->file($fileKey)
+                        ?? ($request->allFiles()[$fileKey] ?? null)
+                        ?? ($request->file($underscoreKey) ?? null)
+                        ?? ($request->allFiles()[$underscoreKey] ?? null)
+                        ?? ($specData['medical_order_file'] ?? null);
+                    if ($uploadedFile instanceof UploadedFile) {
+                        $medOrderPath = $this->storeUploadedFile($uploadedFile, 'medical_orders');
                     }
 
                     $examItems = ! empty($specData['examinations']) && is_array($specData['examinations']) ? $specData['examinations'] : [];
@@ -1557,6 +1583,7 @@ class SpecimenGroupController extends Controller
             'specimens.priority',
             'specimens.cancelledBy',
             'specimens.invoiceGroupSpecimen',
+            'specimens.invoiceSpecimens',
             'specimens.products',
         ]);
 

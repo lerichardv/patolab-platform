@@ -132,7 +132,10 @@ class MigrateInvoiceSpecimenItems extends Command
                 $isv18 = $creditRow->isv_18 ?? $groupRow->isv_18 ?? $invoiceRow->isv_18 ?? 0.00;
                 $total = $creditRow->total ?? $groupRow->total ?? $invoiceRow->total ?? 0.00;
 
-                $selectedPrice = $creditRow->selected_price ?? $groupRow->selected_price ?? null;
+                $rawSelectedPrice = $creditRow->selected_price ?? $groupRow->selected_price ?? null;
+                $selectedPrice = (! empty($rawSelectedPrice) && $rawSelectedPrice !== '0')
+                    ? (string) $rawSelectedPrice
+                    : ((float) $amount > 0 ? (string) $amount : null);
                 $customSpecimenPrice = $creditRow->custom_specimen_price ?? $groupRow->custom_specimen_price ?? $invoiceRow->custom_amount ?? 0.00;
                 $additionalDiscountEnabled = (bool) ($creditRow->additional_discount_enabled ?? $groupRow->additional_discount_enabled ?? false);
                 $additionalDiscount = $creditRow->additional_discount ?? $groupRow->additional_discount ?? 0.00;

@@ -357,6 +357,7 @@ export function KanbanCard({
                                             'cancelled',
                                         ].includes(specimen.status) && (
                                             <div
+                                                suppressHydrationWarning
                                                 className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${dueInfo.colorClass}`}
                                                 title={`Fecha Estimada: ${dueInfo.fullDueDate}`}
                                             >
@@ -399,6 +400,7 @@ export function KanbanCard({
                                                     : specimen.status}
                                 </span>
                                 <span
+                                    suppressHydrationWarning
                                     className="text-muted-foreground capitalize"
                                     title={new Date(
                                         specimen.created_at,

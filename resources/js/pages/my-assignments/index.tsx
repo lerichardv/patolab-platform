@@ -2078,6 +2078,7 @@ export default function MyAssignmentsIndex({
 
                                                                                 return (
                                                                                     <div
+                                                                                        suppressHydrationWarning
                                                                                         className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${dueInfo.colorClass}`}
                                                                                         title={`Vencimiento Interno: ${dueInfo.fullDueDate}`}
                                                                                     >

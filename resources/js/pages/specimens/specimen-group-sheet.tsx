@@ -444,10 +444,76 @@ export default function SpecimenGroupSheet({
                 const existingSpecimens = (group.specimens || []).map(
                     (s: any) => {
                         const breakdown = s.invoice_group_specimen || {};
+                        const invoiceSpecimens = s.invoice_specimens || [];
 
                         let examIdsStr = '';
                         let examNamesStr = '';
                         let itemizedExams: any[] = [];
+
+                        const resolveItemPricing = (
+                            examId: number,
+                            rawItemPrice?: any,
+                        ) => {
+                            const invSpec =
+                                invoiceSpecimens.find(
+                                    (is: any) => is.examination_id === examId,
+                                ) ||
+                                breakdown ||
+                                {};
+
+                            let chosenPrice =
+                                invSpec.selected_price &&
+                                invSpec.selected_price !== '0'
+                                    ? invSpec.selected_price.toString()
+                                    : parseFloat(invSpec.amount) > 0
+                                      ? invSpec.amount.toString()
+                                      : rawItemPrice?.toString() || '0';
+
+                            let customPrice =
+                                invSpec.custom_specimen_price?.toString() ||
+                                '0';
+
+                            // Check if chosenPrice matches one of the exam's preset prices
+                            const examObj = examinations.find(
+                                (e) => e.id === examId,
+                            );
+                            const presetPrices = examObj?.prices || [];
+                            const matchesPreset = presetPrices.some(
+                                (p: any) =>
+                                    parseFloat(p.amount) ===
+                                    parseFloat(chosenPrice),
+                            );
+
+                            if (
+                                !matchesPreset &&
+                                parseFloat(chosenPrice) > 0 &&
+                                chosenPrice !== 'custom'
+                            ) {
+                                customPrice = chosenPrice;
+                                chosenPrice = 'custom';
+                            } else if (
+                                chosenPrice === '0' &&
+                                presetPrices.length > 0
+                            ) {
+                                chosenPrice = presetPrices[0].amount.toString();
+                            }
+
+                            return {
+                                selected_price: chosenPrice,
+                                custom_specimen_price: customPrice,
+                                quantity: invSpec.quantity ?? 1,
+                                additional_discount_enabled:
+                                    !!invSpec.additional_discount_enabled,
+                                additional_discount:
+                                    invSpec.additional_discount?.toString() ||
+                                    '0',
+                                age_discount_type:
+                                    invSpec.age_discount_type || null,
+                                age_discount_amount:
+                                    invSpec.age_discount_amount?.toString() ||
+                                    '0',
+                            };
+                        };
 
                         if (
                             s.specimen_examinations &&
@@ -463,22 +529,10 @@ export default function SpecimenGroupSheet({
                             itemizedExams = s.specimen_examinations.map(
                                 (x: any) => ({
                                     examination_id: x.examination_id,
-                                    selected_price:
-                                        x.selected_price?.toString() || '0',
-                                    custom_specimen_price:
-                                        x.custom_specimen_price?.toString() ||
-                                        '0',
-                                    quantity: x.quantity ?? 1,
-                                    additional_discount_enabled:
-                                        !!x.additional_discount_enabled,
-                                    additional_discount:
-                                        x.additional_discount?.toString() ||
-                                        '0',
-                                    age_discount_type:
-                                        x.age_discount_type || null,
-                                    age_discount_amount:
-                                        x.age_discount_amount?.toString() ||
-                                        '0',
+                                    ...resolveItemPricing(
+                                        x.examination_id,
+                                        x.selected_price,
+                                    ),
                                 }),
                             );
                         } else if (
@@ -497,26 +551,30 @@ export default function SpecimenGroupSheet({
                                 )
                                 .filter(Boolean)
                                 .join(', ');
-                            itemizedExams = s.examinations.map((x: any) => ({
-                                examination_id: x.id || x.examination_id,
-                                selected_price:
-                                    x.selected_price?.toString() || '0',
-                                custom_specimen_price:
-                                    x.custom_specimen_price?.toString() || '0',
-                                quantity: x.quantity ?? 1,
-                                additional_discount_enabled:
-                                    !!x.additional_discount_enabled,
-                                additional_discount:
-                                    x.additional_discount?.toString() || '0',
-                                age_discount_type: x.age_discount_type || null,
-                                age_discount_amount:
-                                    x.age_discount_amount?.toString() || '0',
-                            }));
+                            itemizedExams = s.examinations.map((x: any) => {
+                                const examId = x.id || x.examination_id;
+
+                                return {
+                                    examination_id: examId,
+                                    ...resolveItemPricing(
+                                        examId,
+                                        x.selected_price,
+                                    ),
+                                };
+                            });
                         } else {
                             examIdsStr =
                                 s.specimen_type_examination?.toString() || '';
                             examNamesStr = s.examination?.name || '';
                         }
+
+                        const primaryExamPricing =
+                            itemizedExams.length > 0
+                                ? itemizedExams[0]
+                                : resolveItemPricing(
+                                      parseInt(examIdsStr) || 0,
+                                      breakdown.selected_price,
+                                  );
 
                         return {
                             id: s.id,
@@ -568,22 +626,18 @@ export default function SpecimenGroupSheet({
                             isExisting: true,
                             sequence_code: s.sequence_code,
 
-                            selected_price:
-                                breakdown.selected_price?.toString() || '0',
+                            selected_price: primaryExamPricing.selected_price,
                             custom_specimen_price:
-                                breakdown.custom_specimen_price?.toString() ||
-                                '0',
-                            quantity: breakdown.quantity ?? 1,
+                                primaryExamPricing.custom_specimen_price,
+                            quantity: primaryExamPricing.quantity,
                             age_discount_type:
-                                breakdown.age_discount_type || null,
+                                primaryExamPricing.age_discount_type,
                             age_discount_amount:
-                                breakdown.age_discount_amount?.toString() ||
-                                '0',
+                                primaryExamPricing.age_discount_amount,
                             additional_discount_enabled:
-                                !!breakdown.additional_discount_enabled,
+                                primaryExamPricing.additional_discount_enabled,
                             additional_discount:
-                                breakdown.additional_discount?.toString() ||
-                                '0',
+                                primaryExamPricing.additional_discount,
                         };
                     },
                 );
@@ -1675,6 +1729,37 @@ export default function SpecimenGroupSheet({
 
         setProcessing(true);
 
+        const specimensData = specimens.map((s) => ({
+            id: s.id,
+            customer: s.customer,
+            specimen_type: s.specimen_type,
+            reserved_code: s.id ? null : s.sequence_code || null,
+            specimen_type_examination: s.specimen_type_examination,
+            specimen_category: s.specimen_category,
+            referrer: s.referrer,
+            anatomic_site: s.anatomic_site,
+            diagnosis: s.diagnosis,
+            clinical_notes: s.clinical_notes,
+            status: s.status,
+            priority_id: s.priority_id,
+            sample_collection_date: s.sample_collection_date,
+            selected_price: s.selected_price,
+            custom_specimen_price: s.custom_specimen_price || '0',
+            quantity: s.quantity ?? 1,
+            age_discount_type: s.age_discount_type,
+            age_discount_amount: s.age_discount_amount,
+            additional_discount_enabled: s.additional_discount_enabled,
+            additional_discount: s.additional_discount,
+            examinations: s.examinations || [],
+
+            // Nest supplies
+            insumos: s.insumos.map((i: any) => ({
+                id: i.id,
+                quantity: i.quantity,
+                price: i.price,
+            })),
+        }));
+
         // Build request payload using Inertia router POST
         const payload: Record<string, any> = {
             global_customer_id: globalCustomerId,
@@ -1703,36 +1788,7 @@ export default function SpecimenGroupSheet({
             transfer_authorization_code: transferAuthorizationCode,
 
             // Specimens list
-            specimens: specimens.map((s) => ({
-                id: s.id,
-                customer: s.customer,
-                specimen_type: s.specimen_type,
-                reserved_code: s.id ? null : s.sequence_code || null,
-                specimen_type_examination: s.specimen_type_examination,
-                specimen_category: s.specimen_category,
-                referrer: s.referrer,
-                anatomic_site: s.anatomic_site,
-                diagnosis: s.diagnosis,
-                clinical_notes: s.clinical_notes,
-                status: s.status,
-                priority_id: s.priority_id,
-                sample_collection_date: s.sample_collection_date,
-                selected_price: s.selected_price,
-                custom_specimen_price: s.custom_specimen_price || '0',
-                quantity: s.quantity ?? 1,
-                age_discount_type: s.age_discount_type,
-                age_discount_amount: s.age_discount_amount,
-                additional_discount_enabled: s.additional_discount_enabled,
-                additional_discount: s.additional_discount,
-                examinations: s.examinations || [],
-
-                // Nest supplies
-                insumos: s.insumos.map((i: any) => ({
-                    id: i.id,
-                    quantity: i.quantity,
-                    price: i.price,
-                })),
-            })),
+            specimens: specimensData,
         };
 
         // Attach medical order files dynamically
