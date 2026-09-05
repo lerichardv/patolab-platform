@@ -138,6 +138,9 @@ export default function RentalPaymentForm({
                       email: invoice.customer.email,
                       age: invoice.customer.age,
                       type: invoice.customer.type,
+                      phone: invoice.customer.phone,
+                      gender: invoice.customer.gender,
+                      address: invoice.customer.address,
                   }
                 : null,
         );
@@ -607,11 +610,13 @@ export default function RentalPaymentForm({
 
                         <AsyncCustomerCombobox
                             value={data.customer_id}
+                            initialCustomer={selectedCustomer}
                             onChange={(id, cust) => {
                                 setData('customer_id', id);
                                 setSelectedCustomer(cust ?? null);
                             }}
                             placeholder="Seleccione un cliente"
+                            allowClear
                         />
 
                         {selectedCustomer && (
@@ -1236,6 +1241,22 @@ export default function RentalPaymentForm({
                 onOpenChange={setIsCustomerSheetOpen}
                 className="z-[110]"
                 overlayClassName="z-[105]"
+                onSuccess={(newCustomer) => {
+                    if (newCustomer) {
+                        setData('customer_id', String(newCustomer.id));
+                        setSelectedCustomer({
+                            id: newCustomer.id,
+                            name: newCustomer.name,
+                            id_number: newCustomer.id_number,
+                            email: newCustomer.email,
+                            age: newCustomer.age,
+                            type: newCustomer.type,
+                            phone: newCustomer.phone,
+                            gender: newCustomer.gender,
+                            address: newCustomer.address,
+                        });
+                    }
+                }}
             />
 
             {/* Inline Rental creation sub-sheet */}
