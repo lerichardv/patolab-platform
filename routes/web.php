@@ -205,8 +205,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai-assistant.chat');
 });
 
-Route::get('/phpinfo', function () {
-    phpinfo();
-});
+// Route::get('/phpinfo', function () {
+//     phpinfo();
+// });
 
 require __DIR__.'/settings.php';

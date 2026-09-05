@@ -17,6 +17,7 @@ PatoLab es una aplicación web diseñada para la gestión de laboratorios, segui
 ### 1. Requisitos Previos
 Asegúrate de tener instalado lo siguiente en tu sistema:
 - **PHP 8.2 o superior** (con extensiones `gd`, `pdo_mysql`, `mbstring`, `bcmath`, `zip`, `opcache`)
+  - **Configuración requerida**: Establecer `max_input_vars = 10000` en `php.ini` (CLI y PHP-FPM) para admitir solicitudes `multipart/form-data` con grupos grandes de muestras y archivos adjuntos.
 - **Composer**
 - **Node.js & NPM**
 - **Servidor de Base de Datos** (MySQL / PostgreSQL)
@@ -193,15 +194,21 @@ Al desplegar el proyecto en un servidor de producción o entorno de contenedores
    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
    ```
 
-9. **Configuración de Supervisor (para el Servidor de Colaboración)**:
-   Cada vez que el `editor-collaboration-server` (o los procesadores de colas) se actualicen, debes recargar/reiniciar Supervisor para aplicar los cambios. Abre tu terminal y ejecuta estos comandos:
-   ```bash
-   sudo supervisorctl reread
-   sudo supervisorctl update
-   sudo supervisorctl restart [nombre_del_proceso]
+9. **Configuración de PHP (`max_input_vars`)**:
+   Es indispensable configurar `max_input_vars = 10000` en tu configuración de PHP (`php.ini` o en el pool de PHP-FPM y CLI). Esto previene que PHP descarte silenciosamente campos al procesar formularios grandes con múltiples muestras agrupadas (30+ muestras) y archivos adjuntos vía `multipart/form-data`:
+   ```ini
+   max_input_vars = 10000
    ```
 
-10. **Configuración de Firma Digital de Documentos**:
+10. **Configuración de Supervisor (para el Servidor de Colaboración)**:
+    Cada vez que el `editor-collaboration-server` (o los procesadores de colas) se actualicen, debes recargar/reiniciar Supervisor para aplicar los cambios. Abre tu terminal y ejecuta estos comandos:
+    ```bash
+    sudo supervisorctl reread
+    sudo supervisorctl update
+    sudo supervisorctl restart [nombre_del_proceso]
+    ```
+
+11. **Configuración de Firma Digital de Documentos**:
     Sigue estos pasos para configurar certificados SSL y rutas de claves para la firma digital de documentos PDF:
 
     #### 1. Crear el Directorio Seguro en el Sistema Operativo

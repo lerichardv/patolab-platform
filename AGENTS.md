@@ -69,6 +69,7 @@ Ensure Chromium installed for PDF, queue worker running, cron for scheduler.
 - Always run `php artisan wayfinder:generate --with-form` after route changes
 - `bootstrap/ssr`, `public/build`, `resources/js/{actions,routes,wayfinder}` are gitignored build artifacts
 - Default DB is SQLite (file-based in `database/database.sqlite`)
+- PHP `max_input_vars` must be set to `10000` (CLI & PHP-FPM) to handle large specimen groups and multipart file uploads without field truncation
 
 ===
 
