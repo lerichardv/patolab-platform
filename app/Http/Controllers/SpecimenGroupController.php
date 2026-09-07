@@ -90,6 +90,12 @@ class SpecimenGroupController extends Controller
             'specimens.*.status' => 'required|string',
             'specimens.*.priority_id' => 'required|exists:priorities,id',
             'specimens.*.sample_collection_date' => 'nullable|date',
+            'specimens.*.is_manual_delivery_date_intern_enabled' => 'nullable|boolean',
+            'specimens.*.delivery_date_intern_unit' => 'nullable|in:minutes,hours,days,weeks',
+            'specimens.*.delivery_date_intern_quantity' => 'nullable|integer|min:0',
+            'specimens.*.is_manual_delivery_date_enabled' => 'nullable|boolean',
+            'specimens.*.delivery_date_unit' => 'nullable|in:minutes,hours,days,weeks',
+            'specimens.*.delivery_date_quantity' => 'nullable|integer|min:0',
 
             // Nested pricing config for each specimen
             'specimens.*.selected_price' => 'required|string',
@@ -427,6 +433,12 @@ class SpecimenGroupController extends Controller
                     'group_id' => $group->id,
                     'location_id' => $locationId,
                     'sample_collection_date' => $specData['sample_collection_date'] ?? null,
+                    'is_manual_delivery_date_intern_enabled' => ! empty($specData['is_manual_delivery_date_intern_enabled']),
+                    'delivery_date_intern_unit' => $specData['delivery_date_intern_unit'] ?? 'minutes',
+                    'delivery_date_intern_quantity' => (int) ($specData['delivery_date_intern_quantity'] ?? 0),
+                    'is_manual_delivery_date_enabled' => ! empty($specData['is_manual_delivery_date_enabled']),
+                    'delivery_date_unit' => $specData['delivery_date_unit'] ?? 'minutes',
+                    'delivery_date_quantity' => (int) ($specData['delivery_date_quantity'] ?? 0),
                 ]);
 
                 // Sync all examinations to specimen_examinations pivot table
@@ -702,6 +714,12 @@ class SpecimenGroupController extends Controller
             'specimens.*.status' => 'required|string',
             'specimens.*.priority_id' => 'required|exists:priorities,id',
             'specimens.*.sample_collection_date' => 'nullable|date',
+            'specimens.*.is_manual_delivery_date_intern_enabled' => 'nullable|boolean',
+            'specimens.*.delivery_date_intern_unit' => 'nullable|in:minutes,hours,days,weeks',
+            'specimens.*.delivery_date_intern_quantity' => 'nullable|integer|min:0',
+            'specimens.*.is_manual_delivery_date_enabled' => 'nullable|boolean',
+            'specimens.*.delivery_date_unit' => 'nullable|in:minutes,hours,days,weeks',
+            'specimens.*.delivery_date_quantity' => 'nullable|integer|min:0',
 
             // Nested pricing config for each specimen
             'specimens.*.selected_price' => 'required|string',
@@ -935,9 +953,35 @@ class SpecimenGroupController extends Controller
                         ? (int) $examItems[0]['examination_id']
                         : (is_numeric($specData['specimen_type_examination'] ?? null) ? (int) $specData['specimen_type_examination'] : null);
 
-                    $specimen->update([
+                    $updateFields = [
                         'specimen_type_examination' => $primaryExamId,
-                    ]);
+                    ];
+                    if (isset($specData['specimen_category'])) {
+                        $updateFields['specimen_category'] = $specData['specimen_category'];
+                    }
+                    if (isset($specData['priority_id'])) {
+                        $updateFields['priority_id'] = $specData['priority_id'];
+                    }
+                    if (array_key_exists('is_manual_delivery_date_intern_enabled', $specData)) {
+                        $updateFields['is_manual_delivery_date_intern_enabled'] = ! empty($specData['is_manual_delivery_date_intern_enabled']);
+                    }
+                    if (isset($specData['delivery_date_intern_unit'])) {
+                        $updateFields['delivery_date_intern_unit'] = $specData['delivery_date_intern_unit'];
+                    }
+                    if (array_key_exists('delivery_date_intern_quantity', $specData)) {
+                        $updateFields['delivery_date_intern_quantity'] = (int) $specData['delivery_date_intern_quantity'];
+                    }
+                    if (array_key_exists('is_manual_delivery_date_enabled', $specData)) {
+                        $updateFields['is_manual_delivery_date_enabled'] = ! empty($specData['is_manual_delivery_date_enabled']);
+                    }
+                    if (isset($specData['delivery_date_unit'])) {
+                        $updateFields['delivery_date_unit'] = $specData['delivery_date_unit'];
+                    }
+                    if (array_key_exists('delivery_date_quantity', $specData)) {
+                        $updateFields['delivery_date_quantity'] = (int) $specData['delivery_date_quantity'];
+                    }
+
+                    $specimen->update($updateFields);
 
                     $examIds = array_filter(array_column($examItems, 'examination_id'));
                     if (! empty($examIds)) {
@@ -1072,6 +1116,12 @@ class SpecimenGroupController extends Controller
                         'is_group' => true,
                         'group_id' => $group->id,
                         'sample_collection_date' => $specData['sample_collection_date'] ?? null,
+                        'is_manual_delivery_date_intern_enabled' => ! empty($specData['is_manual_delivery_date_intern_enabled']),
+                        'delivery_date_intern_unit' => $specData['delivery_date_intern_unit'] ?? 'minutes',
+                        'delivery_date_intern_quantity' => (int) ($specData['delivery_date_intern_quantity'] ?? 0),
+                        'is_manual_delivery_date_enabled' => ! empty($specData['is_manual_delivery_date_enabled']),
+                        'delivery_date_unit' => $specData['delivery_date_unit'] ?? 'minutes',
+                        'delivery_date_quantity' => (int) ($specData['delivery_date_quantity'] ?? 0),
                     ]);
 
                     $examIds = array_filter(array_column($examItems, 'examination_id'));

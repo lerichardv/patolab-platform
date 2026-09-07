@@ -1,34 +1,34 @@
 import { useForm, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import {
-    Check,
-    ChevronsUpDown,
-    Plus,
-    Upload,
-    FileText,
-    X,
-    ExternalLink,
-    AlertCircle,
-    Tag,
-    Microscope,
-    Wallet,
-    CreditCard,
-    Landmark,
-    Receipt,
-    Calendar,
-    Edit2,
-    Loader2,
-    Info,
-    Layers,
-    ChevronDown,
-    Search,
+	Check,
+	ChevronsUpDown,
+	Plus,
+	Upload,
+	FileText,
+	X,
+	ExternalLink,
+	AlertCircle,
+	Tag,
+	Microscope,
+	Wallet,
+	CreditCard,
+	Landmark,
+	Receipt,
+	Calendar,
+	Edit2,
+	Loader2,
+	Info,
+	Layers,
+	ChevronDown,
+	Search,
 } from 'lucide-react';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import {
-    store as storeSpecimen,
-    update as updateSpecimen,
+	store as storeSpecimen,
+	update as updateSpecimen,
 } from '@/actions/App/Http/Controllers/SpecimenController';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import type { CustomerOption } from '@/components/async-customer-combobox';
@@ -43,40 +43,40 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
 } from '@/components/ui/command';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberPicker } from '@/components/ui/number-picker';
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
 } from '@/components/ui/popover';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
+	Sheet,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
 } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
@@ -84,14 +84,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { findInaccessibleFile } from '@/lib/file-utils';
 import { cn } from '@/lib/utils';
 import {
-    calculateInvoiceItem,
-    calculateConsolidatedTotals,
+	calculateInvoiceItem,
+	calculateConsolidatedTotals,
 } from '@/services/invoice-calculation';
+import { UNIT_LABELS } from '@/services/specimen-delivery-date';
 import CustomerSheet from '../customers/customer-sheet';
 import {
-    PaymentMethodSheet,
-    PaymentResume,
-    getPaymentTypeLabel,
+	PaymentMethodSheet,
+	PaymentResume,
+	getPaymentTypeLabel,
 } from '../invoices/payment-method-sheet';
 import ReferrerForm from '../referrers/referrer-form';
 import SequenceForm from '../sequences/sequence-form';
@@ -100,4594 +101,4793 @@ import ExaminationPricesForm from '../specimen-type-examinations/examination-pri
 import SpecimenTypeExaminationSheet from '../specimen-type-examinations/specimen-type-examination-sheet';
 import SpecimenTypeForm from '../specimen-types/specimen-type-form';
 interface Props {
-    specimen: any | null;
-    onSuccess: () => void;
-    setIsDirty?: (dirty: boolean) => void;
-    specimenTypes: any[];
-    examinations: any[];
-    categories: any[];
-    referrers: any[];
-    referrerTypes: any[];
-    priorities: any[];
-    locations: any[];
-    sequences: any[];
-    activeLocationId: number | null;
-    products?: any[];
-    banks?: any[];
-    showPaymentMethodEdition?: boolean;
-    readOnlySampleCollectionDate?: boolean;
+	specimen: any | null;
+	onSuccess: () => void;
+	setIsDirty?: (dirty: boolean) => void;
+	specimenTypes: any[];
+	examinations: any[];
+	categories: any[];
+	referrers: any[];
+	referrerTypes: any[];
+	priorities: any[];
+	locations: any[];
+	sequences: any[];
+	activeLocationId: number | null;
+	products?: any[];
+	banks?: any[];
+	showPaymentMethodEdition?: boolean;
+	readOnlySampleCollectionDate?: boolean;
 }
 
 export default function SpecimenForm({
-    specimen,
-    onSuccess,
-    setIsDirty,
-    specimenTypes,
-    examinations,
-    categories,
-    referrers,
-    referrerTypes = [],
-    priorities,
-    locations = [],
-    sequences = [],
-    activeLocationId = null,
-    products = [],
-    banks = [],
-    showPaymentMethodEdition = true,
-    readOnlySampleCollectionDate = false,
+	specimen,
+	onSuccess,
+	setIsDirty,
+	specimenTypes,
+	examinations,
+	categories,
+	referrers,
+	referrerTypes = [],
+	priorities,
+	locations = [],
+	sequences = [],
+	activeLocationId = null,
+	products = [],
+	banks = [],
+	showPaymentMethodEdition = true,
+	readOnlySampleCollectionDate = false,
 }: Props) {
-    const { props: pageProps } = usePage<any>();
-    const flash = pageProps.flash as Record<string, any> | undefined;
-    const [availableTemplates, setAvailableTemplates] = React.useState<any[]>(
-        [],
-    );
-    const [isLoadingTemplates, setIsLoadingTemplates] = React.useState(false);
-    const [isCustomerSheetOpen, setIsCustomerSheetOpen] = React.useState(false);
-    const [customerToEdit, setCustomerToEdit] =
-        React.useState<CustomerOption | null>(null);
-    const [isReferrerSheetOpen, setIsReferrerSheetOpen] = React.useState(false);
-    const [editingReferrer, setEditingReferrer] = React.useState<any | null>(
-        null,
-    );
-    const [referrerInitialData, setReferrerInitialData] = React.useState<
-        any | null
-    >(null);
-    const [isSequenceSheetOpen, setIsSequenceSheetOpen] = React.useState(false);
-    const [isSpecimenTypeSheetOpen, setIsSpecimenTypeSheetOpen] =
-        React.useState(false);
-    const [isExaminationSheetOpen, setIsExaminationSheetOpen] =
-        React.useState(false);
-    const [examinationSearchQuery, setExaminationSearchQuery] =
-        React.useState('');
-    const [isCategorySheetOpen, setIsCategorySheetOpen] = React.useState(false);
-    const [isEditPricesSheetOpen, setIsEditPricesSheetOpen] =
-        React.useState(false);
-    const prevSpecimenTypesRef = React.useRef<any[]>(specimenTypes);
-    const prevExaminationsRef = React.useRef<any[]>(examinations);
-    const prevCategoriesRef = React.useRef<any[]>(categories);
-    const prevReferrersRef = React.useRef<any[]>(referrers);
-    // Track the currently-selected customer locally (for display + detail panel)
-    const [selectedCustomerData, setSelectedCustomerData] =
-        React.useState<CustomerOption | null>(
-            specimen?.customerRelation
-                ? {
-                      id: specimen.customerRelation.id,
-                      name: specimen.customerRelation.name,
-                      id_number: specimen.customerRelation.id_number,
-                      phone: specimen.customerRelation.phone,
-                      email: specimen.customerRelation.email,
-                      gender: specimen.customerRelation.gender,
-                      type: specimen.customerRelation.type,
-                      age: specimen.customerRelation.age,
-                  }
-                : null,
-        );
-
-    React.useEffect(() => {
-        if (specimenTypes.length > prevSpecimenTypesRef.current.length) {
-            const newTypes = specimenTypes.filter(
-                (t) =>
-                    !prevSpecimenTypesRef.current.some(
-                        (prev) => prev.id === t.id,
-                    ),
-            );
-
-            if (newTypes.length > 0) {
-                setData('specimen_type', newTypes[0].id.toString());
-                toast.success(
-                    `Tipo de muestra "${newTypes[0].name}" seleccionado automáticamente`,
-                );
-            }
-        }
-
-        prevSpecimenTypesRef.current = specimenTypes;
-    }, [specimenTypes]);
-
-    React.useEffect(() => {
-        if (examinations.length > prevExaminationsRef.current.length) {
-            const newExams = examinations.filter(
-                (e) =>
-                    !prevExaminationsRef.current.some(
-                        (prev) => prev.id === e.id,
-                    ),
-            );
-
-            if (newExams.length > 0) {
-                setData('specimen_type_examination', newExams[0].id.toString());
-                toast.success(
-                    `Análisis "${newExams[0].name}" seleccionado automáticamente`,
-                );
-            }
-        }
-
-        prevExaminationsRef.current = examinations;
-    }, [examinations]);
-
-    React.useEffect(() => {
-        if (categories.length > prevCategoriesRef.current.length) {
-            const newCats = categories.filter(
-                (c) =>
-                    !prevCategoriesRef.current.some((prev) => prev.id === c.id),
-            );
-
-            if (newCats.length > 0) {
-                setData('specimen_category', newCats[0].id.toString());
-                toast.success(
-                    `Categoría "${newCats[0].name}" seleccionada automáticamente`,
-                );
-            }
-        }
-
-        prevCategoriesRef.current = categories;
-    }, [categories]);
-
-    // Auto-select a newly created customer via flash data from the server
-    const createdCustomerId = flash?.created_customer?.id as number | undefined;
-    React.useEffect(() => {
-        if (!flash?.created_customer) {
-            return;
-        }
-
-        const createdCustomer = flash.created_customer as any;
-
-        if (!createdCustomer.id) {
-            return;
-        }
-
-        setData('customer', createdCustomer.id.toString());
-        setSelectedCustomerData(createdCustomer);
-        toast.success(
-            `Paciente "${createdCustomer.name}" seleccionado automáticamente`,
-        );
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [createdCustomerId]);
-
-    React.useEffect(() => {
-        if (referrers.length > prevReferrersRef.current.length) {
-            const newReferrers = referrers.filter(
-                (r) =>
-                    !prevReferrersRef.current.some((prev) => prev.id === r.id),
-            );
-
-            if (newReferrers.length > 0) {
-                setData('referrer', newReferrers[0].id.toString());
-                toast.success(
-                    `Médico "${newReferrers[0].name}" seleccionado automáticamente`,
-                );
-            }
-        }
-
-        prevReferrersRef.current = referrers;
-    }, [referrers]);
-
-    const [localSequences, setLocalSequences] =
-        React.useState<any[]>(sequences);
-    const [showConfirm, setShowConfirm] = React.useState(false);
-    const [showRegenerateConfirm, setShowRegenerateConfirm] =
-        React.useState(false);
-    const [showBlockedPaymentAlert, setShowBlockedPaymentAlert] =
-        React.useState(false);
-    const [showExamChangePricePrompt, setShowExamChangePricePrompt] =
-        React.useState(false);
-    const [unlockedFullSteps, setUnlockedFullSteps] = React.useState(!specimen);
-    const [isFacturating, setIsFacturating] = React.useState(false);
-    const [isPaymentSheetOpen, setIsPaymentSheetOpen] = React.useState(false);
-    const [isReservingCode, setIsReservingCode] = React.useState(false);
-
-    const [currentStep, setCurrentStep] = React.useState(1);
-    const [searchQuery, setSearchQuery] = React.useState('');
-    const formRef = React.useRef<HTMLFormElement>(null);
-
-    React.useEffect(() => {
-        const container = formRef.current?.closest('.overflow-y-auto');
-
-        if (container) {
-            container.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    }, [currentStep]);
-
-    React.useEffect(() => {
-        setLocalSequences(sequences);
-    }, [sequences]);
-
-    const initialInvoice = specimen
-        ? specimen.invoice_relation ||
-          specimen.invoiceRelation ||
-          specimen.group?.invoice ||
-          specimen.group_invoice ||
-          specimen.invoice ||
-          null
-        : null;
-
-    const {
-        data,
-        setData,
-        post,
-        processing,
-        errors,
-        setError,
-        clearErrors,
-        isDirty,
-        transform,
-    } = useForm({
-        _method: specimen ? 'PUT' : undefined,
-        customer: specimen?.customer ? specimen.customer.toString() : '',
-        specimen_type: specimen?.specimen_type
-            ? specimen.specimen_type.toString()
-            : '',
-        specimen_type_examination: specimen?.specimen_type_examination
-            ? specimen.specimen_type_examination.toString()
-            : '',
-        selected_examination_ids: (() => {
-            if (!specimen) {
-                return [] as string[];
-            }
-
-            const ids = new Set<string>();
-
-            if (
-                Array.isArray(specimen.examinations) &&
-                specimen.examinations.length > 0
-            ) {
-                specimen.examinations.forEach((e: any) => {
-                    if (e?.id) {
-                        ids.add(String(e.id));
-                    }
-                });
-            }
-
-            if (
-                Array.isArray(specimen.specimen_examinations) &&
-                specimen.specimen_examinations.length > 0
-            ) {
-                specimen.specimen_examinations.forEach((se: any) => {
-                    const id = se.examination_id || se.id || se.examination?.id;
-
-                    if (id) {
-                        ids.add(String(id));
-                    }
-                });
-            }
-
-            if (
-                Array.isArray(specimen.specimenExaminations) &&
-                specimen.specimenExaminations.length > 0
-            ) {
-                specimen.specimenExaminations.forEach((se: any) => {
-                    const id = se.examination_id || se.id || se.examination?.id;
-
-                    if (id) {
-                        ids.add(String(id));
-                    }
-                });
-            }
-
-            const inv =
-                specimen.invoice_relation ||
-                specimen.invoiceRelation ||
-                specimen.group?.invoice;
-            const invItems = inv?.invoice_specimens || inv?.invoiceSpecimens;
-
-            if (Array.isArray(invItems) && invItems.length > 0) {
-                invItems.forEach((item: any) => {
-                    if (!item.specimen_id || item.specimen_id === specimen.id) {
-                        const id = item.examination_id || item.examination?.id;
-
-                        if (id) {
-                            ids.add(String(id));
-                        }
-                    }
-                });
-            }
-
-            if (ids.size === 0 && specimen.specimen_type_examination) {
-                ids.add(String(specimen.specimen_type_examination));
-            }
-
-            return Array.from(ids);
-        })(),
-        examinations: [] as Array<any>,
-        specimen_category: specimen?.specimen_category
-            ? specimen.specimen_category.toString()
-            : '',
-        referrer: specimen?.referrer ? specimen.referrer.toString() : '',
-        anatomic_site: specimen?.anatomic_site || '',
-        diagnosis: specimen?.diagnosis || '',
-        clinical_notes: specimen?.clinical_notes || '',
-        status: specimen?.status || 'received',
-        priority_id: specimen?.priority_id
-            ? specimen.priority_id.toString()
-            : priorities && priorities.length > 0
-              ? priorities[0].id.toString()
-              : '',
-        medical_order_file: null as File | null,
-        reserved_code: '',
-        sample_collection_date: specimen?.sample_collection_date
-            ? specimen.sample_collection_date.split('T')[0]
-            : new Date().toISOString().split('T')[0],
-
-        // Billing fields (creation only)
-        quantity: 1,
-        amount: '',
-        selected_price: '',
-        custom_amount_enabled: false,
-        custom_amount: '0',
-        custom_amount_reason: '',
-        discount: '0',
-        additional_discount_enabled: false,
-        additional_discount: '0',
-        age_discount_type: null as string | null,
-        age_discount_amount: '0',
-        payment_type: initialInvoice?.payment_type || '',
-        regenerate_pdf: true,
-        template_id: '',
-        proof_of_payment: null as File | null,
-        has_initial_payment:
-            initialInvoice?.credit_payment_id ||
-            initialInvoice?.credit_relation ||
-            initialInvoice?.creditRelation
-                ? parseFloat(
-                      initialInvoice?.credit_relation?.amount_paid ||
-                          initialInvoice?.creditRelation?.amount_paid ||
-                          '0',
-                  ) > 0
-                : false,
-        initial_payment_amount:
-            initialInvoice?.credit_payment_id ||
-            initialInvoice?.credit_relation ||
-            initialInvoice?.creditRelation
-                ? (
-                      initialInvoice?.credit_relation?.amount_paid ||
-                      initialInvoice?.creditRelation?.amount_paid ||
-                      ''
-                  ).toString()
-                : '',
-        initial_payment_type:
-            initialInvoice?.credit_payment_id ||
-            initialInvoice?.credit_relation ||
-            initialInvoice?.creditRelation
-                ? initialInvoice?.cash_value &&
-                  parseFloat(initialInvoice.cash_value) > 0
-                    ? 'cash'
-                    : initialInvoice?.check_value &&
-                        parseFloat(initialInvoice.check_value) > 0
-                      ? 'check'
-                      : initialInvoice?.card_value_charged &&
-                          parseFloat(initialInvoice.card_value_charged) > 0
-                        ? 'credit card'
-                        : initialInvoice?.transfer_value &&
-                            parseFloat(initialInvoice.transfer_value) > 0
-                          ? 'bank transfer'
-                          : 'cash'
-                : 'cash',
-
-        // Detailed payment fields
-        payment_method_date:
-            initialInvoice?.payment_method_date ||
-            new Date().toISOString().split('T')[0],
-        cash_value: initialInvoice?.cash_value?.toString() || '',
-        check_number: initialInvoice?.check_number || '',
-        check_value: initialInvoice?.check_value?.toString() || '',
-        card_last_4: initialInvoice?.card_last_4 || '',
-        card_value_charged:
-            initialInvoice?.card_value_charged?.toString() || '',
-        card_expiration: initialInvoice?.card_expiration || '',
-        card_authorization_code: initialInvoice?.card_authorization_code || '',
-        transfer_bank_id: initialInvoice?.transfer_bank_id?.toString() || '',
-        transfer_value: initialInvoice?.transfer_value?.toString() || '',
-        transfer_authorization_code:
-            initialInvoice?.transfer_authorization_code || '',
-
-        // Insumos field (creation only)
-        agregar_insumos: false,
-        insumos: [] as Array<{
-            id: number;
-            quantity: number;
-            name: string;
-            code: string;
-            total_stock: number;
-            price: number;
-            prices: any[];
-        }>,
-    });
-
-    React.useEffect(() => {
-        transform((d: any) => {
-            const transformed = {
-                ...d,
-                initial_payment_amount:
-                    d.payment_type === 'credit' && d.has_initial_payment
-                        ? d.initial_payment_amount
-                        : null,
-                initial_payment_type:
-                    d.payment_type === 'credit' && d.has_initial_payment
-                        ? d.initial_payment_type
-                        : null,
-            };
-
-            // When opened from the report editor, do not send
-            // sample_collection_date so the form never overwrites the
-            // value the user set inside the report editor header.
-            if (readOnlySampleCollectionDate && specimen) {
-                delete transformed.sample_collection_date;
-            }
-
-            return transformed;
-        });
-    }, [transform]);
-
-    const specimenInvoice = React.useMemo(() => {
-        if (!specimen) {
-            return null;
-        }
-
-        return (
-            specimen.invoice_relation ||
-            specimen.invoiceRelation ||
-            specimen.group?.invoice ||
-            specimen.group_invoice ||
-            specimen.invoice ||
-            null
-        );
-    }, [specimen]);
-
-    const originalSpecimenType = React.useMemo(() => {
-        return specimen?.specimen_type ? String(specimen.specimen_type) : '';
-    }, [specimen]);
-
-    const originalExaminationIdsStr = React.useMemo(() => {
-        if (!specimen) {
-            return '';
-        }
-
-        const ids = new Set<string>();
-
-        if (
-            Array.isArray(specimen.examinations) &&
-            specimen.examinations.length > 0
-        ) {
-            specimen.examinations.forEach((e: any) => {
-                if (e?.id) {
-                    ids.add(String(e.id));
-                }
-            });
-        }
-
-        if (
-            Array.isArray(specimen.specimen_examinations) &&
-            specimen.specimen_examinations.length > 0
-        ) {
-            specimen.specimen_examinations.forEach((se: any) => {
-                const id = se.examination_id || se.id || se.examination?.id;
-
-                if (id) {
-                    ids.add(String(id));
-                }
-            });
-        }
-
-        if (
-            Array.isArray(specimen.specimenExaminations) &&
-            specimen.specimenExaminations.length > 0
-        ) {
-            specimen.specimenExaminations.forEach((se: any) => {
-                const id = se.examination_id || se.id || se.examination?.id;
-
-                if (id) {
-                    ids.add(String(id));
-                }
-            });
-        }
-
-        const inv =
-            specimen.invoice_relation ||
-            specimen.invoiceRelation ||
-            specimen.group?.invoice;
-        const invItems = inv?.invoice_specimens || inv?.invoiceSpecimens;
-
-        if (Array.isArray(invItems) && invItems.length > 0) {
-            invItems.forEach((item: any) => {
-                if (!item.specimen_id || item.specimen_id === specimen.id) {
-                    const id = item.examination_id || item.examination?.id;
-
-                    if (id) {
-                        ids.add(String(id));
-                    }
-                }
-            });
-        }
-
-        if (ids.size === 0 && specimen.specimen_type_examination) {
-            ids.add(String(specimen.specimen_type_examination));
-        }
-
-        return Array.from(ids).sort().join(',');
-    }, [specimen]);
-
-    const currentExaminationIdsStr = React.useMemo(() => {
-        const ids = (data.selected_examination_ids || []).map((id: any) =>
-            String(id),
-        );
-
-        return ids.sort().join(',');
-    }, [data.selected_examination_ids]);
-
-    const hasTypeOrExamsChanged = React.useMemo(() => {
-        if (!specimen) {
-            return false;
-        }
-
-        const typeChanged =
-            String(data.specimen_type || '') !== originalSpecimenType;
-        const examsChanged =
-            currentExaminationIdsStr !== originalExaminationIdsStr;
-
-        return typeChanged || examsChanged;
-    }, [
-        specimen,
-        data.specimen_type,
-        originalSpecimenType,
-        currentExaminationIdsStr,
-        originalExaminationIdsStr,
-    ]);
-
-    const handleConfirmExamChangePrompt = () => {
-        setShowExamChangePricePrompt(false);
-        setUnlockedFullSteps(true);
-        setCurrentStep(2);
-
-        const targetInvoice = specimenInvoice;
-        const pType =
-            data.payment_type || targetInvoice?.payment_type || 'cash';
-        const calcTotal =
-            consolidatedTotals?.total ??
-            (targetInvoice?.total ? parseFloat(targetInvoice.total) : 0);
-        const calcTotalStr =
-            calcTotal > 0
-                ? calcTotal.toFixed(2)
-                : targetInvoice?.total?.toString() || '0';
-
-        const creditRel =
-            targetInvoice?.credit_relation || targetInvoice?.creditRelation;
-
-        setData((d) => {
-            const next = { ...d };
-            next.payment_type = pType;
-            next.payment_method_date =
-                d.payment_method_date ||
-                targetInvoice?.payment_method_date ||
-                new Date().toISOString().split('T')[0];
-
-            if (pType === 'cash') {
-                next.cash_value =
-                    d.cash_value && parseFloat(d.cash_value) > 0
-                        ? d.cash_value
-                        : targetInvoice?.cash_value?.toString() || calcTotalStr;
-            } else if (pType === 'check') {
-                next.check_number =
-                    d.check_number || targetInvoice?.check_number || '';
-                next.check_value =
-                    d.check_value && parseFloat(d.check_value) > 0
-                        ? d.check_value
-                        : targetInvoice?.check_value?.toString() ||
-                          calcTotalStr;
-            } else if (pType === 'credit card') {
-                next.card_last_4 =
-                    d.card_last_4 || targetInvoice?.card_last_4 || '';
-                next.card_expiration =
-                    d.card_expiration || targetInvoice?.card_expiration || '';
-                next.card_authorization_code =
-                    d.card_authorization_code ||
-                    targetInvoice?.card_authorization_code ||
-                    '';
-                next.card_value_charged =
-                    d.card_value_charged && parseFloat(d.card_value_charged) > 0
-                        ? d.card_value_charged
-                        : targetInvoice?.card_value_charged?.toString() ||
-                          calcTotalStr;
-            } else if (pType === 'bank transfer') {
-                next.transfer_bank_id =
-                    d.transfer_bank_id ||
-                    targetInvoice?.transfer_bank_id?.toString() ||
-                    '';
-                next.transfer_authorization_code =
-                    d.transfer_authorization_code ||
-                    targetInvoice?.transfer_authorization_code ||
-                    '';
-                next.transfer_value =
-                    d.transfer_value && parseFloat(d.transfer_value) > 0
-                        ? d.transfer_value
-                        : targetInvoice?.transfer_value?.toString() ||
-                          calcTotalStr;
-            } else if (pType === 'credit') {
-                const hasCredit =
-                    targetInvoice?.credit_payment_id || creditRel
-                        ? parseFloat(creditRel?.amount_paid || '0') > 0
-                        : false;
-                next.has_initial_payment = d.has_initial_payment ?? hasCredit;
-                next.initial_payment_amount =
-                    d.initial_payment_amount ||
-                    creditRel?.amount_paid?.toString() ||
-                    '';
-            }
-
-            return next;
-        });
-    };
-
-    const filteredProducts = React.useMemo(() => {
-        return products.filter(
-            (product) =>
-                product.name
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase()) ||
-                product.code.toLowerCase().includes(searchQuery.toLowerCase()),
-        );
-    }, [products, searchQuery]);
-
-    const selectedType = React.useMemo(() => {
-        return specimenTypes.find(
-            (t) => t.id.toString() === data.specimen_type,
-        );
-    }, [data.specimen_type, specimenTypes]);
-
-    const selectedExamination = React.useMemo(() => {
-        return examinations.find(
-            (e) => e.id.toString() === data.specimen_type_examination,
-        );
-    }, [data.specimen_type_examination, examinations]);
-
-    const availablePrices = React.useMemo(() => {
-        return selectedExamination?.prices || [];
-    }, [selectedExamination]);
-
-    React.useEffect(() => {
-        if (!data.specimen_type_examination) {
-            setData('selected_price', '');
-
-            return;
-        }
-
-        const selected = examinations.find(
-            (e) => e.id.toString() === data.specimen_type_examination,
-        );
-        const prices = selected?.prices || [];
-
-        if (prices.length > 0) {
-            const sortedPrices = [...prices].sort(
-                (a, b) => parseFloat(b.amount) - parseFloat(a.amount),
-            );
-            setData('selected_price', sortedPrices[0].amount.toString());
-        } else {
-            setData('selected_price', '');
-        }
-    }, [data.specimen_type_examination, examinations]);
-
-    const sortedSpecimenTypes = React.useMemo(() => {
-        return [...specimenTypes].sort((a, b) =>
-            a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }),
-        );
-    }, [specimenTypes]);
-
-    const filteredExaminations = React.useMemo(() => {
-        if (!data.specimen_type) {
-            return [];
-        }
-
-        return examinations
-            .filter((e) => e.specimen_type?.toString() === data.specimen_type)
-            .sort((a, b) =>
-                a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }),
-            );
-    }, [examinations, data.specimen_type]);
-
-    const searchedExaminations = React.useMemo(() => {
-        if (!examinationSearchQuery) {
-            return filteredExaminations;
-        }
-
-        const query = examinationSearchQuery
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '');
-
-        return filteredExaminations.filter((exam) => {
-            const name = exam.name
-                .toLowerCase()
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '');
-
-            return name.includes(query);
-        });
-    }, [filteredExaminations, examinationSearchQuery]);
-
-    React.useEffect(() => {
-        if (data.specimen_type) {
-            const hasValidExamSelected = filteredExaminations.some(
-                (e) => e.id.toString() === data.specimen_type_examination,
-            );
-
-            if (
-                !hasValidExamSelected &&
-                data.specimen_type_examination !== ''
-            ) {
-                setData('specimen_type_examination', '');
-            }
-        } else if (data.specimen_type_examination !== '') {
-            setData('specimen_type_examination', '');
-        }
-    }, [data.specimen_type, filteredExaminations]);
-
-    const handleAddInsumo = (product: any) => {
-        if (data.insumos.some((i: any) => i.id === product.id)) {
-            toast.info(`El producto "${product.name}" ya ha sido agregado.`);
-
-            return;
-        }
-
-        const sortedPrices = [...(product.prices || [])].sort(
-            (a, b) => parseFloat(b.amount) - parseFloat(a.amount),
-        );
-        const defaultPrice =
-            sortedPrices.length > 0
-                ? parseFloat(sortedPrices[0].amount)
-                : parseFloat(product.sale_price) || 0;
-
-        const newInsumo = {
-            id: product.id,
-            name: product.name,
-            code: product.code,
-            quantity: 1,
-            total_stock: parseInt(product.total_stock) || 0,
-            price: defaultPrice,
-            prices: sortedPrices,
-            sale_price: parseFloat(product.sale_price) || 0,
-        };
-
-        setData('insumos', [...data.insumos, newInsumo]);
-        toast.success(`"${product.name}" agregado a insumos.`);
-    };
-
-    const handleUpdateInsumoQty = (id: number, qty: number) => {
-        const updated = data.insumos.map((i: any) => {
-            if (i.id === id) {
-                const cappedQty = Math.max(1, Math.min(i.total_stock, qty));
-
-                return { ...i, quantity: cappedQty };
-            }
-
-            return i;
-        });
-        setData('insumos', updated);
-    };
-
-    const handleUpdateInsumoPrice = (id: number, price: number) => {
-        const updated = data.insumos.map((i: any) => {
-            if (i.id === id) {
-                return { ...i, price: price };
-            }
-
-            return i;
-        });
-        setData('insumos', updated);
-    };
-
-    const handleRemoveInsumo = (id: number) => {
-        const updated = data.insumos.filter((i: any) => i.id !== id);
-        setData('insumos', updated);
-    };
-
-    React.useEffect(() => {
-        clearErrors();
-    }, []);
-
-    const matchingSequence = React.useMemo(() => {
-        if (!data.specimen_type) {
-            return null;
-        }
-
-        const targetLocationId = specimen?.location_id || activeLocationId;
-
-        if (!targetLocationId) {
-            return null;
-        }
-
-        return localSequences.find(
-            (s) =>
-                s.specimen_type.toString() === data.specimen_type.toString() &&
-                s.location_id.toString() === targetLocationId.toString() &&
-                s.active,
-        );
-    }, [specimen, data.specimen_type, localSequences, activeLocationId]);
-
-    const nextSequencePreview = React.useMemo(() => {
-        if (!matchingSequence) {
-            return '';
-        }
-
-        const fillWidth = matchingSequence.fill ?? 4;
-        const paddedSeq = String(matchingSequence.current_sequence).padStart(
-            fillWidth,
-            '0',
-        );
-        const paddedMonth = String(matchingSequence.month).padStart(2, '0');
-
-        return `${matchingSequence.prefix}${matchingSequence.separator}${paddedSeq}${matchingSequence.separator}${paddedMonth}${matchingSequence.separator}${matchingSequence.year}`;
-    }, [matchingSequence]);
-
-    const isSpecimenTypeChanged = React.useMemo(() => {
-        if (!specimen) {
-            return false;
-        }
-
-        return (
-            String(data.specimen_type) !== String(specimen.specimen_type) ||
-            String(data.specimen_type_examination) !==
-                String(specimen.specimen_type_examination)
-        );
-    }, [specimen, data.specimen_type, data.specimen_type_examination]);
-
-    React.useEffect(() => {
-        if (setIsDirty) {
-            setIsDirty(
-                isDirty || isSpecimenTypeChanged || hasTypeOrExamsChanged,
-            );
-        }
-    }, [isDirty, isSpecimenTypeChanged, hasTypeOrExamsChanged, setIsDirty]);
-
-    const isGroupSpecimen = React.useMemo(() => {
-        if (!specimen) {
-            return false;
-        }
-
-        return Boolean(
-            specimen.is_group || specimen.group_id || specimen.group,
-        );
-    }, [specimen]);
-
-    React.useEffect(() => {
-        if (specimen && specimen.report_id && isSpecimenTypeChanged) {
-            const typeId = data.specimen_type;
-            const examId = data.specimen_type_examination;
-
-            if (typeId && examId) {
-                setIsLoadingTemplates(true);
-                fetch(
-                    `/specimens/templates/available?specimen_type_id=${typeId}&specimen_type_examination_id=${examId}`,
-                )
-                    .then((res) => res.json())
-                    .then((templatesList) => {
-                        setAvailableTemplates(templatesList);
-
-                        if (templatesList.length === 1) {
-                            setData('template_id', String(templatesList[0].id));
-                        } else {
-                            setData('template_id', '');
-                        }
-                    })
-                    .catch((err) => {
-                        console.error('Error fetching templates:', err);
-                    })
-                    .finally(() => {
-                        setIsLoadingTemplates(false);
-                    });
-            } else {
-                setAvailableTemplates([]);
-                setData('template_id', '');
-            }
-        } else {
-            setAvailableTemplates([]);
-            setData('template_id', '');
-        }
-    }, [
-        specimen,
-        data.specimen_type,
-        data.specimen_type_examination,
-        isSpecimenTypeChanged,
-    ]);
-
-    const validateStep1 = () => {
-        clearErrors();
-        const localErrors: Record<string, string> = {};
-
-        // Validar campos de la muestra
-        if (!data.customer) {
-            localErrors.customer = 'El paciente es requerido.';
-        }
-
-        if (!data.referrer) {
-            localErrors.referrer = 'El médico remitente es requerido.';
-        }
-
-        if (!data.specimen_type) {
-            localErrors.specimen_type = 'El tipo de muestra es requerido.';
-        } else if (!specimen && !matchingSequence) {
-            localErrors.specimen_type =
-                'No existe una secuencia de numeración activa configurada para este tipo de muestra.';
-        }
-
-        if (!data.specimen_type_examination) {
-            localErrors.specimen_type_examination =
-                'El examen a realizar es requerido.';
-        }
-
-        if (!data.specimen_category) {
-            localErrors.specimen_category =
-                'La categoría de tiempo es requerida.';
-        }
-
-        if (!data.priority_id) {
-            localErrors.priority_id = 'La prioridad es requerida.';
-        }
-
-        if (!data.status) {
-            localErrors.status = 'El estado es requerido.';
-        }
-
-        if (Object.keys(localErrors).length > 0) {
-            Object.entries(localErrors).forEach(([key, val]) => {
-                setError(key as any, val);
-            });
-
-            toast.error(
-                <div className="flex flex-col gap-1">
-                    <span className="flex items-center gap-1.5 text-sm font-bold text-destructive">
-                        <AlertCircle className="h-4 w-4" /> Error de Validación
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                        Por favor, complete todos los campos obligatorios del
-                        Paso 1 antes de continuar.
-                    </span>
-                </div>,
-            );
-
-            return false;
-        }
-
-        return true;
-    };
-
-    const handleNextStep = async () => {
-        if (currentStep === 1 && validateStep1()) {
-            if (data.reserved_code) {
-                setCurrentStep(2);
-
-                return;
-            }
-
-            setIsReservingCode(true);
-
-            try {
-                const response = await axios.post('/specimens/reserve-code', {
-                    specimen_type_id: parseInt(data.specimen_type),
-                    location_id: activeLocationId
-                        ? parseInt(activeLocationId.toString())
-                        : null,
-                });
-                setData((d) => ({
-                    ...d,
-                    reserved_code: response.data.code,
-                }));
-                setCurrentStep(2);
-            } catch (error: any) {
-                console.error('Error reserving code:', error);
-                const errMsg =
-                    error.response?.data?.message ||
-                    'Error al reservar el código de secuencia.';
-                toast.error(errMsg);
-            } finally {
-                setIsReservingCode(false);
-            }
-        }
-    };
-
-    const validateStep3 = () => {
-        clearErrors();
-        const localErrors: Record<string, string> = {};
-
-        // Validar campos de facturación (creación)
-        if (!data.payment_type) {
-            localErrors.payment_type = 'El método de pago es requerido.';
-        }
-
-        if (!data.amount) {
-            localErrors.amount = 'El importe es requerido.';
-        } else if (parseFloat(data.amount) < 0) {
-            localErrors.amount = 'El importe debe ser mayor o igual a 0.';
-        }
-
-        if (data.custom_amount_enabled) {
-            if (!data.custom_amount) {
-                localErrors.custom_amount =
-                    'El importe personalizado es requerido.';
-            } else if (parseFloat(data.custom_amount) < 0) {
-                localErrors.custom_amount =
-                    'El importe personalizado debe ser mayor o igual a 0.';
-            }
-
-            if (
-                !data.custom_amount_reason ||
-                !data.custom_amount_reason.trim()
-            ) {
-                localErrors.custom_amount_reason =
-                    'El concepto/razón del importe adicional es requerido.';
-            }
-        }
-
-        if (data.additional_discount_enabled) {
-            if (!data.additional_discount) {
-                localErrors.additional_discount =
-                    'El descuento adicional es requerido.';
-            } else {
-                const addDiscount = parseFloat(data.additional_discount);
-
-                if (isNaN(addDiscount) || addDiscount < 0) {
-                    localErrors.additional_discount =
-                        'El descuento adicional debe ser mayor o igual a 0.';
-                } else if (addDiscount > subtotalVal) {
-                    localErrors.additional_discount = `El descuento adicional no puede superar el subtotal (L. ${subtotalVal.toFixed(2)}).`;
-                }
-            }
-        }
-
-        if (data.discount && parseFloat(data.discount) < 0) {
-            localErrors.discount = 'El descuento debe ser mayor o igual a 0.';
-        }
-
-        if (data.payment_type === 'credit' && data.has_initial_payment) {
-            if (!data.initial_payment_amount) {
-                localErrors.initial_payment_amount =
-                    'El monto de pago inicial es requerido.';
-            } else {
-                const amt = parseFloat(data.initial_payment_amount);
-                const minAllowed = totalVal === 0 ? 0 : 0.01;
-
-                if (isNaN(amt) || amt < minAllowed) {
-                    localErrors.initial_payment_amount =
-                        totalVal === 0
-                            ? 'El monto de pago inicial debe ser mayor o igual a cero.'
-                            : 'El monto de pago inicial debe ser mayor a cero.';
-                } else if (amt > totalVal) {
-                    localErrors.initial_payment_amount = `El monto de pago inicial no puede superar el total de la factura (L. ${totalVal.toFixed(2)}).`;
-                }
-            }
-
-            if (!data.initial_payment_type) {
-                localErrors.initial_payment_type =
-                    'El tipo de pago inicial es requerido.';
-            }
-        }
-
-        const needsProof =
-            (data.payment_type !== 'credit' && data.payment_type !== 'cash') ||
-            (data.payment_type === 'credit' &&
-                data.has_initial_payment &&
-                data.initial_payment_type !== 'cash');
-
-        if (needsProof && !data.proof_of_payment) {
-            localErrors.proof_of_payment =
-                'El comprobante de pago es requerido.';
-        }
-
-        if (Object.keys(localErrors).length > 0) {
-            Object.entries(localErrors).forEach(([key, val]) => {
-                setError(key as any, val);
-            });
-
-            const firstErrKey = Object.keys(localErrors)[0];
-            const firstErrMsg = localErrors[firstErrKey];
-
-            toast.error(
-                <div className="flex flex-col gap-1">
-                    <span className="flex items-center gap-1.5 text-sm font-bold text-destructive">
-                        <AlertCircle className="h-4 w-4" /> Error de Validación
-                    </span>
-                    <span className="text-xs font-medium text-foreground">
-                        {firstErrMsg}
-                    </span>
-                </div>,
-            );
-
-            return false;
-        }
-
-        return true;
-    };
-
-    const handlePreSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        // Validate step 1 fields before showing confirm/editing
-        if (!validateStep1()) {
-            return;
-        }
-
-        // Si es edición:
-        if (specimen) {
-            if (hasTypeOrExamsChanged && !unlockedFullSteps) {
-                setShowExamChangePricePrompt(true);
-
-                return;
-            }
-
-            if (unlockedFullSteps && currentStep === 1) {
-                setCurrentStep(2);
-
-                return;
-            }
-
-            if (unlockedFullSteps && currentStep === 2) {
-                if (!validateStep3()) {
-                    return;
-                }
-            }
-
-            const originalPaymentType = specimenInvoice?.payment_type;
-            const newVal = data.payment_type;
-
-            if (
-                originalPaymentType === 'credit' &&
-                ['credit card', 'bank transfer', 'check'].includes(newVal)
-            ) {
-                if (!data.proof_of_payment) {
-                    setError(
-                        'proof_of_payment',
-                        'El archivo de comprobante de pago es requerido al cambiar de crédito.',
-                    );
-                    toast.error(
-                        'El archivo de comprobante de pago es requerido al cambiar de crédito.',
-                    );
-
-                    return;
-                }
-            }
-
-            setShowRegenerateConfirm(true);
-
-            return;
-        }
-
-        // Si es creación y estamos en el paso 1, avanzar al paso 2
-        if (currentStep === 1) {
-            handleNextStep();
-
-            return;
-        }
-
-        // Validar campos requeridos nativos en el navegador primero
-        if (formRef.current && !formRef.current.reportValidity()) {
-            return;
-        }
-
-        // Si estamos en el paso 2, validar el paso 2 y mostrar diálogo de confirmación
-        if (validateStep3()) {
-            setShowConfirm(true);
-        }
-    };
-
-    const submitForm = async () => {
-        const inaccessibleFileName = await findInaccessibleFile([
-            data.medical_order_file,
-            data.proof_of_payment,
-        ]);
-
-        if (inaccessibleFileName) {
-            toast.error(
-                `El archivo "${inaccessibleFileName}" ya no se encuentra accesible en su equipo (pudo haber sido movido o eliminado). Por favor selecciónelo nuevamente.`,
-            );
-
-            return;
-        }
-
-        const options = {
-            onBefore: () => {
-                if (!specimen) {
-                    setIsFacturating(true);
-                }
-            },
-            onSuccess: () => {
-                toast.success(
-                    specimen
-                        ? isGroupSpecimen
-                            ? 'Muestra actualizada y factura de grupo regenerada'
-                            : 'Muestra actualizada'
-                        : 'Muestra creada y facturada',
-                );
-                setIsFacturating(false);
-                onSuccess();
-            },
-            onError: (err: any) => {
-                setIsFacturating(false);
-                console.error('Error al guardar la muestra:', err);
-
-                if (err && Object.keys(err).length > 0) {
-                    const firstError = Object.values(err)[0] as string;
-                    toast.error(`Error de validación: ${firstError}`);
-                } else {
-                    toast.error(
-                        'Hubo un error al procesar la solicitud. Por favor verifique los campos.',
-                    );
-                }
-            },
-            onNetworkError: (error: any) => {
-                setIsFacturating(false);
-                console.error('Error de red al guardar la muestra:', error);
-                toast.error(
-                    'Error de conexión de red o internet. Por favor verifique su conexión e intente de nuevo más tarde.',
-                );
-
-                return false;
-            },
-            onFinish: () => {
-                setIsFacturating(false);
-            },
-        };
-
-        if (specimen) {
-            post(updateSpecimen(specimen.id).url, options);
-        } else {
-            post(storeSpecimen().url, options);
-        }
-    };
-
-    // Maximum prices (regular prices)
-    const maxSpecimenPriceVal = React.useMemo(() => {
-        if (availablePrices.length === 0) {
-            return 0;
-        }
-
-        return Math.max(
-            ...availablePrices.map((p: any) => parseFloat(p.amount) || 0),
-        );
-    }, [availablePrices]);
-
-    const maxInsumosTotalVal = React.useMemo(() => {
-        return data.insumos.reduce((sum: number, insumo: any) => {
-            const maxPrice =
-                insumo.prices && insumo.prices.length > 0
-                    ? parseFloat(insumo.prices[0].amount)
-                    : parseFloat(insumo.sale_price) || insumo.price || 0;
-
-            return sum + maxPrice * insumo.quantity;
-        }, 0);
-    }, [data.insumos]);
-
-    // retrieve settings (reuse pageProps from above)
-    const { settings } = pageProps;
-    const thirdAgePercent = parseFloat(settings?.third_age_discount || '30');
-    const fourthAgePercent = parseFloat(settings?.fourth_age_discount || '40');
-
-    // Helper to update individual examination billing settings
-    const updateExamConfig = (examId: number, field: string, value: any) => {
-        setData((prev) => {
-            const currentExams = [...(prev.examinations || [])];
-            const idx = currentExams.findIndex(
-                (x) => x.examination_id === examId,
-            );
-            const updatedItem =
-                idx >= 0
-                    ? { ...currentExams[idx] }
-                    : { examination_id: examId };
-
-            updatedItem[field] = value;
-
-            if (field === 'selected_price' && value !== 'custom') {
-                updatedItem.custom_specimen_price = '0';
-            }
-
-            if (idx >= 0) {
-                currentExams[idx] = updatedItem;
-            } else {
-                currentExams.push(updatedItem);
-            }
-
-            return {
-                ...prev,
-                examinations: currentExams,
-            };
-        });
-    };
-
-    const calculatedExaminations = React.useMemo(() => {
-        const ids = data.selected_examination_ids || [];
-
-        return ids.map((idStr: string) => {
-            const examId = parseInt(idStr, 10);
-            const examObj = examinations.find((e) => e.id === examId);
-            const config =
-                (data.examinations || []).find(
-                    (x: any) => x.examination_id === examId,
-                ) || {};
-            const prices = examObj?.prices || [];
-
-            const itemCalc = calculateInvoiceItem(
-                {
-                    examination_id: examId,
-                    selected_price: config.selected_price,
-                    custom_specimen_price: config.custom_specimen_price,
-                    quantity: config.quantity,
-                    age_discount_type: config.age_discount_type,
-                    additional_discount_enabled:
-                        config.additional_discount_enabled,
-                    additional_discount: config.additional_discount,
-                    available_prices: prices,
-                },
-                examObj,
-                {
-                    third_age_discount: thirdAgePercent,
-                    fourth_age_discount: fourthAgePercent,
-                },
-            );
-
-            return {
-                ...itemCalc,
-                examObj,
-                prices,
-                totalDiscount: itemCalc.totalLineDiscount,
-                subtotal: itemCalc.lineSubtotal,
-                priceDiscount: itemCalc.priceDiscount,
-                ageDiscount: itemCalc.ageDiscountAmount,
-                additionalDiscount: itemCalc.addDiscountAmount,
-            };
-        });
-    }, [
-        data.selected_examination_ids,
-        data.examinations,
-        examinations,
-        thirdAgePercent,
-        fourthAgePercent,
-    ]);
-
-    // Sync data.examinations whenever selected_examination_ids changes to ensure defaults
-    React.useEffect(() => {
-        const ids = data.selected_examination_ids || [];
-
-        if (ids.length === 0) {
-            return;
-        }
-
-        const currentExamConfigs = [...(data.examinations || [])];
-        let updated = false;
-
-        ids.forEach((idStr: string) => {
-            const examId = parseInt(idStr, 10);
-            const exists = currentExamConfigs.some(
-                (x: any) => x.examination_id === examId,
-            );
-
-            if (!exists) {
-                const examObj = examinations.find((e) => e.id === examId);
-                const prices = examObj?.prices || [];
-                const defaultPrice =
-                    prices.length > 0 ? prices[0].amount.toString() : '';
-                currentExamConfigs.push({
-                    examination_id: examId,
-                    quantity: 1,
-                    selected_price: defaultPrice,
-                    custom_specimen_price: '0',
-                    additional_discount_enabled: false,
-                    additional_discount: '0',
-                    age_discount_type: null,
-                    age_discount_amount: '0',
-                });
-                updated = true;
-            }
-        });
-
-        if (updated) {
-            setData('examinations', currentExamConfigs);
-        }
-    }, [data.selected_examination_ids]);
-
-    // Real-time invoice billing totals calculation
-    const insumosTotalVal = data.insumos.reduce(
-        (sum: number, insumo: any) =>
-            sum + parseFloat(insumo.price || 0) * (insumo.quantity || 0),
-        0,
-    );
-
-    const consolidatedTotals = React.useMemo(() => {
-        const extra = data.custom_amount_enabled
-            ? parseFloat(data.custom_amount) || 0
-            : 0;
-
-        return calculateConsolidatedTotals(
-            calculatedExaminations,
-            insumosTotalVal,
-            extra,
-        );
-    }, [
-        calculatedExaminations,
-        insumosTotalVal,
-        data.custom_amount_enabled,
-        data.custom_amount,
-    ]);
-
-    const amountVal = consolidatedTotals.amount;
-    const discountVal = consolidatedTotals.discount;
-    const subtotalVal = consolidatedTotals.subtotal;
-    const totalVal = consolidatedTotals.total;
-
-    React.useEffect(() => {
-        if (
-            data.amount !== amountVal.toString() ||
-            data.discount !== discountVal.toString() ||
-            data.quantity !== (consolidatedTotals.quantity || 1)
-        ) {
-            setData((d) => ({
-                ...d,
-                amount: amountVal.toString(),
-                discount: discountVal.toString(),
-                quantity: consolidatedTotals.quantity || 1,
-            }));
-        }
-    }, [amountVal, discountVal, consolidatedTotals.quantity]);
-    const selectedPriceVal = parseFloat(data.selected_price) || 0;
-    const customAmountVal = data.custom_amount_enabled
-        ? parseFloat(data.custom_amount) || 0
-        : 0;
-    const additionalDiscountVal = data.additional_discount_enabled
-        ? parseFloat(data.additional_discount) || 0
-        : 0;
-
-    const selectedCustomer = selectedCustomerData;
-    const selectedCustomerLabel = selectedCustomer?.name || 'Sin seleccionar';
-    const selectedExaminationLabel =
-        examinations.find(
-            (e) => e.id.toString() === data.specimen_type_examination,
-        )?.name || 'Sin seleccionar';
-
-    const isProofRequired =
-        (data.payment_type !== 'credit' && data.payment_type !== 'cash') ||
-        (data.payment_type === 'credit' &&
-            data.has_initial_payment &&
-            data.initial_payment_type !== 'cash');
-
-    const isSubmitDisabled = !!(
-        specimen?.report_id &&
-        isSpecimenTypeChanged &&
-        availableTemplates.length > 0 &&
-        !data.template_id
-    );
-
-    return (
-        <>
-            {isFacturating &&
-                typeof window !== 'undefined' &&
-                createPortal(
-                    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm">
-                        <Spinner className="h-12 w-12 text-primary" />
-                        <div className="flex flex-col items-center text-center">
-                            <h3 className="text-lg font-bold text-foreground">
-                                Procesando Factura
-                            </h3>
-                            <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-                                Estamos registrando la muestra, aplicando el
-                                rango CAI y generando el PDF de la factura. Por
-                                favor, espere.
-                            </p>
-                        </div>
-                    </div>,
-                    document.body,
-                )}
-
-            <form
-                ref={formRef}
-                onSubmit={handlePreSubmit}
-                className="flex flex-col gap-6 px-5 py-4 pt-0"
-            >
-                <div className="mb-2 flex flex-col gap-4 rounded-lg border border-border/60 bg-muted/40 p-4">
-                    {(!specimen || unlockedFullSteps) && (
-                        <div className="mx-auto flex w-full max-w-lg flex-nowrap items-center justify-center gap-2 border-b border-border/40 pb-4 sm:gap-4">
-                            {/* Paso 1 */}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (currentStep > 1) {
-                                        setCurrentStep(1);
-                                    }
-                                }}
-                                className={cn(
-                                    'group flex cursor-pointer items-center gap-2 text-left focus:outline-none sm:gap-3',
-                                    currentStep > 1 && 'hover:opacity-80',
-                                )}
-                            >
-                                <div
-                                    className={cn(
-                                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all duration-200',
-                                        currentStep === 1
-                                            ? 'bg-primary text-primary-foreground ring-4 ring-primary/10'
-                                            : 'bg-emerald-500 text-white',
-                                    )}
-                                >
-                                    {currentStep > 1 ? (
-                                        <Check className="h-4.5 w-4.5 stroke-[3]" />
-                                    ) : (
-                                        '1'
-                                    )}
-                                </div>
-                                <div className="flex flex-col">
-                                    <span
-                                        className={cn(
-                                            'text-xs leading-none font-bold transition-colors',
-                                            currentStep === 1
-                                                ? 'text-foreground'
-                                                : 'text-muted-foreground group-hover:text-foreground',
-                                        )}
-                                    >
-                                        Paso 1
-                                    </span>
-                                    <span
-                                        className={cn(
-                                            'mt-1 hidden text-[11px] leading-none font-medium transition-colors sm:block',
-                                            currentStep === 1
-                                                ? 'font-semibold text-primary'
-                                                : 'text-muted-foreground group-hover:text-foreground',
-                                        )}
-                                    >
-                                        Datos de la Muestra
-                                    </span>
-                                </div>
-                            </button>
-
-                            <div className="h-[2px] w-8 shrink-0 overflow-hidden rounded-full bg-muted-foreground/20 sm:w-12">
-                                <div
-                                    className={cn(
-                                        'h-full bg-primary transition-all duration-300 ease-out',
-                                        currentStep > 1 ? 'w-full' : 'w-0',
-                                    )}
-                                />
-                            </div>
-
-                            {/* Paso 2 */}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (currentStep === 1 && validateStep1()) {
-                                        setCurrentStep(2);
-                                    }
-                                }}
-                                className={cn(
-                                    'group flex cursor-pointer items-center gap-2 text-left focus:outline-none sm:gap-3',
-                                    currentStep !== 2 && 'hover:opacity-80',
-                                )}
-                            >
-                                <div
-                                    className={cn(
-                                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all duration-200',
-                                        currentStep === 2
-                                            ? 'bg-primary text-primary-foreground ring-4 ring-primary/10'
-                                            : 'border border-border bg-muted text-muted-foreground',
-                                    )}
-                                >
-                                    2
-                                </div>
-                                <div className="flex flex-col">
-                                    <span
-                                        className={cn(
-                                            'text-xs leading-none font-bold transition-colors',
-                                            currentStep === 2
-                                                ? 'text-foreground'
-                                                : 'text-muted-foreground group-hover:text-foreground',
-                                        )}
-                                    >
-                                        Paso 2
-                                    </span>
-                                    <span
-                                        className={cn(
-                                            'mt-1 hidden text-[11px] leading-none font-medium transition-colors sm:block',
-                                            currentStep === 2
-                                                ? 'font-semibold text-primary'
-                                                : 'text-muted-foreground group-hover:text-foreground',
-                                        )}
-                                    >
-                                        Facturación
-                                    </span>
-                                </div>
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Customer Selection Row inside the gray steps container */}
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <span className="shrink-0 text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                Cliente
-                            </span>
-                            {selectedCustomer && (
-                                <span
-                                    className={cn(
-                                        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase',
-                                        selectedCustomer.type === 'empresa'
-                                            ? 'border border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                                            : 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-                                    )}
-                                >
-                                    {selectedCustomer.type === 'empresa'
-                                        ? 'Empresa'
-                                        : 'Individual'}
-                                </span>
-                            )}
-                            <div className="min-w-0 flex-1">
-                                <AsyncCustomerCombobox
-                                    placeholder="Seleccionar cliente"
-                                    value={data.customer}
-                                    initialCustomer={selectedCustomerData}
-                                    onChange={(v, customer) => {
-                                        setData('customer', v);
-                                        setSelectedCustomerData(
-                                            customer ?? null,
-                                        );
-                                    }}
-                                />
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setCustomerToEdit(null);
-                                    setIsCustomerSheetOpen(true);
-                                }}
-                                className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
-                            >
-                                <Plus className="h-3 w-3" /> Nuevo
-                            </button>
-                        </div>
-                        {errors.customer && (
-                            <p className="text-xs text-destructive">
-                                {errors.customer}
-                            </p>
-                        )}
-
-                        {selectedCustomer && (
-                            <div className="relative border-t border-border/50 pt-3 text-xs">
-                                {pageProps.auth?.permissions?.includes(
-                                    'patients.edit',
-                                ) && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setCustomerToEdit(
-                                                selectedCustomerData,
-                                            );
-                                            setIsCustomerSheetOpen(true);
-                                        }}
-                                        className="absolute top-3 right-0 flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-                                    >
-                                        <Edit2 className="h-3 w-3" /> Editar
-                                        cliente
-                                    </button>
-                                )}
-                                <div className="grid grid-cols-1 gap-4 pr-28 sm:grid-cols-3">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                            RTN / Identidad
-                                        </span>
-                                        <span className="font-mono font-medium text-foreground">
-                                            {selectedCustomer.id_number ||
-                                                'N/A'}
-                                        </span>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                            Correo Electrónico
-                                        </span>
-                                        <span className="font-medium break-all text-foreground">
-                                            {selectedCustomer.email ||
-                                                'Sin correo'}
-                                        </span>
-                                    </div>
-                                    {selectedCustomer.type !== 'empresa' && (
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                                Edad
-                                            </span>
-                                            <span className="font-medium text-foreground">
-                                                {selectedCustomer.age
-                                                    ? `${selectedCustomer.age} años`
-                                                    : 'N/A'}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* SECCIÓN 1: DATOS DE LA MUESTRA */}
-                {(!specimen || unlockedFullSteps
-                    ? currentStep === 1
-                    : true) && (
-                    <div>
-                        <h3 className="mb-4 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-                            Datos de la Muestra
-                        </h3>
-
-                        {specimen &&
-                            specimen.sequence_code &&
-                            (Number(data.specimen_type) ===
-                            Number(specimen.specimen_type) ? (
-                                <div className="mb-4 flex items-center justify-between rounded-md border border-dashed bg-muted/40 p-3">
-                                    <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                                        <Tag className="h-3.5 w-3.5" /> Código
-                                        de Secuencia (Muestra):
-                                    </span>
-                                    <span className="font-mono text-sm font-bold text-primary">
-                                        {specimen.sequence_code}
-                                    </span>
-                                </div>
-                            ) : (
-                                <div className="mb-4 flex flex-col gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/5 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-                                    <div className="flex items-center justify-between">
-                                        <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
-                                            <AlertCircle className="h-3.5 w-3.5 text-amber-500" />{' '}
-                                            Código de Secuencia original:
-                                        </span>
-                                        <span className="font-mono text-sm font-bold line-through opacity-70">
-                                            {specimen.sequence_code}
-                                        </span>
-                                    </div>
-                                    <div className="mt-1 flex items-center justify-between border-t border-amber-500/10 pt-1.5">
-                                        <span className="text-[10.5px] font-semibold text-amber-600 dark:text-amber-400">
-                                            Nuevo código estimado:
-                                        </span>
-                                        <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
-                                            {nextSequencePreview ||
-                                                'Generando nuevo correlativo...'}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-
-                        <div className="grid grid-cols-1 gap-4">
-                            <div className="grid gap-2">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="referrer">
-                                        Remitente (Médico)
-                                    </Label>
-                                    <div className="flex items-center gap-3">
-                                        {data.referrer && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const selected =
-                                                        referrers.find(
-                                                            (r) =>
-                                                                r.id.toString() ===
-                                                                data.referrer,
-                                                        );
-
-                                                    if (selected) {
-                                                        setEditingReferrer(
-                                                            selected,
-                                                        );
-                                                        setReferrerInitialData(
-                                                            null,
-                                                        );
-                                                        setIsReferrerSheetOpen(
-                                                            true,
-                                                        );
-                                                    }
-                                                }}
-                                                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                            >
-                                                <Edit2 className="h-3 w-3" />{' '}
-                                                Editar
-                                            </button>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setEditingReferrer(null);
-                                                setIsReferrerSheetOpen(true);
-                                            }}
-                                            className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                        >
-                                            <Plus className="h-3 w-3" /> Nuevo
-                                        </button>
-                                    </div>
-                                </div>
-                                <FormCombobox
-                                    placeholder="Seleccionar médico"
-                                    value={data.referrer}
-                                    onChange={(v) => setData('referrer', v)}
-                                    options={referrers.map((r) => ({
-                                        label:
-                                            r.notes && r.notes.trim()
-                                                ? `(ID: ${r.id}) ${r.name} - ${r.notes.trim()}`
-                                                : `(ID: ${r.id}) ${r.name} - (Sin Notas/Hospital/Clinica)`,
-                                        value: r.id.toString(),
-                                    }))}
-                                />
-                                {errors.referrer && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.referrer}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="grid gap-2">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="specimen_type">
-                                        Tipo de Muestra
-                                    </Label>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setIsSpecimenTypeSheetOpen(true)
-                                        }
-                                        className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                    >
-                                        <Plus className="h-3 w-3" /> Nuevo
-                                    </button>
-                                </div>
-                                <Popover modal={true}>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            role="combobox"
-                                            className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
-                                        >
-                                            <div className="flex items-center gap-2 truncate">
-                                                <Microscope className="h-4 w-4 text-muted-foreground" />
-                                                <span className="truncate">
-                                                    {sortedSpecimenTypes.find(
-                                                        (t) =>
-                                                            t.id.toString() ===
-                                                            data.specimen_type,
-                                                    )?.name ||
-                                                        'Seleccionar tipo'}
-                                                </span>
-                                            </div>
-                                            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent
-                                        className="z-[9999] w-[--radix-popover-trigger-width] p-0"
-                                        align="start"
-                                    >
-                                        <Command>
-                                            <CommandInput placeholder="Buscar tipo de muestra..." />
-                                            <CommandList>
-                                                <CommandEmpty>
-                                                    No se encontraron
-                                                    resultados.
-                                                </CommandEmpty>
-                                                <CommandGroup>
-                                                    {sortedSpecimenTypes.map(
-                                                        (t) => (
-                                                            <CommandItem
-                                                                key={t.id}
-                                                                value={t.name}
-                                                                onSelect={() => {
-                                                                    setData(
-                                                                        (
-                                                                            d,
-                                                                        ) => ({
-                                                                            ...d,
-                                                                            specimen_type:
-                                                                                t.id.toString(),
-                                                                            selected_examination_ids:
-                                                                                [],
-                                                                            specimen_type_examination:
-                                                                                '',
-                                                                            examinations:
-                                                                                [],
-                                                                            reserved_code:
-                                                                                '',
-                                                                        }),
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <Check
-                                                                    className={cn(
-                                                                        'mr-2 h-4 w-4',
-                                                                        data.specimen_type ===
-                                                                            t.id.toString()
-                                                                            ? 'opacity-100'
-                                                                            : 'opacity-0',
-                                                                    )}
-                                                                />
-                                                                <span>
-                                                                    {t.name}
-                                                                </span>
-                                                            </CommandItem>
-                                                        ),
-                                                    )}
-                                                </CommandGroup>
-                                            </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-
-                                {errors.specimen_type && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.specimen_type}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="grid gap-2">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="specimen_type_examination">
-                                        Examen(es) a Realizar
-                                    </Label>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setIsExaminationSheetOpen(true)
-                                        }
-                                        disabled={!data.specimen_type}
-                                        className={cn(
-                                            'flex items-center gap-1 text-xs font-medium transition-colors',
-                                            data.specimen_type
-                                                ? 'cursor-pointer text-primary hover:underline'
-                                                : 'cursor-not-allowed text-muted-foreground/50',
-                                        )}
-                                    >
-                                        <Plus className="h-3 w-3" /> Nuevo
-                                    </button>
-                                </div>
-                                <Popover
-                                    modal={true}
-                                    onOpenChange={(open) => {
-                                        if (!open) {
-                                            setExaminationSearchQuery('');
-                                        }
-                                    }}
-                                >
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            disabled={!data.specimen_type}
-                                            className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50 disabled:opacity-50"
-                                        >
-                                            <div className="flex items-center gap-2 truncate">
-                                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                                <span className="truncate">
-                                                    {data.selected_examination_ids &&
-                                                    data
-                                                        .selected_examination_ids
-                                                        .length > 0
-                                                        ? `Análisis (${data.selected_examination_ids.length} seleccionados)`
-                                                        : data.specimen_type
-                                                          ? 'Seleccionar análisis'
-                                                          : 'Seleccione un tipo primero'}
-                                                </span>
-                                            </div>
-                                            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent
-                                        className="z-[9999] w-[--radix-popover-trigger-width] p-2"
-                                        align="start"
-                                    >
-                                        <div className="space-y-1.5">
-                                            <div className="relative px-1 py-1">
-                                                <Search className="absolute top-3 left-3 h-4 w-4 text-muted-foreground/70" />
-                                                <Input
-                                                    placeholder="Buscar análisis..."
-                                                    value={
-                                                        examinationSearchQuery
-                                                    }
-                                                    onChange={(e) => {
-                                                        setExaminationSearchQuery(
-                                                            e.target.value,
-                                                        );
-                                                    }}
-                                                    className="h-9 w-full pr-3 pl-9 text-sm focus-visible:ring-1"
-                                                />
-                                            </div>
-                                            <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
-                                                <span>
-                                                    Filtrar por análisis
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const visibleExamIds =
-                                                            searchedExaminations.map(
-                                                                (e) =>
-                                                                    e.id.toString(),
-                                                            );
-                                                        const areAllSelected =
-                                                            visibleExamIds.length >
-                                                                0 &&
-                                                            visibleExamIds.every(
-                                                                (id) =>
-                                                                    (
-                                                                        data.selected_examination_ids ||
-                                                                        []
-                                                                    ).includes(
-                                                                        id,
-                                                                    ),
-                                                            );
-                                                        const nextExams =
-                                                            areAllSelected
-                                                                ? (
-                                                                      data.selected_examination_ids ||
-                                                                      []
-                                                                  ).filter(
-                                                                      (
-                                                                          id: string,
-                                                                      ) =>
-                                                                          !visibleExamIds.includes(
-                                                                              id,
-                                                                          ),
-                                                                  )
-                                                                : [
-                                                                      ...new Set(
-                                                                          [
-                                                                              ...(data.selected_examination_ids ||
-                                                                                  []),
-                                                                              ...visibleExamIds,
-                                                                          ],
-                                                                      ),
-                                                                  ];
-
-                                                        const examObjs =
-                                                            nextExams.map(
-                                                                (idStr) => {
-                                                                    const examObj =
-                                                                        filteredExaminations.find(
-                                                                            (
-                                                                                e,
-                                                                            ) =>
-                                                                                e.id.toString() ===
-                                                                                idStr,
-                                                                        );
-
-                                                                    return {
-                                                                        examination_id:
-                                                                            parseInt(
-                                                                                idStr,
-                                                                                10,
-                                                                            ),
-                                                                        name: examObj
-                                                                            ? examObj.name
-                                                                            : '',
-                                                                        quantity: 1,
-                                                                        amount: 0,
-                                                                        discount: 0,
-                                                                        subtotal: 0,
-                                                                    };
-                                                                },
-                                                            );
-
-                                                        setData((d) => ({
-                                                            ...d,
-                                                            selected_examination_ids:
-                                                                nextExams,
-                                                            specimen_type_examination:
-                                                                nextExams[0] ||
-                                                                '',
-                                                            examinations:
-                                                                examObjs,
-                                                        }));
-                                                    }}
-                                                    className="cursor-pointer font-medium transition-colors hover:text-primary"
-                                                >
-                                                    {searchedExaminations.length >
-                                                        0 &&
-                                                    searchedExaminations.every(
-                                                        (e) =>
-                                                            (
-                                                                data.selected_examination_ids ||
-                                                                []
-                                                            ).includes(
-                                                                e.id.toString(),
-                                                            ),
-                                                    )
-                                                        ? 'Ninguno'
-                                                        : 'Todos'}
-                                                </button>
-                                            </div>
-                                            <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
-                                                {searchedExaminations.length ===
-                                                0 ? (
-                                                    <div className="py-6 text-center text-xs text-muted-foreground select-none">
-                                                        No se encontraron
-                                                        resultados.
-                                                    </div>
-                                                ) : (
-                                                    searchedExaminations.map(
-                                                        (exam) => {
-                                                            const examIdStr =
-                                                                exam.id.toString();
-                                                            const isChecked = (
-                                                                data.selected_examination_ids ||
-                                                                []
-                                                            ).includes(
-                                                                examIdStr,
-                                                            );
-
-                                                            return (
-                                                                <div
-                                                                    key={
-                                                                        exam.id
-                                                                    }
-                                                                    className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
-                                                                    onClick={() => {
-                                                                        const currentSelected =
-                                                                            data.selected_examination_ids ||
-                                                                            [];
-                                                                        const nextExams =
-                                                                            isChecked
-                                                                                ? currentSelected.filter(
-                                                                                      (
-                                                                                          id: string,
-                                                                                      ) =>
-                                                                                          id !==
-                                                                                          examIdStr,
-                                                                                  )
-                                                                                : [
-                                                                                      ...currentSelected,
-                                                                                      examIdStr,
-                                                                                  ];
-
-                                                                        const examObjs =
-                                                                            nextExams.map(
-                                                                                (
-                                                                                    idStr: string,
-                                                                                ) => {
-                                                                                    const examObj =
-                                                                                        filteredExaminations.find(
-                                                                                            (
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                e.id.toString() ===
-                                                                                                idStr,
-                                                                                        );
-
-                                                                                    return {
-                                                                                        examination_id:
-                                                                                            parseInt(
-                                                                                                idStr,
-                                                                                                10,
-                                                                                            ),
-                                                                                        name: examObj
-                                                                                            ? examObj.name
-                                                                                            : '',
-                                                                                        quantity: 1,
-                                                                                        amount: 0,
-                                                                                        discount: 0,
-                                                                                        subtotal: 0,
-                                                                                    };
-                                                                                },
-                                                                            );
-
-                                                                        setData(
-                                                                            (
-                                                                                d,
-                                                                            ) => ({
-                                                                                ...d,
-                                                                                selected_examination_ids:
-                                                                                    nextExams,
-                                                                                specimen_type_examination:
-                                                                                    nextExams[0] ||
-                                                                                    '',
-                                                                                examinations:
-                                                                                    examObjs,
-                                                                            }),
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    <Checkbox
-                                                                        checked={
-                                                                            isChecked
-                                                                        }
-                                                                        className="pointer-events-none"
-                                                                        onCheckedChange={() => {}}
-                                                                    />
-                                                                    <span className="truncate">
-                                                                        {
-                                                                            exam.name
-                                                                        }
-                                                                    </span>
-                                                                </div>
-                                                            );
-                                                        },
-                                                    )
-                                                )}
-                                            </div>
-                                        </div>
-                                    </PopoverContent>
-                                </Popover>
-                                {errors.specimen_type_examination && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.specimen_type_examination}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="mt-4">
-                            {!specimen && data.specimen_type && (
-                                <div className="mt-1 transition-all duration-300">
-                                    {matchingSequence ? (
-                                        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                            <Tag className="h-4 w-4 shrink-0 text-emerald-500" />
-                                            <span className="text-xs font-semibold">
-                                                Secuencia de numeración activa
-                                                configurada para el tipo de
-                                                muestra
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-                                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
-                                                    ¡Falta secuencia de
-                                                    numeración!
-                                                </span>
-                                                <span className="text-[10.5px] leading-normal text-amber-600 dark:text-amber-400">
-                                                    No existe una secuencia
-                                                    activa para este tipo de
-                                                    muestra en la sucursal
-                                                    activa. Debe crear una antes
-                                                    de poder facturar.
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setIsSequenceSheetOpen(
-                                                            true,
-                                                        )
-                                                    }
-                                                    className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 self-start rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-500/20 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30"
-                                                >
-                                                    <Plus className="h-3.5 w-3.5" />
-                                                    Crear Secuencia Ahora
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="grid gap-2">
-                                <div className="flex items-center justify-between">
-                                    <Label htmlFor="specimen_category">
-                                        Categoría (Tiempo)
-                                    </Label>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setIsCategorySheetOpen(true)
-                                        }
-                                        className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                                    >
-                                        <Plus className="h-3 w-3" /> Nuevo
-                                    </button>
-                                </div>
-                                <FormCombobox
-                                    placeholder="Seleccionar categoría"
-                                    value={data.specimen_category}
-                                    onChange={(v) =>
-                                        setData('specimen_category', v)
-                                    }
-                                    options={categories.map((c) => ({
-                                        label: c.name,
-                                        value: c.id.toString(),
-                                    }))}
-                                />
-                                {errors.specimen_category && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.specimen_category}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="priority_id">Prioridad</Label>
-                                <FormCombobox
-                                    placeholder="Seleccionar prioridad"
-                                    value={data.priority_id}
-                                    onChange={(v) => setData('priority_id', v)}
-                                    options={priorities.map((p) => ({
-                                        label: p.name,
-                                        value: p.id.toString(),
-                                        color: p.color,
-                                    }))}
-                                />
-                                {errors.priority_id && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.priority_id}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="grid gap-2">
-                                <Label htmlFor="sample_collection_date">
-                                    Fecha de la toma
-                                </Label>
-                                <DatePicker
-                                    value={data.sample_collection_date}
-                                    onChange={(v) =>
-                                        setData('sample_collection_date', v)
-                                    }
-                                    disabled={
-                                        readOnlySampleCollectionDate &&
-                                        !!specimen
-                                    }
-                                />
-                                {readOnlySampleCollectionDate && !!specimen && (
-                                    <p className="text-xs text-muted-foreground">
-                                        Para modificar esta fecha, edítela desde
-                                        el editor de reporte.
-                                    </p>
-                                )}
-                                {errors.sample_collection_date && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.sample_collection_date}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="status">
-                                    Estado Inicial / Actual
-                                </Label>
-                                <FormCombobox
-                                    placeholder="Seleccionar estado"
-                                    value={data.status}
-                                    onChange={(v) => setData('status', v)}
-                                    options={[
-                                        {
-                                            label: 'Recibida',
-                                            value: 'received',
-                                            color: '#3b82f6',
-                                        },
-                                        {
-                                            label: 'Revisión Macroscópica',
-                                            value: 'macroscopic_review',
-                                            color: '#8b5cf6',
-                                            disabled:
-                                                data.status !==
-                                                'macroscopic_review',
-                                        },
-                                        {
-                                            label: 'En Proceso',
-                                            value: 'processing',
-                                            color: '#f59e0b',
-                                            disabled:
-                                                data.status !== 'processing',
-                                        },
-                                        {
-                                            label: 'Revisión Microscópica',
-                                            value: 'microscopic_review',
-                                            color: '#d946ef',
-                                            disabled:
-                                                data.status !==
-                                                'microscopic_review',
-                                        },
-                                        {
-                                            label: 'Finalizada',
-                                            value: 'finalized',
-                                            color: '#10b981',
-                                            disabled:
-                                                data.status !== 'finalized',
-                                        },
-                                        {
-                                            label: 'Entregada',
-                                            value: 'delivered',
-                                            color: '#64748b',
-                                            disabled:
-                                                data.status !== 'delivered',
-                                        },
-                                        {
-                                            label: 'Cancelada',
-                                            value: 'cancelled',
-                                            color: '#ef4444',
-                                            disabled:
-                                                data.status !== 'cancelled',
-                                        },
-                                    ]}
-                                />
-                                {errors.status && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.status}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="mt-4 grid gap-2">
-                            <Label htmlFor="medical_order_file">
-                                Orden Médica (Archivo PDF o Imagen)
-                            </Label>
-
-                            {specimen?.medical_order_file &&
-                                !data.medical_order_file && (
-                                    <div className="flex items-center justify-between rounded-lg border border-muted bg-muted/40 p-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="rounded-md bg-primary/10 p-2 text-primary">
-                                                <FileText className="h-5 w-5" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-semibold text-foreground">
-                                                    Archivo de Orden Médica
-                                                    existente
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    Ya hay un archivo subido
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <a
-                                                href={`/storage/${specimen.medical_order_file}`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
-                                            >
-                                                <ExternalLink className="h-3.5 w-3.5" />{' '}
-                                                Ver / Descargar
-                                            </a>
-                                        </div>
-                                    </div>
-                                )}
-
-                            {data.medical_order_file && (
-                                <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
-                                    <div className="flex items-center gap-3">
-                                        <div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
-                                            <FileText className="h-5 w-5" />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="max-w-[200px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
-                                                {data.medical_order_file.name}
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground">
-                                                {(
-                                                    data.medical_order_file
-                                                        .size /
-                                                    1024 /
-                                                    1024
-                                                ).toFixed(2)}{' '}
-                                                MB
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() =>
-                                            setData('medical_order_file', null)
-                                        }
-                                        className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            )}
-
-                            {!data.medical_order_file && (
-                                <div className="group relative">
-                                    <input
-                                        type="file"
-                                        id="medical_order_file"
-                                        className="hidden"
-                                        accept=".pdf,image/*"
-                                        onChange={(e) => {
-                                            const file =
-                                                e.target.files?.[0] || null;
-
-                                            if (
-                                                file &&
-                                                file.size > 50 * 1024 * 1024
-                                            ) {
-                                                toast.error(
-                                                    'El archivo de Orden Médica no debe exceder los 50MB.',
-                                                );
-                                                e.target.value = '';
-
-                                                return;
-                                            }
-
-                                            setData('medical_order_file', file);
-                                        }}
-                                    />
-                                    <label
-                                        htmlFor="medical_order_file"
-                                        className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-5 transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
-                                    >
-                                        <div className="mb-2 rounded-full bg-secondary p-2.5 text-secondary-foreground transition-transform duration-200 group-hover:scale-110">
-                                            <Upload className="h-4 w-4" />
-                                        </div>
-                                        <span className="text-xs font-semibold text-foreground">
-                                            {specimen?.medical_order_file
-                                                ? 'Reemplazar archivo de Orden Médica'
-                                                : 'Subir Orden Médica'}
-                                        </span>
-                                        <span className="mt-1 text-[10px] text-muted-foreground">
-                                            PDF o imágenes hasta 50MB
-                                        </span>
-                                    </label>
-                                </div>
-                            )}
-
-                            {errors.medical_order_file && (
-                                <p className="text-sm text-destructive">
-                                    {errors.medical_order_file}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="mt-4 grid gap-2">
-                            <Label htmlFor="diagnosis">
-                                Diagnóstico Clínico / Sospecha
-                            </Label>
-                            <Textarea
-                                id="diagnosis"
-                                value={data.diagnosis}
-                                onChange={(e) =>
-                                    setData('diagnosis', e.target.value)
-                                }
-                                placeholder="Escriba el diagnóstico aquí..."
-                                className="resize-none"
-                                rows={3}
-                            />
-                            {errors.diagnosis && (
-                                <p className="text-sm text-destructive">
-                                    {errors.diagnosis}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="mt-4 grid gap-2">
-                            <Label htmlFor="anatomic_site">
-                                Sitio Anatómico
-                            </Label>
-                            <Textarea
-                                id="anatomic_site"
-                                value={data.anatomic_site}
-                                onChange={(e) =>
-                                    setData('anatomic_site', e.target.value)
-                                }
-                                placeholder="Ej. Brazo izquierdo..."
-                                className="resize-none"
-                                rows={3}
-                            />
-                            {errors.anatomic_site && (
-                                <p className="text-sm text-destructive">
-                                    {errors.anatomic_site}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="mt-4 grid gap-2">
-                            <Label htmlFor="clinical_notes">
-                                Notas Clínicas
-                            </Label>
-                            <Textarea
-                                id="clinical_notes"
-                                value={data.clinical_notes}
-                                onChange={(e) =>
-                                    setData('clinical_notes', e.target.value)
-                                }
-                                placeholder="Información adicional relevante..."
-                                className="resize-none"
-                                rows={3}
-                            />
-                            {errors.clinical_notes && (
-                                <p className="text-sm text-destructive">
-                                    {errors.clinical_notes}
-                                </p>
-                            )}
-                        </div>
-
-                        {specimen && specimenInvoice && (
-                            <div className="mt-6 flex flex-col gap-5 border-t pt-4">
-                                <h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-                                    Información de Facturación
-                                </h3>
-
-                                <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <span className="text-xs font-semibold">
-                                                    Método de pago:
-                                                </span>
-                                                <span className="ml-2 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary capitalize">
-                                                    {getPaymentTypeLabel(
-                                                        data.payment_type,
-                                                    )}
-                                                </span>
-                                            </div>
-                                            {showPaymentMethodEdition && (
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        setIsPaymentSheetOpen(
-                                                            true,
-                                                        )
-                                                    }
-                                                    className="h-8 font-semibold"
-                                                >
-                                                    {data.payment_type
-                                                        ? 'Cambiar método de Pago'
-                                                        : 'Seleccionar método de pago'}
-                                                </Button>
-                                            )}
-                                        </div>
-
-                                        {data.payment_type ? (
-                                            <PaymentResume
-                                                data={data}
-                                                banks={banks}
-                                            />
-                                        ) : (
-                                            <div className="mt-2 border-t pt-2.5 text-[11px] text-muted-foreground italic">
-                                                Por favor, configure los
-                                                detalles del pago.
-                                            </div>
-                                        )}
-                                        {errors.payment_type && (
-                                            <p className="mt-1 text-sm text-destructive">
-                                                {errors.payment_type}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Comprobante de Pago */}
-                                {((data.payment_type !== 'cash' &&
-                                    data.payment_type !== 'credit') ||
-                                    (data.payment_type === 'credit' &&
-                                        data.has_initial_payment &&
-                                        data.initial_payment_type !==
-                                            'cash')) && (
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="proof_of_payment">
-                                            Comprobante de Pago (PDF o Imagen){' '}
-                                            {isProofRequired &&
-                                                !specimenInvoice?.proof_of_payment && (
-                                                    <span className="text-destructive">
-                                                        *
-                                                    </span>
-                                                )}
-                                        </Label>
-
-                                        {/* If a new proof of payment was selected */}
-                                        {data.proof_of_payment && (
-                                            <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
-                                                        <FileText className="h-5 w-5" />
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="max-w-[150px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
-                                                            {
-                                                                data
-                                                                    .proof_of_payment
-                                                                    .name
-                                                            }
-                                                        </span>
-                                                        <span className="text-[10px] text-muted-foreground">
-                                                            {(
-                                                                data
-                                                                    .proof_of_payment
-                                                                    .size /
-                                                                1024 /
-                                                                1024
-                                                            ).toFixed(2)}{' '}
-                                                            MB
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() =>
-                                                        setData(
-                                                            'proof_of_payment',
-                                                            null,
-                                                        )
-                                                    }
-                                                    className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        )}
-
-                                        {/* If no new proof of payment is selected but one already exists in DB */}
-                                        {!data.proof_of_payment &&
-                                            specimenInvoice?.proof_of_payment &&
-                                            specimenInvoice.proof_of_payment !==
-                                                'Efectivo' && (
-                                                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 p-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="rounded-md bg-primary/10 p-2 text-primary">
-                                                            <FileText className="h-5 w-5" />
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-xs font-semibold text-foreground">
-                                                                Comprobante
-                                                                actual guardado
-                                                            </span>
-                                                            <a
-                                                                href={`/storage/${specimenInvoice.proof_of_payment}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="text-[10px] text-primary hover:underline"
-                                                            >
-                                                                Ver archivo
-                                                                actual
-                                                            </a>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                        {/* Upload input */}
-                                        <div className="group relative mt-1">
-                                            <input
-                                                type="file"
-                                                id="proof_of_payment"
-                                                className="hidden"
-                                                accept=".pdf,image/*"
-                                                onChange={(e) => {
-                                                    const file =
-                                                        e.target.files?.[0] ||
-                                                        null;
-
-                                                    if (
-                                                        file &&
-                                                        file.size >
-                                                            50 * 1024 * 1024
-                                                    ) {
-                                                        toast.error(
-                                                            'El archivo de Comprobante no debe exceder los 50MB.',
-                                                        );
-                                                        e.target.value = '';
-
-                                                        return;
-                                                    }
-
-                                                    setData(
-                                                        'proof_of_payment',
-                                                        file,
-                                                    );
-                                                }}
-                                            />
-                                            <label
-                                                htmlFor="proof_of_payment"
-                                                className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 px-6 py-4 text-center text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/50"
-                                            >
-                                                <Upload className="h-4 w-4 text-muted-foreground" />
-                                                <span>
-                                                    {specimenInvoice?.proof_of_payment
-                                                        ? 'Reemplazar Comprobante'
-                                                        : 'Seleccionar Archivo (Máx 50MB)'}
-                                                </span>
-                                            </label>
-                                        </div>
-                                        {errors.proof_of_payment && (
-                                            <span className="text-[10px] text-destructive">
-                                                {errors.proof_of_payment}
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {!specimen && (
-                            <>
-                                <div className="mt-4 flex items-center justify-between rounded-lg border bg-muted/30 p-4">
-                                    <div className="flex flex-col gap-0.5">
-                                        <Label
-                                            htmlFor="agregar-insumos-toggle"
-                                            className="cursor-pointer text-sm font-semibold"
-                                        >
-                                            Agregar insumos
-                                        </Label>
-                                        <span className="text-xs text-muted-foreground">
-                                            Registre los insumos químicos o
-                                            reactivos que se utilizarán en el
-                                            análisis de esta muestra.
-                                        </span>
-                                    </div>
-                                    <Switch
-                                        id="agregar-insumos-toggle"
-                                        checked={data.agregar_insumos}
-                                        onCheckedChange={(checked) => {
-                                            setData((d) => ({
-                                                ...d,
-                                                agregar_insumos: checked,
-                                                insumos: checked
-                                                    ? d.insumos
-                                                    : [],
-                                            }));
-                                        }}
-                                    />
-                                </div>
-
-                                {data.agregar_insumos && (
-                                    <div className="mt-4 space-y-4 rounded-xl border border-border/60 bg-muted/10 p-4">
-                                        <div className="flex flex-col gap-1">
-                                            <h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-                                                Selección de Insumos / Reactivos
-                                            </h3>
-                                            <p className="text-xs text-muted-foreground">
-                                                Busque y agregue los insumos
-                                                químicos o reactivos que se
-                                                utilizarán en el análisis de
-                                                esta muestra.
-                                            </p>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-                                            {/* Columna Izquierda: Buscador e Insumos Disponibles */}
-                                            <div className="flex flex-col gap-4 lg:col-span-7">
-                                                <div className="relative">
-                                                    <Input
-                                                        type="text"
-                                                        placeholder="Buscar insumo por nombre o código..."
-                                                        value={searchQuery}
-                                                        onChange={(e) =>
-                                                            setSearchQuery(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className="w-full pr-8"
-                                                    />
-                                                    {searchQuery && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setSearchQuery(
-                                                                    '',
-                                                                )
-                                                            }
-                                                            className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                                        >
-                                                            <X className="h-4 w-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-
-                                                <div className="overflow-hidden rounded-xl border bg-card">
-                                                    <div className="flex justify-between border-b bg-muted/40 p-3 text-xs font-semibold text-muted-foreground">
-                                                        <span>
-                                                            Insumo / Descripción
-                                                        </span>
-                                                        <span>
-                                                            Stock Disponible
-                                                        </span>
-                                                    </div>
-                                                    <div className="max-h-[350px] divide-y divide-border overflow-y-auto">
-                                                        {filteredProducts.length ===
-                                                        0 ? (
-                                                            <div className="flex flex-col items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
-                                                                <Microscope className="h-8 w-8 text-muted-foreground/40" />
-                                                                <span>
-                                                                    No se
-                                                                    encontraron
-                                                                    insumos
-                                                                    disponibles.
-                                                                </span>
-                                                            </div>
-                                                        ) : (
-                                                            filteredProducts.map(
-                                                                (product) => {
-                                                                    const totalStock =
-                                                                        parseInt(
-                                                                            product.total_stock,
-                                                                        ) || 0;
-                                                                    const isOutOfStock =
-                                                                        totalStock <=
-                                                                        0;
-                                                                    const isAlreadyAdded =
-                                                                        data.insumos.some(
-                                                                            (
-                                                                                i: any,
-                                                                            ) =>
-                                                                                i.id ===
-                                                                                product.id,
-                                                                        );
-
-                                                                    return (
-                                                                        <div
-                                                                            key={
-                                                                                product.id
-                                                                            }
-                                                                            className={cn(
-                                                                                'flex items-center justify-between p-3 transition-colors',
-                                                                                isOutOfStock
-                                                                                    ? 'bg-muted/10 opacity-70'
-                                                                                    : 'hover:bg-accent/10',
-                                                                            )}
-                                                                        >
-                                                                            <div className="flex max-w-[70%] flex-col gap-0.5">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="truncate text-sm font-semibold text-foreground">
-                                                                                        {
-                                                                                            product.name
-                                                                                        }
-                                                                                    </span>
-                                                                                    <span className="shrink-0 rounded border bg-muted px-1 font-mono text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                                                                                        {
-                                                                                            product.code
-                                                                                        }
-                                                                                    </span>
-                                                                                </div>
-                                                                                <span className="truncate text-xs text-muted-foreground">
-                                                                                    {product.description ||
-                                                                                        'Sin descripción'}
-                                                                                </span>
-                                                                            </div>
-
-                                                                            <div className="flex items-center gap-3">
-                                                                                {isOutOfStock ? (
-                                                                                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-destructive/20 bg-destructive/10 px-2 py-1 text-[11px] font-semibold text-destructive">
-                                                                                        Agotado
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                                                                                        {
-                                                                                            totalStock
-                                                                                        }{' '}
-                                                                                        u.
-                                                                                    </span>
-                                                                                )}
-
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    size="sm"
-                                                                                    variant={
-                                                                                        isAlreadyAdded
-                                                                                            ? 'secondary'
-                                                                                            : 'outline'
-                                                                                    }
-                                                                                    onClick={() =>
-                                                                                        handleAddInsumo(
-                                                                                            product,
-                                                                                        )
-                                                                                    }
-                                                                                    disabled={
-                                                                                        isOutOfStock
-                                                                                    }
-                                                                                    className="h-8 shrink-0 font-semibold"
-                                                                                >
-                                                                                    {isAlreadyAdded ? (
-                                                                                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                                                                                            <Check className="h-3.5 w-3.5" />{' '}
-                                                                                            Agregado
-                                                                                        </span>
-                                                                                    ) : (
-                                                                                        <span className="flex items-center gap-1">
-                                                                                            <Plus className="h-3.5 w-3.5" />{' '}
-                                                                                            Agregar
-                                                                                        </span>
-                                                                                    )}
-                                                                                </Button>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                },
-                                                            )
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Columna Derecha: Insumos Seleccionados */}
-                                            <div className="flex flex-col gap-4 lg:col-span-5">
-                                                <div className="overflow-hidden rounded-xl border bg-card">
-                                                    <div className="flex items-center justify-between border-b bg-muted/40 p-3 text-xs font-bold text-muted-foreground">
-                                                        <span>
-                                                            Insumos
-                                                            Seleccionados
-                                                        </span>
-                                                        <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">
-                                                            {
-                                                                data.insumos
-                                                                    .length
-                                                            }
-                                                        </span>
-                                                    </div>
-
-                                                    <div className="flex max-h-[400px] min-h-[250px] flex-col divide-y divide-border overflow-y-auto">
-                                                        {data.insumos.length ===
-                                                        0 ? (
-                                                            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
-                                                                <div className="rounded-full bg-secondary p-3 text-muted-foreground/50">
-                                                                    <Tag className="h-6 w-6" />
-                                                                </div>
-                                                                <div className="flex max-w-[200px] flex-col gap-1">
-                                                                    <span className="font-bold text-foreground">
-                                                                        Lista
-                                                                        vacía
-                                                                    </span>
-                                                                    <span className="text-xs leading-normal text-muted-foreground">
-                                                                        Presione
-                                                                        "Agregar"
-                                                                        en la
-                                                                        lista de
-                                                                        insumos
-                                                                        disponibles.
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            data.insumos.map(
-                                                                (
-                                                                    insumo: any,
-                                                                ) => (
-                                                                    <div
-                                                                        key={
-                                                                            insumo.id
-                                                                        }
-                                                                        className="flex flex-col gap-3 p-3.5 transition-colors hover:bg-accent/5"
-                                                                    >
-                                                                        <div className="flex items-start justify-between gap-2">
-                                                                            <div className="flex min-w-0 flex-col gap-0.5">
-                                                                                <span className="truncate text-sm font-semibold text-foreground">
-                                                                                    {
-                                                                                        insumo.name
-                                                                                    }
-                                                                                </span>
-                                                                                <span className="font-mono text-[10px] text-muted-foreground uppercase">
-                                                                                    {
-                                                                                        insumo.code
-                                                                                    }
-                                                                                </span>
-                                                                            </div>
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                onClick={() =>
-                                                                                    handleRemoveInsumo(
-                                                                                        insumo.id,
-                                                                                    )
-                                                                                }
-                                                                                className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                                                            >
-                                                                                <X className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </div>
-
-                                                                        <div className="flex items-center justify-between gap-4">
-                                                                            <div className="flex w-[55%] flex-col gap-1">
-                                                                                <span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                                                                    Precio
-                                                                                </span>
-                                                                                <Select
-                                                                                    value={parseFloat(
-                                                                                        insumo.price ||
-                                                                                            0,
-                                                                                    ).toString()}
-                                                                                    onValueChange={(
-                                                                                        val,
-                                                                                    ) => {
-                                                                                        const parsed =
-                                                                                            parseFloat(
-                                                                                                val,
-                                                                                            );
-
-                                                                                        if (
-                                                                                            !isNaN(
-                                                                                                parsed,
-                                                                                            )
-                                                                                        ) {
-                                                                                            handleUpdateInsumoPrice(
-                                                                                                insumo.id,
-                                                                                                parsed,
-                                                                                            );
-                                                                                        }
-                                                                                    }}
-                                                                                >
-                                                                                    <SelectTrigger className="h-8 w-full font-mono text-xs font-medium">
-                                                                                        <SelectValue placeholder="Seleccionar precio" />
-                                                                                    </SelectTrigger>
-                                                                                    <SelectContent>
-                                                                                        {insumo.prices &&
-                                                                                        insumo
-                                                                                            .prices
-                                                                                            .length >
-                                                                                            0 ? (
-                                                                                            insumo.prices.map(
-                                                                                                (
-                                                                                                    p: any,
-                                                                                                    idx: number,
-                                                                                                ) => {
-                                                                                                    const priceStr =
-                                                                                                        parseFloat(
-                                                                                                            p.amount ||
-                                                                                                                0,
-                                                                                                        ).toString();
-
-                                                                                                    return (
-                                                                                                        <SelectItem
-                                                                                                            key={
-                                                                                                                idx
-                                                                                                            }
-                                                                                                            value={
-                                                                                                                priceStr
-                                                                                                            }
-                                                                                                            className="font-mono text-xs"
-                                                                                                        >
-                                                                                                            L.{' '}
-                                                                                                            {parseFloat(
-                                                                                                                p.amount ||
-                                                                                                                    0,
-                                                                                                            ).toFixed(
-                                                                                                                2,
-                                                                                                            )}
-                                                                                                        </SelectItem>
-                                                                                                    );
-                                                                                                },
-                                                                                            )
-                                                                                        ) : (
-                                                                                            <SelectItem
-                                                                                                value={parseFloat(
-                                                                                                    insumo.price ||
-                                                                                                        0,
-                                                                                                ).toString()}
-                                                                                                className="font-mono text-xs"
-                                                                                            >
-                                                                                                L.{' '}
-                                                                                                {parseFloat(
-                                                                                                    insumo.price ||
-                                                                                                        0,
-                                                                                                ).toFixed(
-                                                                                                    2,
-                                                                                                )}
-                                                                                            </SelectItem>
-                                                                                        )}
-                                                                                    </SelectContent>
-                                                                                </Select>
-                                                                            </div>
-
-                                                                            <div className="flex w-[45%] flex-col items-end gap-1">
-                                                                                <span className="w-full text-right text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                                                                    Cantidad
-                                                                                </span>
-                                                                                <div className="flex h-8 w-full shrink-0 items-center justify-between rounded-lg border bg-background p-1 shadow-sm">
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="ghost"
-                                                                                        size="icon"
-                                                                                        onClick={() =>
-                                                                                            handleUpdateInsumoQty(
-                                                                                                insumo.id,
-                                                                                                insumo.quantity -
-                                                                                                    1,
-                                                                                            )
-                                                                                        }
-                                                                                        disabled={
-                                                                                            insumo.quantity <=
-                                                                                            1
-                                                                                        }
-                                                                                        className="h-6 w-6 rounded-md"
-                                                                                    >
-                                                                                        <span className="text-sm leading-none font-bold">
-                                                                                            -
-                                                                                        </span>
-                                                                                    </Button>
-                                                                                    <input
-                                                                                        type="number"
-                                                                                        min="1"
-                                                                                        max={
-                                                                                            insumo.total_stock
-                                                                                        }
-                                                                                        value={
-                                                                                            insumo.quantity
-                                                                                        }
-                                                                                        onChange={(
-                                                                                            e,
-                                                                                        ) => {
-                                                                                            const val =
-                                                                                                parseInt(
-                                                                                                    e
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                                ) ||
-                                                                                                1;
-                                                                                            handleUpdateInsumoQty(
-                                                                                                insumo.id,
-                                                                                                val,
-                                                                                            );
-                                                                                        }}
-                                                                                        className="w-8 shrink-0 border-none p-0 text-center font-mono text-xs font-bold select-all focus:ring-0 focus:outline-none"
-                                                                                    />
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="ghost"
-                                                                                        size="icon"
-                                                                                        onClick={() =>
-                                                                                            handleUpdateInsumoQty(
-                                                                                                insumo.id,
-                                                                                                insumo.quantity +
-                                                                                                    1,
-                                                                                            )
-                                                                                        }
-                                                                                        disabled={
-                                                                                            insumo.quantity >=
-                                                                                            insumo.total_stock
-                                                                                        }
-                                                                                        className="h-6 w-6 rounded-md"
-                                                                                    >
-                                                                                        <span className="text-sm leading-none font-bold">
-                                                                                            +
-                                                                                        </span>
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="mt-1 flex items-center justify-between border-t pt-2 text-[11px] text-muted-foreground">
-                                                                            <span>
-                                                                                Límite:{' '}
-                                                                                <strong className="text-foreground">
-                                                                                    {
-                                                                                        insumo.total_stock
-                                                                                    }{' '}
-                                                                                    u.
-                                                                                </strong>
-                                                                            </span>
-                                                                            <span className="font-mono">
-                                                                                Total:{' '}
-                                                                                <strong className="text-xs text-foreground">
-                                                                                    L.{' '}
-                                                                                    {(
-                                                                                        insumo.price *
-                                                                                        insumo.quantity
-                                                                                    ).toFixed(
-                                                                                        2,
-                                                                                    )}
-                                                                                </strong>
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                ),
-                                                            )
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* SECCIÓN 2: FACTURACIÓN */}
-                {(!specimen || unlockedFullSteps) && currentStep === 2 && (
-                    <>
-                        {data.reserved_code && (
-                            <div className="mb-4 flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                <span className="flex items-center gap-2 text-xs font-semibold">
-                                    <Tag className="h-4 w-4 shrink-0 text-emerald-500" />
-                                    Código de Muestra Reservado:
-                                </span>
-                                <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
-                                    {data.reserved_code}
-                                </span>
-                            </div>
-                        )}
-
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
-                                Facturación
-                            </h3>
-
-                            <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-                                {/* Left Column: Fields */}
-                                <div className="flex flex-col gap-5 lg:col-span-8">
-                                    {/* Itemized examination billing cards list */}
-                                    <div className="flex flex-col gap-4">
-                                        {calculatedExaminations.map(
-                                            (examCalc: any, idx: number) => {
-                                                const examObj =
-                                                    examCalc.examObj;
-                                                const examName = examObj
-                                                    ? examObj.name
-                                                    : `Análisis #${idx + 1}`;
-                                                const examPrices =
-                                                    examCalc.prices || [];
-
-                                                return (
-                                                    <Card
-                                                        key={
-                                                            examCalc.examination_id
-                                                        }
-                                                        className="overflow-hidden border border-border/80 pt-6 pb-2 shadow-sm"
-                                                    >
-                                                        <CardHeader className="flex flex-row items-center justify-between px-4">
-                                                            <div className="flex flex-col gap-0.5">
-                                                                <div className="text-xs text-muted-foreground">
-                                                                    Tipo de
-                                                                    muestra:{' '}
-                                                                    <strong className="text-foreground">
-                                                                        {selectedType?.name ||
-                                                                            'Muestra'}
-                                                                    </strong>
-                                                                </div>
-                                                                <div className="text-sm font-bold text-foreground">
-                                                                    {examName}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="border-emerald-500/30 bg-emerald-500/10 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400"
-                                                                >
-                                                                    Descuento:
-                                                                    L.{' '}
-                                                                    {examCalc.totalDiscount.toFixed(
-                                                                        2,
-                                                                    )}
-                                                                </Badge>
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="font-mono text-xs font-semibold text-primary"
-                                                                >
-                                                                    Subtotal: L.{' '}
-                                                                    {examCalc.subtotal.toFixed(
-                                                                        2,
-                                                                    )}
-                                                                </Badge>
-                                                            </div>
-                                                        </CardHeader>
-                                                        <CardContent className="space-y-4 p-4">
-                                                            <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-                                                                {/* Price selector */}
-                                                                <div className="grid gap-2">
-                                                                    <div className="flex items-center justify-between">
-                                                                        <Label className="text-xs font-semibold">
-                                                                            Importe
-                                                                            /
-                                                                            Precio
-                                                                            Base
-                                                                            (L.)
-                                                                            *
-                                                                        </Label>
-                                                                        {examObj && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    if (
-                                                                                        examObj
-                                                                                    ) {
-                                                                                        setIsEditPricesSheetOpen(
-                                                                                            true,
-                                                                                        );
-                                                                                    }
-                                                                                }}
-                                                                                className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-                                                                            >
-                                                                                <Edit2 className="h-3 w-3" />{' '}
-                                                                                Precios
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                    <Select
-                                                                        value={
-                                                                            examCalc.selected_price
-                                                                        }
-                                                                        onValueChange={(
-                                                                            val,
-                                                                        ) =>
-                                                                            updateExamConfig(
-                                                                                examCalc.examination_id,
-                                                                                'selected_price',
-                                                                                val,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <SelectTrigger className="h-9 w-full">
-                                                                            <SelectValue placeholder="Seleccione un precio" />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            {examPrices.length >
-                                                                            0 ? (
-                                                                                <>
-                                                                                    {examPrices.map(
-                                                                                        (
-                                                                                            p: any,
-                                                                                        ) => (
-                                                                                            <SelectItem
-                                                                                                key={
-                                                                                                    p.id
-                                                                                                }
-                                                                                                value={p.amount.toString()}
-                                                                                            >
-                                                                                                L.{' '}
-                                                                                                {parseFloat(
-                                                                                                    p.amount,
-                                                                                                ).toFixed(
-                                                                                                    2,
-                                                                                                )}
-                                                                                            </SelectItem>
-                                                                                        ),
-                                                                                    )}
-                                                                                    <SelectItem value="custom">
-                                                                                        Precio
-                                                                                        Personalizado
-                                                                                    </SelectItem>
-                                                                                </>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <SelectItem
-                                                                                        value="0"
-                                                                                        disabled
-                                                                                    >
-                                                                                        No
-                                                                                        hay
-                                                                                        precios
-                                                                                        configurados
-                                                                                    </SelectItem>
-                                                                                    <SelectItem value="custom">
-                                                                                        Precio
-                                                                                        Personalizado
-                                                                                    </SelectItem>
-                                                                                </>
-                                                                            )}
-                                                                        </SelectContent>
-                                                                    </Select>
-
-                                                                    {examCalc.selected_price ===
-                                                                        'custom' && (
-                                                                        <div className="relative mt-1">
-                                                                            <span className="absolute top-1/2 left-3 -translate-y-1/2 font-mono text-xs text-muted-foreground select-none">
-                                                                                L.
-                                                                            </span>
-                                                                            <Input
-                                                                                type="number"
-                                                                                step="0.01"
-                                                                                min="0"
-                                                                                value={
-                                                                                    examCalc.custom_specimen_price
-                                                                                }
-                                                                                onChange={(
-                                                                                    e,
-                                                                                ) =>
-                                                                                    updateExamConfig(
-                                                                                        examCalc.examination_id,
-                                                                                        'custom_specimen_price',
-                                                                                        e
-                                                                                            .target
-                                                                                            .value,
-                                                                                    )
-                                                                                }
-                                                                                placeholder="0.00"
-                                                                                className="h-8 pl-7 font-mono text-xs"
-                                                                                required
-                                                                            />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-
-                                                                {/* Quantity */}
-                                                                <div className="flex flex-col items-start gap-2">
-                                                                    <Label className="text-xs font-semibold">
-                                                                        Cantidad
-                                                                        *
-                                                                    </Label>
-                                                                    <NumberPicker
-                                                                        value={
-                                                                            examCalc.quantity
-                                                                        }
-                                                                        onChange={(
-                                                                            val,
-                                                                        ) =>
-                                                                            updateExamConfig(
-                                                                                examCalc.examination_id,
-                                                                                'quantity',
-                                                                                val,
-                                                                            )
-                                                                        }
-                                                                        min={1}
-                                                                    />
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Collapsible Discounts Section */}
-                                                            <Collapsible
-                                                                defaultOpen={
-                                                                    examCalc.totalDiscount >
-                                                                        0 ||
-                                                                    examCalc.additional_discount_enabled ||
-                                                                    !!examCalc.age_discount_type
-                                                                }
-                                                                className="rounded-lg border bg-muted/20 p-3"
-                                                            >
-                                                                <CollapsibleTrigger
-                                                                    asChild
-                                                                >
-                                                                    <button
-                                                                        type="button"
-                                                                        className="group flex w-full cursor-pointer items-center justify-between text-xs font-semibold text-foreground transition-colors hover:text-primary"
-                                                                    >
-                                                                        <div className="flex items-center gap-2">
-                                                                            <Tag className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover:text-primary" />
-                                                                            <span>
-                                                                                Opciones
-                                                                                de
-                                                                                Descuento
-                                                                            </span>
-                                                                            {examCalc.totalDiscount >
-                                                                                0 && (
-                                                                                <Badge
-                                                                                    variant="secondary"
-                                                                                    className="h-5 px-1.5 font-mono text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
-                                                                                >
-                                                                                    -L.{' '}
-                                                                                    {examCalc.totalDiscount.toFixed(
-                                                                                        2,
-                                                                                    )}
-                                                                                </Badge>
-                                                                            )}
-                                                                        </div>
-                                                                        <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                                                                    </button>
-                                                                </CollapsibleTrigger>
-
-                                                                <CollapsibleContent className="space-y-3 pt-3">
-                                                                    {/* Additional Discount Switch */}
-                                                                    <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
-                                                                        <div className="flex items-center justify-between">
-                                                                            <div className="flex flex-col gap-0.5">
-                                                                                <Label className="cursor-pointer text-xs font-semibold">
-                                                                                    Descuento
-                                                                                    Adicional
-                                                                                </Label>
-                                                                                <span className="text-[10px] text-muted-foreground">
-                                                                                    Permite
-                                                                                    aplicar
-                                                                                    un
-                                                                                    descuento
-                                                                                    adicional
-                                                                                    personalizado
-                                                                                    a
-                                                                                    este
-                                                                                    análisis.
-                                                                                </span>
-                                                                            </div>
-                                                                            <Switch
-                                                                                checked={
-                                                                                    examCalc.additional_discount_enabled
-                                                                                }
-                                                                                onCheckedChange={(
-                                                                                    checked,
-                                                                                ) =>
-                                                                                    updateExamConfig(
-                                                                                        examCalc.examination_id,
-                                                                                        'additional_discount_enabled',
-                                                                                        checked,
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        </div>
-                                                                        {examCalc.additional_discount_enabled && (
-                                                                            <div className="border-t border-border/50 pt-2">
-                                                                                <Input
-                                                                                    type="number"
-                                                                                    step="0.01"
-                                                                                    min="0"
-                                                                                    placeholder="0.00"
-                                                                                    value={
-                                                                                        examCalc.additional_discount
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        e,
-                                                                                    ) =>
-                                                                                        updateExamConfig(
-                                                                                            examCalc.examination_id,
-                                                                                            'additional_discount',
-                                                                                            e
-                                                                                                .target
-                                                                                                .value,
-                                                                                        )
-                                                                                    }
-                                                                                    className="h-8 font-mono text-xs"
-                                                                                />
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-
-                                                                    {/* Age Discounts Switches */}
-                                                                    <div className="grid grid-cols-1 gap-3 border-t pt-3 md:grid-cols-2">
-                                                                        <div className="flex items-center justify-between rounded-lg border bg-card p-2.5">
-                                                                            <div className="flex flex-col gap-0.5">
-                                                                                <Label className="text-xs font-semibold">
-                                                                                    Tercera
-                                                                                    Edad
-                                                                                    (
-                                                                                    {
-                                                                                        thirdAgePercent
-                                                                                    }
-                                                                                    %)
-                                                                                </Label>
-                                                                                <span className="text-[10px] text-muted-foreground">
-                                                                                    Aplica{' '}
-                                                                                    {
-                                                                                        thirdAgePercent
-                                                                                    }
-
-                                                                                    %
-                                                                                    sobre
-                                                                                    el
-                                                                                    precio
-                                                                                    base.
-                                                                                </span>
-                                                                            </div>
-                                                                            <Switch
-                                                                                checked={
-                                                                                    examCalc.age_discount_type ===
-                                                                                    'third'
-                                                                                }
-                                                                                onCheckedChange={(
-                                                                                    checked,
-                                                                                ) =>
-                                                                                    updateExamConfig(
-                                                                                        examCalc.examination_id,
-                                                                                        'age_discount_type',
-                                                                                        checked
-                                                                                            ? 'third'
-                                                                                            : null,
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        </div>
-
-                                                                        <div className="flex items-center justify-between rounded-lg border bg-card p-2.5">
-                                                                            <div className="flex flex-col gap-0.5">
-                                                                                <Label className="text-xs font-semibold">
-                                                                                    Cuarta
-                                                                                    Edad
-                                                                                    (
-                                                                                    {
-                                                                                        fourthAgePercent
-                                                                                    }
-                                                                                    %)
-                                                                                </Label>
-                                                                                <span className="text-[10px] text-muted-foreground">
-                                                                                    Aplica{' '}
-                                                                                    {
-                                                                                        fourthAgePercent
-                                                                                    }
-
-                                                                                    %
-                                                                                    sobre
-                                                                                    el
-                                                                                    precio
-                                                                                    base.
-                                                                                </span>
-                                                                            </div>
-                                                                            <Switch
-                                                                                checked={
-                                                                                    examCalc.age_discount_type ===
-                                                                                    'fourth'
-                                                                                }
-                                                                                onCheckedChange={(
-                                                                                    checked,
-                                                                                ) =>
-                                                                                    updateExamConfig(
-                                                                                        examCalc.examination_id,
-                                                                                        'age_discount_type',
-                                                                                        checked
-                                                                                            ? 'fourth'
-                                                                                            : null,
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-                                                                </CollapsibleContent>
-                                                            </Collapsible>
-                                                        </CardContent>
-                                                    </Card>
-                                                );
-                                            },
-                                        )}
-                                    </div>
-
-                                    {/* Cobrar otro importe personalizado */}
-                                    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex flex-col gap-0.5">
-                                                <Label
-                                                    htmlFor="custom-amount-toggle"
-                                                    className="cursor-pointer text-xs font-semibold"
-                                                >
-                                                    Cobrar otro importe
-                                                    personalizado
-                                                </Label>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    Permite agregar un importe
-                                                    manual para servicios
-                                                    adicionales.
-                                                </span>
-                                            </div>
-                                            <Switch
-                                                id="custom-amount-toggle"
-                                                checked={
-                                                    data.custom_amount_enabled
-                                                }
-                                                onCheckedChange={(checked) => {
-                                                    setData((d) => ({
-                                                        ...d,
-                                                        custom_amount_enabled:
-                                                            checked,
-                                                        custom_amount: checked
-                                                            ? d.custom_amount ||
-                                                              '0'
-                                                            : '0',
-                                                        custom_amount_reason:
-                                                            checked
-                                                                ? d.custom_amount_reason ||
-                                                                  ''
-                                                                : '',
-                                                    }));
-                                                }}
-                                            />
-                                        </div>
-
-                                        {data.custom_amount_enabled && (
-                                            <div className="flex flex-col gap-3 border-t border-border/50 pt-2 transition-all duration-300">
-                                                <div className="grid gap-1.5">
-                                                    <Label
-                                                        htmlFor="custom_amount"
-                                                        className="text-xs"
-                                                    >
-                                                        Importe Adicional
-                                                        Personalizado (L.){' '}
-                                                        <span className="text-destructive">
-                                                            *
-                                                        </span>
-                                                    </Label>
-                                                    <Input
-                                                        id="custom_amount"
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={
-                                                            data.custom_amount
-                                                        }
-                                                        onChange={(e) =>
-                                                            setData(
-                                                                'custom_amount',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="0.00"
-                                                        required
-                                                    />
-                                                    {errors.custom_amount && (
-                                                        <span className="text-[10px] text-destructive">
-                                                            {
-                                                                errors.custom_amount
-                                                            }
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="grid gap-1.5">
-                                                    <Label
-                                                        htmlFor="custom_amount_reason"
-                                                        className="text-xs"
-                                                    >
-                                                        Concepto / Razón del
-                                                        Importe Adicional{' '}
-                                                        <span className="text-destructive">
-                                                            *
-                                                        </span>
-                                                    </Label>
-                                                    <Input
-                                                        id="custom_amount_reason"
-                                                        type="text"
-                                                        value={
-                                                            data.custom_amount_reason
-                                                        }
-                                                        onChange={(e) =>
-                                                            setData(
-                                                                'custom_amount_reason',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Ej. Materiales especiales, urgencia, etc."
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Detalle y Tipo de Pago Wrapper */}
-                                    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <span className="text-xs font-semibold">
-                                                        Método de pago:
-                                                    </span>
-                                                    <span className="ml-2 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary capitalize">
-                                                        {getPaymentTypeLabel(
-                                                            data.payment_type,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                                {showPaymentMethodEdition && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            setIsPaymentSheetOpen(
-                                                                true,
-                                                            )
-                                                        }
-                                                        className="h-8 font-semibold"
-                                                    >
-                                                        {data.payment_type
-                                                            ? 'Cambiar método de Pago'
-                                                            : 'Seleccionar método de pago'}
-                                                    </Button>
-                                                )}
-                                            </div>
-
-                                            {data.payment_type ? (
-                                                <PaymentResume
-                                                    data={data}
-                                                    banks={banks}
-                                                />
-                                            ) : (
-                                                <div className="mt-2 border-t pt-2.5 text-[11px] text-muted-foreground italic">
-                                                    Por favor, configure los
-                                                    detalles del pago.
-                                                </div>
-                                            )}
-                                            {errors.payment_type && (
-                                                <p className="mt-1 text-sm text-destructive">
-                                                    {errors.payment_type}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Comprobante de Pago */}
-                                    {((data.payment_type !== 'cash' &&
-                                        data.payment_type !== 'credit') ||
-                                        (data.payment_type === 'credit' &&
-                                            data.has_initial_payment &&
-                                            data.initial_payment_type !==
-                                                'cash')) && (
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="proof_of_payment">
-                                                Comprobante de Pago (PDF o
-                                                Imagen){' '}
-                                                {isProofRequired && (
-                                                    <span className="text-destructive">
-                                                        *
-                                                    </span>
-                                                )}
-                                            </Label>
-
-                                            {data.proof_of_payment && (
-                                                <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
-                                                            <FileText className="h-5 w-5" />
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="max-w-[150px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
-                                                                {
-                                                                    data
-                                                                        .proof_of_payment
-                                                                        .name
-                                                                }
-                                                            </span>
-                                                            <span className="text-[10px] text-muted-foreground">
-                                                                {(
-                                                                    data
-                                                                        .proof_of_payment
-                                                                        .size /
-                                                                    1024 /
-                                                                    1024
-                                                                ).toFixed(
-                                                                    2,
-                                                                )}{' '}
-                                                                MB
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() =>
-                                                            setData(
-                                                                'proof_of_payment',
-                                                                null,
-                                                            )
-                                                        }
-                                                        className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            )}
-
-                                            {!data.proof_of_payment && (
-                                                <div className="group relative">
-                                                    <input
-                                                        type="file"
-                                                        id="proof_of_payment"
-                                                        className="hidden"
-                                                        accept=".pdf,image/*"
-                                                        onChange={(e) => {
-                                                            const file =
-                                                                e.target
-                                                                    .files?.[0] ||
-                                                                null;
-
-                                                            if (
-                                                                file &&
-                                                                file.size >
-                                                                    50 *
-                                                                        1024 *
-                                                                        1024
-                                                            ) {
-                                                                toast.error(
-                                                                    'El archivo de Comprobante no debe exceder los 50MB.',
-                                                                );
-                                                                e.target.value =
-                                                                    '';
-
-                                                                return;
-                                                            }
-
-                                                            setData(
-                                                                'proof_of_payment',
-                                                                file,
-                                                            );
-                                                        }}
-                                                    />
-                                                    <label
-                                                        htmlFor="proof_of_payment"
-                                                        className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-5 transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
-                                                    >
-                                                        <div className="mb-2 rounded-full bg-secondary p-2.5 text-secondary-foreground transition-transform duration-200 group-hover:scale-110">
-                                                            <Upload className="h-4 w-4" />
-                                                        </div>
-                                                        <span className="text-xs font-semibold text-foreground">
-                                                            Subir Comprobante
-                                                        </span>
-                                                        <span className="mt-1 text-[10px] text-muted-foreground">
-                                                            PDF o imágenes hasta
-                                                            50MB
-                                                        </span>
-                                                    </label>
-                                                </div>
-                                            )}
-                                            {errors.proof_of_payment && (
-                                                <p className="text-sm text-destructive">
-                                                    {errors.proof_of_payment}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Breakdown of selected supplies */}
-                                    {data.insumos &&
-                                        data.insumos.length > 0 && (
-                                            <div className="mt-2 overflow-hidden rounded-xl border bg-card">
-                                                <div className="flex justify-between border-b bg-muted/40 p-3 text-xs font-semibold text-muted-foreground">
-                                                    <span>
-                                                        Insumo / Reactivo
-                                                        Utilizado
-                                                    </span>
-                                                    <div className="flex gap-8 text-right font-semibold">
-                                                        <span className="w-12">
-                                                            Cant.
-                                                        </span>
-                                                        <span className="w-20">
-                                                            Precio U.
-                                                        </span>
-                                                        <span className="w-20">
-                                                            Total
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="divide-y divide-border">
-                                                    {data.insumos.map(
-                                                        (insumo: any) => (
-                                                            <div
-                                                                key={insumo.id}
-                                                                className="flex items-center justify-between p-3 text-xs"
-                                                            >
-                                                                <div className="flex min-w-0 flex-col gap-0.5">
-                                                                    <span className="max-w-[180px] truncate font-semibold text-foreground sm:max-w-xs">
-                                                                        {
-                                                                            insumo.name
-                                                                        }
-                                                                    </span>
-                                                                    <span className="font-mono text-[9px] text-muted-foreground uppercase">
-                                                                        {
-                                                                            insumo.code
-                                                                        }
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex shrink-0 gap-8 text-right font-mono text-xs">
-                                                                    <span className="w-12 text-muted-foreground">
-                                                                        {
-                                                                            insumo.quantity
-                                                                        }{' '}
-                                                                        u.
-                                                                    </span>
-                                                                    <span className="w-20 text-muted-foreground">
-                                                                        L.{' '}
-                                                                        {parseFloat(
-                                                                            insumo.price ||
-                                                                                0,
-                                                                        ).toFixed(
-                                                                            2,
-                                                                        )}
-                                                                    </span>
-                                                                    <span className="w-20 font-bold text-foreground">
-                                                                        L.{' '}
-                                                                        {(
-                                                                            insumo.price *
-                                                                            insumo.quantity
-                                                                        ).toFixed(
-                                                                            2,
-                                                                        )}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        ),
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center justify-between border-t bg-muted/20 p-3 text-xs font-semibold">
-                                                    <span className="text-muted-foreground">
-                                                        Subtotal Insumos /
-                                                        Reactivos:
-                                                    </span>
-                                                    <span className="font-mono text-sm text-primary">
-                                                        L.{' '}
-                                                        {insumosTotalVal.toFixed(
-                                                            2,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )}
-                                </div>
-
-                                {/* Right Column: Summary Card */}
-                                <div className="flex flex-col justify-start lg:col-span-4">
-                                    <div className="flex flex-col gap-4 rounded-xl border bg-muted/30 p-5 shadow-sm dark:bg-muted/10">
-                                        <h4 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                            Resumen de Totales
-                                        </h4>
-                                        <div className="mt-2 flex flex-col gap-3">
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-muted-foreground">
-                                                    Precio Regular Muestra:
-                                                </span>
-                                                <span className="font-semibold text-foreground">
-                                                    L.{' '}
-                                                    {maxSpecimenPriceVal.toFixed(
-                                                        2,
-                                                    )}
-                                                </span>
-                                            </div>
-                                            {data.custom_amount_enabled && (
-                                                <div className="flex flex-col gap-0.5 text-sm">
-                                                    <div className="flex justify-between">
-                                                        <span className="text-muted-foreground">
-                                                            Importe
-                                                            Personalizado:
-                                                        </span>
-                                                        <span className="font-semibold text-foreground text-primary">
-                                                            L.{' '}
-                                                            {customAmountVal.toFixed(
-                                                                2,
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    {data.custom_amount_reason && (
-                                                        <span className="truncate text-[10px] text-muted-foreground italic">
-                                                            Razón:{' '}
-                                                            {
-                                                                data.custom_amount_reason
-                                                            }
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {discountVal > 0 ? (
-                                                <div className="flex flex-col gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                                    <span className="text-[10px] font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
-                                                        Descuentos Aplicados
-                                                    </span>
-                                                    <div className="flex justify-between text-xs font-bold">
-                                                        <span>
-                                                            Descuento Total:
-                                                        </span>
-                                                        <span>
-                                                            - L.{' '}
-                                                            {discountVal.toFixed(
-                                                                2,
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-muted-foreground">
-                                                        Descuento:
-                                                    </span>
-                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                                                        - L. 0.00
-                                                    </span>
-                                                </div>
-                                            )}
-                                            <Separator />
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">
-                                                    Sub-Total:
-                                                </span>
-                                                <span className="font-semibold text-foreground">
-                                                    L. {subtotalVal.toFixed(2)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between text-xs">
-                                                <span className="flex flex-col text-muted-foreground">
-                                                    <span>
-                                                        Importe Exonerado:
-                                                    </span>
-                                                    <span className="text-[10px] text-muted-foreground/80">
-                                                        (Servicios médicos)
-                                                    </span>
-                                                </span>
-                                                <span className="font-semibold text-foreground">
-                                                    L. {totalVal.toFixed(2)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">
-                                                    Importe Exento:
-                                                </span>
-                                                <span className="font-semibold text-foreground">
-                                                    L. 0.00
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">
-                                                    Importe Gravado 15%:
-                                                </span>
-                                                <span className="font-semibold text-foreground">
-                                                    L. 0.00
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">
-                                                    Importe Gravado 18%:
-                                                </span>
-                                                <span className="font-semibold text-foreground">
-                                                    L. 0.00
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">
-                                                    ISV 15%:
-                                                </span>
-                                                <span className="font-semibold text-foreground">
-                                                    L. 0.00
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-muted-foreground">
-                                                    ISV 18%:
-                                                </span>
-                                                <span className="font-semibold text-foreground">
-                                                    L. 0.00
-                                                </span>
-                                            </div>
-                                            <Separator className="h-0.5" />
-                                            <div className="mt-2 flex items-center justify-between">
-                                                <span className="text-sm font-bold text-foreground">
-                                                    Total a Pagar:
-                                                </span>
-                                                <span className="text-lg font-extrabold text-primary">
-                                                    L. {totalVal.toFixed(2)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </>
-                )}
-
-                {/* BOTONES DE ENVÍO */}
-                <div className="mt-4 flex flex-col items-center justify-between gap-3 border-t pt-4 sm:flex-row">
-                    {specimen && specimen.created_at ? (
-                        <div className="flex items-center gap-3">
-                            <div className="text-sm text-muted-foreground">
-                                Creada el:{' '}
-                                {new Date(specimen.created_at).toLocaleString(
-                                    'es-ES',
-                                    {
-                                        dateStyle: 'long',
-                                        timeStyle: 'short',
-                                    },
-                                )}
-                            </div>
-                            {unlockedFullSteps && currentStep > 1 && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() =>
-                                        setCurrentStep((prev) => prev - 1)
-                                    }
-                                    className="w-full sm:w-auto"
-                                    disabled={processing}
-                                >
-                                    Atrás
-                                </Button>
-                            )}
-                        </div>
-                    ) : !specimen && currentStep > 1 ? (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setCurrentStep((prev) => prev - 1)}
-                            className="w-full sm:w-auto"
-                            disabled={processing}
-                        >
-                            Atrás
-                        </Button>
-                    ) : (
-                        <div />
-                    )}
-
-                    {specimen ? (
-                        <Button
-                            type="submit"
-                            disabled={processing}
-                            className="w-full sm:w-auto"
-                        >
-                            {processing && <Spinner className="mr-2" />}
-                            {unlockedFullSteps && currentStep === 1
-                                ? 'Siguiente (Facturación)'
-                                : 'Guardar Cambios'}
-                        </Button>
-                    ) : currentStep < 2 ? (
-                        <Button
-                            key="btn-next"
-                            type="button"
-                            onClick={handleNextStep}
-                            className="w-full sm:w-auto"
-                            disabled={
-                                isReservingCode ||
-                                (!specimen &&
-                                    currentStep === 1 &&
-                                    !!data.specimen_type &&
-                                    !matchingSequence)
-                            }
-                        >
-                            {isReservingCode ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Reservando Código de Muestra...
-                                </>
-                            ) : (
-                                'Siguiente'
-                            )}
-                        </Button>
-                    ) : (
-                        <Button
-                            key="btn-submit"
-                            type="submit"
-                            disabled={processing}
-                            className="w-full sm:w-auto"
-                        >
-                            {processing && <Spinner className="mr-2" />}
-                            Facturar y Crear Muestra
-                        </Button>
-                    )}
-                </div>
-            </form>
-
-            <PaymentMethodSheet
-                open={isPaymentSheetOpen}
-                onOpenChange={setIsPaymentSheetOpen}
-                banks={banks}
-                totalAmount={totalVal}
-                paymentData={data}
-                onSave={(paymentData) => {
-                    if (specimen) {
-                        const originalPaymentType =
-                            specimenInvoice?.payment_type;
-                        const hasPayments = (
-                            specimenInvoice?.credit_relation ||
-                            specimenInvoice?.creditRelation
-                        )?.has_payments;
-                        const newVal = paymentData.payment_type;
-
-                        if (
-                            originalPaymentType === 'credit' &&
-                            newVal !== 'credit' &&
-                            hasPayments
-                        ) {
-                            setShowBlockedPaymentAlert(true);
-                            setIsPaymentSheetOpen(false);
-
-                            return;
-                        }
-
-                        if (
-                            newVal === 'credit' &&
-                            originalPaymentType !== 'credit' &&
-                            hasPayments
-                        ) {
-                            setShowBlockedPaymentAlert(true);
-                            setIsPaymentSheetOpen(false);
-
-                            return;
-                        }
-                    }
-
-                    const isCredit = paymentData.payment_type === 'credit';
-                    setData((d) => ({
-                        ...d,
-                        ...paymentData,
-                        has_initial_payment: isCredit
-                            ? paymentData.has_initial_payment
-                            : false,
-                        initial_payment_amount: isCredit
-                            ? paymentData.initial_payment_amount
-                            : '',
-                        initial_payment_type: isCredit
-                            ? paymentData.initial_payment_type
-                            : '',
-                    }));
-                    setIsPaymentSheetOpen(false);
-                }}
-            />
-
-            <Sheet
-                open={isEditPricesSheetOpen}
-                onOpenChange={setIsEditPricesSheetOpen}
-            >
-                <SheetContent
-                    side="right"
-                    className="z-[120] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                >
-                    <HeadingSheet
-                        title="Gestionar Precios"
-                        description="Modifique la lista de precios para este análisis."
-                    />
-                    <div className="-mx-5 mt-4 px-5">
-                        {selectedExamination && (
-                            <ExaminationPricesForm
-                                examination={selectedExamination}
-                                onSuccess={() =>
-                                    setIsEditPricesSheetOpen(false)
-                                }
-                            />
-                        )}
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            <CustomerSheet
-                open={isCustomerSheetOpen}
-                onOpenChange={setIsCustomerSheetOpen}
-                customer={customerToEdit as any}
-                className="w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                onSuccess={(updatedCustomer: any) => {
-                    if (updatedCustomer) {
-                        setSelectedCustomerData(updatedCustomer);
-                    }
-                }}
-            />
-
-            <Sheet
-                open={isReferrerSheetOpen}
-                onOpenChange={setIsReferrerSheetOpen}
-            >
-                <SheetContent
-                    side="right"
-                    className="w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                >
-                    <HeadingSheet
-                        title={
-                            editingReferrer
-                                ? 'Editar Remitente'
-                                : 'Nuevo Remitente'
-                        }
-                        description={
-                            editingReferrer
-                                ? 'Modifique los campos para actualizar el remitente.'
-                                : 'Complete los campos para registrar un nuevo remitente.'
-                        }
-                    />
-                    <div className="-mx-5 mt-4 px-5">
-                        <ReferrerForm
-                            key={
-                                editingReferrer
-                                    ? editingReferrer.id
-                                    : referrerInitialData
-                                      ? 'new-data'
-                                      : 'new'
-                            }
-                            referrer={editingReferrer}
-                            referrerTypes={referrerTypes}
-                            initialData={referrerInitialData}
-                            onSuccess={() => setIsReferrerSheetOpen(false)}
-                            onSwitchToCreateNew={(formData) => {
-                                setReferrerInitialData(formData);
-                                setEditingReferrer(null);
-                            }}
-                            onSelectExistingReferrer={(existingReferrer) => {
-                                setData(
-                                    'referrer',
-                                    existingReferrer.id.toString(),
-                                );
-                                setIsReferrerSheetOpen(false);
-                                toast.info(
-                                    `Se seleccionó el remitente existente: ${existingReferrer.name} (${existingReferrer.notes || 'Sin hospital'})`,
-                                );
-                            }}
-                        />
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            <Sheet
-                open={isSequenceSheetOpen}
-                onOpenChange={setIsSequenceSheetOpen}
-            >
-                <SheetContent
-                    side="right"
-                    className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                >
-                    <SheetHeader>
-                        <SheetTitle>Nueva Secuencia de Numeración</SheetTitle>
-                    </SheetHeader>
-                    <div className="-mx-5 mt-4 px-5">
-                        {isSequenceSheetOpen && (
-                            <SequenceForm
-                                locations={locations}
-                                specimenTypes={specimenTypes}
-                                defaultLocationId={
-                                    activeLocationId || undefined
-                                }
-                                defaultSpecimenTypeId={
-                                    data.specimen_type
-                                        ? parseInt(data.specimen_type)
-                                        : undefined
-                                }
-                                sequences={localSequences}
-                                onSuccess={() => {
-                                    setIsSequenceSheetOpen(false);
-                                }}
-                            />
-                        )}
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            <Sheet
-                open={isSpecimenTypeSheetOpen}
-                onOpenChange={setIsSpecimenTypeSheetOpen}
-            >
-                <SheetContent
-                    side="right"
-                    className="w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
-                >
-                    <HeadingSheet
-                        title="Nuevo Tipo de Muestra"
-                        description="Complete el formulario para crear un nuevo tipo de muestra."
-                    />
-                    <div className="-mx-5 mt-4 px-5">
-                        <SpecimenTypeForm
-                            specimenType={null}
-                            onSuccess={() => setIsSpecimenTypeSheetOpen(false)}
-                        />
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            <SpecimenTypeExaminationSheet
-                examination={null}
-                specimenTypes={specimenTypes}
-                open={isExaminationSheetOpen}
-                onOpenChange={setIsExaminationSheetOpen}
-                defaultSpecimenTypeId={data.specimen_type}
-            />
-
-            <CategorySheet
-                category={null}
-                open={isCategorySheetOpen}
-                onOpenChange={setIsCategorySheetOpen}
-            />
-
-            {/* CONFIRMACIÓN DE DIÁLOGO SHADCN (ALERTDIALOG) */}
-            <SpecimenInvoiceSummaryAlertDialog
-                open={showConfirm}
-                onOpenChange={setShowConfirm}
-                customerLabel={selectedCustomerLabel}
-                examinationLabel={`${selectedType?.name || 'Sin seleccionar'} - ${selectedExaminationLabel}`}
-                paymentTypeLabel={getPaymentTypeLabel(data.payment_type)}
-                agregarInsumos={data.agregar_insumos}
-                insumos={data.insumos}
-                regularPrice={maxSpecimenPriceVal}
-                customAmountEnabled={data.custom_amount_enabled}
-                customAmountVal={customAmountVal}
-                customAmountReason={data.custom_amount_reason}
-                discountVal={discountVal}
-                totalVal={totalVal}
-                onConfirm={submitForm}
-            />
-
-            <SpecimenRegenerateConfirmAlertDialog
-                open={showRegenerateConfirm}
-                onOpenChange={setShowRegenerateConfirm}
-                isGroupSpecimen={isGroupSpecimen}
-                isSpecimenTypeChanged={isSpecimenTypeChanged}
-                hasReport={!!specimen?.report_id}
-                isLoadingTemplates={isLoadingTemplates}
-                availableTemplates={availableTemplates}
-                selectedTemplateId={data.template_id}
-                onTemplateChange={(val) => setData('template_id', val)}
-                isSubmitDisabled={isSubmitDisabled}
-                onConfirm={submitForm}
-            />
-
-            <BlockedPaymentAlertDialog
-                open={showBlockedPaymentAlert}
-                onOpenChange={setShowBlockedPaymentAlert}
-            />
-
-            <SpecimenExamChangePriceAlertDialog
-                open={showExamChangePricePrompt}
-                onOpenChange={setShowExamChangePricePrompt}
-                onConfirm={handleConfirmExamChangePrompt}
-            />
-        </>
-    );
+	const { props: pageProps } = usePage<any>();
+	const flash = pageProps.flash as Record<string, any> | undefined;
+	const [availableTemplates, setAvailableTemplates] = React.useState<any[]>(
+		[],
+	);
+	const [isLoadingTemplates, setIsLoadingTemplates] = React.useState(false);
+	const [isCustomerSheetOpen, setIsCustomerSheetOpen] = React.useState(false);
+	const [customerToEdit, setCustomerToEdit] =
+		React.useState<CustomerOption | null>(null);
+	const [isReferrerSheetOpen, setIsReferrerSheetOpen] = React.useState(false);
+	const [editingReferrer, setEditingReferrer] = React.useState<any | null>(
+		null,
+	);
+	const [referrerInitialData, setReferrerInitialData] = React.useState<
+		any | null
+	>(null);
+	const [isSequenceSheetOpen, setIsSequenceSheetOpen] = React.useState(false);
+	const [isSpecimenTypeSheetOpen, setIsSpecimenTypeSheetOpen] =
+		React.useState(false);
+	const [isExaminationSheetOpen, setIsExaminationSheetOpen] =
+		React.useState(false);
+	const [examinationSearchQuery, setExaminationSearchQuery] =
+		React.useState('');
+	const [isCategorySheetOpen, setIsCategorySheetOpen] = React.useState(false);
+	const [isEditPricesSheetOpen, setIsEditPricesSheetOpen] =
+		React.useState(false);
+	const prevSpecimenTypesRef = React.useRef<any[]>(specimenTypes);
+	const prevExaminationsRef = React.useRef<any[]>(examinations);
+	const prevCategoriesRef = React.useRef<any[]>(categories);
+	const prevReferrersRef = React.useRef<any[]>(referrers);
+	// Track the currently-selected customer locally (for display + detail panel)
+	const [selectedCustomerData, setSelectedCustomerData] =
+		React.useState<CustomerOption | null>(
+			specimen?.customerRelation
+				? {
+					id: specimen.customerRelation.id,
+					name: specimen.customerRelation.name,
+					id_number: specimen.customerRelation.id_number,
+					phone: specimen.customerRelation.phone,
+					email: specimen.customerRelation.email,
+					gender: specimen.customerRelation.gender,
+					type: specimen.customerRelation.type,
+					age: specimen.customerRelation.age,
+				}
+				: null,
+		);
+
+	React.useEffect(() => {
+		if (specimenTypes.length > prevSpecimenTypesRef.current.length) {
+			const newTypes = specimenTypes.filter(
+				(t) =>
+					!prevSpecimenTypesRef.current.some(
+						(prev) => prev.id === t.id,
+					),
+			);
+
+			if (newTypes.length > 0) {
+				setData('specimen_type', newTypes[0].id.toString());
+				toast.success(
+					`Tipo de muestra "${newTypes[0].name}" seleccionado automáticamente`,
+				);
+			}
+		}
+
+		prevSpecimenTypesRef.current = specimenTypes;
+	}, [specimenTypes]);
+
+	React.useEffect(() => {
+		if (examinations.length > prevExaminationsRef.current.length) {
+			const newExams = examinations.filter(
+				(e) =>
+					!prevExaminationsRef.current.some(
+						(prev) => prev.id === e.id,
+					),
+			);
+
+			if (newExams.length > 0) {
+				setData('specimen_type_examination', newExams[0].id.toString());
+				toast.success(
+					`Análisis "${newExams[0].name}" seleccionado automáticamente`,
+				);
+			}
+		}
+
+		prevExaminationsRef.current = examinations;
+	}, [examinations]);
+
+	React.useEffect(() => {
+		if (categories.length > prevCategoriesRef.current.length) {
+			const newCats = categories.filter(
+				(c) =>
+					!prevCategoriesRef.current.some((prev) => prev.id === c.id),
+			);
+
+			if (newCats.length > 0) {
+				setData('specimen_category', newCats[0].id.toString());
+				toast.success(
+					`Categoría "${newCats[0].name}" seleccionada automáticamente`,
+				);
+			}
+		}
+
+		prevCategoriesRef.current = categories;
+	}, [categories]);
+
+	// Auto-select a newly created customer via flash data from the server
+	const createdCustomerId = flash?.created_customer?.id as number | undefined;
+	React.useEffect(() => {
+		if (!flash?.created_customer) {
+			return;
+		}
+
+		const createdCustomer = flash.created_customer as any;
+
+		if (!createdCustomer.id) {
+			return;
+		}
+
+		setData('customer', createdCustomer.id.toString());
+		setSelectedCustomerData(createdCustomer);
+		toast.success(
+			`Paciente "${createdCustomer.name}" seleccionado automáticamente`,
+		);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [createdCustomerId]);
+
+	React.useEffect(() => {
+		if (referrers.length > prevReferrersRef.current.length) {
+			const newReferrers = referrers.filter(
+				(r) =>
+					!prevReferrersRef.current.some((prev) => prev.id === r.id),
+			);
+
+			if (newReferrers.length > 0) {
+				setData('referrer', newReferrers[0].id.toString());
+				toast.success(
+					`Médico "${newReferrers[0].name}" seleccionado automáticamente`,
+				);
+			}
+		}
+
+		prevReferrersRef.current = referrers;
+	}, [referrers]);
+
+	const [localSequences, setLocalSequences] =
+		React.useState<any[]>(sequences);
+	const [showConfirm, setShowConfirm] = React.useState(false);
+	const [showRegenerateConfirm, setShowRegenerateConfirm] =
+		React.useState(false);
+	const [showBlockedPaymentAlert, setShowBlockedPaymentAlert] =
+		React.useState(false);
+	const [showExamChangePricePrompt, setShowExamChangePricePrompt] =
+		React.useState(false);
+	const [unlockedFullSteps, setUnlockedFullSteps] = React.useState(!specimen);
+	const [isFacturating, setIsFacturating] = React.useState(false);
+	const [isPaymentSheetOpen, setIsPaymentSheetOpen] = React.useState(false);
+	const [isReservingCode, setIsReservingCode] = React.useState(false);
+
+	const [currentStep, setCurrentStep] = React.useState(1);
+	const [searchQuery, setSearchQuery] = React.useState('');
+	const formRef = React.useRef<HTMLFormElement>(null);
+
+	React.useEffect(() => {
+		const container = formRef.current?.closest('.overflow-y-auto');
+
+		if (container) {
+			container.scrollTo({ top: 0, behavior: 'smooth' });
+		}
+	}, [currentStep]);
+
+	React.useEffect(() => {
+		setLocalSequences(sequences);
+	}, [sequences]);
+
+	const initialInvoice = specimen
+		? specimen.invoice_relation ||
+		specimen.invoiceRelation ||
+		specimen.group?.invoice ||
+		specimen.group_invoice ||
+		specimen.invoice ||
+		null
+		: null;
+
+	const {
+		data,
+		setData,
+		post,
+		processing,
+		errors,
+		setError,
+		clearErrors,
+		isDirty,
+		transform,
+	} = useForm({
+		_method: specimen ? 'PUT' : undefined,
+		customer: specimen?.customer ? specimen.customer.toString() : '',
+		specimen_type: specimen?.specimen_type
+			? specimen.specimen_type.toString()
+			: '',
+		specimen_type_examination: specimen?.specimen_type_examination
+			? specimen.specimen_type_examination.toString()
+			: '',
+		selected_examination_ids: (() => {
+			if (!specimen) {
+				return [] as string[];
+			}
+
+			const ids = new Set<string>();
+
+			if (
+				Array.isArray(specimen.examinations) &&
+				specimen.examinations.length > 0
+			) {
+				specimen.examinations.forEach((e: any) => {
+					if (e?.id) {
+						ids.add(String(e.id));
+					}
+				});
+			}
+
+			if (
+				Array.isArray(specimen.specimen_examinations) &&
+				specimen.specimen_examinations.length > 0
+			) {
+				specimen.specimen_examinations.forEach((se: any) => {
+					const id = se.examination_id || se.id || se.examination?.id;
+
+					if (id) {
+						ids.add(String(id));
+					}
+				});
+			}
+
+			if (
+				Array.isArray(specimen.specimenExaminations) &&
+				specimen.specimenExaminations.length > 0
+			) {
+				specimen.specimenExaminations.forEach((se: any) => {
+					const id = se.examination_id || se.id || se.examination?.id;
+
+					if (id) {
+						ids.add(String(id));
+					}
+				});
+			}
+
+			const inv =
+				specimen.invoice_relation ||
+				specimen.invoiceRelation ||
+				specimen.group?.invoice;
+			const invItems = inv?.invoice_specimens || inv?.invoiceSpecimens;
+
+			if (Array.isArray(invItems) && invItems.length > 0) {
+				invItems.forEach((item: any) => {
+					if (!item.specimen_id || item.specimen_id === specimen.id) {
+						const id = item.examination_id || item.examination?.id;
+
+						if (id) {
+							ids.add(String(id));
+						}
+					}
+				});
+			}
+
+			if (ids.size === 0 && specimen.specimen_type_examination) {
+				ids.add(String(specimen.specimen_type_examination));
+			}
+
+			return Array.from(ids);
+		})(),
+		examinations: [] as Array<any>,
+		specimen_category: specimen?.specimen_category
+			? specimen.specimen_category.toString()
+			: '',
+		is_manual_delivery_date_intern_enabled: Boolean(
+			specimen?.is_manual_delivery_date_intern_enabled,
+		),
+		delivery_date_intern_unit:
+			specimen?.delivery_date_intern_unit || 'minutes',
+		delivery_date_intern_quantity:
+			specimen?.delivery_date_intern_quantity ?? '',
+		is_manual_delivery_date_enabled: Boolean(
+			specimen?.is_manual_delivery_date_enabled,
+		),
+		delivery_date_unit:
+			specimen?.delivery_date_unit || 'minutes',
+		delivery_date_quantity:
+			specimen?.delivery_date_quantity ?? '',
+		referrer: specimen?.referrer ? specimen.referrer.toString() : '',
+		anatomic_site: specimen?.anatomic_site || '',
+		diagnosis: specimen?.diagnosis || '',
+		clinical_notes: specimen?.clinical_notes || '',
+		status: specimen?.status || 'received',
+		priority_id: specimen?.priority_id
+			? specimen.priority_id.toString()
+			: priorities && priorities.length > 0
+				? priorities[0].id.toString()
+				: '',
+		medical_order_file: null as File | null,
+		reserved_code: '',
+		sample_collection_date: specimen?.sample_collection_date
+			? specimen.sample_collection_date.split('T')[0]
+			: new Date().toISOString().split('T')[0],
+
+		// Billing fields (creation only)
+		quantity: 1,
+		amount: '',
+		selected_price: '',
+		custom_amount_enabled: false,
+		custom_amount: '0',
+		custom_amount_reason: '',
+		discount: '0',
+		additional_discount_enabled: false,
+		additional_discount: '0',
+		age_discount_type: null as string | null,
+		age_discount_amount: '0',
+		payment_type: initialInvoice?.payment_type || '',
+		regenerate_pdf: true,
+		template_id: '',
+		proof_of_payment: null as File | null,
+		has_initial_payment:
+			initialInvoice?.credit_payment_id ||
+				initialInvoice?.credit_relation ||
+				initialInvoice?.creditRelation
+				? parseFloat(
+					initialInvoice?.credit_relation?.amount_paid ||
+					initialInvoice?.creditRelation?.amount_paid ||
+					'0',
+				) > 0
+				: false,
+		initial_payment_amount:
+			initialInvoice?.credit_payment_id ||
+				initialInvoice?.credit_relation ||
+				initialInvoice?.creditRelation
+				? (
+					initialInvoice?.credit_relation?.amount_paid ||
+					initialInvoice?.creditRelation?.amount_paid ||
+					''
+				).toString()
+				: '',
+		initial_payment_type:
+			initialInvoice?.credit_payment_id ||
+				initialInvoice?.credit_relation ||
+				initialInvoice?.creditRelation
+				? initialInvoice?.cash_value &&
+					parseFloat(initialInvoice.cash_value) > 0
+					? 'cash'
+					: initialInvoice?.check_value &&
+						parseFloat(initialInvoice.check_value) > 0
+						? 'check'
+						: initialInvoice?.card_value_charged &&
+							parseFloat(initialInvoice.card_value_charged) > 0
+							? 'credit card'
+							: initialInvoice?.transfer_value &&
+								parseFloat(initialInvoice.transfer_value) > 0
+								? 'bank transfer'
+								: 'cash'
+				: 'cash',
+
+		// Detailed payment fields
+		payment_method_date:
+			initialInvoice?.payment_method_date ||
+			new Date().toISOString().split('T')[0],
+		cash_value: initialInvoice?.cash_value?.toString() || '',
+		check_number: initialInvoice?.check_number || '',
+		check_value: initialInvoice?.check_value?.toString() || '',
+		card_last_4: initialInvoice?.card_last_4 || '',
+		card_value_charged:
+			initialInvoice?.card_value_charged?.toString() || '',
+		card_expiration: initialInvoice?.card_expiration || '',
+		card_authorization_code: initialInvoice?.card_authorization_code || '',
+		transfer_bank_id: initialInvoice?.transfer_bank_id?.toString() || '',
+		transfer_value: initialInvoice?.transfer_value?.toString() || '',
+		transfer_authorization_code:
+			initialInvoice?.transfer_authorization_code || '',
+
+		// Insumos field (creation only)
+		agregar_insumos: false,
+		insumos: [] as Array<{
+			id: number;
+			quantity: number;
+			name: string;
+			code: string;
+			total_stock: number;
+			price: number;
+			prices: any[];
+		}>,
+	});
+
+	React.useEffect(() => {
+		transform((d: any) => {
+			const transformed = {
+				...d,
+				delivery_date_quantity: d.is_manual_delivery_date_enabled
+					? parseInt(d.delivery_date_quantity || '0', 10)
+					: 0,
+				delivery_date_intern_quantity: d.is_manual_delivery_date_intern_enabled
+					? parseInt(d.delivery_date_intern_quantity || '0', 10)
+					: 0,
+				initial_payment_amount:
+					d.payment_type === 'credit' && d.has_initial_payment
+						? d.initial_payment_amount
+						: null,
+				initial_payment_type:
+					d.payment_type === 'credit' && d.has_initial_payment
+						? d.initial_payment_type
+						: null,
+			};
+
+			// When opened from the report editor, do not send
+			// sample_collection_date so the form never overwrites the
+			// value the user set inside the report editor header.
+			if (readOnlySampleCollectionDate && specimen) {
+				delete transformed.sample_collection_date;
+			}
+
+			return transformed;
+		});
+	}, [transform]);
+
+	const specimenInvoice = React.useMemo(() => {
+		if (!specimen) {
+			return null;
+		}
+
+		return (
+			specimen.invoice_relation ||
+			specimen.invoiceRelation ||
+			specimen.group?.invoice ||
+			specimen.group_invoice ||
+			specimen.invoice ||
+			null
+		);
+	}, [specimen]);
+
+	const originalSpecimenType = React.useMemo(() => {
+		return specimen?.specimen_type ? String(specimen.specimen_type) : '';
+	}, [specimen]);
+
+	const originalExaminationIdsStr = React.useMemo(() => {
+		if (!specimen) {
+			return '';
+		}
+
+		const ids = new Set<string>();
+
+		if (
+			Array.isArray(specimen.examinations) &&
+			specimen.examinations.length > 0
+		) {
+			specimen.examinations.forEach((e: any) => {
+				if (e?.id) {
+					ids.add(String(e.id));
+				}
+			});
+		}
+
+		if (
+			Array.isArray(specimen.specimen_examinations) &&
+			specimen.specimen_examinations.length > 0
+		) {
+			specimen.specimen_examinations.forEach((se: any) => {
+				const id = se.examination_id || se.id || se.examination?.id;
+
+				if (id) {
+					ids.add(String(id));
+				}
+			});
+		}
+
+		if (
+			Array.isArray(specimen.specimenExaminations) &&
+			specimen.specimenExaminations.length > 0
+		) {
+			specimen.specimenExaminations.forEach((se: any) => {
+				const id = se.examination_id || se.id || se.examination?.id;
+
+				if (id) {
+					ids.add(String(id));
+				}
+			});
+		}
+
+		const inv =
+			specimen.invoice_relation ||
+			specimen.invoiceRelation ||
+			specimen.group?.invoice;
+		const invItems = inv?.invoice_specimens || inv?.invoiceSpecimens;
+
+		if (Array.isArray(invItems) && invItems.length > 0) {
+			invItems.forEach((item: any) => {
+				if (!item.specimen_id || item.specimen_id === specimen.id) {
+					const id = item.examination_id || item.examination?.id;
+
+					if (id) {
+						ids.add(String(id));
+					}
+				}
+			});
+		}
+
+		if (ids.size === 0 && specimen.specimen_type_examination) {
+			ids.add(String(specimen.specimen_type_examination));
+		}
+
+		return Array.from(ids).sort().join(',');
+	}, [specimen]);
+
+	const currentExaminationIdsStr = React.useMemo(() => {
+		const ids = (data.selected_examination_ids || []).map((id: any) =>
+			String(id),
+		);
+
+		return ids.sort().join(',');
+	}, [data.selected_examination_ids]);
+
+	const hasTypeOrExamsChanged = React.useMemo(() => {
+		if (!specimen) {
+			return false;
+		}
+
+		const typeChanged =
+			String(data.specimen_type || '') !== originalSpecimenType;
+		const examsChanged =
+			currentExaminationIdsStr !== originalExaminationIdsStr;
+
+		return typeChanged || examsChanged;
+	}, [
+		specimen,
+		data.specimen_type,
+		originalSpecimenType,
+		currentExaminationIdsStr,
+		originalExaminationIdsStr,
+	]);
+
+	const handleConfirmExamChangePrompt = () => {
+		setShowExamChangePricePrompt(false);
+		setUnlockedFullSteps(true);
+		setCurrentStep(2);
+
+		const targetInvoice = specimenInvoice;
+		const pType =
+			data.payment_type || targetInvoice?.payment_type || 'cash';
+		const calcTotal =
+			consolidatedTotals?.total ??
+			(targetInvoice?.total ? parseFloat(targetInvoice.total) : 0);
+		const calcTotalStr =
+			calcTotal > 0
+				? calcTotal.toFixed(2)
+				: targetInvoice?.total?.toString() || '0';
+
+		const creditRel =
+			targetInvoice?.credit_relation || targetInvoice?.creditRelation;
+
+		setData((d) => {
+			const next = { ...d };
+			next.payment_type = pType;
+			next.payment_method_date =
+				d.payment_method_date ||
+				targetInvoice?.payment_method_date ||
+				new Date().toISOString().split('T')[0];
+
+			if (pType === 'cash') {
+				next.cash_value =
+					d.cash_value && parseFloat(d.cash_value) > 0
+						? d.cash_value
+						: targetInvoice?.cash_value?.toString() || calcTotalStr;
+			} else if (pType === 'check') {
+				next.check_number =
+					d.check_number || targetInvoice?.check_number || '';
+				next.check_value =
+					d.check_value && parseFloat(d.check_value) > 0
+						? d.check_value
+						: targetInvoice?.check_value?.toString() ||
+						calcTotalStr;
+			} else if (pType === 'credit card') {
+				next.card_last_4 =
+					d.card_last_4 || targetInvoice?.card_last_4 || '';
+				next.card_expiration =
+					d.card_expiration || targetInvoice?.card_expiration || '';
+				next.card_authorization_code =
+					d.card_authorization_code ||
+					targetInvoice?.card_authorization_code ||
+					'';
+				next.card_value_charged =
+					d.card_value_charged && parseFloat(d.card_value_charged) > 0
+						? d.card_value_charged
+						: targetInvoice?.card_value_charged?.toString() ||
+						calcTotalStr;
+			} else if (pType === 'bank transfer') {
+				next.transfer_bank_id =
+					d.transfer_bank_id ||
+					targetInvoice?.transfer_bank_id?.toString() ||
+					'';
+				next.transfer_authorization_code =
+					d.transfer_authorization_code ||
+					targetInvoice?.transfer_authorization_code ||
+					'';
+				next.transfer_value =
+					d.transfer_value && parseFloat(d.transfer_value) > 0
+						? d.transfer_value
+						: targetInvoice?.transfer_value?.toString() ||
+						calcTotalStr;
+			} else if (pType === 'credit') {
+				const hasCredit =
+					targetInvoice?.credit_payment_id || creditRel
+						? parseFloat(creditRel?.amount_paid || '0') > 0
+						: false;
+				next.has_initial_payment = d.has_initial_payment ?? hasCredit;
+				next.initial_payment_amount =
+					d.initial_payment_amount ||
+					creditRel?.amount_paid?.toString() ||
+					'';
+			}
+
+			return next;
+		});
+	};
+
+	const filteredProducts = React.useMemo(() => {
+		return products.filter(
+			(product) =>
+				product.name
+					.toLowerCase()
+					.includes(searchQuery.toLowerCase()) ||
+				product.code.toLowerCase().includes(searchQuery.toLowerCase()),
+		);
+	}, [products, searchQuery]);
+
+	const selectedType = React.useMemo(() => {
+		return specimenTypes.find(
+			(t) => t.id.toString() === data.specimen_type,
+		);
+	}, [data.specimen_type, specimenTypes]);
+
+	const selectedExamination = React.useMemo(() => {
+		return examinations.find(
+			(e) => e.id.toString() === data.specimen_type_examination,
+		);
+	}, [data.specimen_type_examination, examinations]);
+
+	const availablePrices = React.useMemo(() => {
+		return selectedExamination?.prices || [];
+	}, [selectedExamination]);
+
+	React.useEffect(() => {
+		if (!data.specimen_type_examination) {
+			setData('selected_price', '');
+
+			return;
+		}
+
+		const selected = examinations.find(
+			(e) => e.id.toString() === data.specimen_type_examination,
+		);
+		const prices = selected?.prices || [];
+
+		if (prices.length > 0) {
+			const sortedPrices = [...prices].sort(
+				(a, b) => parseFloat(b.amount) - parseFloat(a.amount),
+			);
+			setData('selected_price', sortedPrices[0].amount.toString());
+		} else {
+			setData('selected_price', '');
+		}
+	}, [data.specimen_type_examination, examinations]);
+
+	const sortedSpecimenTypes = React.useMemo(() => {
+		return [...specimenTypes].sort((a, b) =>
+			a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }),
+		);
+	}, [specimenTypes]);
+
+	const filteredExaminations = React.useMemo(() => {
+		if (!data.specimen_type) {
+			return [];
+		}
+
+		return examinations
+			.filter((e) => e.specimen_type?.toString() === data.specimen_type)
+			.sort((a, b) =>
+				a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }),
+			);
+	}, [examinations, data.specimen_type]);
+
+	const searchedExaminations = React.useMemo(() => {
+		if (!examinationSearchQuery) {
+			return filteredExaminations;
+		}
+
+		const query = examinationSearchQuery
+			.toLowerCase()
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '');
+
+		return filteredExaminations.filter((exam) => {
+			const name = exam.name
+				.toLowerCase()
+				.normalize('NFD')
+				.replace(/[\u0300-\u036f]/g, '');
+
+			return name.includes(query);
+		});
+	}, [filteredExaminations, examinationSearchQuery]);
+
+	React.useEffect(() => {
+		if (data.specimen_type) {
+			const hasValidExamSelected = filteredExaminations.some(
+				(e) => e.id.toString() === data.specimen_type_examination,
+			);
+
+			if (
+				!hasValidExamSelected &&
+				data.specimen_type_examination !== ''
+			) {
+				setData('specimen_type_examination', '');
+			}
+		} else if (data.specimen_type_examination !== '') {
+			setData('specimen_type_examination', '');
+		}
+	}, [data.specimen_type, filteredExaminations]);
+
+	const handleAddInsumo = (product: any) => {
+		if (data.insumos.some((i: any) => i.id === product.id)) {
+			toast.info(`El producto "${product.name}" ya ha sido agregado.`);
+
+			return;
+		}
+
+		const sortedPrices = [...(product.prices || [])].sort(
+			(a, b) => parseFloat(b.amount) - parseFloat(a.amount),
+		);
+		const defaultPrice =
+			sortedPrices.length > 0
+				? parseFloat(sortedPrices[0].amount)
+				: parseFloat(product.sale_price) || 0;
+
+		const newInsumo = {
+			id: product.id,
+			name: product.name,
+			code: product.code,
+			quantity: 1,
+			total_stock: parseInt(product.total_stock) || 0,
+			price: defaultPrice,
+			prices: sortedPrices,
+			sale_price: parseFloat(product.sale_price) || 0,
+		};
+
+		setData('insumos', [...data.insumos, newInsumo]);
+		toast.success(`"${product.name}" agregado a insumos.`);
+	};
+
+	const handleUpdateInsumoQty = (id: number, qty: number) => {
+		const updated = data.insumos.map((i: any) => {
+			if (i.id === id) {
+				const cappedQty = Math.max(1, Math.min(i.total_stock, qty));
+
+				return { ...i, quantity: cappedQty };
+			}
+
+			return i;
+		});
+		setData('insumos', updated);
+	};
+
+	const handleUpdateInsumoPrice = (id: number, price: number) => {
+		const updated = data.insumos.map((i: any) => {
+			if (i.id === id) {
+				return { ...i, price: price };
+			}
+
+			return i;
+		});
+		setData('insumos', updated);
+	};
+
+	const handleRemoveInsumo = (id: number) => {
+		const updated = data.insumos.filter((i: any) => i.id !== id);
+		setData('insumos', updated);
+	};
+
+	React.useEffect(() => {
+		clearErrors();
+	}, []);
+
+	const matchingSequence = React.useMemo(() => {
+		if (!data.specimen_type) {
+			return null;
+		}
+
+		const targetLocationId = specimen?.location_id || activeLocationId;
+
+		if (!targetLocationId) {
+			return null;
+		}
+
+		return localSequences.find(
+			(s) =>
+				s.specimen_type.toString() === data.specimen_type.toString() &&
+				s.location_id.toString() === targetLocationId.toString() &&
+				s.active,
+		);
+	}, [specimen, data.specimen_type, localSequences, activeLocationId]);
+
+	const nextSequencePreview = React.useMemo(() => {
+		if (!matchingSequence) {
+			return '';
+		}
+
+		const fillWidth = matchingSequence.fill ?? 4;
+		const paddedSeq = String(matchingSequence.current_sequence).padStart(
+			fillWidth,
+			'0',
+		);
+		const paddedMonth = String(matchingSequence.month).padStart(2, '0');
+
+		return `${matchingSequence.prefix}${matchingSequence.separator}${paddedSeq}${matchingSequence.separator}${paddedMonth}${matchingSequence.separator}${matchingSequence.year}`;
+	}, [matchingSequence]);
+
+	const isSpecimenTypeChanged = React.useMemo(() => {
+		if (!specimen) {
+			return false;
+		}
+
+		return (
+			String(data.specimen_type) !== String(specimen.specimen_type) ||
+			String(data.specimen_type_examination) !==
+			String(specimen.specimen_type_examination)
+		);
+	}, [specimen, data.specimen_type, data.specimen_type_examination]);
+
+	React.useEffect(() => {
+		if (setIsDirty) {
+			setIsDirty(
+				isDirty || isSpecimenTypeChanged || hasTypeOrExamsChanged,
+			);
+		}
+	}, [isDirty, isSpecimenTypeChanged, hasTypeOrExamsChanged, setIsDirty]);
+
+	const isGroupSpecimen = React.useMemo(() => {
+		if (!specimen) {
+			return false;
+		}
+
+		return Boolean(
+			specimen.is_group || specimen.group_id || specimen.group,
+		);
+	}, [specimen]);
+
+	React.useEffect(() => {
+		if (specimen && specimen.report_id && isSpecimenTypeChanged) {
+			const typeId = data.specimen_type;
+			const examId = data.specimen_type_examination;
+
+			if (typeId && examId) {
+				setIsLoadingTemplates(true);
+				fetch(
+					`/specimens/templates/available?specimen_type_id=${typeId}&specimen_type_examination_id=${examId}`,
+				)
+					.then((res) => res.json())
+					.then((templatesList) => {
+						setAvailableTemplates(templatesList);
+
+						if (templatesList.length === 1) {
+							setData('template_id', String(templatesList[0].id));
+						} else {
+							setData('template_id', '');
+						}
+					})
+					.catch((err) => {
+						console.error('Error fetching templates:', err);
+					})
+					.finally(() => {
+						setIsLoadingTemplates(false);
+					});
+			} else {
+				setAvailableTemplates([]);
+				setData('template_id', '');
+			}
+		} else {
+			setAvailableTemplates([]);
+			setData('template_id', '');
+		}
+	}, [
+		specimen,
+		data.specimen_type,
+		data.specimen_type_examination,
+		isSpecimenTypeChanged,
+	]);
+
+	const validateStep1 = () => {
+		clearErrors();
+		const localErrors: Record<string, string> = {};
+
+		// Validar campos de la muestra
+		if (!data.customer) {
+			localErrors.customer = 'El paciente es requerido.';
+		}
+
+		if (!data.referrer) {
+			localErrors.referrer = 'El médico remitente es requerido.';
+		}
+
+		if (!data.specimen_type) {
+			localErrors.specimen_type = 'El tipo de muestra es requerido.';
+		} else if (!specimen && !matchingSequence) {
+			localErrors.specimen_type =
+				'No existe una secuencia de numeración activa configurada para este tipo de muestra.';
+		}
+
+		if (!data.specimen_type_examination) {
+			localErrors.specimen_type_examination =
+				'El examen a realizar es requerido.';
+		}
+
+		if (!data.specimen_category) {
+			localErrors.specimen_category =
+				'La categoría de tiempo es requerida.';
+		}
+
+		if (!data.priority_id) {
+			localErrors.priority_id = 'La prioridad es requerida.';
+		}
+
+		if (!data.status) {
+			localErrors.status = 'El estado es requerido.';
+		}
+
+		if (Object.keys(localErrors).length > 0) {
+			Object.entries(localErrors).forEach(([key, val]) => {
+				setError(key as any, val);
+			});
+
+			toast.error(
+				<div className="flex flex-col gap-1">
+					<span className="flex items-center gap-1.5 text-sm font-bold text-destructive">
+						<AlertCircle className="h-4 w-4" /> Error de Validación
+					</span>
+					<span className="text-xs text-muted-foreground">
+						Por favor, complete todos los campos obligatorios del
+						Paso 1 antes de continuar.
+					</span>
+				</div>,
+			);
+
+			return false;
+		}
+
+		return true;
+	};
+
+	const handleNextStep = async () => {
+		if (currentStep === 1 && validateStep1()) {
+			if (data.reserved_code) {
+				setCurrentStep(2);
+
+				return;
+			}
+
+			setIsReservingCode(true);
+
+			try {
+				const response = await axios.post('/specimens/reserve-code', {
+					specimen_type_id: parseInt(data.specimen_type),
+					location_id: activeLocationId
+						? parseInt(activeLocationId.toString())
+						: null,
+				});
+				setData((d) => ({
+					...d,
+					reserved_code: response.data.code,
+				}));
+				setCurrentStep(2);
+			} catch (error: any) {
+				console.error('Error reserving code:', error);
+				const errMsg =
+					error.response?.data?.message ||
+					'Error al reservar el código de secuencia.';
+				toast.error(errMsg);
+			} finally {
+				setIsReservingCode(false);
+			}
+		}
+	};
+
+	const validateStep3 = () => {
+		clearErrors();
+		const localErrors: Record<string, string> = {};
+
+		// Validar campos de facturación (creación)
+		if (!data.payment_type) {
+			localErrors.payment_type = 'El método de pago es requerido.';
+		}
+
+		if (!data.amount) {
+			localErrors.amount = 'El importe es requerido.';
+		} else if (parseFloat(data.amount) < 0) {
+			localErrors.amount = 'El importe debe ser mayor o igual a 0.';
+		}
+
+		if (data.custom_amount_enabled) {
+			if (!data.custom_amount) {
+				localErrors.custom_amount =
+					'El importe personalizado es requerido.';
+			} else if (parseFloat(data.custom_amount) < 0) {
+				localErrors.custom_amount =
+					'El importe personalizado debe ser mayor o igual a 0.';
+			}
+
+			if (
+				!data.custom_amount_reason ||
+				!data.custom_amount_reason.trim()
+			) {
+				localErrors.custom_amount_reason =
+					'El concepto/razón del importe adicional es requerido.';
+			}
+		}
+
+		if (data.additional_discount_enabled) {
+			if (!data.additional_discount) {
+				localErrors.additional_discount =
+					'El descuento adicional es requerido.';
+			} else {
+				const addDiscount = parseFloat(data.additional_discount);
+
+				if (isNaN(addDiscount) || addDiscount < 0) {
+					localErrors.additional_discount =
+						'El descuento adicional debe ser mayor o igual a 0.';
+				} else if (addDiscount > subtotalVal) {
+					localErrors.additional_discount = `El descuento adicional no puede superar el subtotal (L. ${subtotalVal.toFixed(2)}).`;
+				}
+			}
+		}
+
+		if (data.discount && parseFloat(data.discount) < 0) {
+			localErrors.discount = 'El descuento debe ser mayor o igual a 0.';
+		}
+
+		if (data.payment_type === 'credit' && data.has_initial_payment) {
+			if (!data.initial_payment_amount) {
+				localErrors.initial_payment_amount =
+					'El monto de pago inicial es requerido.';
+			} else {
+				const amt = parseFloat(data.initial_payment_amount);
+				const minAllowed = totalVal === 0 ? 0 : 0.01;
+
+				if (isNaN(amt) || amt < minAllowed) {
+					localErrors.initial_payment_amount =
+						totalVal === 0
+							? 'El monto de pago inicial debe ser mayor o igual a cero.'
+							: 'El monto de pago inicial debe ser mayor a cero.';
+				} else if (amt > totalVal) {
+					localErrors.initial_payment_amount = `El monto de pago inicial no puede superar el total de la factura (L. ${totalVal.toFixed(2)}).`;
+				}
+			}
+
+			if (!data.initial_payment_type) {
+				localErrors.initial_payment_type =
+					'El tipo de pago inicial es requerido.';
+			}
+		}
+
+		const needsProof =
+			(data.payment_type !== 'credit' && data.payment_type !== 'cash') ||
+			(data.payment_type === 'credit' &&
+				data.has_initial_payment &&
+				data.initial_payment_type !== 'cash');
+
+		if (needsProof && !data.proof_of_payment) {
+			localErrors.proof_of_payment =
+				'El comprobante de pago es requerido.';
+		}
+
+		if (Object.keys(localErrors).length > 0) {
+			Object.entries(localErrors).forEach(([key, val]) => {
+				setError(key as any, val);
+			});
+
+			const firstErrKey = Object.keys(localErrors)[0];
+			const firstErrMsg = localErrors[firstErrKey];
+
+			toast.error(
+				<div className="flex flex-col gap-1">
+					<span className="flex items-center gap-1.5 text-sm font-bold text-destructive">
+						<AlertCircle className="h-4 w-4" /> Error de Validación
+					</span>
+					<span className="text-xs font-medium text-foreground">
+						{firstErrMsg}
+					</span>
+				</div>,
+			);
+
+			return false;
+		}
+
+		return true;
+	};
+
+	const handlePreSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+
+		// Validate step 1 fields before showing confirm/editing
+		if (!validateStep1()) {
+			return;
+		}
+
+		// Si es edición:
+		if (specimen) {
+			if (hasTypeOrExamsChanged && !unlockedFullSteps) {
+				setShowExamChangePricePrompt(true);
+
+				return;
+			}
+
+			if (unlockedFullSteps && currentStep === 1) {
+				setCurrentStep(2);
+
+				return;
+			}
+
+			if (unlockedFullSteps && currentStep === 2) {
+				if (!validateStep3()) {
+					return;
+				}
+			}
+
+			const originalPaymentType = specimenInvoice?.payment_type;
+			const newVal = data.payment_type;
+
+			if (
+				originalPaymentType === 'credit' &&
+				['credit card', 'bank transfer', 'check'].includes(newVal)
+			) {
+				if (!data.proof_of_payment) {
+					setError(
+						'proof_of_payment',
+						'El archivo de comprobante de pago es requerido al cambiar de crédito.',
+					);
+					toast.error(
+						'El archivo de comprobante de pago es requerido al cambiar de crédito.',
+					);
+
+					return;
+				}
+			}
+
+			setShowRegenerateConfirm(true);
+
+			return;
+		}
+
+		// Si es creación y estamos en el paso 1, avanzar al paso 2
+		if (currentStep === 1) {
+			handleNextStep();
+
+			return;
+		}
+
+		// Validar campos requeridos nativos en el navegador primero
+		if (formRef.current && !formRef.current.reportValidity()) {
+			return;
+		}
+
+		// Si estamos en el paso 2, validar el paso 2 y mostrar diálogo de confirmación
+		if (validateStep3()) {
+			setShowConfirm(true);
+		}
+	};
+
+	const submitForm = async () => {
+		const inaccessibleFileName = await findInaccessibleFile([
+			data.medical_order_file,
+			data.proof_of_payment,
+		]);
+
+		if (inaccessibleFileName) {
+			toast.error(
+				`El archivo "${inaccessibleFileName}" ya no se encuentra accesible en su equipo (pudo haber sido movido o eliminado). Por favor selecciónelo nuevamente.`,
+			);
+
+			return;
+		}
+
+		const options = {
+			onBefore: () => {
+				if (!specimen) {
+					setIsFacturating(true);
+				}
+			},
+			onSuccess: () => {
+				toast.success(
+					specimen
+						? isGroupSpecimen
+							? 'Muestra actualizada y factura de grupo regenerada'
+							: 'Muestra actualizada'
+						: 'Muestra creada y facturada',
+				);
+				setIsFacturating(false);
+				onSuccess();
+			},
+			onError: (err: any) => {
+				setIsFacturating(false);
+				console.error('Error al guardar la muestra:', err);
+
+				if (err && Object.keys(err).length > 0) {
+					const firstError = Object.values(err)[0] as string;
+					toast.error(`Error de validación: ${firstError}`);
+				} else {
+					toast.error(
+						'Hubo un error al procesar la solicitud. Por favor verifique los campos.',
+					);
+				}
+			},
+			onNetworkError: (error: any) => {
+				setIsFacturating(false);
+				console.error('Error de red al guardar la muestra:', error);
+				toast.error(
+					'Error de conexión de red o internet. Por favor verifique su conexión e intente de nuevo más tarde.',
+				);
+
+				return false;
+			},
+			onFinish: () => {
+				setIsFacturating(false);
+			},
+		};
+
+		if (specimen) {
+			post(updateSpecimen(specimen.id).url, options);
+		} else {
+			post(storeSpecimen().url, options);
+		}
+	};
+
+	// Maximum prices (regular prices)
+	const maxSpecimenPriceVal = React.useMemo(() => {
+		if (availablePrices.length === 0) {
+			return 0;
+		}
+
+		return Math.max(
+			...availablePrices.map((p: any) => parseFloat(p.amount) || 0),
+		);
+	}, [availablePrices]);
+
+	const maxInsumosTotalVal = React.useMemo(() => {
+		return data.insumos.reduce((sum: number, insumo: any) => {
+			const maxPrice =
+				insumo.prices && insumo.prices.length > 0
+					? parseFloat(insumo.prices[0].amount)
+					: parseFloat(insumo.sale_price) || insumo.price || 0;
+
+			return sum + maxPrice * insumo.quantity;
+		}, 0);
+	}, [data.insumos]);
+
+	// retrieve settings (reuse pageProps from above)
+	const { settings } = pageProps;
+	const thirdAgePercent = parseFloat(settings?.third_age_discount || '30');
+	const fourthAgePercent = parseFloat(settings?.fourth_age_discount || '40');
+
+	// Helper to update individual examination billing settings
+	const updateExamConfig = (examId: number, field: string, value: any) => {
+		setData((prev) => {
+			const currentExams = [...(prev.examinations || [])];
+			const idx = currentExams.findIndex(
+				(x) => x.examination_id === examId,
+			);
+			const updatedItem =
+				idx >= 0
+					? { ...currentExams[idx] }
+					: { examination_id: examId };
+
+			updatedItem[field] = value;
+
+			if (field === 'selected_price' && value !== 'custom') {
+				updatedItem.custom_specimen_price = '0';
+			}
+
+			if (idx >= 0) {
+				currentExams[idx] = updatedItem;
+			} else {
+				currentExams.push(updatedItem);
+			}
+
+			return {
+				...prev,
+				examinations: currentExams,
+			};
+		});
+	};
+
+	const calculatedExaminations = React.useMemo(() => {
+		const ids = data.selected_examination_ids || [];
+
+		return ids.map((idStr: string) => {
+			const examId = parseInt(idStr, 10);
+			const examObj = examinations.find((e) => e.id === examId);
+			const config =
+				(data.examinations || []).find(
+					(x: any) => x.examination_id === examId,
+				) || {};
+			const prices = examObj?.prices || [];
+
+			const itemCalc = calculateInvoiceItem(
+				{
+					examination_id: examId,
+					selected_price: config.selected_price,
+					custom_specimen_price: config.custom_specimen_price,
+					quantity: config.quantity,
+					age_discount_type: config.age_discount_type,
+					additional_discount_enabled:
+						config.additional_discount_enabled,
+					additional_discount: config.additional_discount,
+					available_prices: prices,
+				},
+				examObj,
+				{
+					third_age_discount: thirdAgePercent,
+					fourth_age_discount: fourthAgePercent,
+				},
+			);
+
+			return {
+				...itemCalc,
+				examObj,
+				prices,
+				totalDiscount: itemCalc.totalLineDiscount,
+				subtotal: itemCalc.lineSubtotal,
+				priceDiscount: itemCalc.priceDiscount,
+				ageDiscount: itemCalc.ageDiscountAmount,
+				additionalDiscount: itemCalc.addDiscountAmount,
+			};
+		});
+	}, [
+		data.selected_examination_ids,
+		data.examinations,
+		examinations,
+		thirdAgePercent,
+		fourthAgePercent,
+	]);
+
+	// Sync data.examinations whenever selected_examination_ids changes to ensure defaults
+	React.useEffect(() => {
+		const ids = data.selected_examination_ids || [];
+
+		if (ids.length === 0) {
+			return;
+		}
+
+		const currentExamConfigs = [...(data.examinations || [])];
+		let updated = false;
+
+		ids.forEach((idStr: string) => {
+			const examId = parseInt(idStr, 10);
+			const exists = currentExamConfigs.some(
+				(x: any) => x.examination_id === examId,
+			);
+
+			if (!exists) {
+				const examObj = examinations.find((e) => e.id === examId);
+				const prices = examObj?.prices || [];
+				const defaultPrice =
+					prices.length > 0 ? prices[0].amount.toString() : '';
+				currentExamConfigs.push({
+					examination_id: examId,
+					quantity: 1,
+					selected_price: defaultPrice,
+					custom_specimen_price: '0',
+					additional_discount_enabled: false,
+					additional_discount: '0',
+					age_discount_type: null,
+					age_discount_amount: '0',
+				});
+				updated = true;
+			}
+		});
+
+		if (updated) {
+			setData('examinations', currentExamConfigs);
+		}
+	}, [data.selected_examination_ids]);
+
+	// Real-time invoice billing totals calculation
+	const insumosTotalVal = data.insumos.reduce(
+		(sum: number, insumo: any) =>
+			sum + parseFloat(insumo.price || 0) * (insumo.quantity || 0),
+		0,
+	);
+
+	const consolidatedTotals = React.useMemo(() => {
+		const extra = data.custom_amount_enabled
+			? parseFloat(data.custom_amount) || 0
+			: 0;
+
+		return calculateConsolidatedTotals(
+			calculatedExaminations,
+			insumosTotalVal,
+			extra,
+		);
+	}, [
+		calculatedExaminations,
+		insumosTotalVal,
+		data.custom_amount_enabled,
+		data.custom_amount,
+	]);
+
+	const amountVal = consolidatedTotals.amount;
+	const discountVal = consolidatedTotals.discount;
+	const subtotalVal = consolidatedTotals.subtotal;
+	const totalVal = consolidatedTotals.total;
+
+	React.useEffect(() => {
+		if (
+			data.amount !== amountVal.toString() ||
+			data.discount !== discountVal.toString() ||
+			data.quantity !== (consolidatedTotals.quantity || 1)
+		) {
+			setData((d) => ({
+				...d,
+				amount: amountVal.toString(),
+				discount: discountVal.toString(),
+				quantity: consolidatedTotals.quantity || 1,
+			}));
+		}
+	}, [amountVal, discountVal, consolidatedTotals.quantity]);
+	const selectedPriceVal = parseFloat(data.selected_price) || 0;
+	const customAmountVal = data.custom_amount_enabled
+		? parseFloat(data.custom_amount) || 0
+		: 0;
+	const additionalDiscountVal = data.additional_discount_enabled
+		? parseFloat(data.additional_discount) || 0
+		: 0;
+
+	const selectedCustomer = selectedCustomerData;
+	const selectedCustomerLabel = selectedCustomer?.name || 'Sin seleccionar';
+	const selectedExaminationLabel =
+		examinations.find(
+			(e) => e.id.toString() === data.specimen_type_examination,
+		)?.name || 'Sin seleccionar';
+
+	const isProofRequired =
+		(data.payment_type !== 'credit' && data.payment_type !== 'cash') ||
+		(data.payment_type === 'credit' &&
+			data.has_initial_payment &&
+			data.initial_payment_type !== 'cash');
+
+	const isSubmitDisabled = !!(
+		specimen?.report_id &&
+		isSpecimenTypeChanged &&
+		availableTemplates.length > 0 &&
+		!data.template_id
+	);
+
+	return (
+		<>
+			{isFacturating &&
+				typeof window !== 'undefined' &&
+				createPortal(
+					<div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4 bg-background/80 backdrop-blur-sm">
+						<Spinner className="h-12 w-12 text-primary" />
+						<div className="flex flex-col items-center text-center">
+							<h3 className="text-lg font-bold text-foreground">
+								Procesando Factura
+							</h3>
+							<p className="mt-1 max-w-xs text-sm text-muted-foreground">
+								Estamos registrando la muestra, aplicando el
+								rango CAI y generando el PDF de la factura. Por
+								favor, espere.
+							</p>
+						</div>
+					</div>,
+					document.body,
+				)}
+
+			<form
+				ref={formRef}
+				onSubmit={handlePreSubmit}
+				className="flex flex-col gap-6 px-5 py-4 pt-0"
+			>
+				<div className="mb-2 flex flex-col gap-4 rounded-lg border border-border/60 bg-muted/40 p-4">
+					{(!specimen || unlockedFullSteps) && (
+						<div className="mx-auto flex w-full max-w-lg flex-nowrap items-center justify-center gap-2 border-b border-border/40 pb-4 sm:gap-4">
+							{/* Paso 1 */}
+							<button
+								type="button"
+								onClick={() => {
+									if (currentStep > 1) {
+										setCurrentStep(1);
+									}
+								}}
+								className={cn(
+									'group flex cursor-pointer items-center gap-2 text-left focus:outline-none sm:gap-3',
+									currentStep > 1 && 'hover:opacity-80',
+								)}
+							>
+								<div
+									className={cn(
+										'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all duration-200',
+										currentStep === 1
+											? 'bg-primary text-primary-foreground ring-4 ring-primary/10'
+											: 'bg-emerald-500 text-white',
+									)}
+								>
+									{currentStep > 1 ? (
+										<Check className="h-4.5 w-4.5 stroke-[3]" />
+									) : (
+										'1'
+									)}
+								</div>
+								<div className="flex flex-col">
+									<span
+										className={cn(
+											'text-xs leading-none font-bold transition-colors',
+											currentStep === 1
+												? 'text-foreground'
+												: 'text-muted-foreground group-hover:text-foreground',
+										)}
+									>
+										Paso 1
+									</span>
+									<span
+										className={cn(
+											'mt-1 hidden text-[11px] leading-none font-medium transition-colors sm:block',
+											currentStep === 1
+												? 'font-semibold text-primary'
+												: 'text-muted-foreground group-hover:text-foreground',
+										)}
+									>
+										Datos de la Muestra
+									</span>
+								</div>
+							</button>
+
+							<div className="h-[2px] w-8 shrink-0 overflow-hidden rounded-full bg-muted-foreground/20 sm:w-12">
+								<div
+									className={cn(
+										'h-full bg-primary transition-all duration-300 ease-out',
+										currentStep > 1 ? 'w-full' : 'w-0',
+									)}
+								/>
+							</div>
+
+							{/* Paso 2 */}
+							<button
+								type="button"
+								onClick={() => {
+									if (currentStep === 1 && validateStep1()) {
+										setCurrentStep(2);
+									}
+								}}
+								className={cn(
+									'group flex cursor-pointer items-center gap-2 text-left focus:outline-none sm:gap-3',
+									currentStep !== 2 && 'hover:opacity-80',
+								)}
+							>
+								<div
+									className={cn(
+										'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all duration-200',
+										currentStep === 2
+											? 'bg-primary text-primary-foreground ring-4 ring-primary/10'
+											: 'border border-border bg-muted text-muted-foreground',
+									)}
+								>
+									2
+								</div>
+								<div className="flex flex-col">
+									<span
+										className={cn(
+											'text-xs leading-none font-bold transition-colors',
+											currentStep === 2
+												? 'text-foreground'
+												: 'text-muted-foreground group-hover:text-foreground',
+										)}
+									>
+										Paso 2
+									</span>
+									<span
+										className={cn(
+											'mt-1 hidden text-[11px] leading-none font-medium transition-colors sm:block',
+											currentStep === 2
+												? 'font-semibold text-primary'
+												: 'text-muted-foreground group-hover:text-foreground',
+										)}
+									>
+										Facturación
+									</span>
+								</div>
+							</button>
+						</div>
+					)}
+
+					{/* Customer Selection Row inside the gray steps container */}
+					<div className="space-y-4">
+						<div className="flex items-center gap-2">
+							<span className="shrink-0 text-xs font-bold tracking-wider text-muted-foreground uppercase">
+								Cliente
+							</span>
+							{selectedCustomer && (
+								<span
+									className={cn(
+										'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase',
+										selectedCustomer.type === 'empresa'
+											? 'border border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400'
+											: 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+									)}
+								>
+									{selectedCustomer.type === 'empresa'
+										? 'Empresa'
+										: 'Individual'}
+								</span>
+							)}
+							<div className="min-w-0 flex-1">
+								<AsyncCustomerCombobox
+									placeholder="Seleccionar cliente"
+									value={data.customer}
+									initialCustomer={selectedCustomerData}
+									onChange={(v, customer) => {
+										setData('customer', v);
+										setSelectedCustomerData(
+											customer ?? null,
+										);
+									}}
+								/>
+							</div>
+							<button
+								type="button"
+								onClick={() => {
+									setCustomerToEdit(null);
+									setIsCustomerSheetOpen(true);
+								}}
+								className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+							>
+								<Plus className="h-3 w-3" /> Nuevo
+							</button>
+						</div>
+						{errors.customer && (
+							<p className="text-xs text-destructive">
+								{errors.customer}
+							</p>
+						)}
+
+						{selectedCustomer && (
+							<div className="relative border-t border-border/50 pt-3 text-xs">
+								{pageProps.auth?.permissions?.includes(
+									'patients.edit',
+								) && (
+										<button
+											type="button"
+											onClick={() => {
+												setCustomerToEdit(
+													selectedCustomerData,
+												);
+												setIsCustomerSheetOpen(true);
+											}}
+											className="absolute top-3 right-0 flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+										>
+											<Edit2 className="h-3 w-3" /> Editar
+											cliente
+										</button>
+									)}
+								<div className="grid grid-cols-1 gap-4 pr-28 sm:grid-cols-3">
+									<div className="flex flex-col gap-1">
+										<span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+											RTN / Identidad
+										</span>
+										<span className="font-mono font-medium text-foreground">
+											{selectedCustomer.id_number ||
+												'N/A'}
+										</span>
+									</div>
+									<div className="flex flex-col gap-1">
+										<span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+											Correo Electrónico
+										</span>
+										<span className="font-medium break-all text-foreground">
+											{selectedCustomer.email ||
+												'Sin correo'}
+										</span>
+									</div>
+									{selectedCustomer.type !== 'empresa' && (
+										<div className="flex flex-col gap-1">
+											<span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+												Edad
+											</span>
+											<span className="font-medium text-foreground">
+												{selectedCustomer.age
+													? `${selectedCustomer.age} años`
+													: 'N/A'}
+											</span>
+										</div>
+									)}
+								</div>
+							</div>
+						)}
+					</div>
+				</div>
+
+				{/* SECCIÓN 1: DATOS DE LA MUESTRA */}
+				{(!specimen || unlockedFullSteps
+					? currentStep === 1
+					: true) && (
+						<div>
+							<h3 className="mb-4 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+								Datos de la Muestra
+							</h3>
+
+							{specimen &&
+								specimen.sequence_code &&
+								(Number(data.specimen_type) ===
+									Number(specimen.specimen_type) ? (
+									<div className="mb-4 flex items-center justify-between rounded-md border border-dashed bg-muted/40 p-3">
+										<span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+											<Tag className="h-3.5 w-3.5" /> Código
+											de Secuencia (Muestra):
+										</span>
+										<span className="font-mono text-sm font-bold text-primary">
+											{specimen.sequence_code}
+										</span>
+									</div>
+								) : (
+									<div className="mb-4 flex flex-col gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/5 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+										<div className="flex items-center justify-between">
+											<span className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+												<AlertCircle className="h-3.5 w-3.5 text-amber-500" />{' '}
+												Código de Secuencia original:
+											</span>
+											<span className="font-mono text-sm font-bold line-through opacity-70">
+												{specimen.sequence_code}
+											</span>
+										</div>
+										<div className="mt-1 flex items-center justify-between border-t border-amber-500/10 pt-1.5">
+											<span className="text-[10.5px] font-semibold text-amber-600 dark:text-amber-400">
+												Nuevo código estimado:
+											</span>
+											<span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+												{nextSequencePreview ||
+													'Generando nuevo correlativo...'}
+											</span>
+										</div>
+									</div>
+								))}
+
+							<div className="grid grid-cols-1 gap-4">
+								<div className="grid gap-2">
+									<div className="flex items-center justify-between">
+										<Label htmlFor="referrer">
+											Remitente (Médico)
+										</Label>
+										<div className="flex items-center gap-3">
+											{data.referrer && (
+												<button
+													type="button"
+													onClick={() => {
+														const selected =
+															referrers.find(
+																(r) =>
+																	r.id.toString() ===
+																	data.referrer,
+															);
+
+														if (selected) {
+															setEditingReferrer(
+																selected,
+															);
+															setReferrerInitialData(
+																null,
+															);
+															setIsReferrerSheetOpen(
+																true,
+															);
+														}
+													}}
+													className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+												>
+													<Edit2 className="h-3 w-3" />{' '}
+													Editar
+												</button>
+											)}
+											<button
+												type="button"
+												onClick={() => {
+													setEditingReferrer(null);
+													setIsReferrerSheetOpen(true);
+												}}
+												className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+											>
+												<Plus className="h-3 w-3" /> Nuevo
+											</button>
+										</div>
+									</div>
+									<FormCombobox
+										placeholder="Seleccionar médico"
+										value={data.referrer}
+										onChange={(v) => setData('referrer', v)}
+										options={referrers.map((r) => ({
+											label:
+												r.notes && r.notes.trim()
+													? `(ID: ${r.id}) ${r.name} - ${r.notes.trim()}`
+													: `(ID: ${r.id}) ${r.name} - (Sin Notas/Hospital/Clinica)`,
+											value: r.id.toString(),
+										}))}
+									/>
+									{errors.referrer && (
+										<p className="text-sm text-destructive">
+											{errors.referrer}
+										</p>
+									)}
+								</div>
+							</div>
+
+							<div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+								<div className="grid gap-2">
+									<div className="flex items-center justify-between">
+										<Label htmlFor="specimen_type">
+											Tipo de Muestra
+										</Label>
+										<button
+											type="button"
+											onClick={() =>
+												setIsSpecimenTypeSheetOpen(true)
+											}
+											className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+										>
+											<Plus className="h-3 w-3" /> Nuevo
+										</button>
+									</div>
+									<Popover modal={true}>
+										<PopoverTrigger asChild>
+											<Button
+												variant="outline"
+												role="combobox"
+												className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
+											>
+												<div className="flex items-center gap-2 truncate">
+													<Microscope className="h-4 w-4 text-muted-foreground" />
+													<span className="truncate">
+														{sortedSpecimenTypes.find(
+															(t) =>
+																t.id.toString() ===
+																data.specimen_type,
+														)?.name ||
+															'Seleccionar tipo'}
+													</span>
+												</div>
+												<ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+											</Button>
+										</PopoverTrigger>
+										<PopoverContent
+											className="z-[9999] w-[--radix-popover-trigger-width] p-0"
+											align="start"
+										>
+											<Command>
+												<CommandInput placeholder="Buscar tipo de muestra..." />
+												<CommandList>
+													<CommandEmpty>
+														No se encontraron
+														resultados.
+													</CommandEmpty>
+													<CommandGroup>
+														{sortedSpecimenTypes.map(
+															(t) => (
+																<CommandItem
+																	key={t.id}
+																	value={t.name}
+																	onSelect={() => {
+																		setData(
+																			(
+																				d,
+																			) => ({
+																				...d,
+																				specimen_type:
+																					t.id.toString(),
+																				selected_examination_ids:
+																					[],
+																				specimen_type_examination:
+																					'',
+																				examinations:
+																					[],
+																				reserved_code:
+																					'',
+																			}),
+																		);
+																	}}
+																>
+																	<Check
+																		className={cn(
+																			'mr-2 h-4 w-4',
+																			data.specimen_type ===
+																				t.id.toString()
+																				? 'opacity-100'
+																				: 'opacity-0',
+																		)}
+																	/>
+																	<span>
+																		{t.name}
+																	</span>
+																</CommandItem>
+															),
+														)}
+													</CommandGroup>
+												</CommandList>
+											</Command>
+										</PopoverContent>
+									</Popover>
+
+									{errors.specimen_type && (
+										<p className="text-sm text-destructive">
+											{errors.specimen_type}
+										</p>
+									)}
+								</div>
+
+								<div className="grid gap-2">
+									<div className="flex items-center justify-between">
+										<Label htmlFor="specimen_type_examination">
+											Examen(es) a Realizar
+										</Label>
+										<button
+											type="button"
+											onClick={() =>
+												setIsExaminationSheetOpen(true)
+											}
+											disabled={!data.specimen_type}
+											className={cn(
+												'flex items-center gap-1 text-xs font-medium transition-colors',
+												data.specimen_type
+													? 'cursor-pointer text-primary hover:underline'
+													: 'cursor-not-allowed text-muted-foreground/50',
+											)}
+										>
+											<Plus className="h-3 w-3" /> Nuevo
+										</button>
+									</div>
+									<Popover
+										modal={true}
+										onOpenChange={(open) => {
+											if (!open) {
+												setExaminationSearchQuery('');
+											}
+										}}
+									>
+										<PopoverTrigger asChild>
+											<Button
+												variant="outline"
+												disabled={!data.specimen_type}
+												className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50 disabled:opacity-50"
+											>
+												<div className="flex items-center gap-2 truncate">
+													<FileText className="h-4 w-4 text-muted-foreground" />
+													<span className="truncate">
+														{data.selected_examination_ids &&
+															data
+																.selected_examination_ids
+																.length > 0
+															? `Análisis (${data.selected_examination_ids.length} seleccionados)`
+															: data.specimen_type
+																? 'Seleccionar análisis'
+																: 'Seleccione un tipo primero'}
+													</span>
+												</div>
+												<ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+											</Button>
+										</PopoverTrigger>
+										<PopoverContent
+											className="z-[9999] w-[--radix-popover-trigger-width] p-2"
+											align="start"
+										>
+											<div className="space-y-1.5">
+												<div className="relative px-1 py-1">
+													<Search className="absolute top-3 left-3 h-4 w-4 text-muted-foreground/70" />
+													<Input
+														placeholder="Buscar análisis..."
+														value={
+															examinationSearchQuery
+														}
+														onChange={(e) => {
+															setExaminationSearchQuery(
+																e.target.value,
+															);
+														}}
+														className="h-9 w-full pr-3 pl-9 text-sm focus-visible:ring-1"
+													/>
+												</div>
+												<div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+													<span>
+														Filtrar por análisis
+													</span>
+													<button
+														type="button"
+														onClick={() => {
+															const visibleExamIds =
+																searchedExaminations.map(
+																	(e) =>
+																		e.id.toString(),
+																);
+															const areAllSelected =
+																visibleExamIds.length >
+																0 &&
+																visibleExamIds.every(
+																	(id) =>
+																		(
+																			data.selected_examination_ids ||
+																			[]
+																		).includes(
+																			id,
+																		),
+																);
+															const nextExams =
+																areAllSelected
+																	? (
+																		data.selected_examination_ids ||
+																		[]
+																	).filter(
+																		(
+																			id: string,
+																		) =>
+																			!visibleExamIds.includes(
+																				id,
+																			),
+																	)
+																	: [
+																		...new Set(
+																			[
+																				...(data.selected_examination_ids ||
+																					[]),
+																				...visibleExamIds,
+																			],
+																		),
+																	];
+
+															const examObjs =
+																nextExams.map(
+																	(idStr) => {
+																		const examObj =
+																			filteredExaminations.find(
+																				(
+																					e,
+																				) =>
+																					e.id.toString() ===
+																					idStr,
+																			);
+
+																		return {
+																			examination_id:
+																				parseInt(
+																					idStr,
+																					10,
+																				),
+																			name: examObj
+																				? examObj.name
+																				: '',
+																			quantity: 1,
+																			amount: 0,
+																			discount: 0,
+																			subtotal: 0,
+																		};
+																	},
+																);
+
+															setData((d) => ({
+																...d,
+																selected_examination_ids:
+																	nextExams,
+																specimen_type_examination:
+																	nextExams[0] ||
+																	'',
+																examinations:
+																	examObjs,
+															}));
+														}}
+														className="cursor-pointer font-medium transition-colors hover:text-primary"
+													>
+														{searchedExaminations.length >
+															0 &&
+															searchedExaminations.every(
+																(e) =>
+																	(
+																		data.selected_examination_ids ||
+																		[]
+																	).includes(
+																		e.id.toString(),
+																	),
+															)
+															? 'Ninguno'
+															: 'Todos'}
+													</button>
+												</div>
+												<div className="max-h-60 space-y-1 overflow-y-auto pt-1">
+													{searchedExaminations.length ===
+														0 ? (
+														<div className="py-6 text-center text-xs text-muted-foreground select-none">
+															No se encontraron
+															resultados.
+														</div>
+													) : (
+														searchedExaminations.map(
+															(exam) => {
+																const examIdStr =
+																	exam.id.toString();
+																const isChecked = (
+																	data.selected_examination_ids ||
+																	[]
+																).includes(
+																	examIdStr,
+																);
+
+																return (
+																	<div
+																		key={
+																			exam.id
+																		}
+																		className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
+																		onClick={() => {
+																			const currentSelected =
+																				data.selected_examination_ids ||
+																				[];
+																			const nextExams =
+																				isChecked
+																					? currentSelected.filter(
+																						(
+																							id: string,
+																						) =>
+																							id !==
+																							examIdStr,
+																					)
+																					: [
+																						...currentSelected,
+																						examIdStr,
+																					];
+
+																			const examObjs =
+																				nextExams.map(
+																					(
+																						idStr: string,
+																					) => {
+																						const examObj =
+																							filteredExaminations.find(
+																								(
+																									e,
+																								) =>
+																									e.id.toString() ===
+																									idStr,
+																							);
+
+																						return {
+																							examination_id:
+																								parseInt(
+																									idStr,
+																									10,
+																								),
+																							name: examObj
+																								? examObj.name
+																								: '',
+																							quantity: 1,
+																							amount: 0,
+																							discount: 0,
+																							subtotal: 0,
+																						};
+																					},
+																				);
+
+																			setData(
+																				(
+																					d,
+																				) => ({
+																					...d,
+																					selected_examination_ids:
+																						nextExams,
+																					specimen_type_examination:
+																						nextExams[0] ||
+																						'',
+																					examinations:
+																						examObjs,
+																				}),
+																			);
+																		}}
+																	>
+																		<Checkbox
+																			checked={
+																				isChecked
+																			}
+																			className="pointer-events-none"
+																			onCheckedChange={() => { }}
+																		/>
+																		<span className="truncate">
+																			{
+																				exam.name
+																			}
+																		</span>
+																	</div>
+																);
+															},
+														)
+													)}
+												</div>
+											</div>
+										</PopoverContent>
+									</Popover>
+									{errors.specimen_type_examination && (
+										<p className="text-sm text-destructive">
+											{errors.specimen_type_examination}
+										</p>
+									)}
+								</div>
+							</div>
+
+							<div className="mt-4">
+								{!specimen && data.specimen_type && (
+									<div className="mt-1 transition-all duration-300">
+										{matchingSequence ? (
+											<div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+												<Tag className="h-4 w-4 shrink-0 text-emerald-500" />
+												<span className="text-xs font-semibold">
+													Secuencia de numeración activa
+													configurada para el tipo de
+													muestra
+												</span>
+											</div>
+										) : (
+											<div className="flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+												<AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+												<div className="flex flex-col gap-1">
+													<span className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+														¡Falta secuencia de
+														numeración!
+													</span>
+													<span className="text-[10.5px] leading-normal text-amber-600 dark:text-amber-400">
+														No existe una secuencia
+														activa para este tipo de
+														muestra en la sucursal
+														activa. Debe crear una antes
+														de poder facturar.
+													</span>
+													<button
+														type="button"
+														onClick={() =>
+															setIsSequenceSheetOpen(
+																true,
+															)
+														}
+														className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 self-start rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-500/20 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30"
+													>
+														<Plus className="h-3.5 w-3.5" />
+														Crear Secuencia Ahora
+													</button>
+												</div>
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+
+							<div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+								<div className="grid gap-2">
+									<div className="flex items-center justify-between">
+										<Label htmlFor="specimen_category">
+											Categoría (Tiempo)
+										</Label>
+										<button
+											type="button"
+											onClick={() =>
+												setIsCategorySheetOpen(true)
+											}
+											className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+										>
+											<Plus className="h-3 w-3" /> Nuevo
+										</button>
+									</div>
+									<FormCombobox
+										placeholder="Seleccionar categoría"
+										value={data.specimen_category}
+										onChange={(v) =>
+											setData('specimen_category', v)
+										}
+										options={categories.map((c) => ({
+											label: c.name,
+											value: c.id.toString(),
+										}))}
+									/>
+									{errors.specimen_category && (
+										<p className="text-sm text-destructive">
+											{errors.specimen_category}
+										</p>
+									)}
+								</div>
+
+								<div className="grid gap-2">
+									<Label htmlFor="priority_id">Prioridad</Label>
+									<FormCombobox
+										placeholder="Seleccionar prioridad"
+										value={data.priority_id}
+										onChange={(v) => setData('priority_id', v)}
+										options={priorities.map((p) => ({
+											label: p.name,
+											value: p.id.toString(),
+											color: p.color,
+										}))}
+									/>
+									{errors.priority_id && (
+										<p className="text-sm text-destructive">
+											{errors.priority_id}
+										</p>
+									)}
+								</div>
+							</div>
+
+							{/* Manual Delivery Date Overrides */}
+							<div className="mt-4 space-y-4 rounded-xl border border-border/60 bg-muted/10 p-4">
+								{/* Client Delivery Time Override */}
+								<div className="space-y-3">
+									<div className="flex items-center justify-between">
+										<div className="space-y-0.5">
+											<Label htmlFor="manual-delivery-client-toggle" className="text-sm font-semibold cursor-pointer">
+												Personalizar tiempo de entrega (Cliente)
+											</Label>
+											<p className="text-xs text-muted-foreground">
+												Anula el tiempo de entrega definido por la categoría para el cliente.
+											</p>
+										</div>
+										<Switch
+											id="manual-delivery-client-toggle"
+											checked={data.is_manual_delivery_date_enabled}
+											onCheckedChange={(checked) => {
+												const selectedCat = categories.find(
+													(c) => c.id.toString() === data.specimen_category,
+												);
+												setData((prev) => ({
+													...prev,
+													is_manual_delivery_date_enabled: checked,
+													delivery_date_quantity: checked
+														? (prev.delivery_date_quantity || selectedCat?.quantity || '')
+														: prev.delivery_date_quantity,
+													delivery_date_unit: checked
+														? (prev.delivery_date_unit || selectedCat?.unit || 'minutes')
+														: prev.delivery_date_unit,
+												}));
+											}}
+										/>
+									</div>
+
+									{data.is_manual_delivery_date_enabled && (
+										<div className="space-y-4 pt-2 border-t border-border/40">
+											<div className="grid grid-cols-2 gap-4">
+												<div className="grid gap-2">
+													<Label htmlFor="delivery_date_quantity">Cantidad</Label>
+													<Input
+														id="delivery_date_quantity"
+														type="number"
+														step="1"
+														min="0"
+														value={data.delivery_date_quantity}
+														onChange={(e) =>
+															setData('delivery_date_quantity', e.target.value)
+														}
+														placeholder="Ej. 24"
+													/>
+													{errors.delivery_date_quantity && (
+														<p className="text-sm text-destructive">
+															{errors.delivery_date_quantity}
+														</p>
+													)}
+												</div>
+
+												<div className="grid gap-2">
+													<Label htmlFor="delivery_date_unit">Unidad</Label>
+													<Select
+														value={data.delivery_date_unit}
+														onValueChange={(v) =>
+															setData('delivery_date_unit', v)
+														}
+													>
+														<SelectTrigger id="delivery_date_unit">
+															<SelectValue placeholder="Unidad" />
+														</SelectTrigger>
+														<SelectContent>
+															{Object.entries(UNIT_LABELS).map(
+																([value, label]) => (
+																	<SelectItem key={value} value={value}>
+																		{label}
+																	</SelectItem>
+																),
+															)}
+														</SelectContent>
+													</Select>
+													{errors.delivery_date_unit && (
+														<p className="text-sm text-destructive">
+															{errors.delivery_date_unit}
+														</p>
+													)}
+												</div>
+											</div>
+										</div>
+									)}
+								</div>
+
+								<Separator className="bg-border/40" />
+
+								{/* Internal Delivery Time Override */}
+								<div className="space-y-3">
+									<div className="flex items-center justify-between">
+										<div className="space-y-0.5">
+											<Label htmlFor="manual-delivery-intern-toggle" className="text-sm font-semibold cursor-pointer">
+												Personalizar tiempo de entrega (Interno)
+											</Label>
+											<p className="text-xs text-muted-foreground">
+												Anula el tiempo límite de procesamiento interno definido por la categoría.
+											</p>
+										</div>
+										<Switch
+											id="manual-delivery-intern-toggle"
+											checked={data.is_manual_delivery_date_intern_enabled}
+											onCheckedChange={(checked) => {
+												const selectedCat = categories.find(
+													(c) => c.id.toString() === data.specimen_category,
+												);
+												setData((prev) => ({
+													...prev,
+													is_manual_delivery_date_intern_enabled: checked,
+													delivery_date_intern_quantity: checked
+														? (prev.delivery_date_intern_quantity || selectedCat?.intern_quantity || '')
+														: prev.delivery_date_intern_quantity,
+													delivery_date_intern_unit: checked
+														? (prev.delivery_date_intern_unit || selectedCat?.intern_unit || 'days')
+														: prev.delivery_date_intern_unit,
+												}));
+											}}
+										/>
+									</div>
+
+									{data.is_manual_delivery_date_intern_enabled && (
+										<div className="space-y-4 pt-2 border-t border-border/40">
+											<div className="grid grid-cols-2 gap-4">
+												<div className="grid gap-2">
+													<Label htmlFor="delivery_date_intern_quantity">Cantidad</Label>
+													<Input
+														id="delivery_date_intern_quantity"
+														type="number"
+														step="1"
+														min="0"
+														value={data.delivery_date_intern_quantity}
+														onChange={(e) =>
+															setData('delivery_date_intern_quantity', e.target.value)
+														}
+														placeholder="Ej. 1"
+													/>
+													{errors.delivery_date_intern_quantity && (
+														<p className="text-sm text-destructive">
+															{errors.delivery_date_intern_quantity}
+														</p>
+													)}
+												</div>
+
+												<div className="grid gap-2">
+													<Label htmlFor="delivery_date_intern_unit">Unidad</Label>
+													<Select
+														value={data.delivery_date_intern_unit}
+														onValueChange={(v) =>
+															setData('delivery_date_intern_unit', v)
+														}
+													>
+														<SelectTrigger id="delivery_date_intern_unit">
+															<SelectValue placeholder="Unidad" />
+														</SelectTrigger>
+														<SelectContent>
+															{Object.entries(UNIT_LABELS).map(
+																([value, label]) => (
+																	<SelectItem key={value} value={value}>
+																		{label}
+																	</SelectItem>
+																),
+															)}
+														</SelectContent>
+													</Select>
+													{errors.delivery_date_intern_unit && (
+														<p className="text-sm text-destructive">
+															{errors.delivery_date_intern_unit}
+														</p>
+													)}
+												</div>
+											</div>
+										</div>
+									)}
+								</div>
+							</div>
+
+							<div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+								<div className="grid gap-2">
+									<Label htmlFor="sample_collection_date">
+										Fecha de la toma
+									</Label>
+									<DatePicker
+										value={data.sample_collection_date}
+										onChange={(v) =>
+											setData('sample_collection_date', v)
+										}
+										disabled={
+											readOnlySampleCollectionDate &&
+											!!specimen
+										}
+									/>
+									{readOnlySampleCollectionDate && !!specimen && (
+										<p className="text-xs text-muted-foreground">
+											Para modificar esta fecha, edítela desde
+											el editor de reporte.
+										</p>
+									)}
+									{errors.sample_collection_date && (
+										<p className="text-sm text-destructive">
+											{errors.sample_collection_date}
+										</p>
+									)}
+								</div>
+
+								<div className="grid gap-2">
+									<Label htmlFor="status">
+										Estado Inicial / Actual
+									</Label>
+									<FormCombobox
+										placeholder="Seleccionar estado"
+										value={data.status}
+										onChange={(v) => setData('status', v)}
+										options={[
+											{
+												label: 'Recibida',
+												value: 'received',
+												color: '#3b82f6',
+											},
+											{
+												label: 'Revisión Macroscópica',
+												value: 'macroscopic_review',
+												color: '#8b5cf6',
+												disabled:
+													data.status !==
+													'macroscopic_review',
+											},
+											{
+												label: 'En Proceso',
+												value: 'processing',
+												color: '#f59e0b',
+												disabled:
+													data.status !== 'processing',
+											},
+											{
+												label: 'Revisión Microscópica',
+												value: 'microscopic_review',
+												color: '#d946ef',
+												disabled:
+													data.status !==
+													'microscopic_review',
+											},
+											{
+												label: 'Finalizada',
+												value: 'finalized',
+												color: '#10b981',
+												disabled:
+													data.status !== 'finalized',
+											},
+											{
+												label: 'Entregada',
+												value: 'delivered',
+												color: '#64748b',
+												disabled:
+													data.status !== 'delivered',
+											},
+											{
+												label: 'Cancelada',
+												value: 'cancelled',
+												color: '#ef4444',
+												disabled:
+													data.status !== 'cancelled',
+											},
+										]}
+									/>
+									{errors.status && (
+										<p className="text-sm text-destructive">
+											{errors.status}
+										</p>
+									)}
+								</div>
+							</div>
+
+							<div className="mt-4 grid gap-2">
+								<Label htmlFor="medical_order_file">
+									Orden Médica (Archivo PDF o Imagen)
+								</Label>
+
+								{specimen?.medical_order_file &&
+									!data.medical_order_file && (
+										<div className="flex items-center justify-between rounded-lg border border-muted bg-muted/40 p-3">
+											<div className="flex items-center gap-3">
+												<div className="rounded-md bg-primary/10 p-2 text-primary">
+													<FileText className="h-5 w-5" />
+												</div>
+												<div className="flex flex-col">
+													<span className="text-xs font-semibold text-foreground">
+														Archivo de Orden Médica
+														existente
+													</span>
+													<span className="text-[10px] text-muted-foreground">
+														Ya hay un archivo subido
+													</span>
+												</div>
+											</div>
+											<div className="flex items-center gap-2">
+												<a
+													href={`/storage/${specimen.medical_order_file}`}
+													target="_blank"
+													rel="noreferrer"
+													className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+												>
+													<ExternalLink className="h-3.5 w-3.5" />{' '}
+													Ver / Descargar
+												</a>
+											</div>
+										</div>
+									)}
+
+								{data.medical_order_file && (
+									<div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
+										<div className="flex items-center gap-3">
+											<div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
+												<FileText className="h-5 w-5" />
+											</div>
+											<div className="flex flex-col">
+												<span className="max-w-[200px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
+													{data.medical_order_file.name}
+												</span>
+												<span className="text-[10px] text-muted-foreground">
+													{(
+														data.medical_order_file
+															.size /
+														1024 /
+														1024
+													).toFixed(2)}{' '}
+													MB
+												</span>
+											</div>
+										</div>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon"
+											onClick={() =>
+												setData('medical_order_file', null)
+											}
+											className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+										>
+											<X className="h-4 w-4" />
+										</Button>
+									</div>
+								)}
+
+								{!data.medical_order_file && (
+									<div className="group relative">
+										<input
+											type="file"
+											id="medical_order_file"
+											className="hidden"
+											accept=".pdf,image/*"
+											onChange={(e) => {
+												const file =
+													e.target.files?.[0] || null;
+
+												if (
+													file &&
+													file.size > 50 * 1024 * 1024
+												) {
+													toast.error(
+														'El archivo de Orden Médica no debe exceder los 50MB.',
+													);
+													e.target.value = '';
+
+													return;
+												}
+
+												setData('medical_order_file', file);
+											}}
+										/>
+										<label
+											htmlFor="medical_order_file"
+											className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-5 transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
+										>
+											<div className="mb-2 rounded-full bg-secondary p-2.5 text-secondary-foreground transition-transform duration-200 group-hover:scale-110">
+												<Upload className="h-4 w-4" />
+											</div>
+											<span className="text-xs font-semibold text-foreground">
+												{specimen?.medical_order_file
+													? 'Reemplazar archivo de Orden Médica'
+													: 'Subir Orden Médica'}
+											</span>
+											<span className="mt-1 text-[10px] text-muted-foreground">
+												PDF o imágenes hasta 50MB
+											</span>
+										</label>
+									</div>
+								)}
+
+								{errors.medical_order_file && (
+									<p className="text-sm text-destructive">
+										{errors.medical_order_file}
+									</p>
+								)}
+							</div>
+
+							<div className="mt-4 grid gap-2">
+								<Label htmlFor="diagnosis">
+									Diagnóstico Clínico / Sospecha
+								</Label>
+								<Textarea
+									id="diagnosis"
+									value={data.diagnosis}
+									onChange={(e) =>
+										setData('diagnosis', e.target.value)
+									}
+									placeholder="Escriba el diagnóstico aquí..."
+									className="resize-none"
+									rows={3}
+								/>
+								{errors.diagnosis && (
+									<p className="text-sm text-destructive">
+										{errors.diagnosis}
+									</p>
+								)}
+							</div>
+
+							<div className="mt-4 grid gap-2">
+								<Label htmlFor="anatomic_site">
+									Sitio Anatómico
+								</Label>
+								<Textarea
+									id="anatomic_site"
+									value={data.anatomic_site}
+									onChange={(e) =>
+										setData('anatomic_site', e.target.value)
+									}
+									placeholder="Ej. Brazo izquierdo..."
+									className="resize-none"
+									rows={3}
+								/>
+								{errors.anatomic_site && (
+									<p className="text-sm text-destructive">
+										{errors.anatomic_site}
+									</p>
+								)}
+							</div>
+
+							<div className="mt-4 grid gap-2">
+								<Label htmlFor="clinical_notes">
+									Notas Clínicas
+								</Label>
+								<Textarea
+									id="clinical_notes"
+									value={data.clinical_notes}
+									onChange={(e) =>
+										setData('clinical_notes', e.target.value)
+									}
+									placeholder="Información adicional relevante..."
+									className="resize-none"
+									rows={3}
+								/>
+								{errors.clinical_notes && (
+									<p className="text-sm text-destructive">
+										{errors.clinical_notes}
+									</p>
+								)}
+							</div>
+
+							{specimen && specimenInvoice && (
+								<div className="mt-6 flex flex-col gap-5 border-t pt-4">
+									<h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+										Información de Facturación
+									</h3>
+
+									<div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+										<div className="flex flex-col gap-2">
+											<div className="flex items-center justify-between">
+												<div>
+													<span className="text-xs font-semibold">
+														Método de pago:
+													</span>
+													<span className="ml-2 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary capitalize">
+														{getPaymentTypeLabel(
+															data.payment_type,
+														)}
+													</span>
+												</div>
+												{showPaymentMethodEdition && (
+													<Button
+														type="button"
+														variant="outline"
+														size="sm"
+														onClick={() =>
+															setIsPaymentSheetOpen(
+																true,
+															)
+														}
+														className="h-8 font-semibold"
+													>
+														{data.payment_type
+															? 'Cambiar método de Pago'
+															: 'Seleccionar método de pago'}
+													</Button>
+												)}
+											</div>
+
+											{data.payment_type ? (
+												<PaymentResume
+													data={data}
+													banks={banks}
+												/>
+											) : (
+												<div className="mt-2 border-t pt-2.5 text-[11px] text-muted-foreground italic">
+													Por favor, configure los
+													detalles del pago.
+												</div>
+											)}
+											{errors.payment_type && (
+												<p className="mt-1 text-sm text-destructive">
+													{errors.payment_type}
+												</p>
+											)}
+										</div>
+									</div>
+
+									{/* Comprobante de Pago */}
+									{((data.payment_type !== 'cash' &&
+										data.payment_type !== 'credit') ||
+										(data.payment_type === 'credit' &&
+											data.has_initial_payment &&
+											data.initial_payment_type !==
+											'cash')) && (
+											<div className="grid gap-2">
+												<Label htmlFor="proof_of_payment">
+													Comprobante de Pago (PDF o Imagen){' '}
+													{isProofRequired &&
+														!specimenInvoice?.proof_of_payment && (
+															<span className="text-destructive">
+																*
+															</span>
+														)}
+												</Label>
+
+												{/* If a new proof of payment was selected */}
+												{data.proof_of_payment && (
+													<div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
+														<div className="flex items-center gap-3">
+															<div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
+																<FileText className="h-5 w-5" />
+															</div>
+															<div className="flex flex-col">
+																<span className="max-w-[150px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
+																	{
+																		data
+																			.proof_of_payment
+																			.name
+																	}
+																</span>
+																<span className="text-[10px] text-muted-foreground">
+																	{(
+																		data
+																			.proof_of_payment
+																			.size /
+																		1024 /
+																		1024
+																	).toFixed(2)}{' '}
+																	MB
+																</span>
+															</div>
+														</div>
+														<Button
+															type="button"
+															variant="ghost"
+															size="icon"
+															onClick={() =>
+																setData(
+																	'proof_of_payment',
+																	null,
+																)
+															}
+															className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+														>
+															<X className="h-4 w-4" />
+														</Button>
+													</div>
+												)}
+
+												{/* If no new proof of payment is selected but one already exists in DB */}
+												{!data.proof_of_payment &&
+													specimenInvoice?.proof_of_payment &&
+													specimenInvoice.proof_of_payment !==
+													'Efectivo' && (
+														<div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 p-3">
+															<div className="flex items-center gap-3">
+																<div className="rounded-md bg-primary/10 p-2 text-primary">
+																	<FileText className="h-5 w-5" />
+																</div>
+																<div className="flex flex-col">
+																	<span className="text-xs font-semibold text-foreground">
+																		Comprobante
+																		actual guardado
+																	</span>
+																	<a
+																		href={`/storage/${specimenInvoice.proof_of_payment}`}
+																		target="_blank"
+																		rel="noopener noreferrer"
+																		className="text-[10px] text-primary hover:underline"
+																	>
+																		Ver archivo
+																		actual
+																	</a>
+																</div>
+															</div>
+														</div>
+													)}
+
+												{/* Upload input */}
+												<div className="group relative mt-1">
+													<input
+														type="file"
+														id="proof_of_payment"
+														className="hidden"
+														accept=".pdf,image/*"
+														onChange={(e) => {
+															const file =
+																e.target.files?.[0] ||
+																null;
+
+															if (
+																file &&
+																file.size >
+																50 * 1024 * 1024
+															) {
+																toast.error(
+																	'El archivo de Comprobante no debe exceder los 50MB.',
+																);
+																e.target.value = '';
+
+																return;
+															}
+
+															setData(
+																'proof_of_payment',
+																file,
+															);
+														}}
+													/>
+													<label
+														htmlFor="proof_of_payment"
+														className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 bg-muted/30 px-6 py-4 text-center text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/50"
+													>
+														<Upload className="h-4 w-4 text-muted-foreground" />
+														<span>
+															{specimenInvoice?.proof_of_payment
+																? 'Reemplazar Comprobante'
+																: 'Seleccionar Archivo (Máx 50MB)'}
+														</span>
+													</label>
+												</div>
+												{errors.proof_of_payment && (
+													<span className="text-[10px] text-destructive">
+														{errors.proof_of_payment}
+													</span>
+												)}
+											</div>
+										)}
+								</div>
+							)}
+
+							{!specimen && (
+								<>
+									<div className="mt-4 flex items-center justify-between rounded-lg border bg-muted/30 p-4">
+										<div className="flex flex-col gap-0.5">
+											<Label
+												htmlFor="agregar-insumos-toggle"
+												className="cursor-pointer text-sm font-semibold"
+											>
+												Agregar insumos
+											</Label>
+											<span className="text-xs text-muted-foreground">
+												Registre los insumos químicos o
+												reactivos que se utilizarán en el
+												análisis de esta muestra.
+											</span>
+										</div>
+										<Switch
+											id="agregar-insumos-toggle"
+											checked={data.agregar_insumos}
+											onCheckedChange={(checked) => {
+												setData((d) => ({
+													...d,
+													agregar_insumos: checked,
+													insumos: checked
+														? d.insumos
+														: [],
+												}));
+											}}
+										/>
+									</div>
+
+									{data.agregar_insumos && (
+										<div className="mt-4 space-y-4 rounded-xl border border-border/60 bg-muted/10 p-4">
+											<div className="flex flex-col gap-1">
+												<h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+													Selección de Insumos / Reactivos
+												</h3>
+												<p className="text-xs text-muted-foreground">
+													Busque y agregue los insumos
+													químicos o reactivos que se
+													utilizarán en el análisis de
+													esta muestra.
+												</p>
+											</div>
+
+											<div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+												{/* Columna Izquierda: Buscador e Insumos Disponibles */}
+												<div className="flex flex-col gap-4 lg:col-span-7">
+													<div className="relative">
+														<Input
+															type="text"
+															placeholder="Buscar insumo por nombre o código..."
+															value={searchQuery}
+															onChange={(e) =>
+																setSearchQuery(
+																	e.target.value,
+																)
+															}
+															className="w-full pr-8"
+														/>
+														{searchQuery && (
+															<button
+																type="button"
+																onClick={() =>
+																	setSearchQuery(
+																		'',
+																	)
+																}
+																className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+															>
+																<X className="h-4 w-4" />
+															</button>
+														)}
+													</div>
+
+													<div className="overflow-hidden rounded-xl border bg-card">
+														<div className="flex justify-between border-b bg-muted/40 p-3 text-xs font-semibold text-muted-foreground">
+															<span>
+																Insumo / Descripción
+															</span>
+															<span>
+																Stock Disponible
+															</span>
+														</div>
+														<div className="max-h-[350px] divide-y divide-border overflow-y-auto">
+															{filteredProducts.length ===
+																0 ? (
+																<div className="flex flex-col items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
+																	<Microscope className="h-8 w-8 text-muted-foreground/40" />
+																	<span>
+																		No se
+																		encontraron
+																		insumos
+																		disponibles.
+																	</span>
+																</div>
+															) : (
+																filteredProducts.map(
+																	(product) => {
+																		const totalStock =
+																			parseInt(
+																				product.total_stock,
+																			) || 0;
+																		const isOutOfStock =
+																			totalStock <=
+																			0;
+																		const isAlreadyAdded =
+																			data.insumos.some(
+																				(
+																					i: any,
+																				) =>
+																					i.id ===
+																					product.id,
+																			);
+
+																		return (
+																			<div
+																				key={
+																					product.id
+																				}
+																				className={cn(
+																					'flex items-center justify-between p-3 transition-colors',
+																					isOutOfStock
+																						? 'bg-muted/10 opacity-70'
+																						: 'hover:bg-accent/10',
+																				)}
+																			>
+																				<div className="flex max-w-[70%] flex-col gap-0.5">
+																					<div className="flex items-center gap-2">
+																						<span className="truncate text-sm font-semibold text-foreground">
+																							{
+																								product.name
+																							}
+																						</span>
+																						<span className="shrink-0 rounded border bg-muted px-1 font-mono text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+																							{
+																								product.code
+																							}
+																						</span>
+																					</div>
+																					<span className="truncate text-xs text-muted-foreground">
+																						{product.description ||
+																							'Sin descripción'}
+																					</span>
+																				</div>
+
+																				<div className="flex items-center gap-3">
+																					{isOutOfStock ? (
+																						<span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-destructive/20 bg-destructive/10 px-2 py-1 text-[11px] font-semibold text-destructive">
+																							Agotado
+																						</span>
+																					) : (
+																						<span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+																							{
+																								totalStock
+																							}{' '}
+																							u.
+																						</span>
+																					)}
+
+																					<Button
+																						type="button"
+																						size="sm"
+																						variant={
+																							isAlreadyAdded
+																								? 'secondary'
+																								: 'outline'
+																						}
+																						onClick={() =>
+																							handleAddInsumo(
+																								product,
+																							)
+																						}
+																						disabled={
+																							isOutOfStock
+																						}
+																						className="h-8 shrink-0 font-semibold"
+																					>
+																						{isAlreadyAdded ? (
+																							<span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+																								<Check className="h-3.5 w-3.5" />{' '}
+																								Agregado
+																							</span>
+																						) : (
+																							<span className="flex items-center gap-1">
+																								<Plus className="h-3.5 w-3.5" />{' '}
+																								Agregar
+																							</span>
+																						)}
+																					</Button>
+																				</div>
+																			</div>
+																		);
+																	},
+																)
+															)}
+														</div>
+													</div>
+												</div>
+
+												{/* Columna Derecha: Insumos Seleccionados */}
+												<div className="flex flex-col gap-4 lg:col-span-5">
+													<div className="overflow-hidden rounded-xl border bg-card">
+														<div className="flex items-center justify-between border-b bg-muted/40 p-3 text-xs font-bold text-muted-foreground">
+															<span>
+																Insumos
+																Seleccionados
+															</span>
+															<span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">
+																{
+																	data.insumos
+																		.length
+																}
+															</span>
+														</div>
+
+														<div className="flex max-h-[400px] min-h-[250px] flex-col divide-y divide-border overflow-y-auto">
+															{data.insumos.length ===
+																0 ? (
+																<div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
+																	<div className="rounded-full bg-secondary p-3 text-muted-foreground/50">
+																		<Tag className="h-6 w-6" />
+																	</div>
+																	<div className="flex max-w-[200px] flex-col gap-1">
+																		<span className="font-bold text-foreground">
+																			Lista
+																			vacía
+																		</span>
+																		<span className="text-xs leading-normal text-muted-foreground">
+																			Presione
+																			"Agregar"
+																			en la
+																			lista de
+																			insumos
+																			disponibles.
+																		</span>
+																	</div>
+																</div>
+															) : (
+																data.insumos.map(
+																	(
+																		insumo: any,
+																	) => (
+																		<div
+																			key={
+																				insumo.id
+																			}
+																			className="flex flex-col gap-3 p-3.5 transition-colors hover:bg-accent/5"
+																		>
+																			<div className="flex items-start justify-between gap-2">
+																				<div className="flex min-w-0 flex-col gap-0.5">
+																					<span className="truncate text-sm font-semibold text-foreground">
+																						{
+																							insumo.name
+																						}
+																					</span>
+																					<span className="font-mono text-[10px] text-muted-foreground uppercase">
+																						{
+																							insumo.code
+																						}
+																					</span>
+																				</div>
+																				<Button
+																					type="button"
+																					variant="ghost"
+																					size="icon"
+																					onClick={() =>
+																						handleRemoveInsumo(
+																							insumo.id,
+																						)
+																					}
+																					className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+																				>
+																					<X className="h-4 w-4" />
+																				</Button>
+																			</div>
+
+																			<div className="flex items-center justify-between gap-4">
+																				<div className="flex w-[55%] flex-col gap-1">
+																					<span className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+																						Precio
+																					</span>
+																					<Select
+																						value={parseFloat(
+																							insumo.price ||
+																							0,
+																						).toString()}
+																						onValueChange={(
+																							val,
+																						) => {
+																							const parsed =
+																								parseFloat(
+																									val,
+																								);
+
+																							if (
+																								!isNaN(
+																									parsed,
+																								)
+																							) {
+																								handleUpdateInsumoPrice(
+																									insumo.id,
+																									parsed,
+																								);
+																							}
+																						}}
+																					>
+																						<SelectTrigger className="h-8 w-full font-mono text-xs font-medium">
+																							<SelectValue placeholder="Seleccionar precio" />
+																						</SelectTrigger>
+																						<SelectContent>
+																							{insumo.prices &&
+																								insumo
+																									.prices
+																									.length >
+																								0 ? (
+																								insumo.prices.map(
+																									(
+																										p: any,
+																										idx: number,
+																									) => {
+																										const priceStr =
+																											parseFloat(
+																												p.amount ||
+																												0,
+																											).toString();
+
+																										return (
+																											<SelectItem
+																												key={
+																													idx
+																												}
+																												value={
+																													priceStr
+																												}
+																												className="font-mono text-xs"
+																											>
+																												L.{' '}
+																												{parseFloat(
+																													p.amount ||
+																													0,
+																												).toFixed(
+																													2,
+																												)}
+																											</SelectItem>
+																										);
+																									},
+																								)
+																							) : (
+																								<SelectItem
+																									value={parseFloat(
+																										insumo.price ||
+																										0,
+																									).toString()}
+																									className="font-mono text-xs"
+																								>
+																									L.{' '}
+																									{parseFloat(
+																										insumo.price ||
+																										0,
+																									).toFixed(
+																										2,
+																									)}
+																								</SelectItem>
+																							)}
+																						</SelectContent>
+																					</Select>
+																				</div>
+
+																				<div className="flex w-[45%] flex-col items-end gap-1">
+																					<span className="w-full text-right text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+																						Cantidad
+																					</span>
+																					<div className="flex h-8 w-full shrink-0 items-center justify-between rounded-lg border bg-background p-1 shadow-sm">
+																						<Button
+																							type="button"
+																							variant="ghost"
+																							size="icon"
+																							onClick={() =>
+																								handleUpdateInsumoQty(
+																									insumo.id,
+																									insumo.quantity -
+																									1,
+																								)
+																							}
+																							disabled={
+																								insumo.quantity <=
+																								1
+																							}
+																							className="h-6 w-6 rounded-md"
+																						>
+																							<span className="text-sm leading-none font-bold">
+																								-
+																							</span>
+																						</Button>
+																						<input
+																							type="number"
+																							min="1"
+																							max={
+																								insumo.total_stock
+																							}
+																							value={
+																								insumo.quantity
+																							}
+																							onChange={(
+																								e,
+																							) => {
+																								const val =
+																									parseInt(
+																										e
+																											.target
+																											.value,
+																									) ||
+																									1;
+																								handleUpdateInsumoQty(
+																									insumo.id,
+																									val,
+																								);
+																							}}
+																							className="w-8 shrink-0 border-none p-0 text-center font-mono text-xs font-bold select-all focus:ring-0 focus:outline-none"
+																						/>
+																						<Button
+																							type="button"
+																							variant="ghost"
+																							size="icon"
+																							onClick={() =>
+																								handleUpdateInsumoQty(
+																									insumo.id,
+																									insumo.quantity +
+																									1,
+																								)
+																							}
+																							disabled={
+																								insumo.quantity >=
+																								insumo.total_stock
+																							}
+																							className="h-6 w-6 rounded-md"
+																						>
+																							<span className="text-sm leading-none font-bold">
+																								+
+																							</span>
+																						</Button>
+																					</div>
+																				</div>
+																			</div>
+
+																			<div className="mt-1 flex items-center justify-between border-t pt-2 text-[11px] text-muted-foreground">
+																				<span>
+																					Límite:{' '}
+																					<strong className="text-foreground">
+																						{
+																							insumo.total_stock
+																						}{' '}
+																						u.
+																					</strong>
+																				</span>
+																				<span className="font-mono">
+																					Total:{' '}
+																					<strong className="text-xs text-foreground">
+																						L.{' '}
+																						{(
+																							insumo.price *
+																							insumo.quantity
+																						).toFixed(
+																							2,
+																						)}
+																					</strong>
+																				</span>
+																			</div>
+																		</div>
+																	),
+																)
+															)}
+														</div>
+													</div>
+												</div>
+											</div>
+										</div>
+									)}
+								</>
+							)}
+						</div>
+					)}
+
+				{/* SECCIÓN 2: FACTURACIÓN */}
+				{(!specimen || unlockedFullSteps) && currentStep === 2 && (
+					<>
+						{data.reserved_code && (
+							<div className="mb-4 flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+								<span className="flex items-center gap-2 text-xs font-semibold">
+									<Tag className="h-4 w-4 shrink-0 text-emerald-500" />
+									Código de Muestra Reservado:
+								</span>
+								<span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-bold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+									{data.reserved_code}
+								</span>
+							</div>
+						)}
+
+						<div className="space-y-4">
+							<h3 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+								Facturación
+							</h3>
+
+							<div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+								{/* Left Column: Fields */}
+								<div className="flex flex-col gap-5 lg:col-span-8">
+									{/* Itemized examination billing cards list */}
+									<div className="flex flex-col gap-4">
+										{calculatedExaminations.map(
+											(examCalc: any, idx: number) => {
+												const examObj =
+													examCalc.examObj;
+												const examName = examObj
+													? examObj.name
+													: `Análisis #${idx + 1}`;
+												const examPrices =
+													examCalc.prices || [];
+
+												return (
+													<Card
+														key={
+															examCalc.examination_id
+														}
+														className="overflow-hidden border border-border/80 pt-6 pb-2 shadow-sm"
+													>
+														<CardHeader className="flex flex-row items-center justify-between px-4">
+															<div className="flex flex-col gap-0.5">
+																<div className="text-xs text-muted-foreground">
+																	Tipo de
+																	muestra:{' '}
+																	<strong className="text-foreground">
+																		{selectedType?.name ||
+																			'Muestra'}
+																	</strong>
+																</div>
+																<div className="text-sm font-bold text-foreground">
+																	{examName}
+																</div>
+															</div>
+															<div className="flex items-center gap-2">
+																<Badge
+																	variant="outline"
+																	className="border-emerald-500/30 bg-emerald-500/10 font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400"
+																>
+																	Descuento:
+																	L.{' '}
+																	{examCalc.totalDiscount.toFixed(
+																		2,
+																	)}
+																</Badge>
+																<Badge
+																	variant="outline"
+																	className="font-mono text-xs font-semibold text-primary"
+																>
+																	Subtotal: L.{' '}
+																	{examCalc.subtotal.toFixed(
+																		2,
+																	)}
+																</Badge>
+															</div>
+														</CardHeader>
+														<CardContent className="space-y-4 p-4">
+															<div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+																{/* Price selector */}
+																<div className="grid gap-2">
+																	<div className="flex items-center justify-between">
+																		<Label className="text-xs font-semibold">
+																			Importe
+																			/
+																			Precio
+																			Base
+																			(L.)
+																			*
+																		</Label>
+																		{examObj && (
+																			<button
+																				type="button"
+																				onClick={() => {
+																					if (
+																						examObj
+																					) {
+																						setIsEditPricesSheetOpen(
+																							true,
+																						);
+																					}
+																				}}
+																				className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+																			>
+																				<Edit2 className="h-3 w-3" />{' '}
+																				Precios
+																			</button>
+																		)}
+																	</div>
+																	<Select
+																		value={
+																			examCalc.selected_price
+																		}
+																		onValueChange={(
+																			val,
+																		) =>
+																			updateExamConfig(
+																				examCalc.examination_id,
+																				'selected_price',
+																				val,
+																			)
+																		}
+																	>
+																		<SelectTrigger className="h-9 w-full">
+																			<SelectValue placeholder="Seleccione un precio" />
+																		</SelectTrigger>
+																		<SelectContent>
+																			{examPrices.length >
+																				0 ? (
+																				<>
+																					{examPrices.map(
+																						(
+																							p: any,
+																						) => (
+																							<SelectItem
+																								key={
+																									p.id
+																								}
+																								value={p.amount.toString()}
+																							>
+																								L.{' '}
+																								{parseFloat(
+																									p.amount,
+																								).toFixed(
+																									2,
+																								)}
+																							</SelectItem>
+																						),
+																					)}
+																					<SelectItem value="custom">
+																						Precio
+																						Personalizado
+																					</SelectItem>
+																				</>
+																			) : (
+																				<>
+																					<SelectItem
+																						value="0"
+																						disabled
+																					>
+																						No
+																						hay
+																						precios
+																						configurados
+																					</SelectItem>
+																					<SelectItem value="custom">
+																						Precio
+																						Personalizado
+																					</SelectItem>
+																				</>
+																			)}
+																		</SelectContent>
+																	</Select>
+
+																	{examCalc.selected_price ===
+																		'custom' && (
+																			<div className="relative mt-1">
+																				<span className="absolute top-1/2 left-3 -translate-y-1/2 font-mono text-xs text-muted-foreground select-none">
+																					L.
+																				</span>
+																				<Input
+																					type="number"
+																					step="0.01"
+																					min="0"
+																					value={
+																						examCalc.custom_specimen_price
+																					}
+																					onChange={(
+																						e,
+																					) =>
+																						updateExamConfig(
+																							examCalc.examination_id,
+																							'custom_specimen_price',
+																							e
+																								.target
+																								.value,
+																						)
+																					}
+																					placeholder="0.00"
+																					className="h-8 pl-7 font-mono text-xs"
+																					required
+																				/>
+																			</div>
+																		)}
+																</div>
+
+																{/* Quantity */}
+																<div className="flex flex-col items-start gap-2">
+																	<Label className="text-xs font-semibold">
+																		Cantidad
+																		*
+																	</Label>
+																	<NumberPicker
+																		value={
+																			examCalc.quantity
+																		}
+																		onChange={(
+																			val,
+																		) =>
+																			updateExamConfig(
+																				examCalc.examination_id,
+																				'quantity',
+																				val,
+																			)
+																		}
+																		min={1}
+																	/>
+																</div>
+															</div>
+
+															{/* Collapsible Discounts Section */}
+															<Collapsible
+																defaultOpen={
+																	examCalc.totalDiscount >
+																	0 ||
+																	examCalc.additional_discount_enabled ||
+																	!!examCalc.age_discount_type
+																}
+																className="rounded-lg border bg-muted/20 p-3"
+															>
+																<CollapsibleTrigger
+																	asChild
+																>
+																	<button
+																		type="button"
+																		className="group flex w-full cursor-pointer items-center justify-between text-xs font-semibold text-foreground transition-colors hover:text-primary"
+																	>
+																		<div className="flex items-center gap-2">
+																			<Tag className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover:text-primary" />
+																			<span>
+																				Opciones
+																				de
+																				Descuento
+																			</span>
+																			{examCalc.totalDiscount >
+																				0 && (
+																					<Badge
+																						variant="secondary"
+																						className="h-5 px-1.5 font-mono text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+																					>
+																						-L.{' '}
+																						{examCalc.totalDiscount.toFixed(
+																							2,
+																						)}
+																					</Badge>
+																				)}
+																		</div>
+																		<ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+																	</button>
+																</CollapsibleTrigger>
+
+																<CollapsibleContent className="space-y-3 pt-3">
+																	{/* Additional Discount Switch */}
+																	<div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
+																		<div className="flex items-center justify-between">
+																			<div className="flex flex-col gap-0.5">
+																				<Label className="cursor-pointer text-xs font-semibold">
+																					Descuento
+																					Adicional
+																				</Label>
+																				<span className="text-[10px] text-muted-foreground">
+																					Permite
+																					aplicar
+																					un
+																					descuento
+																					adicional
+																					personalizado
+																					a
+																					este
+																					análisis.
+																				</span>
+																			</div>
+																			<Switch
+																				checked={
+																					examCalc.additional_discount_enabled
+																				}
+																				onCheckedChange={(
+																					checked,
+																				) =>
+																					updateExamConfig(
+																						examCalc.examination_id,
+																						'additional_discount_enabled',
+																						checked,
+																					)
+																				}
+																			/>
+																		</div>
+																		{examCalc.additional_discount_enabled && (
+																			<div className="border-t border-border/50 pt-2">
+																				<Input
+																					type="number"
+																					step="0.01"
+																					min="0"
+																					placeholder="0.00"
+																					value={
+																						examCalc.additional_discount
+																					}
+																					onChange={(
+																						e,
+																					) =>
+																						updateExamConfig(
+																							examCalc.examination_id,
+																							'additional_discount',
+																							e
+																								.target
+																								.value,
+																						)
+																					}
+																					className="h-8 font-mono text-xs"
+																				/>
+																			</div>
+																		)}
+																	</div>
+
+																	{/* Age Discounts Switches */}
+																	<div className="grid grid-cols-1 gap-3 border-t pt-3 md:grid-cols-2">
+																		<div className="flex items-center justify-between rounded-lg border bg-card p-2.5">
+																			<div className="flex flex-col gap-0.5">
+																				<Label className="text-xs font-semibold">
+																					Tercera
+																					Edad
+																					(
+																					{
+																						thirdAgePercent
+																					}
+																					%)
+																				</Label>
+																				<span className="text-[10px] text-muted-foreground">
+																					Aplica{' '}
+																					{
+																						thirdAgePercent
+																					}
+
+																					%
+																					sobre
+																					el
+																					precio
+																					base.
+																				</span>
+																			</div>
+																			<Switch
+																				checked={
+																					examCalc.age_discount_type ===
+																					'third'
+																				}
+																				onCheckedChange={(
+																					checked,
+																				) =>
+																					updateExamConfig(
+																						examCalc.examination_id,
+																						'age_discount_type',
+																						checked
+																							? 'third'
+																							: null,
+																					)
+																				}
+																			/>
+																		</div>
+
+																		<div className="flex items-center justify-between rounded-lg border bg-card p-2.5">
+																			<div className="flex flex-col gap-0.5">
+																				<Label className="text-xs font-semibold">
+																					Cuarta
+																					Edad
+																					(
+																					{
+																						fourthAgePercent
+																					}
+																					%)
+																				</Label>
+																				<span className="text-[10px] text-muted-foreground">
+																					Aplica{' '}
+																					{
+																						fourthAgePercent
+																					}
+
+																					%
+																					sobre
+																					el
+																					precio
+																					base.
+																				</span>
+																			</div>
+																			<Switch
+																				checked={
+																					examCalc.age_discount_type ===
+																					'fourth'
+																				}
+																				onCheckedChange={(
+																					checked,
+																				) =>
+																					updateExamConfig(
+																						examCalc.examination_id,
+																						'age_discount_type',
+																						checked
+																							? 'fourth'
+																							: null,
+																					)
+																				}
+																			/>
+																		</div>
+																	</div>
+																</CollapsibleContent>
+															</Collapsible>
+														</CardContent>
+													</Card>
+												);
+											},
+										)}
+									</div>
+
+									{/* Cobrar otro importe personalizado */}
+									<div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+										<div className="flex items-center justify-between">
+											<div className="flex flex-col gap-0.5">
+												<Label
+													htmlFor="custom-amount-toggle"
+													className="cursor-pointer text-xs font-semibold"
+												>
+													Cobrar otro importe
+													personalizado
+												</Label>
+												<span className="text-[10px] text-muted-foreground">
+													Permite agregar un importe
+													manual para servicios
+													adicionales.
+												</span>
+											</div>
+											<Switch
+												id="custom-amount-toggle"
+												checked={
+													data.custom_amount_enabled
+												}
+												onCheckedChange={(checked) => {
+													setData((d) => ({
+														...d,
+														custom_amount_enabled:
+															checked,
+														custom_amount: checked
+															? d.custom_amount ||
+															'0'
+															: '0',
+														custom_amount_reason:
+															checked
+																? d.custom_amount_reason ||
+																''
+																: '',
+													}));
+												}}
+											/>
+										</div>
+
+										{data.custom_amount_enabled && (
+											<div className="flex flex-col gap-3 border-t border-border/50 pt-2 transition-all duration-300">
+												<div className="grid gap-1.5">
+													<Label
+														htmlFor="custom_amount"
+														className="text-xs"
+													>
+														Importe Adicional
+														Personalizado (L.){' '}
+														<span className="text-destructive">
+															*
+														</span>
+													</Label>
+													<Input
+														id="custom_amount"
+														type="number"
+														step="0.01"
+														min="0"
+														value={
+															data.custom_amount
+														}
+														onChange={(e) =>
+															setData(
+																'custom_amount',
+																e.target.value,
+															)
+														}
+														placeholder="0.00"
+														required
+													/>
+													{errors.custom_amount && (
+														<span className="text-[10px] text-destructive">
+															{
+																errors.custom_amount
+															}
+														</span>
+													)}
+												</div>
+												<div className="grid gap-1.5">
+													<Label
+														htmlFor="custom_amount_reason"
+														className="text-xs"
+													>
+														Concepto / Razón del
+														Importe Adicional{' '}
+														<span className="text-destructive">
+															*
+														</span>
+													</Label>
+													<Input
+														id="custom_amount_reason"
+														type="text"
+														value={
+															data.custom_amount_reason
+														}
+														onChange={(e) =>
+															setData(
+																'custom_amount_reason',
+																e.target.value,
+															)
+														}
+														placeholder="Ej. Materiales especiales, urgencia, etc."
+														required
+													/>
+												</div>
+											</div>
+										)}
+									</div>
+
+									{/* Detalle y Tipo de Pago Wrapper */}
+									<div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
+										<div className="flex flex-col gap-2">
+											<div className="flex items-center justify-between">
+												<div>
+													<span className="text-xs font-semibold">
+														Método de pago:
+													</span>
+													<span className="ml-2 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary capitalize">
+														{getPaymentTypeLabel(
+															data.payment_type,
+														)}
+													</span>
+												</div>
+												{showPaymentMethodEdition && (
+													<Button
+														type="button"
+														variant="outline"
+														size="sm"
+														onClick={() =>
+															setIsPaymentSheetOpen(
+																true,
+															)
+														}
+														className="h-8 font-semibold"
+													>
+														{data.payment_type
+															? 'Cambiar método de Pago'
+															: 'Seleccionar método de pago'}
+													</Button>
+												)}
+											</div>
+
+											{data.payment_type ? (
+												<PaymentResume
+													data={data}
+													banks={banks}
+												/>
+											) : (
+												<div className="mt-2 border-t pt-2.5 text-[11px] text-muted-foreground italic">
+													Por favor, configure los
+													detalles del pago.
+												</div>
+											)}
+											{errors.payment_type && (
+												<p className="mt-1 text-sm text-destructive">
+													{errors.payment_type}
+												</p>
+											)}
+										</div>
+									</div>
+
+									{/* Comprobante de Pago */}
+									{((data.payment_type !== 'cash' &&
+										data.payment_type !== 'credit') ||
+										(data.payment_type === 'credit' &&
+											data.has_initial_payment &&
+											data.initial_payment_type !==
+											'cash')) && (
+											<div className="grid gap-2">
+												<Label htmlFor="proof_of_payment">
+													Comprobante de Pago (PDF o
+													Imagen){' '}
+													{isProofRequired && (
+														<span className="text-destructive">
+															*
+														</span>
+													)}
+												</Label>
+
+												{data.proof_of_payment && (
+													<div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
+														<div className="flex items-center gap-3">
+															<div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
+																<FileText className="h-5 w-5" />
+															</div>
+															<div className="flex flex-col">
+																<span className="max-w-[150px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
+																	{
+																		data
+																			.proof_of_payment
+																			.name
+																	}
+																</span>
+																<span className="text-[10px] text-muted-foreground">
+																	{(
+																		data
+																			.proof_of_payment
+																			.size /
+																		1024 /
+																		1024
+																	).toFixed(
+																		2,
+																	)}{' '}
+																	MB
+																</span>
+															</div>
+														</div>
+														<Button
+															type="button"
+															variant="ghost"
+															size="icon"
+															onClick={() =>
+																setData(
+																	'proof_of_payment',
+																	null,
+																)
+															}
+															className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+														>
+															<X className="h-4 w-4" />
+														</Button>
+													</div>
+												)}
+
+												{!data.proof_of_payment && (
+													<div className="group relative">
+														<input
+															type="file"
+															id="proof_of_payment"
+															className="hidden"
+															accept=".pdf,image/*"
+															onChange={(e) => {
+																const file =
+																	e.target
+																		.files?.[0] ||
+																	null;
+
+																if (
+																	file &&
+																	file.size >
+																	50 *
+																	1024 *
+																	1024
+																) {
+																	toast.error(
+																		'El archivo de Comprobante no debe exceder los 50MB.',
+																	);
+																	e.target.value =
+																		'';
+
+																	return;
+																}
+
+																setData(
+																	'proof_of_payment',
+																	file,
+																);
+															}}
+														/>
+														<label
+															htmlFor="proof_of_payment"
+															className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-5 transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
+														>
+															<div className="mb-2 rounded-full bg-secondary p-2.5 text-secondary-foreground transition-transform duration-200 group-hover:scale-110">
+																<Upload className="h-4 w-4" />
+															</div>
+															<span className="text-xs font-semibold text-foreground">
+																Subir Comprobante
+															</span>
+															<span className="mt-1 text-[10px] text-muted-foreground">
+																PDF o imágenes hasta
+																50MB
+															</span>
+														</label>
+													</div>
+												)}
+												{errors.proof_of_payment && (
+													<p className="text-sm text-destructive">
+														{errors.proof_of_payment}
+													</p>
+												)}
+											</div>
+										)}
+
+									{/* Breakdown of selected supplies */}
+									{data.insumos &&
+										data.insumos.length > 0 && (
+											<div className="mt-2 overflow-hidden rounded-xl border bg-card">
+												<div className="flex justify-between border-b bg-muted/40 p-3 text-xs font-semibold text-muted-foreground">
+													<span>
+														Insumo / Reactivo
+														Utilizado
+													</span>
+													<div className="flex gap-8 text-right font-semibold">
+														<span className="w-12">
+															Cant.
+														</span>
+														<span className="w-20">
+															Precio U.
+														</span>
+														<span className="w-20">
+															Total
+														</span>
+													</div>
+												</div>
+												<div className="divide-y divide-border">
+													{data.insumos.map(
+														(insumo: any) => (
+															<div
+																key={insumo.id}
+																className="flex items-center justify-between p-3 text-xs"
+															>
+																<div className="flex min-w-0 flex-col gap-0.5">
+																	<span className="max-w-[180px] truncate font-semibold text-foreground sm:max-w-xs">
+																		{
+																			insumo.name
+																		}
+																	</span>
+																	<span className="font-mono text-[9px] text-muted-foreground uppercase">
+																		{
+																			insumo.code
+																		}
+																	</span>
+																</div>
+																<div className="flex shrink-0 gap-8 text-right font-mono text-xs">
+																	<span className="w-12 text-muted-foreground">
+																		{
+																			insumo.quantity
+																		}{' '}
+																		u.
+																	</span>
+																	<span className="w-20 text-muted-foreground">
+																		L.{' '}
+																		{parseFloat(
+																			insumo.price ||
+																			0,
+																		).toFixed(
+																			2,
+																		)}
+																	</span>
+																	<span className="w-20 font-bold text-foreground">
+																		L.{' '}
+																		{(
+																			insumo.price *
+																			insumo.quantity
+																		).toFixed(
+																			2,
+																		)}
+																	</span>
+																</div>
+															</div>
+														),
+													)}
+												</div>
+												<div className="flex items-center justify-between border-t bg-muted/20 p-3 text-xs font-semibold">
+													<span className="text-muted-foreground">
+														Subtotal Insumos /
+														Reactivos:
+													</span>
+													<span className="font-mono text-sm text-primary">
+														L.{' '}
+														{insumosTotalVal.toFixed(
+															2,
+														)}
+													</span>
+												</div>
+											</div>
+										)}
+								</div>
+
+								{/* Right Column: Summary Card */}
+								<div className="flex flex-col justify-start lg:col-span-4">
+									<div className="flex flex-col gap-4 rounded-xl border bg-muted/30 p-5 shadow-sm dark:bg-muted/10">
+										<h4 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+											Resumen de Totales
+										</h4>
+										<div className="mt-2 flex flex-col gap-3">
+											<div className="flex justify-between text-sm">
+												<span className="text-muted-foreground">
+													Precio Regular Muestra:
+												</span>
+												<span className="font-semibold text-foreground">
+													L.{' '}
+													{maxSpecimenPriceVal.toFixed(
+														2,
+													)}
+												</span>
+											</div>
+											{data.custom_amount_enabled && (
+												<div className="flex flex-col gap-0.5 text-sm">
+													<div className="flex justify-between">
+														<span className="text-muted-foreground">
+															Importe
+															Personalizado:
+														</span>
+														<span className="font-semibold text-foreground text-primary">
+															L.{' '}
+															{customAmountVal.toFixed(
+																2,
+															)}
+														</span>
+													</div>
+													{data.custom_amount_reason && (
+														<span className="truncate text-[10px] text-muted-foreground italic">
+															Razón:{' '}
+															{
+																data.custom_amount_reason
+															}
+														</span>
+													)}
+												</div>
+											)}
+											{discountVal > 0 ? (
+												<div className="flex flex-col gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+													<span className="text-[10px] font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
+														Descuentos Aplicados
+													</span>
+													<div className="flex justify-between text-xs font-bold">
+														<span>
+															Descuento Total:
+														</span>
+														<span>
+															- L.{' '}
+															{discountVal.toFixed(
+																2,
+															)}
+														</span>
+													</div>
+												</div>
+											) : (
+												<div className="flex justify-between text-sm">
+													<span className="text-muted-foreground">
+														Descuento:
+													</span>
+													<span className="font-semibold text-emerald-600 dark:text-emerald-400">
+														- L. 0.00
+													</span>
+												</div>
+											)}
+											<Separator />
+											<div className="flex justify-between text-xs">
+												<span className="text-muted-foreground">
+													Sub-Total:
+												</span>
+												<span className="font-semibold text-foreground">
+													L. {subtotalVal.toFixed(2)}
+												</span>
+											</div>
+											<div className="flex justify-between text-xs">
+												<span className="flex flex-col text-muted-foreground">
+													<span>
+														Importe Exonerado:
+													</span>
+													<span className="text-[10px] text-muted-foreground/80">
+														(Servicios médicos)
+													</span>
+												</span>
+												<span className="font-semibold text-foreground">
+													L. {totalVal.toFixed(2)}
+												</span>
+											</div>
+											<div className="flex justify-between text-xs">
+												<span className="text-muted-foreground">
+													Importe Exento:
+												</span>
+												<span className="font-semibold text-foreground">
+													L. 0.00
+												</span>
+											</div>
+											<div className="flex justify-between text-xs">
+												<span className="text-muted-foreground">
+													Importe Gravado 15%:
+												</span>
+												<span className="font-semibold text-foreground">
+													L. 0.00
+												</span>
+											</div>
+											<div className="flex justify-between text-xs">
+												<span className="text-muted-foreground">
+													Importe Gravado 18%:
+												</span>
+												<span className="font-semibold text-foreground">
+													L. 0.00
+												</span>
+											</div>
+											<div className="flex justify-between text-xs">
+												<span className="text-muted-foreground">
+													ISV 15%:
+												</span>
+												<span className="font-semibold text-foreground">
+													L. 0.00
+												</span>
+											</div>
+											<div className="flex justify-between text-xs">
+												<span className="text-muted-foreground">
+													ISV 18%:
+												</span>
+												<span className="font-semibold text-foreground">
+													L. 0.00
+												</span>
+											</div>
+											<Separator className="h-0.5" />
+											<div className="mt-2 flex items-center justify-between">
+												<span className="text-sm font-bold text-foreground">
+													Total a Pagar:
+												</span>
+												<span className="text-lg font-extrabold text-primary">
+													L. {totalVal.toFixed(2)}
+												</span>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</>
+				)}
+
+				{/* BOTONES DE ENVÍO */}
+				<div className="mt-4 flex flex-col items-center justify-between gap-3 border-t pt-4 sm:flex-row">
+					{specimen && specimen.created_at ? (
+						<div className="flex items-center gap-3">
+							<div className="text-sm text-muted-foreground">
+								Creada el:{' '}
+								{new Date(specimen.created_at).toLocaleString(
+									'es-ES',
+									{
+										dateStyle: 'long',
+										timeStyle: 'short',
+									},
+								)}
+							</div>
+							{unlockedFullSteps && currentStep > 1 && (
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() =>
+										setCurrentStep((prev) => prev - 1)
+									}
+									className="w-full sm:w-auto"
+									disabled={processing}
+								>
+									Atrás
+								</Button>
+							)}
+						</div>
+					) : !specimen && currentStep > 1 ? (
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => setCurrentStep((prev) => prev - 1)}
+							className="w-full sm:w-auto"
+							disabled={processing}
+						>
+							Atrás
+						</Button>
+					) : (
+						<div />
+					)}
+
+					{specimen ? (
+						<Button
+							type="submit"
+							disabled={processing}
+							className="w-full sm:w-auto"
+						>
+							{processing && <Spinner className="mr-2" />}
+							{unlockedFullSteps && currentStep === 1
+								? 'Siguiente (Facturación)'
+								: 'Guardar Cambios'}
+						</Button>
+					) : currentStep < 2 ? (
+						<Button
+							key="btn-next"
+							type="button"
+							onClick={handleNextStep}
+							className="w-full sm:w-auto"
+							disabled={
+								isReservingCode ||
+								(!specimen &&
+									currentStep === 1 &&
+									!!data.specimen_type &&
+									!matchingSequence)
+							}
+						>
+							{isReservingCode ? (
+								<>
+									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+									Reservando Código de Muestra...
+								</>
+							) : (
+								'Siguiente'
+							)}
+						</Button>
+					) : (
+						<Button
+							key="btn-submit"
+							type="submit"
+							disabled={processing}
+							className="w-full sm:w-auto"
+						>
+							{processing && <Spinner className="mr-2" />}
+							Facturar y Crear Muestra
+						</Button>
+					)}
+				</div>
+			</form>
+
+			<PaymentMethodSheet
+				open={isPaymentSheetOpen}
+				onOpenChange={setIsPaymentSheetOpen}
+				banks={banks}
+				totalAmount={totalVal}
+				paymentData={data}
+				onSave={(paymentData) => {
+					if (specimen) {
+						const originalPaymentType =
+							specimenInvoice?.payment_type;
+						const hasPayments = (
+							specimenInvoice?.credit_relation ||
+							specimenInvoice?.creditRelation
+						)?.has_payments;
+						const newVal = paymentData.payment_type;
+
+						if (
+							originalPaymentType === 'credit' &&
+							newVal !== 'credit' &&
+							hasPayments
+						) {
+							setShowBlockedPaymentAlert(true);
+							setIsPaymentSheetOpen(false);
+
+							return;
+						}
+
+						if (
+							newVal === 'credit' &&
+							originalPaymentType !== 'credit' &&
+							hasPayments
+						) {
+							setShowBlockedPaymentAlert(true);
+							setIsPaymentSheetOpen(false);
+
+							return;
+						}
+					}
+
+					const isCredit = paymentData.payment_type === 'credit';
+					setData((d) => ({
+						...d,
+						...paymentData,
+						has_initial_payment: isCredit
+							? paymentData.has_initial_payment
+							: false,
+						initial_payment_amount: isCredit
+							? paymentData.initial_payment_amount
+							: '',
+						initial_payment_type: isCredit
+							? paymentData.initial_payment_type
+							: '',
+					}));
+					setIsPaymentSheetOpen(false);
+				}}
+			/>
+
+			<Sheet
+				open={isEditPricesSheetOpen}
+				onOpenChange={setIsEditPricesSheetOpen}
+			>
+				<SheetContent
+					side="right"
+					className="z-[120] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+				>
+					<HeadingSheet
+						title="Gestionar Precios"
+						description="Modifique la lista de precios para este análisis."
+					/>
+					<div className="-mx-5 mt-4 px-5">
+						{selectedExamination && (
+							<ExaminationPricesForm
+								examination={selectedExamination}
+								onSuccess={() =>
+									setIsEditPricesSheetOpen(false)
+								}
+							/>
+						)}
+					</div>
+				</SheetContent>
+			</Sheet>
+
+			<CustomerSheet
+				open={isCustomerSheetOpen}
+				onOpenChange={setIsCustomerSheetOpen}
+				customer={customerToEdit as any}
+				className="w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+				onSuccess={(updatedCustomer: any) => {
+					if (updatedCustomer) {
+						setSelectedCustomerData(updatedCustomer);
+					}
+				}}
+			/>
+
+			<Sheet
+				open={isReferrerSheetOpen}
+				onOpenChange={setIsReferrerSheetOpen}
+			>
+				<SheetContent
+					side="right"
+					className="w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+				>
+					<HeadingSheet
+						title={
+							editingReferrer
+								? 'Editar Remitente'
+								: 'Nuevo Remitente'
+						}
+						description={
+							editingReferrer
+								? 'Modifique los campos para actualizar el remitente.'
+								: 'Complete los campos para registrar un nuevo remitente.'
+						}
+					/>
+					<div className="-mx-5 mt-4 px-5">
+						<ReferrerForm
+							key={
+								editingReferrer
+									? editingReferrer.id
+									: referrerInitialData
+										? 'new-data'
+										: 'new'
+							}
+							referrer={editingReferrer}
+							referrerTypes={referrerTypes}
+							initialData={referrerInitialData}
+							onSuccess={() => setIsReferrerSheetOpen(false)}
+							onSwitchToCreateNew={(formData) => {
+								setReferrerInitialData(formData);
+								setEditingReferrer(null);
+							}}
+							onSelectExistingReferrer={(existingReferrer) => {
+								setData(
+									'referrer',
+									existingReferrer.id.toString(),
+								);
+								setIsReferrerSheetOpen(false);
+								toast.info(
+									`Se seleccionó el remitente existente: ${existingReferrer.name} (${existingReferrer.notes || 'Sin hospital'})`,
+								);
+							}}
+						/>
+					</div>
+				</SheetContent>
+			</Sheet>
+
+			<Sheet
+				open={isSequenceSheetOpen}
+				onOpenChange={setIsSequenceSheetOpen}
+			>
+				<SheetContent
+					side="right"
+					className="z-[100] w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+				>
+					<SheetHeader>
+						<SheetTitle>Nueva Secuencia de Numeración</SheetTitle>
+					</SheetHeader>
+					<div className="-mx-5 mt-4 px-5">
+						{isSequenceSheetOpen && (
+							<SequenceForm
+								locations={locations}
+								specimenTypes={specimenTypes}
+								defaultLocationId={
+									activeLocationId || undefined
+								}
+								defaultSpecimenTypeId={
+									data.specimen_type
+										? parseInt(data.specimen_type)
+										: undefined
+								}
+								sequences={localSequences}
+								onSuccess={() => {
+									setIsSequenceSheetOpen(false);
+								}}
+							/>
+						)}
+					</div>
+				</SheetContent>
+			</Sheet>
+
+			<Sheet
+				open={isSpecimenTypeSheetOpen}
+				onOpenChange={setIsSpecimenTypeSheetOpen}
+			>
+				<SheetContent
+					side="right"
+					className="w-full max-w-[450px] overflow-y-auto sm:max-w-[650px]"
+				>
+					<HeadingSheet
+						title="Nuevo Tipo de Muestra"
+						description="Complete el formulario para crear un nuevo tipo de muestra."
+					/>
+					<div className="-mx-5 mt-4 px-5">
+						<SpecimenTypeForm
+							specimenType={null}
+							onSuccess={() => setIsSpecimenTypeSheetOpen(false)}
+						/>
+					</div>
+				</SheetContent>
+			</Sheet>
+
+			<SpecimenTypeExaminationSheet
+				examination={null}
+				specimenTypes={specimenTypes}
+				open={isExaminationSheetOpen}
+				onOpenChange={setIsExaminationSheetOpen}
+				defaultSpecimenTypeId={data.specimen_type}
+			/>
+
+			<CategorySheet
+				category={null}
+				open={isCategorySheetOpen}
+				onOpenChange={setIsCategorySheetOpen}
+			/>
+
+			{/* CONFIRMACIÓN DE DIÁLOGO SHADCN (ALERTDIALOG) */}
+			<SpecimenInvoiceSummaryAlertDialog
+				open={showConfirm}
+				onOpenChange={setShowConfirm}
+				customerLabel={selectedCustomerLabel}
+				examinationLabel={`${selectedType?.name || 'Sin seleccionar'} - ${selectedExaminationLabel}`}
+				paymentTypeLabel={getPaymentTypeLabel(data.payment_type)}
+				agregarInsumos={data.agregar_insumos}
+				insumos={data.insumos}
+				regularPrice={maxSpecimenPriceVal}
+				customAmountEnabled={data.custom_amount_enabled}
+				customAmountVal={customAmountVal}
+				customAmountReason={data.custom_amount_reason}
+				discountVal={discountVal}
+				totalVal={totalVal}
+				onConfirm={submitForm}
+			/>
+
+			<SpecimenRegenerateConfirmAlertDialog
+				open={showRegenerateConfirm}
+				onOpenChange={setShowRegenerateConfirm}
+				isGroupSpecimen={isGroupSpecimen}
+				isSpecimenTypeChanged={isSpecimenTypeChanged}
+				hasReport={!!specimen?.report_id}
+				isLoadingTemplates={isLoadingTemplates}
+				availableTemplates={availableTemplates}
+				selectedTemplateId={data.template_id}
+				onTemplateChange={(val) => setData('template_id', val)}
+				isSubmitDisabled={isSubmitDisabled}
+				onConfirm={submitForm}
+			/>
+
+			<BlockedPaymentAlertDialog
+				open={showBlockedPaymentAlert}
+				onOpenChange={setShowBlockedPaymentAlert}
+			/>
+
+			<SpecimenExamChangePriceAlertDialog
+				open={showExamChangePricePrompt}
+				onOpenChange={setShowExamChangePricePrompt}
+				onConfirm={handleConfirmExamChangePrompt}
+			/>
+		</>
+	);
 }

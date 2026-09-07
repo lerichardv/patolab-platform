@@ -13,9 +13,7 @@ use App\Models\Priority;
 use App\Models\Product;
 use App\Models\Referrer;
 use App\Models\ReferrerType;
-use App\Models\Role;
 use App\Models\Sequence;
-use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenCategory;
 use App\Models\SpecimenReport;
@@ -381,14 +379,6 @@ class ReportEditorController extends Controller
             'workOrders.users',
         ]);
 
-        $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
-        $pathologists = [];
-        if ($pathologistRoleId) {
-            $assistantRole = Role::where('slug', 'assistant_pathologist')->first();
-            $roleIds = array_filter([$pathologistRoleId, $assistantRole?->id]);
-            $pathologists = User::where('active', true)->whereIn('role_id', $roleIds)->get();
-        }
-
         $products = Product::where('active', true)
             ->whereHas('inventory', function ($q) {
                 $q->where('active', true);
@@ -469,7 +459,6 @@ class ReportEditorController extends Controller
                 ],
                 'permissions' => auth()->user()->role ? (auth()->user()->role->slug === 'admin' ? Permission::pluck('slug')->toArray() : auth()->user()->role->permissions->pluck('slug')->toArray()) : [],
             ],
-            'pathologists' => $pathologists,
             'products' => $products,
             'cutting_slide_types' => $workOrderTypes,
             'users' => $usersList,

@@ -82,7 +82,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { cn, addWithoutWeekends } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import {
+    getSpecimenDueDate,
+    getSpecimenDueDateInfo,
+} from '@/services/specimen-delivery-date';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import ManageCuttingsSheet from '../specimens/report-editor/cuttings/manage-cuttings-sheet';
 import SpecimenBulkCollaboratorSheet from '../specimens/specimen-bulk-collaborator-sheet';
@@ -132,6 +136,12 @@ interface Specimen {
     work_orders?: any[];
     collaborators?: any[];
     cuttings?: any[];
+    is_manual_delivery_date_enabled?: boolean;
+    delivery_date_unit?: 'minutes' | 'hours' | 'days' | 'weeks' | null;
+    delivery_date_quantity?: number | null;
+    is_manual_delivery_date_intern_enabled?: boolean;
+    delivery_date_intern_unit?: 'minutes' | 'hours' | 'days' | 'weeks' | null;
+    delivery_date_intern_quantity?: number | null;
 }
 
 interface Priority {
@@ -182,70 +192,11 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const getDueDate = (specimen: Specimen): Date => {
-    const createdAt = new Date(specimen.created_at);
-
-    const unit = specimen.category?.intern_unit || specimen.category?.unit;
-    const quantity =
-        specimen.category?.intern_quantity || specimen.category?.quantity;
-
-    if (!unit || !quantity) {
-        return createdAt;
-    }
-
-    return addWithoutWeekends(createdAt, quantity, unit);
+    return getSpecimenDueDate(specimen);
 };
 
 const getDueDateInfo = (specimen: Specimen) => {
-    if (!specimen.category) {
-        return null;
-    }
-
-    const unit = specimen.category.intern_unit || specimen.category.unit;
-    const quantity =
-        specimen.category.intern_quantity || specimen.category.quantity;
-
-    if (!unit || !quantity) {
-        return null;
-    }
-
-    const dueDate = getDueDate(specimen);
-    const isCompleted = ['finalized', 'delivered', 'cancelled'].includes(
-        specimen.status,
-    );
-
-    const dueDateFormatted = formatDistanceToNow(dueDate, {
-        addSuffix: true,
-        locale: es,
-    });
-    const fullDueDate = format(dueDate, 'dd/MM/yyyy h:mm a');
-
-    const isExpired = isPast(dueDate);
-    const isWithinOneDay =
-        !isExpired && dueDate.getTime() - Date.now() <= 24 * 60 * 60 * 1000;
-
-    let colorClass =
-        'bg-secondary text-secondary-foreground border-transparent';
-
-    if (!isCompleted) {
-        if (isExpired) {
-            colorClass =
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800/50';
-        } else if (isWithinOneDay) {
-            colorClass =
-                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800/50';
-        } else {
-            colorClass =
-                'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50';
-        }
-    }
-
-    return {
-        dueDateFormatted,
-        fullDueDate,
-        colorClass,
-        isExpired,
-        dueDate,
-    };
+    return getSpecimenDueDateInfo(specimen);
 };
 
 const getCuttingsSummary = (cuttings?: any[]) => {
@@ -2504,7 +2455,6 @@ export default function MyAssignmentsIndex({
                 selectedSpecimens={selectedSpecimens}
                 open={isBulkCollaboratorSheetOpen}
                 onOpenChange={setIsBulkCollaboratorSheetOpen}
-                usersList={usersList}
             />
 
             <SpecimenWorkOrdersSheet

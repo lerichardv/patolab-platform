@@ -17,6 +17,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import {
+    getClientDeliveryDuration,
+    getInternalDeliveryDuration,
+    formatDurationText,
+} from '@/services/specimen-delivery-date';
 
 interface Props {
     group: any | null;
@@ -415,10 +420,31 @@ export default function SpecimenGroupViewSheet({
                                                         <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
                                                             Tiempo / Categoría
                                                         </span>
-                                                        <span className="font-medium text-foreground">
-                                                            {specimen.category
-                                                                ?.name || 'N/A'}
-                                                        </span>
+                                                        <div className="flex flex-wrap items-center gap-1.5 font-medium text-foreground">
+                                                            <span>
+                                                                {specimen.category?.name || 'N/A'}
+                                                            </span>
+                                                            {(() => {
+                                                                const clientDur = getClientDeliveryDuration(specimen);
+                                                                const internDur = getInternalDeliveryDuration(specimen);
+                                                                const clientTxt = formatDurationText('Cli', clientDur);
+                                                                const internTxt = formatDurationText('Int', internDur);
+                                                                return (
+                                                                    <>
+                                                                        {clientTxt && (
+                                                                            <Badge variant="outline" className="h-4 py-0 text-[10px]">
+                                                                                {clientTxt}
+                                                                            </Badge>
+                                                                        )}
+                                                                        {internTxt && (
+                                                                            <Badge variant="outline" className="h-4 py-0 text-[10px]">
+                                                                                {internTxt}
+                                                                            </Badge>
+                                                                        )}
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     </div>
                                                     <div>
                                                         <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">

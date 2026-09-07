@@ -109,12 +109,22 @@ class Specimen extends Model
         'cancelled_by_id',
         'sample_collection_date',
         'sample_collection_date_na',
+        'is_manual_delivery_date_intern_enabled',
+        'delivery_date_intern_unit',
+        'delivery_date_intern_quantity',
+        'is_manual_delivery_date_enabled',
+        'delivery_date_unit',
+        'delivery_date_quantity',
     ];
 
     protected $casts = [
         'active' => 'boolean',
         'is_group' => 'boolean',
         'sample_collection_date_na' => 'boolean',
+        'is_manual_delivery_date_intern_enabled' => 'boolean',
+        'delivery_date_intern_quantity' => 'integer',
+        'is_manual_delivery_date_enabled' => 'boolean',
+        'delivery_date_quantity' => 'integer',
         'received_at' => 'datetime',
         'macroscopic_review_at' => 'datetime',
         'processing_at' => 'datetime',
@@ -188,13 +198,27 @@ class Specimen extends Model
 
     public function getExpectedFinalizationDateAttribute(): ?Carbon
     {
-        if (! $this->category || ! $this->category->unit || ! $this->category->quantity || ! $this->created_at) {
+        if (! $this->created_at) {
+            return null;
+        }
+
+        if ($this->is_manual_delivery_date_enabled) {
+            $unit = $this->delivery_date_unit;
+            $quantity = $this->delivery_date_quantity;
+        } else {
+            if (! $this->category || ! $this->category->unit || ! $this->category->quantity) {
+                return null;
+            }
+
+            $unit = $this->category->unit;
+            $quantity = $this->category->quantity;
+        }
+
+        if (! $unit || ! $quantity) {
             return null;
         }
 
         $createdAt = Carbon::parse($this->created_at);
-        $unit = $this->category->unit;
-        $quantity = $this->category->quantity;
 
         switch ($unit) {
             case 'minutes':
@@ -225,13 +249,27 @@ class Specimen extends Model
 
     public function getExpectedInternalFinalizationDateAttribute(): ?Carbon
     {
-        if (! $this->category || ! $this->category->intern_unit || ! $this->category->intern_quantity || ! $this->created_at) {
+        if (! $this->created_at) {
+            return null;
+        }
+
+        if ($this->is_manual_delivery_date_intern_enabled) {
+            $unit = $this->delivery_date_intern_unit;
+            $quantity = $this->delivery_date_intern_quantity;
+        } else {
+            if (! $this->category || ! $this->category->intern_unit || ! $this->category->intern_quantity) {
+                return null;
+            }
+
+            $unit = $this->category->intern_unit;
+            $quantity = $this->category->intern_quantity;
+        }
+
+        if (! $unit || ! $quantity) {
             return null;
         }
 
         $createdAt = Carbon::parse($this->created_at);
-        $unit = $this->category->intern_unit;
-        $quantity = $this->category->intern_quantity;
 
         switch ($unit) {
             case 'minutes':

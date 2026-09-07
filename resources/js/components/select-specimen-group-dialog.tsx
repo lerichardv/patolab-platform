@@ -1,7 +1,8 @@
 import axios from 'axios';
 import debounce from 'lodash/debounce';
 import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import SelectSpecimenGroupSkeleton from '@/components/select-specimen-group-skeleton';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -42,35 +43,60 @@ export default function SelectSpecimenGroupDialog({
     const [lastPage, setLastPage] = useState(1);
     const [total, setTotal] = useState(0);
 
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const isFirstRender = useRef(true);
+
     const fetchGroups = async (query: string, pageNum: number = 1) => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        abortControllerRef.current = new AbortController();
+
         setLoading(true);
 
         try {
             const response = await axios.get('/specimen-groups/search', {
                 params: { q: query, page: pageNum },
+                signal: abortControllerRef.current.signal,
             });
 
             setGroups(response.data.data);
             setPage(response.data.current_page);
             setLastPage(response.data.last_page);
             setTotal(response.data.total);
-        } catch (error) {
+        } catch (error: any) {
+            if (axios.isCancel(error) || error.name === 'CanceledError') {
+                return;
+            }
+
             console.error('Error fetching specimen groups:', error);
         } finally {
-            setLoading(false);
+            if (!abortControllerRef.current?.signal.aborted) {
+                setLoading(false);
+            }
         }
     };
 
-    const debouncedFetch = useMemo(
-        () =>
-            debounce((query: string) => {
-                fetchGroups(query, 1);
-            }, 300),
-        [],
-    );
+    const debouncedFetchRef = useRef<ReturnType<typeof debounce> | null>(null);
+
+    useEffect(() => {
+        debouncedFetchRef.current = debounce((query: string) => {
+            fetchGroups(query, 1);
+        }, 300);
+
+        return () => {
+            debouncedFetchRef.current?.cancel();
+
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (open) {
+            isFirstRender.current = true;
             const timer = setTimeout(() => {
                 setSearch('');
                 setSelectedGroupId(null);
@@ -82,14 +108,26 @@ export default function SelectSpecimenGroupDialog({
             }, 0);
 
             return () => clearTimeout(timer);
+        } else {
+            debouncedFetchRef.current?.cancel();
+
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
         }
     }, [open]);
 
     useEffect(() => {
         if (open) {
-            debouncedFetch(search);
+            if (isFirstRender.current) {
+                isFirstRender.current = false;
+
+                return;
+            }
+
+            debouncedFetchRef.current?.(search);
         }
-    }, [search, open, debouncedFetch]);
+    }, [search, open]);
 
     const handlePageChange = (newPage: number) => {
         if (newPage >= 1 && newPage <= lastPage) {
@@ -133,7 +171,11 @@ export default function SelectSpecimenGroupDialog({
 
                 <div className="space-y-4 py-4">
                     <div className="relative">
-                        <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
+                        {loading ? (
+                            <Loader2 className="absolute top-2.5 left-3 h-4 w-4 animate-spin text-primary" />
+                        ) : (
+                            <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
+                        )}
                         <Input
                             placeholder="Buscar por nombre, nº factura o código de muestra..."
                             value={search}
@@ -143,11 +185,8 @@ export default function SelectSpecimenGroupDialog({
                     </div>
 
                     <div className="max-h-[500px] divide-y divide-border overflow-y-auto rounded-md border border-border bg-card">
-                        {loading && groups.length === 0 ? (
-                            <div className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
-                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                <span>Cargando grupos...</span>
-                            </div>
+                        {loading ? (
+                            <SelectSpecimenGroupSkeleton count={6} />
                         ) : groups.length === 0 ? (
                             <div className="p-8 text-center text-sm text-muted-foreground">
                                 No se encontraron grupos de muestras

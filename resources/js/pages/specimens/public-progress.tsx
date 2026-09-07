@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import GuestLayout from '@/layouts/guest-layout';
-import { addWithoutWeekends } from '@/lib/utils';
+import { getClientEstimatedDate } from '@/services/specimen-delivery-date';
 
 interface Props {
     specimen: any;
@@ -86,26 +86,7 @@ export default function PublicProgress({ specimen }: Props) {
           })
         : 'N/A';
 
-    const getEstimatedDate = () => {
-        if (
-            !specimen.category ||
-            !specimen.category.unit ||
-            !specimen.category.quantity ||
-            !specimen.created_at
-        ) {
-            return null;
-        }
-
-        const createdAt = new Date(specimen.created_at);
-
-        return addWithoutWeekends(
-            createdAt,
-            specimen.category.quantity,
-            specimen.category.unit,
-        );
-    };
-
-    const estimatedDate = getEstimatedDate();
+    const estimatedDate = getClientEstimatedDate(specimen);
     const formattedEstimatedDate = estimatedDate
         ? format(estimatedDate, "dd 'de' MMMM, yyyy - HH:mm", { locale: es })
         : null;

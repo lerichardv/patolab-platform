@@ -22,6 +22,7 @@ use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MyAssignmentController;
 use App\Http\Controllers\MySpecimenTypeTemplateController;
 use App\Http\Controllers\MyWorkOrderController;
+use App\Http\Controllers\PathologistFormDataController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReferrerController;
 use App\Http\Controllers\ReferrerTypeController;
@@ -134,6 +135,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('specimens/quick-edit-metadata', [SpecimenController::class, 'quickEditMetadata'])->name('specimens.quick-edit-metadata');
     Route::post('specimens/{specimen}/quick-update', [SpecimenController::class, 'quickUpdate'])->name('specimens.quick-update');
     Route::get('specimens/form-data', SpecimenFormDataController::class)->name('specimens.form-data');
+    Route::get('specimens/pathologists/form-data', PathologistFormDataController::class)->name('specimens.pathologists.form-data');
     Route::resource('specimens', SpecimenController::class);
     Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');
     Route::get('invoices/{invoice}/audit-history', [InvoiceController::class, 'auditHistory'])->name('invoices.audit-history');

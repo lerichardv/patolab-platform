@@ -160,7 +160,6 @@ export default function ReportWorkspace({
     specimen,
     report,
     auth,
-    pathologists = [],
     products = [],
     cutting_codes = [],
     cutting_prefixes = [],
@@ -3403,7 +3402,6 @@ export default function ReportWorkspace({
                         specimen={specimen}
                         open={isAssignSheetOpen}
                         onOpenChange={setIsAssignSheetOpen}
-                        pathologists={pathologists}
                     />
 
                     <ManageCuttingsSheet
