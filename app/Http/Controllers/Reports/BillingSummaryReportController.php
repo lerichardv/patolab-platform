@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Reports;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\InvoiceSpecimen;
+use App\Models\Specimen;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Services\DateFilterService;
@@ -60,9 +62,12 @@ class BillingSummaryReportController extends Controller
         $activeInvoicesPaginated = $activeQuery->paginate(15, ['*'], 'active_page')->withQueryString();
         $cancelledInvoicesPaginated = $cancelledQuery->paginate(10, ['*'], 'cancelled_page')->withQueryString();
 
+        $typeIds = $this->parseFilterIds($request, 'specimen_type_id');
+        $examIds = $this->parseFilterIds($request, 'examination_id');
+
         // Transform collection to flat-mapped specimen/item rows
-        $activeRows = $this->transformInvoicesToRows($activeInvoicesPaginated->items(), $dateFrom, $dateTo, $sortOrder);
-        $cancelledRows = $this->transformInvoicesToRows($cancelledInvoicesPaginated->items(), $dateFrom, $dateTo, $sortOrder);
+        $activeRows = $this->transformInvoicesToRows($activeInvoicesPaginated->items(), $dateFrom, $dateTo, $sortOrder, $typeIds, $examIds);
+        $cancelledRows = $this->transformInvoicesToRows($cancelledInvoicesPaginated->items(), $dateFrom, $dateTo, $sortOrder, $typeIds, $examIds);
 
         // Replace the raw paginated items with our processed rows
         $activeInvoicesData = $activeInvoicesPaginated->toArray();
@@ -73,7 +78,7 @@ class BillingSummaryReportController extends Controller
 
         // Calculate totals and payment details for the entire filtered set (unpaginated)
         $allActiveInvoices = $this->buildQuery($request, false)->get();
-        $activeRowsAll = $this->transformInvoicesToRows($allActiveInvoices, $dateFrom, $dateTo, $sortOrder);
+        $activeRowsAll = $this->transformInvoicesToRows($allActiveInvoices, $dateFrom, $dateTo, $sortOrder, $typeIds, $examIds);
 
         $paymentDetails = [
             'cash' => 0.0,
@@ -117,7 +122,7 @@ class BillingSummaryReportController extends Controller
 
         // Calculate cancelled totals
         $allCancelledInvoices = $this->buildQuery($request, true)->get();
-        $cancelledRowsAll = $this->transformInvoicesToRows($allCancelledInvoices, $dateFrom, $dateTo, $sortOrder);
+        $cancelledRowsAll = $this->transformInvoicesToRows($allCancelledInvoices, $dateFrom, $dateTo, $sortOrder, $typeIds, $examIds);
 
         $cancelledTotals = [
             'gross' => 0.0,
@@ -188,12 +193,15 @@ class BillingSummaryReportController extends Controller
             $sortOrder = 'desc';
         }
 
+        $typeIds = $this->parseFilterIds($request, 'specimen_type_id');
+        $examIds = $this->parseFilterIds($request, 'examination_id');
+
         // Fetch active and cancelled items
         $allActiveInvoices = $this->buildQuery($request, false)->get();
-        $activeRows = $this->transformInvoicesToRows($allActiveInvoices, $dateFrom, $dateTo, $sortOrder);
+        $activeRows = $this->transformInvoicesToRows($allActiveInvoices, $dateFrom, $dateTo, $sortOrder, $typeIds, $examIds);
 
         $allCancelledInvoices = $this->buildQuery($request, true)->get();
-        $cancelledRows = $this->transformInvoicesToRows($allCancelledInvoices, $dateFrom, $dateTo, $sortOrder);
+        $cancelledRows = $this->transformInvoicesToRows($allCancelledInvoices, $dateFrom, $dateTo, $sortOrder, $typeIds, $examIds);
 
         // Build Excel Sheet
         $spreadsheet = new Spreadsheet;
@@ -622,10 +630,22 @@ class BillingSummaryReportController extends Controller
             'customer',
             'specimen.type',
             'specimen.examination',
+            'specimen.examinations',
+            'specimen.specimenExaminations.examination',
+            'specimen.invoiceSpecimens.examination',
+            'invoiceSpecimens.examination',
+            'groupSpecimens.examination',
             'groupSpecimens.specimen.type',
             'groupSpecimens.specimen.examination',
+            'groupSpecimens.specimen.examinations',
+            'groupSpecimens.specimen.specimenExaminations.examination',
+            'groupSpecimens.specimen.invoiceSpecimens.examination',
+            'creditInvoiceSpecimens.examination',
             'creditInvoiceSpecimens.specimen.type',
             'creditInvoiceSpecimens.specimen.examination',
+            'creditInvoiceSpecimens.specimen.examinations',
+            'creditInvoiceSpecimens.specimen.specimenExaminations.examination',
+            'creditInvoiceSpecimens.specimen.invoiceSpecimens.examination',
             'createdBy',
         ]);
 
@@ -649,6 +669,9 @@ class BillingSummaryReportController extends Controller
                     })
                     ->orWhereHas('groupSpecimens.specimen', function ($gsq) use ($search) {
                         $gsq->where('sequence_code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('creditInvoiceSpecimens.specimen', function ($csq) use ($search) {
+                        $csq->where('sequence_code', 'like', "%{$search}%");
                     });
             });
         }
@@ -728,12 +751,8 @@ class BillingSummaryReportController extends Controller
         }
 
         // Specimen Type
-        if ($request->has('specimen_type_id') && $request->get('specimen_type_id') !== 'all') {
-            $typeIds = $request->get('specimen_type_id');
-            if (! is_array($typeIds)) {
-                $typeIds = [$typeIds];
-            }
-            $typeIds = array_values(array_filter(array_map('strval', $typeIds), fn ($v) => $v !== '' && $v !== 'all'));
+        $typeIds = $this->parseFilterIds($request, 'specimen_type_id');
+        if ($typeIds !== null) {
             if (empty($typeIds)) {
                 $query->whereRaw('1 = 0');
             } else {
@@ -742,26 +761,28 @@ class BillingSummaryReportController extends Controller
                         $sq->whereIn('specimen_type', $typeIds);
                     })->orWhereHas('groupSpecimens.specimen', function ($gsq) use ($typeIds) {
                         $gsq->whereIn('specimen_type', $typeIds);
+                    })->orWhereHas('creditInvoiceSpecimens.specimen', function ($csq) use ($typeIds) {
+                        $csq->whereIn('specimen_type', $typeIds);
                     });
                 });
             }
         }
 
         // Examination
-        if ($request->has('examination_id') && $request->get('examination_id') !== 'all') {
-            $examIds = $request->get('examination_id');
-            if (! is_array($examIds)) {
-                $examIds = [$examIds];
-            }
-            $examIds = array_values(array_filter(array_map('strval', $examIds), fn ($v) => $v !== '' && $v !== 'all'));
+        $examIds = $this->parseFilterIds($request, 'examination_id');
+        if ($examIds !== null) {
             if (empty($examIds)) {
                 $query->whereRaw('1 = 0');
             } else {
                 $query->where(function ($q) use ($examIds) {
-                    $q->whereHas('specimen', function ($sq) use ($examIds) {
-                        $sq->whereIn('specimen_type_examination', $examIds);
-                    })->orWhereHas('groupSpecimens.specimen', function ($gsq) use ($examIds) {
-                        $gsq->whereIn('specimen_type_examination', $examIds);
+                    $q->whereHas('specimen.specimenExaminations', function ($seq) use ($examIds) {
+                        $seq->whereIn('examination_id', $examIds);
+                    })->orWhereHas('groupSpecimens', function ($giq) use ($examIds) {
+                        $giq->whereIn('examination_id', $examIds)
+                            ->orWhereHas('specimen.specimenExaminations', fn ($seq) => $seq->whereIn('examination_id', $examIds));
+                    })->orWhereHas('creditInvoiceSpecimens', function ($ciq) use ($examIds) {
+                        $ciq->whereIn('examination_id', $examIds)
+                            ->orWhereHas('specimen.specimenExaminations', fn ($seq) => $seq->whereIn('examination_id', $examIds));
                     });
                 });
             }
@@ -778,10 +799,239 @@ class BillingSummaryReportController extends Controller
     }
 
     /**
+     * Parse multi-select filter parameters into array of IDs.
+     * Returns null if 'all' or not present.
+     * Returns empty array if 'none' or empty.
+     *
+     * @return string[]|null
+     */
+    private function parseFilterIds(Request $request, string $key): ?array
+    {
+        if (! $request->has($key)) {
+            return null;
+        }
+
+        $val = $request->get($key);
+        if ($val === 'all') {
+            return null;
+        }
+
+        if ($val === 'none') {
+            return [];
+        }
+
+        if (! is_array($val)) {
+            $val = [$val];
+        }
+
+        return array_values(array_filter(array_map('strval', $val), fn ($v) => $v !== '' && $v !== 'all' && $v !== 'none'));
+    }
+
+    /**
+     * Resolve examination IDs for a specimen, invoice specimen, or invoice.
+     * Uses SpecimenExamination pivot model and InvoiceSpecimen records.
+     *
+     * @return string[]
+     */
+    private function getSpecimenExaminationIds(?Specimen $specimen, ?InvoiceSpecimen $invoiceSpecimen = null, ?Invoice $invoice = null): array
+    {
+        $ids = collect();
+
+        if ($invoiceSpecimen?->examination_id) {
+            $ids->push((string) $invoiceSpecimen->examination_id);
+        }
+
+        if ($invoice && $invoice->invoiceSpecimens && $invoice->invoiceSpecimens->isNotEmpty()) {
+            foreach ($invoice->invoiceSpecimens as $is) {
+                if ($is->examination_id) {
+                    $ids->push((string) $is->examination_id);
+                }
+            }
+        }
+
+        if ($specimen) {
+            if ($specimen->invoiceSpecimens && $specimen->invoiceSpecimens->isNotEmpty()) {
+                foreach ($specimen->invoiceSpecimens as $is) {
+                    if ($is->examination_id) {
+                        $ids->push((string) $is->examination_id);
+                    }
+                }
+            }
+
+            // 1. SpecimenExamination pivot model
+            if ($specimen->specimenExaminations && $specimen->specimenExaminations->isNotEmpty()) {
+                foreach ($specimen->specimenExaminations as $se) {
+                    if ($se->examination_id) {
+                        $ids->push((string) $se->examination_id);
+                    }
+                }
+            }
+
+            // 2. BelongsToMany examinations
+            if ($ids->isEmpty() && $specimen->examinations && $specimen->examinations->isNotEmpty()) {
+                foreach ($specimen->examinations as $exam) {
+                    if ($exam->id) {
+                        $ids->push((string) $exam->id);
+                    }
+                }
+            }
+
+            // 3. Fallback to invoice specimen examination if present
+            if ($ids->isEmpty() && $invoiceSpecimen?->examination_id) {
+                $ids->push((string) $invoiceSpecimen->examination_id);
+            }
+
+            // 4. Legacy fallback: specimen_type_examination
+            if ($ids->isEmpty() && $specimen->specimen_type_examination) {
+                $ids->push((string) $specimen->specimen_type_examination);
+            }
+        } elseif ($invoiceSpecimen?->examination_id) {
+            $ids->push((string) $invoiceSpecimen->examination_id);
+        }
+
+        return $ids->unique()->values()->all();
+    }
+
+    /**
+     * Resolve examination names and quantities for a specimen or invoice specimen.
+     * Each examination quantity is stored on InvoiceSpecimen with the examination_id.
+     *
+     * @return array<int, array{name: string, quantity: int}>
+     */
+    private function getSpecimenExaminations(?Specimen $specimen, ?InvoiceSpecimen $invoiceSpecimen = null, ?Invoice $invoice = null): array
+    {
+        if ($invoiceSpecimen) {
+            $examName = $invoiceSpecimen->examination?->name;
+
+            if (! $examName && $invoiceSpecimen->examination_id) {
+                $examName = $specimen?->specimenExaminations
+                    ?->firstWhere('examination_id', $invoiceSpecimen->examination_id)
+                    ?->examination?->name
+                    ?? $specimen?->examinations
+                        ?->firstWhere('id', $invoiceSpecimen->examination_id)
+                        ?->name;
+            }
+
+            if ($examName) {
+                return [[
+                    'name' => $examName,
+                    'quantity' => (int) ($invoiceSpecimen->quantity ?: 1),
+                ]];
+            }
+        }
+
+        if (! $specimen) {
+            return [];
+        }
+
+        $items = collect();
+
+        // 1. Try InvoiceSpecimen records from the invoice or specimen
+        $invoiceSpecs = collect();
+        if ($invoice && $invoice->invoiceSpecimens && $invoice->invoiceSpecimens->isNotEmpty()) {
+            $invoiceSpecs = $invoice->invoiceSpecimens->filter(fn ($is) => (int) $is->specimen_id === (int) $specimen->id);
+        }
+
+        if ($invoiceSpecs->isEmpty() && $specimen->invoiceSpecimens && $specimen->invoiceSpecimens->isNotEmpty()) {
+            $invoiceSpecs = $invoice
+                ? $specimen->invoiceSpecimens->filter(fn ($is) => (int) $is->invoice_id === (int) $invoice->id)
+                : $specimen->invoiceSpecimens;
+
+            if ($invoiceSpecs->isEmpty()) {
+                $invoiceSpecs = $specimen->invoiceSpecimens;
+            }
+        }
+
+        if ($invoiceSpecs->isNotEmpty()) {
+            foreach ($invoiceSpecs as $is) {
+                $name = $is->examination?->name;
+                if (! $name && $is->examination_id) {
+                    $name = $specimen->specimenExaminations
+                        ?->firstWhere('examination_id', $is->examination_id)
+                        ?->examination?->name
+                        ?? $specimen->examinations
+                            ?->firstWhere('id', $is->examination_id)
+                            ?->name;
+                }
+
+                if ($name) {
+                    $items->push([
+                        'name' => $name,
+                        'quantity' => (int) ($is->quantity ?: 1),
+                    ]);
+                }
+            }
+        }
+
+        // 2. If no InvoiceSpecimen with examination found, fall back to SpecimenExamination pivot models
+        if ($items->isEmpty() && $specimen->specimenExaminations && $specimen->specimenExaminations->isNotEmpty()) {
+            foreach ($specimen->specimenExaminations as $se) {
+                if ($se->examination?->name) {
+                    $matchingIs = $invoiceSpecs->firstWhere('examination_id', $se->examination_id)
+                        ?? $specimen->invoiceSpecimens?->firstWhere('examination_id', $se->examination_id);
+                    $qty = $matchingIs ? (int) ($matchingIs->quantity ?: 1) : 1;
+
+                    $items->push([
+                        'name' => $se->examination->name,
+                        'quantity' => $qty,
+                    ]);
+                }
+            }
+        }
+
+        // 3. Fall back to BelongsToMany examinations
+        if ($items->isEmpty() && $specimen->examinations && $specimen->examinations->isNotEmpty()) {
+            foreach ($specimen->examinations as $exam) {
+                if ($exam->name) {
+                    $matchingIs = $invoiceSpecs->firstWhere('examination_id', $exam->id)
+                        ?? $specimen->invoiceSpecimens?->firstWhere('examination_id', $exam->id);
+                    $qty = $matchingIs ? (int) ($matchingIs->quantity ?: 1) : 1;
+
+                    $items->push([
+                        'name' => $exam->name,
+                        'quantity' => $qty,
+                    ]);
+                }
+            }
+        }
+
+        // 4. Fall back to legacy specimen_type_examination
+        if ($items->isEmpty() && $specimen->examination?->name) {
+            $matchingIs = $invoiceSpecs->first() ?? $specimen->invoiceSpecimen;
+            $qty = $matchingIs ? (int) ($matchingIs->quantity ?: 1) : (int) (($invoice?->quantity && $invoice->quantity > 0) ? $invoice->quantity : 1);
+
+            $items->push([
+                'name' => $specimen->examination->name,
+                'quantity' => $qty,
+            ]);
+        }
+
+        // Group by examination name and sum quantities if duplicates
+        $grouped = [];
+        foreach ($items as $item) {
+            $name = $item['name'];
+            $qty = (int) ($item['quantity'] ?? 1);
+            if (isset($grouped[$name])) {
+                $grouped[$name]['quantity'] += $qty;
+            } else {
+                $grouped[$name] = ['name' => $name, 'quantity' => $qty];
+            }
+        }
+
+        return array_values($grouped);
+    }
+
+    /**
      * Map raw invoices list into detailed specimen/item rows.
      */
-    private function transformInvoicesToRows($invoices, $dateFrom = null, $dateTo = null, $sortOrder = 'desc')
-    {
+    private function transformInvoicesToRows(
+        $invoices,
+        $dateFrom = null,
+        $dateTo = null,
+        $sortOrder = 'desc',
+        ?array $typeIds = null,
+        ?array $examIds = null
+    ) {
         $rows = [];
         foreach ($invoices as $invoice) {
             if ($invoice->is_group && ! in_array($invoice->invoice_type, ['credit payment', 'social security'])) {
@@ -794,9 +1044,33 @@ class BillingSummaryReportController extends Controller
                         $cisItems = $cisItems->filter(fn ($cis) => $cis->created_at && $cis->created_at->toDateString() <= $dateTo);
                     }
 
+                    if ($typeIds !== null) {
+                        $cisItems = $cisItems->filter(function ($cis) use ($typeIds) {
+                            $typeId = $cis->specimen?->specimen_type;
+
+                            return $typeId && in_array((string) $typeId, $typeIds, true);
+                        });
+                    }
+
+                    if ($examIds !== null) {
+                        $cisItems = $cisItems->filter(function ($cis) use ($examIds) {
+                            $itemExamIds = $this->getSpecimenExaminationIds($cis->specimen, $cis);
+
+                            return ! empty(array_intersect($examIds, $itemExamIds));
+                        });
+                    }
+
                     if ($cisItems->count() > 0) {
                         foreach ($cisItems as $cis) {
                             $quantity = $cis->quantity ?? 1;
+                            $specimen = $cis->specimen;
+                            $specimenType = $specimen?->type?->name;
+                            $examItems = $this->getSpecimenExaminations($specimen, $cis, $invoice);
+                            $examNames = array_column($examItems, 'name');
+                            $service = $specimenType
+                                ? (! empty($examNames) ? "{$specimenType} - ".implode(', ', $examNames) : $specimenType)
+                                : ($cis->examination?->name ?? 'N/A');
+
                             $rows[] = [
                                 'id' => 'cis-'.$cis->id,
                                 'invoice_id' => $invoice->id,
@@ -811,8 +1085,10 @@ class BillingSummaryReportController extends Controller
                                 'isv_15' => (float) $cis->isv_15,
                                 'discount' => (float) $cis->discount,
                                 'net_amount' => $cis->is_paid ? (float) $cis->total : 0.0,
-                                'service' => ($cis->specimen?->type?->name ?? 'N/A').' - '.($cis->specimen?->examination?->name ?? 'N/A'),
-                                'specimen_code' => $cis->specimen?->sequence_code ?? 'N/A',
+                                'service' => $service,
+                                'specimen_type' => $specimenType,
+                                'examinations' => $examItems,
+                                'specimen_code' => $specimen?->sequence_code ?? 'N/A',
                                 'username' => $invoice->createdBy?->name ?? 'N/A',
                                 'payment_type' => $invoice->payment_type,
                                 'is_cancelled' => $invoice->invoice_type === 'cancelled',
@@ -829,9 +1105,33 @@ class BillingSummaryReportController extends Controller
                         $igsItems = $igsItems->filter(fn ($igs) => $igs->created_at && $igs->created_at->toDateString() <= $dateTo);
                     }
 
+                    if ($typeIds !== null) {
+                        $igsItems = $igsItems->filter(function ($igs) use ($typeIds) {
+                            $typeId = $igs->specimen?->specimen_type;
+
+                            return $typeId && in_array((string) $typeId, $typeIds, true);
+                        });
+                    }
+
+                    if ($examIds !== null) {
+                        $igsItems = $igsItems->filter(function ($igs) use ($examIds) {
+                            $itemExamIds = $this->getSpecimenExaminationIds($igs->specimen, $igs);
+
+                            return ! empty(array_intersect($examIds, $itemExamIds));
+                        });
+                    }
+
                     if ($igsItems->count() > 0) {
                         foreach ($igsItems as $igs) {
                             $quantity = $igs->quantity ?? 1;
+                            $specimen = $igs->specimen;
+                            $specimenType = $specimen?->type?->name;
+                            $examItems = $this->getSpecimenExaminations($specimen, $igs, $invoice);
+                            $examNames = array_column($examItems, 'name');
+                            $service = $specimenType
+                                ? (! empty($examNames) ? "{$specimenType} - ".implode(', ', $examNames) : $specimenType)
+                                : ($igs->examination?->name ?? 'N/A');
+
                             $rows[] = [
                                 'id' => 'igs-'.$igs->id,
                                 'invoice_id' => $invoice->id,
@@ -846,8 +1146,10 @@ class BillingSummaryReportController extends Controller
                                 'isv_15' => (float) $igs->isv_15,
                                 'discount' => (float) $igs->discount,
                                 'net_amount' => (float) $igs->total,
-                                'service' => ($igs->specimen?->type?->name ?? 'N/A').' - '.($igs->specimen?->examination?->name ?? 'N/A'),
-                                'specimen_code' => $igs->specimen?->sequence_code ?? 'N/A',
+                                'service' => $service,
+                                'specimen_type' => $specimenType,
+                                'examinations' => $examItems,
+                                'specimen_code' => $specimen?->sequence_code ?? 'N/A',
                                 'username' => $invoice->createdBy?->name ?? 'N/A',
                                 'payment_type' => $invoice->payment_type,
                                 'is_cancelled' => $invoice->invoice_type === 'cancelled',
@@ -857,11 +1159,33 @@ class BillingSummaryReportController extends Controller
                     }
                 }
             } else {
+                if ($typeIds !== null) {
+                    $typeId = $invoice->specimen?->specimen_type;
+                    if (! $typeId || ! in_array((string) $typeId, $typeIds, true)) {
+                        continue;
+                    }
+                }
+
+                if ($examIds !== null) {
+                    $itemExamIds = $this->getSpecimenExaminationIds($invoice->specimen, null, $invoice);
+                    if (empty(array_intersect($examIds, $itemExamIds))) {
+                        continue;
+                    }
+                }
                 $service = 'N/A';
                 $specimenCode = 'N/A';
+                $specimenType = null;
+                $examItems = [];
+
                 if ($invoice->specimen) {
-                    $service = ($invoice->specimen->type?->name ?? 'N/A').' - '.($invoice->specimen->examination?->name ?? 'N/A');
-                    $specimenCode = $invoice->specimen->sequence_code ?? 'N/A';
+                    $specimen = $invoice->specimen;
+                    $specimenType = $specimen->type?->name;
+                    $examItems = $this->getSpecimenExaminations($specimen, null, $invoice);
+                    $examNames = array_column($examItems, 'name');
+                    $service = $specimenType
+                        ? (! empty($examNames) ? "{$specimenType} - ".implode(', ', $examNames) : $specimenType)
+                        : 'N/A';
+                    $specimenCode = $specimen->sequence_code ?? 'N/A';
                 } elseif ($invoice->invoice_type === 'credit payment') {
                     $service = 'Abono de Crédito';
                 } elseif ($invoice->invoice_type === 'social security') {
@@ -870,7 +1194,7 @@ class BillingSummaryReportController extends Controller
                     $service = $invoice->description ?? 'Alquiler';
                 }
 
-                $quantity = $invoice->quantity ?? 1;
+                $quantity = $invoice->quantity ?? (count($examItems) > 0 ? array_sum(array_column($examItems, 'quantity')) : 1);
                 $rows[] = [
                     'id' => 'inv-'.$invoice->id,
                     'invoice_id' => $invoice->id,
@@ -886,6 +1210,8 @@ class BillingSummaryReportController extends Controller
                     'discount' => (float) $invoice->discount,
                     'net_amount' => (float) $invoice->total_paid,
                     'service' => $service,
+                    'specimen_type' => $specimenType,
+                    'examinations' => $examItems,
                     'specimen_code' => $specimenCode,
                     'username' => $invoice->createdBy?->name ?? 'N/A',
                     'payment_type' => $invoice->payment_type,

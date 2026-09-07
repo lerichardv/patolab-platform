@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Representa una muestra o examen (espécimen) en el sistema.
+ *
+ * @property int|null $specimen_type_examination @deprecated The specimen_type_examination column won't be used anymore and is being populated only for legacy support but soon will be deleted. Use \App\Models\SpecimenExamination instead.
  */
 class Specimen extends Model
 {
@@ -80,7 +82,7 @@ class Specimen extends Model
         'customer',
         'location_id',
         'specimen_type',
-        // LEGACY: The specimen_type_examination column is legacy. The correct way to store specimen_type_examinations is by creating them on InvoiceSpecimen (or examinations pivot).
+        // @deprecated The specimen_type_examination column won't be used anymore and is being populated only for legacy support but soon will be deleted. Must use \App\Models\SpecimenExamination instead.
         'specimen_type_examination',
         'specimen_category',
         'referrer',
@@ -161,6 +163,9 @@ class Specimen extends Model
         return $this->belongsTo(SpecimenType::class, 'specimen_type');
     }
 
+    /**
+     * @deprecated The examination relationship based on specimen_type_examination won't be used anymore and is being populated only for legacy support but soon will be deleted. Must use examinations() or specimenExaminations() via \App\Models\SpecimenExamination instead.
+     */
     public function examination(): BelongsTo
     {
         return $this->belongsTo(SpecimenTypeExamination::class, 'specimen_type_examination');

@@ -25,19 +25,21 @@ import { Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+
 import {
     Table,
     TableBody,
@@ -48,6 +50,11 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import SpecimenViewSheet from '../../specimens/specimen-view-sheet';
+
+interface ExaminationItem {
+    name: string;
+    quantity: number;
+}
 
 interface SpecimenReportRow {
     id: number;
@@ -62,6 +69,7 @@ interface SpecimenReportRow {
     examination?: {
         name: string;
     };
+    examination_items?: ExaminationItem[];
     category?: {
         name: string;
     };
@@ -213,7 +221,23 @@ export default function DeliveryReportIndex({
         string[]
     >(() => parseInitialIds(filters.pathologist_id, pathologists));
 
-    useEffect(() => {
+    const [prevFilters, setPrevFilters] = useState({
+        specimen_type_id: filters.specimen_type_id,
+        examination_id: filters.examination_id,
+        pathologist_id: filters.pathologist_id,
+    });
+
+    if (
+        prevFilters.specimen_type_id !== filters.specimen_type_id ||
+        prevFilters.examination_id !== filters.examination_id ||
+        prevFilters.pathologist_id !== filters.pathologist_id
+    ) {
+        setPrevFilters({
+            specimen_type_id: filters.specimen_type_id,
+            examination_id: filters.examination_id,
+            pathologist_id: filters.pathologist_id,
+        });
+
         if (filters.specimen_type_id !== undefined) {
             setSelectedSpecimenTypeIds(
                 parseInitialIds(filters.specimen_type_id, specimenTypes),
@@ -231,14 +255,7 @@ export default function DeliveryReportIndex({
                 parseInitialIds(filters.pathologist_id, pathologists),
             );
         }
-    }, [
-        filters.specimen_type_id,
-        filters.examination_id,
-        filters.pathologist_id,
-        specimenTypes,
-        examinations,
-        pathologists,
-    ]);
+    }
 
     const handlePathologistSelectionChange = (nextPathologistIds: string[]) => {
         setSelectedPathologistIds(nextPathologistIds);
@@ -436,27 +453,6 @@ export default function DeliveryReportIndex({
         setIsSheetOpen(true);
     };
 
-    const examinationOptions = useMemo(() => {
-        const selectedSpecimenType = filters.specimen_type_id || 'all';
-
-        const filtered =
-            selectedSpecimenType === 'all'
-                ? examinations
-                : examinations.filter(
-                      (exam) =>
-                          exam.specimen_type?.toString() ===
-                          selectedSpecimenType,
-                  );
-
-        return [
-            { label: 'Todos los exámenes', value: 'all' },
-            ...filtered.map((exam) => ({
-                label: exam.name,
-                value: exam.id.toString(),
-            })),
-        ];
-    }, [examinations, filters.specimen_type_id]);
-
     const activeSummary = useMemo(() => {
         return summary.filter((item) => item.total > 0);
     }, [summary]);
@@ -616,7 +612,7 @@ export default function DeliveryReportIndex({
                     </div>
 
                     {/* Row 2: Advanced filters */}
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
                         {/* Customer */}
                         <div className="flex flex-col gap-1.5">
                             <span className="text-xs font-semibold text-muted-foreground">
@@ -756,25 +752,46 @@ export default function DeliveryReportIndex({
                                 <PopoverTrigger asChild>
                                     <Button
                                         variant="outline"
+                                        role="combobox"
                                         className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
                                     >
                                         <div className="flex items-center gap-2 truncate">
                                             <Microscope className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                            <span>
+                                            <span className="truncate">
                                                 Tipos (
                                                 {selectedSpecimenTypeIds.length}
                                                 )
                                             </span>
                                         </div>
-                                        <ChevronDown className="h-4 w-4 opacity-50" />
+                                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent
-                                    className="w-64 p-2"
+                                    className="w-[--radix-popover-trigger-width] min-w-[240px] p-0"
                                     align="start"
                                 >
-                                    <div className="space-y-1.5">
-                                        <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+                                    <Command
+                                        filter={(value, search) => {
+                                            const v = value
+                                                .toLowerCase()
+                                                .normalize('NFD')
+                                                .replace(
+                                                    /[\u0300-\u036f]/g,
+                                                    '',
+                                                );
+                                            const s = search
+                                                .toLowerCase()
+                                                .normalize('NFD')
+                                                .replace(
+                                                    /[\u0300-\u036f]/g,
+                                                    '',
+                                                );
+
+                                            return v.includes(s) ? 1 : 0;
+                                        }}
+                                    >
+                                        <CommandInput placeholder="Buscar tipo de muestra..." />
+                                        <div className="flex items-center justify-between border-b px-3 py-1.5 text-xs text-muted-foreground">
                                             <span>Filtrar por tipo</span>
                                             <button
                                                 type="button"
@@ -812,56 +829,63 @@ export default function DeliveryReportIndex({
                                                     : 'Todos'}
                                             </button>
                                         </div>
-                                        <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
-                                            {specimenTypes.map((type) => {
-                                                const isChecked =
-                                                    selectedSpecimenTypeIds.includes(
-                                                        type.id.toString(),
-                                                    );
+                                        <CommandList>
+                                            <CommandEmpty>
+                                                No se encontraron resultados.
+                                            </CommandEmpty>
+                                            <CommandGroup className="max-h-60 overflow-y-auto">
+                                                {specimenTypes.map((type) => {
+                                                    const isChecked =
+                                                        selectedSpecimenTypeIds.includes(
+                                                            type.id.toString(),
+                                                        );
 
-                                                return (
-                                                    <div
-                                                        key={type.id}
-                                                        className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
-                                                        onClick={() => {
-                                                            const typeIdStr =
-                                                                type.id.toString();
-                                                            const nextTypes =
-                                                                isChecked
-                                                                    ? selectedSpecimenTypeIds.filter(
-                                                                          (
-                                                                              id,
-                                                                          ) =>
-                                                                              id !==
+                                                    return (
+                                                        <CommandItem
+                                                            key={type.id}
+                                                            value={type.name}
+                                                            onSelect={() => {
+                                                                const typeIdStr =
+                                                                    type.id.toString();
+                                                                const nextTypes =
+                                                                    isChecked
+                                                                        ? selectedSpecimenTypeIds.filter(
+                                                                              (
+                                                                                  id,
+                                                                              ) =>
+                                                                                  id !==
+                                                                                  typeIdStr,
+                                                                          )
+                                                                        : [
+                                                                              ...selectedSpecimenTypeIds,
                                                                               typeIdStr,
-                                                                      )
-                                                                    : [
-                                                                          ...selectedSpecimenTypeIds,
-                                                                          typeIdStr,
-                                                                      ];
+                                                                          ];
 
-                                                            handleSpecimenTypeSelectionChange(
-                                                                nextTypes,
-                                                            );
-                                                        }}
-                                                    >
-                                                        <Checkbox
-                                                            checked={isChecked}
-                                                            className="pointer-events-none"
-                                                            onCheckedChange={() => {}}
-                                                        />
-                                                        <span className="truncate">
-                                                            {type.name}
-                                                        </span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
+                                                                handleSpecimenTypeSelectionChange(
+                                                                    nextTypes,
+                                                                );
+                                                            }}
+                                                            className="flex cursor-pointer items-center gap-2"
+                                                        >
+                                                            <Checkbox
+                                                                checked={
+                                                                    isChecked
+                                                                }
+                                                                className="pointer-events-none"
+                                                                onCheckedChange={() => {}}
+                                                            />
+                                                            <span className="truncate">
+                                                                {type.name}
+                                                            </span>
+                                                        </CommandItem>
+                                                    );
+                                                })}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
                                 </PopoverContent>
                             </Popover>
                         </div>
-
                         {/* Examination */}
                         <div className="flex flex-col gap-1.5">
                             <span className="text-xs font-semibold text-muted-foreground">
@@ -871,24 +895,45 @@ export default function DeliveryReportIndex({
                                 <PopoverTrigger asChild>
                                     <Button
                                         variant="outline"
+                                        role="combobox"
                                         className="h-10 w-full justify-between gap-2 border bg-card transition-colors hover:bg-accent/50"
                                     >
                                         <div className="flex items-center gap-2 truncate">
                                             <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                            <span>
+                                            <span className="truncate">
                                                 Análisis (
                                                 {selectedExaminationIds.length})
                                             </span>
                                         </div>
-                                        <ChevronDown className="h-4 w-4 opacity-50" />
+                                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent
-                                    className="w-64 p-2"
+                                    className="w-[--radix-popover-trigger-width] min-w-[240px] p-0"
                                     align="start"
                                 >
-                                    <div className="space-y-1.5">
-                                        <div className="flex items-center justify-between border-b px-2 py-1 pb-1.5 text-xs text-muted-foreground">
+                                    <Command
+                                        filter={(value, search) => {
+                                            const v = value
+                                                .toLowerCase()
+                                                .normalize('NFD')
+                                                .replace(
+                                                    /[\u0300-\u036f]/g,
+                                                    '',
+                                                );
+                                            const s = search
+                                                .toLowerCase()
+                                                .normalize('NFD')
+                                                .replace(
+                                                    /[\u0300-\u036f]/g,
+                                                    '',
+                                                );
+
+                                            return v.includes(s) ? 1 : 0;
+                                        }}
+                                    >
+                                        <CommandInput placeholder="Buscar análisis / examen..." />
+                                        <div className="flex items-center justify-between border-b px-3 py-1.5 text-xs text-muted-foreground">
                                             <span>Filtrar por análisis</span>
                                             <button
                                                 type="button"
@@ -928,56 +973,67 @@ export default function DeliveryReportIndex({
                                                     : 'Todos'}
                                             </button>
                                         </div>
-                                        <div className="max-h-60 space-y-1 overflow-y-auto pt-1">
-                                            {filteredExaminationsForDropdown.map(
-                                                (exam) => {
-                                                    const isChecked =
-                                                        selectedExaminationIds.includes(
-                                                            exam.id.toString(),
-                                                        );
+                                        <CommandList>
+                                            <CommandEmpty>
+                                                {selectedSpecimenTypeIds.length ===
+                                                0
+                                                    ? 'Seleccione un tipo de muestra primero.'
+                                                    : 'No se encontraron resultados.'}
+                                            </CommandEmpty>
+                                            <CommandGroup className="max-h-60 overflow-y-auto">
+                                                {filteredExaminationsForDropdown.map(
+                                                    (exam) => {
+                                                        const isChecked =
+                                                            selectedExaminationIds.includes(
+                                                                exam.id.toString(),
+                                                            );
 
-                                                    return (
-                                                        <div
-                                                            key={exam.id}
-                                                            className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none hover:bg-accent hover:text-accent-foreground"
-                                                            onClick={() => {
-                                                                const examIdStr =
-                                                                    exam.id.toString();
-                                                                const nextExams =
-                                                                    isChecked
-                                                                        ? selectedExaminationIds.filter(
-                                                                              (
-                                                                                  id,
-                                                                              ) =>
-                                                                                  id !==
-                                                                                  examIdStr,
-                                                                          )
-                                                                        : [
-                                                                              ...selectedExaminationIds,
-                                                                              examIdStr,
-                                                                          ];
-
-                                                                handleExaminationSelectionChange(
-                                                                    nextExams,
-                                                                );
-                                                            }}
-                                                        >
-                                                            <Checkbox
-                                                                checked={
-                                                                    isChecked
+                                                        return (
+                                                            <CommandItem
+                                                                key={exam.id}
+                                                                value={
+                                                                    exam.name
                                                                 }
-                                                                className="pointer-events-none"
-                                                                onCheckedChange={() => {}}
-                                                            />
-                                                            <span className="truncate">
-                                                                {exam.name}
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                },
-                                            )}
-                                        </div>
-                                    </div>
+                                                                onSelect={() => {
+                                                                    const examIdStr =
+                                                                        exam.id.toString();
+                                                                    const nextExams =
+                                                                        isChecked
+                                                                            ? selectedExaminationIds.filter(
+                                                                                  (
+                                                                                      id,
+                                                                                  ) =>
+                                                                                      id !==
+                                                                                      examIdStr,
+                                                                              )
+                                                                            : [
+                                                                                  ...selectedExaminationIds,
+                                                                                  examIdStr,
+                                                                              ];
+
+                                                                    handleExaminationSelectionChange(
+                                                                        nextExams,
+                                                                    );
+                                                                }}
+                                                                className="flex cursor-pointer items-center gap-2"
+                                                            >
+                                                                <Checkbox
+                                                                    checked={
+                                                                        isChecked
+                                                                    }
+                                                                    className="pointer-events-none"
+                                                                    onCheckedChange={() => {}}
+                                                                />
+                                                                <span className="truncate">
+                                                                    {exam.name}
+                                                                </span>
+                                                            </CommandItem>
+                                                        );
+                                                    },
+                                                )}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
                                 </PopoverContent>
                             </Popover>
                         </div>
@@ -1046,7 +1102,20 @@ export default function DeliveryReportIndex({
                                     </TableRow>
                                 ) : (
                                     specimens.data.map((row) => {
-                                        const service = `${row.type?.name || 'N/A'} - ${row.examination?.name || 'N/A'}`;
+                                        const examItems =
+                                            row.examination_items &&
+                                            row.examination_items.length > 0
+                                                ? row.examination_items
+                                                : row.examination?.name
+                                                  ? [
+                                                        {
+                                                            name: row
+                                                                .examination
+                                                                .name,
+                                                            quantity: 1,
+                                                        },
+                                                    ]
+                                                  : [];
                                         const expectedInternal =
                                             row.expected_internal_finalization_date
                                                 ? format(
@@ -1086,7 +1155,66 @@ export default function DeliveryReportIndex({
                                                         ?.id_number ?? 'N/A'}
                                                 </TableCell>
                                                 <TableCell className="text-xs">
-                                                    {service}
+                                                    <div className="flex items-center gap-1.5 leading-tight">
+                                                        <span className="shrink-0 font-medium text-foreground">
+                                                            {row.type?.name ||
+                                                                'N/A'}
+                                                        </span>
+                                                        <span className="shrink-0 text-muted-foreground">
+                                                            -
+                                                        </span>
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            {examItems.length >
+                                                            0 ? (
+                                                                examItems.map(
+                                                                    (
+                                                                        item,
+                                                                        idx,
+                                                                    ) => (
+                                                                        <span
+                                                                            key={
+                                                                                idx
+                                                                            }
+                                                                            className="inline-flex items-center gap-1"
+                                                                        >
+                                                                            <Badge
+                                                                                variant="outline"
+                                                                                className="h-4 shrink-0 px-1 py-0 font-mono text-[9px] font-semibold text-muted-foreground"
+                                                                            >
+                                                                                {
+                                                                                    item.quantity
+                                                                                }
+                                                                            </Badge>
+                                                                            <span
+                                                                                className="text-muted-foreground"
+                                                                                title={
+                                                                                    item.name
+                                                                                }
+                                                                            >
+                                                                                {
+                                                                                    item.name
+                                                                                }
+                                                                            </span>
+                                                                            {idx <
+                                                                                examItems.length -
+                                                                                    1 && (
+                                                                                <span className="text-muted-foreground">
+                                                                                    ,
+                                                                                </span>
+                                                                            )}
+                                                                        </span>
+                                                                    ),
+                                                                )
+                                                            ) : (
+                                                                <span className="text-muted-foreground">
+                                                                    {row
+                                                                        .examination
+                                                                        ?.name ||
+                                                                        'N/A'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge variant="outline">

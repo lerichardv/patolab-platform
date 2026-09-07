@@ -46,8 +46,16 @@ class DeliveryReportController extends Controller
         $internalDateTo = $request->get('internal_date_to');
 
         // Build base query
-        $query = Specimen::with(['customerRelation', 'type', 'examination', 'category', 'users'])
-            ->where('status', '!=', 'cancelled');
+        $query = Specimen::with([
+            'customerRelation',
+            'type',
+            'examination',
+            'specimenExaminations.examination',
+            'examinations',
+            'invoiceSpecimens.examination',
+            'category',
+            'users',
+        ])->where('status', '!=', 'cancelled');
 
         // Apply filters in database
         if ($request->filled('search')) {
@@ -87,7 +95,11 @@ class DeliveryReportController extends Controller
             if (empty($examIds)) {
                 $query->whereRaw('1 = 0');
             } else {
-                $query->whereIn('specimen_type_examination', $examIds);
+                $query->where(function ($q) use ($examIds) {
+                    $q->whereHas('specimenExaminations', function ($sq) use ($examIds) {
+                        $sq->whereIn('examination_id', $examIds);
+                    })->orWhereIn('specimen_type_examination', $examIds);
+                });
             }
         }
 
@@ -166,6 +178,10 @@ class DeliveryReportController extends Controller
         $perPage = 15;
         $sliced = $filteredSpecimens->slice(($page - 1) * $perPage, $perPage)->values();
 
+        $sliced->each(function ($specimen) {
+            $specimen->setAttribute('examination_items', $this->getSpecimenExaminations($specimen));
+        });
+
         $paginated = new LengthAwarePaginator(
             $sliced,
             $filteredSpecimens->count(),
@@ -181,8 +197,19 @@ class DeliveryReportController extends Controller
 
         $summary = $allExaminations->map(function ($exam) use ($filteredSpecimens) {
             $count = $filteredSpecimens->filter(function ($specimen) use ($exam) {
-                return $specimen->specimen_type == $exam->specimen_type &&
-                       $specimen->specimen_type_examination == $exam->id;
+                if ($specimen->specimen_type != $exam->specimen_type) {
+                    return false;
+                }
+
+                if ($specimen->specimenExaminations && $specimen->specimenExaminations->isNotEmpty()) {
+                    return $specimen->specimenExaminations->contains('examination_id', $exam->id);
+                }
+
+                if ($specimen->examinations && $specimen->examinations->isNotEmpty()) {
+                    return $specimen->examinations->contains('id', $exam->id);
+                }
+
+                return $specimen->specimen_type_examination == $exam->id;
             })->count();
 
             return [
@@ -256,8 +283,16 @@ class DeliveryReportController extends Controller
         $internalDateTo = $request->get('internal_date_to');
 
         // Build query
-        $query = Specimen::with(['customerRelation', 'type', 'examination', 'category', 'users'])
-            ->where('status', '!=', 'cancelled');
+        $query = Specimen::with([
+            'customerRelation',
+            'type',
+            'examination',
+            'specimenExaminations.examination',
+            'examinations',
+            'invoiceSpecimens.examination',
+            'category',
+            'users',
+        ])->where('status', '!=', 'cancelled');
 
         if ($request->filled('search')) {
             $search = $request->get('search');
@@ -296,7 +331,11 @@ class DeliveryReportController extends Controller
             if (empty($examIds)) {
                 $query->whereRaw('1 = 0');
             } else {
-                $query->whereIn('specimen_type_examination', $examIds);
+                $query->where(function ($q) use ($examIds) {
+                    $q->whereHas('specimenExaminations', function ($sq) use ($examIds) {
+                        $sq->whereIn('examination_id', $examIds);
+                    })->orWhereIn('specimen_type_examination', $examIds);
+                });
             }
         }
 
@@ -504,7 +543,17 @@ class DeliveryReportController extends Controller
         foreach ($filteredSpecimens as $specimen) {
             $sheet->getRowDimension($currentRow)->setRowHeight(20);
 
-            $service = ($specimen->type?->name ?? 'N/A').' - '.($specimen->examination?->name ?? 'N/A');
+            $examItems = $this->getSpecimenExaminations($specimen);
+            if (! empty($examItems)) {
+                $examsFormatted = collect($examItems)->map(function ($item) {
+                    return $item['quantity'] > 1
+                        ? "{$item['name']} (x{$item['quantity']})"
+                        : $item['name'];
+                })->join(', ');
+                $service = ($specimen->type?->name ?? 'N/A').' - '.$examsFormatted;
+            } else {
+                $service = ($specimen->type?->name ?? 'N/A').' - '.($specimen->examination?->name ?? 'N/A');
+            }
             $expectedInternal = $specimen->expected_internal_finalization_date
                 ? $specimen->expected_internal_finalization_date->format('d/m/Y')
                 : 'N/A';
@@ -595,8 +644,19 @@ class DeliveryReportController extends Controller
 
         foreach ($allExaminations as $exam) {
             $count = $filteredSpecimens->filter(function ($specimen) use ($exam) {
-                return $specimen->specimen_type == $exam->specimen_type &&
-                       $specimen->specimen_type_examination == $exam->id;
+                if ($specimen->specimen_type != $exam->specimen_type) {
+                    return false;
+                }
+
+                if ($specimen->specimenExaminations && $specimen->specimenExaminations->isNotEmpty()) {
+                    return $specimen->specimenExaminations->contains('examination_id', $exam->id);
+                }
+
+                if ($specimen->examinations && $specimen->examinations->isNotEmpty()) {
+                    return $specimen->examinations->contains('id', $exam->id);
+                }
+
+                return $specimen->specimen_type_examination == $exam->id;
             })->count();
 
             if ($count === 0) {
@@ -659,5 +719,97 @@ class DeliveryReportController extends Controller
         ];
 
         return $date->day.' de '.$months[$date->month];
+    }
+
+    /**
+     * Resolve examination names and quantities for a specimen.
+     * Each examination quantity is stored on InvoiceSpecimen with the examination_id.
+     *
+     * @return array<int, array{name: string, quantity: int}>
+     */
+    private function getSpecimenExaminations(?Specimen $specimen): array
+    {
+        if (! $specimen) {
+            return [];
+        }
+
+        $items = collect();
+
+        // 1. Try InvoiceSpecimen records from the specimen
+        if ($specimen->invoiceSpecimens && $specimen->invoiceSpecimens->isNotEmpty()) {
+            foreach ($specimen->invoiceSpecimens as $is) {
+                $name = $is->examination?->name;
+                if (! $name && $is->examination_id) {
+                    $name = $specimen->specimenExaminations
+                        ?->firstWhere('examination_id', $is->examination_id)
+                        ?->examination?->name
+                        ?? $specimen->examinations
+                            ?->firstWhere('id', $is->examination_id)
+                            ?->name;
+                }
+
+                if ($name) {
+                    $items->push([
+                        'name' => $name,
+                        'quantity' => (int) ($is->quantity ?: 1),
+                    ]);
+                }
+            }
+        }
+
+        // 2. If no InvoiceSpecimen with examination found, fall back to SpecimenExamination pivot models
+        if ($items->isEmpty() && $specimen->specimenExaminations && $specimen->specimenExaminations->isNotEmpty()) {
+            foreach ($specimen->specimenExaminations as $se) {
+                if ($se->examination?->name) {
+                    $matchingIs = $specimen->invoiceSpecimens?->firstWhere('examination_id', $se->examination_id);
+                    $qty = $matchingIs ? (int) ($matchingIs->quantity ?: 1) : 1;
+
+                    $items->push([
+                        'name' => $se->examination->name,
+                        'quantity' => $qty,
+                    ]);
+                }
+            }
+        }
+
+        // 3. Fall back to BelongsToMany examinations
+        if ($items->isEmpty() && $specimen->examinations && $specimen->examinations->isNotEmpty()) {
+            foreach ($specimen->examinations as $exam) {
+                if ($exam->name) {
+                    $matchingIs = $specimen->invoiceSpecimens?->firstWhere('examination_id', $exam->id);
+                    $qty = $matchingIs ? (int) ($matchingIs->quantity ?: 1) : 1;
+
+                    $items->push([
+                        'name' => $exam->name,
+                        'quantity' => $qty,
+                    ]);
+                }
+            }
+        }
+
+        // 4. Fall back to legacy specimen_type_examination
+        if ($items->isEmpty() && $specimen->examination?->name) {
+            $matchingIs = $specimen->invoiceSpecimens?->first() ?? $specimen->invoiceSpecimen;
+            $qty = $matchingIs ? (int) ($matchingIs->quantity ?: 1) : 1;
+
+            $items->push([
+                'name' => $specimen->examination->name,
+                'quantity' => $qty,
+            ]);
+        }
+
+        // Group by examination name and sum quantities if duplicates
+        $grouped = [];
+        foreach ($items as $item) {
+            $name = $item['name'];
+            $qty = (int) ($item['quantity'] ?? 1);
+            if (isset($grouped[$name])) {
+                $grouped[$name]['quantity'] += $qty;
+            } else {
+                $grouped[$name] = ['name' => $name, 'quantity' => $qty];
+            }
+        }
+
+        return array_values($grouped);
     }
 }
