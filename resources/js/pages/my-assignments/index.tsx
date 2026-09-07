@@ -149,9 +149,9 @@ interface Props {
     workOrderTypes: any[];
     workOrderTasks: any[];
     usersList: any[];
-    cuttingCodes: any[];
-    cuttingPrefixes: any[];
-    cuttingSlideTypes: any[];
+    cuttingCodes?: any[];
+    cuttingPrefixes?: any[];
+    cuttingSlideTypes?: any[];
     filters: {
         status?: string[];
         specimen_type_id?: string;
@@ -539,9 +539,9 @@ export default function MyAssignmentsIndex({
     workOrderTypes,
     workOrderTasks,
     usersList,
-    cuttingCodes,
-    cuttingPrefixes,
-    cuttingSlideTypes,
+    cuttingCodes = [],
+    cuttingPrefixes = [],
+    cuttingSlideTypes = [],
     filters,
 }: Props) {
     const { props } = usePage() as any;
@@ -2528,10 +2528,6 @@ export default function MyAssignmentsIndex({
                         cuttings: [],
                     }
                 }
-                cuttingCodes={cuttingCodes}
-                cuttingPrefixes={cuttingPrefixes}
-                cuttingSlideTypes={cuttingSlideTypes}
-                users={usersList}
                 open={isManageCuttingsOpen}
                 onOpenChange={(open) => {
                     setIsManageCuttingsOpen(open);

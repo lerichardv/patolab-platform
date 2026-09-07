@@ -136,16 +136,16 @@ interface Props {
     priorities: Priority[];
     specimenTypes: any[];
     examinations: any[];
-    categories: any[];
-    referrers: any[];
-    referrerTypes: any[];
-    locations: any[];
-    sequences: any[];
-    activeLocationId: number | null;
-    products: any[];
     pathologists: any[];
     usersList?: any[];
-    banks: any[];
+    banks?: any[];
+    categories?: any[];
+    referrers?: any[];
+    referrerTypes?: any[];
+    locations?: any[];
+    sequences?: any[];
+    activeLocationId?: number | null;
+    products?: any[];
     filters: {
         status?: string[];
         specimen_type_id?: string;
@@ -283,7 +283,7 @@ export default function SpecimensIndex({
     products,
     pathologists,
     usersList = [],
-    banks,
+    banks = [],
     filters,
 }: Props) {
     const { props } = usePage() as any;
@@ -1954,17 +1954,6 @@ export default function SpecimensIndex({
                 }
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
-                specimenTypes={specimenTypes}
-                examinations={examinations}
-                categories={categories}
-                referrers={referrers}
-                referrerTypes={referrerTypes}
-                priorities={initialPriorities}
-                locations={locations}
-                sequences={sequences}
-                activeLocationId={activeLocationId}
-                products={products}
-                banks={banks}
             />
 
             <SpecimenGroupSheet
@@ -1977,17 +1966,6 @@ export default function SpecimensIndex({
                     }
                 }}
                 group={selectedGroup}
-                specimenTypes={specimenTypes}
-                examinations={examinations}
-                categories={categories}
-                referrers={referrers}
-                referrerTypes={referrerTypes}
-                priorities={initialPriorities}
-                locations={locations}
-                sequences={sequences}
-                activeLocationId={activeLocationId}
-                products={products}
-                banks={banks}
             />
 
             <SelectSpecimenGroupDialog
@@ -2030,7 +2008,6 @@ export default function SpecimensIndex({
                 invoice={selectedInvoice}
                 open={isInvoiceSheetOpen}
                 onOpenChange={setIsInvoiceSheetOpen}
-                banks={banks}
             />
 
             <SpecimenPathologistSheet

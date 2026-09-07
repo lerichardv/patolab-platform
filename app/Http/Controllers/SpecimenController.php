@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Bank;
 use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
@@ -15,7 +14,6 @@ use App\Models\Priority;
 use App\Models\PrioritySpecimenOrder;
 use App\Models\Product;
 use App\Models\Referrer;
-use App\Models\ReferrerType;
 use App\Models\Role;
 use App\Models\Sequence;
 use App\Models\Setting;
@@ -166,37 +164,6 @@ class SpecimenController extends Controller
                 ->orderBy('specimen.created_at', 'desc');
         }]);
 
-        $activeCai = CaiRange::where('status', 'active')->first();
-        $activeLocationId = $activeCai ? $activeCai->location_id : null;
-        $sequences = Sequence::where('active', true)->get()->map(function ($sequence) {
-            $tempSequence = clone $sequence;
-            $currentMonth = now()->format('m');
-            $currentYear = now()->format('Y');
-            do {
-                $paddedSeq = str_pad($tempSequence->current_sequence, $tempSequence->fill ?? 4, '0', STR_PAD_LEFT);
-                $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
-                $sequenceCode = $tempSequence->prefix.$tempSequence->separator.$paddedSeq.$tempSequence->separator.$paddedMonth.$tempSequence->separator.$currentYear;
-
-                $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
-                if ($exists) {
-                    $tempSequence->current_sequence++;
-                }
-            } while ($exists);
-            $sequence->current_sequence = $tempSequence->current_sequence;
-
-            return $sequence;
-        });
-
-        $products = Product::where('active', true)
-            ->whereHas('inventory', function ($q) {
-                $q->where('active', true);
-            })
-            ->withSum(['inventory as total_stock' => function ($q) {
-                $q->where('active', true);
-            }], 'quantity')
-            ->with('prices')
-            ->get();
-
         $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
         $pathologists = [];
         if ($pathologistRoleId) {
@@ -209,17 +176,9 @@ class SpecimenController extends Controller
             'priorities' => $priorities,
             'specimenTypes' => SpecimenType::where('active', true)->get(),
             'examinations' => SpecimenTypeExamination::where('active', true)->with('prices')->get(),
-            'categories' => SpecimenCategory::where('active', true)->get(),
-            'referrers' => Referrer::where('active', true)->get(),
-            'referrerTypes' => ReferrerType::where('active', true)->get(),
-            'locations' => Location::where('active', true)->get(),
-            'sequences' => $sequences,
-            'activeLocationId' => $activeLocationId,
-            'products' => $products,
             'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
             'pathologists' => $pathologists,
             'usersList' => User::where('active', true)->orderBy('name')->get(),
-            'banks' => Bank::all(),
             'filters' => [
                 'status' => $statuses,
                 'specimen_type_id' => $specimenTypeIds === null ? 'all' : (empty($specimenTypeIds) ? 'none' : $specimenTypeIds),

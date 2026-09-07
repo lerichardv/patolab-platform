@@ -32,17 +32,12 @@ import {
 } from '@/actions/App/Http/Controllers/SpecimenController';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import type { CustomerOption } from '@/components/async-customer-combobox';
+import BlockedPaymentAlertDialog from '@/components/blocked-payment-alert-dialog';
+import FormCombobox from '@/components/form-combobox';
 import HeadingSheet from '@/components/heading-sheet';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import SpecimenExamChangePriceAlertDialog from '@/components/specimen-exam-change-price-alert-dialog';
+import SpecimenInvoiceSummaryAlertDialog from '@/components/specimen-invoice-summary-alert-dialog';
+import SpecimenRegenerateConfirmAlertDialog from '@/components/specimen-regenerate-confirm-alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -121,117 +116,6 @@ interface Props {
     banks?: any[];
     showPaymentMethodEdition?: boolean;
     readOnlySampleCollectionDate?: boolean;
-}
-
-function FormCombobox({
-    options,
-    value,
-    onChange,
-    placeholder,
-    emptyMessage = 'No se encontraron resultados.',
-    disabled = false,
-}: {
-    options: {
-        label: string;
-        value: string;
-        color?: string;
-        disabled?: boolean;
-    }[];
-    value: string;
-    onChange: (value: string) => void;
-    placeholder: string;
-    emptyMessage?: string;
-    disabled?: boolean;
-}) {
-    const [open, setOpen] = React.useState(false);
-    const selectedOption = options.find((opt) => opt.value === value);
-
-    return (
-        <Popover open={open} onOpenChange={setOpen} modal={true}>
-            <PopoverTrigger asChild className="w-full">
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-full justify-between"
-                    disabled={disabled}
-                >
-                    <div className="flex items-center gap-2 truncate">
-                        {selectedOption?.color && (
-                            <div
-                                className="h-3 w-3 shrink-0 rounded-full"
-                                style={{
-                                    backgroundColor: selectedOption.color,
-                                }}
-                            />
-                        )}
-                        <span className="truncate">
-                            {selectedOption
-                                ? selectedOption.label
-                                : placeholder}
-                        </span>
-                    </div>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                className="w-[--radix-popover-trigger-width] p-0"
-                align="start"
-            >
-                <Command>
-                    <CommandInput
-                        placeholder={`Buscar ${placeholder.toLowerCase()}...`}
-                    />
-                    <CommandList>
-                        <CommandEmpty>{emptyMessage}</CommandEmpty>
-                        <CommandGroup>
-                            {options.map((option) => (
-                                <CommandItem
-                                    key={option.value}
-                                    value={option.label}
-                                    disabled={option.disabled}
-                                    onSelect={() => {
-                                        if (option.disabled) {
-                                            return;
-                                        }
-
-                                        onChange(option.value);
-                                        setOpen(false);
-                                    }}
-                                >
-                                    <Check
-                                        className={cn(
-                                            'mr-2 h-4 w-4 shrink-0',
-                                            value === option.value
-                                                ? 'opacity-100'
-                                                : 'opacity-0',
-                                        )}
-                                    />
-                                    {option.color && (
-                                        <div
-                                            className="mr-2 h-3 w-3 shrink-0 rounded-full"
-                                            style={{
-                                                backgroundColor: option.color,
-                                            }}
-                                        />
-                                    )}
-                                    <span
-                                        className={cn(
-                                            'truncate',
-                                            option.disabled &&
-                                                'text-muted-foreground opacity-50',
-                                        )}
-                                    >
-                                        {option.label}
-                                    </span>
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
-    );
 }
 
 export default function SpecimenForm({
@@ -4763,407 +4647,47 @@ export default function SpecimenForm({
             />
 
             {/* CONFIRMACIÓN DE DIÁLOGO SHADCN (ALERTDIALOG) */}
-            <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
-                <AlertDialogContent className="max-w-[500px]">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            Resumen de Factura y Transacción
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Revise detalladamente los importes antes de emitir
-                            la factura fiscal.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
+            <SpecimenInvoiceSummaryAlertDialog
+                open={showConfirm}
+                onOpenChange={setShowConfirm}
+                customerLabel={selectedCustomerLabel}
+                examinationLabel={`${selectedType?.name || 'Sin seleccionar'} - ${selectedExaminationLabel}`}
+                paymentTypeLabel={getPaymentTypeLabel(data.payment_type)}
+                agregarInsumos={data.agregar_insumos}
+                insumos={data.insumos}
+                regularPrice={maxSpecimenPriceVal}
+                customAmountEnabled={data.custom_amount_enabled}
+                customAmountVal={customAmountVal}
+                customAmountReason={data.custom_amount_reason}
+                discountVal={discountVal}
+                totalVal={totalVal}
+                onConfirm={submitForm}
+            />
 
-                    <div className="grid gap-3 py-3 text-sm">
-                        <div className="flex justify-between border-b pb-2">
-                            <span className="font-medium text-muted-foreground">
-                                Cliente / Paciente:
-                            </span>
-                            <span className="font-semibold text-foreground">
-                                {selectedCustomerLabel}
-                            </span>
-                        </div>
-                        <div className="flex justify-between border-b pb-2">
-                            <span className="font-medium text-muted-foreground">
-                                Examen:
-                            </span>
-                            <span className="max-w-[250px] truncate font-semibold text-foreground">
-                                {selectedType?.name || 'Sin seleccionar'} -{' '}
-                                {selectedExaminationLabel}
-                            </span>
-                        </div>
-                        <div className="flex justify-between border-b pb-2">
-                            <span className="font-medium text-muted-foreground">
-                                Tipo de Pago:
-                            </span>
-                            <span className="font-semibold text-foreground">
-                                {getPaymentTypeLabel(data.payment_type)}
-                            </span>
-                        </div>
-
-                        {data.agregar_insumos &&
-                            data.insumos &&
-                            data.insumos.length > 0 && (
-                                <div className="flex flex-col gap-1.5 border-b pb-2">
-                                    <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                        Insumos Seleccionados (Consumo Interno):
-                                    </span>
-                                    <div className="flex max-h-[120px] flex-col gap-1.5 overflow-y-auto pr-1">
-                                        {data.insumos.map((insumo: any) => (
-                                            <div
-                                                key={insumo.id}
-                                                className="flex items-center justify-between rounded border border-border/50 bg-muted/30 p-1.5 text-xs"
-                                            >
-                                                <div className="flex min-w-0 flex-col">
-                                                    <span className="max-w-[220px] truncate font-semibold text-foreground">
-                                                        {insumo.name}
-                                                    </span>
-                                                    <span className="font-mono text-[9px] text-muted-foreground uppercase">
-                                                        {insumo.code}
-                                                    </span>
-                                                </div>
-                                                <div className="shrink-0 text-right font-mono text-xs">
-                                                    <span className="mr-2 text-[10px] text-muted-foreground">
-                                                        {insumo.quantity}x
-                                                    </span>
-                                                    <span className="font-bold text-emerald-600">
-                                                        L. 0.00
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                        <div className="flex justify-between border-b pb-2">
-                            <span className="font-medium text-muted-foreground">
-                                Precio Regular Muestra:
-                            </span>
-                            <span className="font-semibold text-foreground">
-                                L. {maxSpecimenPriceVal.toFixed(2)}
-                            </span>
-                        </div>
-                        {data.custom_amount_enabled && (
-                            <div className="flex flex-col gap-0.5 border-b pb-2">
-                                <div className="flex justify-between">
-                                    <span className="font-medium text-muted-foreground">
-                                        Importe Personalizado:
-                                    </span>
-                                    <span className="font-semibold text-foreground">
-                                        L. {customAmountVal.toFixed(2)}
-                                    </span>
-                                </div>
-                                {data.custom_amount_reason && (
-                                    <span className="text-left text-[10px] text-muted-foreground italic">
-                                        Razón: {data.custom_amount_reason}
-                                    </span>
-                                )}
-                            </div>
-                        )}
-                        {data.agregar_insumos &&
-                            data.insumos &&
-                            data.insumos.length > 0 && (
-                                <div className="flex justify-between border-b pb-2">
-                                    <span className="font-medium text-muted-foreground">
-                                        Insumos y Reactivos (Reg.):
-                                    </span>
-                                    <span className="font-semibold text-emerald-600">
-                                        L. 0.00 (Consumo Interno)
-                                    </span>
-                                </div>
-                            )}
-                        {discountVal > 0 ? (
-                            <div className="flex flex-col gap-1.5 rounded border border-b border-emerald-500/20 bg-emerald-500/5 p-2.5 pb-2 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                <span className="text-[10px] font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
-                                    Descuentos Aplicados
-                                </span>
-                                <div className="flex justify-between border-t border-emerald-500/20 pt-1 text-xs font-bold">
-                                    <span>Total Descuentos:</span>
-                                    <span>- L. {discountVal.toFixed(2)}</span>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex justify-between border-b pb-2 text-emerald-600 dark:text-emerald-400">
-                                <span className="font-medium">
-                                    Descuentos Aplicados:
-                                </span>
-                                <span className="font-semibold">- L. 0.00</span>
-                            </div>
-                        )}
-                        <div className="flex justify-between border-b pb-2 text-xs">
-                            <span className="font-medium text-muted-foreground">
-                                Importe Exonerado:
-                            </span>
-                            <span className="font-semibold text-foreground">
-                                L. {totalVal.toFixed(2)}
-                            </span>
-                        </div>
-                        <div className="flex justify-between border-b pb-2 text-xs">
-                            <span className="font-medium text-muted-foreground">
-                                Importe Exento:
-                            </span>
-                            <span className="font-semibold text-foreground">
-                                L. 0.00
-                            </span>
-                        </div>
-                        <div className="flex justify-between pt-1 text-base font-bold">
-                            <span>TOTAL NETO A PAGAR:</span>
-                            <span className="text-primary">
-                                L. {totalVal.toFixed(2)}
-                            </span>
-                        </div>
-                    </div>
-
-                    <AlertDialogFooter>
-                        <AlertDialogCancel
-                            onClick={() => setShowConfirm(false)}
-                        >
-                            Cancelar
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => {
-                                setShowConfirm(false);
-                                submitForm();
-                            }}
-                        >
-                            Confirmar y Emitir Factura
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            <AlertDialog
+            <SpecimenRegenerateConfirmAlertDialog
                 open={showRegenerateConfirm}
                 onOpenChange={setShowRegenerateConfirm}
-            >
-                <AlertDialogContent className="max-w-[450px]">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            {isGroupSpecimen
-                                ? '¿Actualizar muestra y regenerar factura del grupo?'
-                                : '¿Actualizar muestra y regenerar factura?'}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription asChild>
-                            <div className="space-y-3 text-sm text-muted-foreground">
-                                {isGroupSpecimen ? (
-                                    <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3.5 text-xs text-blue-900 dark:text-blue-200">
-                                        <span className="mb-1 flex items-center justify-start font-semibold">
-                                            <Info className="mr-1 h-4 w-4" />{' '}
-                                            Factura de Grupo de Muestras:
-                                        </span>
-                                        Debido a que esta muestra pertenece a un
-                                        grupo de muestras, al guardar los
-                                        cambios se regenerará la factura PDF de
-                                        todo el grupo para asegurar que contenga
-                                        los datos más recientes y actualizados.
-                                    </div>
-                                ) : (
-                                    <p>
-                                        Se guardarán los cambios de la muestra y
-                                        se regenerará la factura PDF
-                                        correspondiente con los nuevos datos.
-                                    </p>
-                                )}
-                                {isSpecimenTypeChanged && (
-                                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-                                        <span className="mb-1 block font-semibold">
-                                            ⚠️ Advertencia de cambio de
-                                            Tipo/Examen:
-                                        </span>
-                                        Al cambiar el tipo de muestra o examen,
-                                        el código de secuencia será actualizado.
-                                        Además, se cargará la plantilla
-                                        correspondiente al nuevo examen en el
-                                        reporte, lo que significa que{' '}
-                                        <strong>
-                                            todos los cambios previos realizados
-                                            en el reporte se perderán
-                                            permanentemente.
-                                        </strong>
-                                    </div>
-                                )}
-                                {isSpecimenTypeChanged &&
-                                    specimen?.report_id && (
-                                        <div className="mt-4 space-y-3 text-left">
-                                            <label className="block text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                                Seleccionar Nueva Plantilla de
-                                                Reporte
-                                            </label>
-                                            {isLoadingTemplates ? (
-                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                                    <span>
-                                                        Cargando plantillas...
-                                                    </span>
-                                                </div>
-                                            ) : availableTemplates.length >
-                                              0 ? (
-                                                <Select
-                                                    value={data.template_id}
-                                                    onValueChange={(val) =>
-                                                        setData(
-                                                            'template_id',
-                                                            val,
-                                                        )
-                                                    }
-                                                >
-                                                    <SelectTrigger className="w-full text-foreground">
-                                                        <SelectValue placeholder="Seleccione una plantilla..." />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="z-[200] max-h-[250px]">
-                                                        {availableTemplates.map(
-                                                            (temp) => (
-                                                                <SelectItem
-                                                                    key={
-                                                                        temp.id
-                                                                    }
-                                                                    value={String(
-                                                                        temp.id,
-                                                                    )}
-                                                                    className="group"
-                                                                >
-                                                                    <div className="flex flex-row flex-nowrap gap-3 py-1 text-left">
-                                                                        <span className="text-sm font-medium text-foreground group-focus:text-white group-data-[highlighted]:text-white">
-                                                                            {temp
-                                                                                .user
-                                                                                ?.name ||
-                                                                                'Sin propietario'}
-                                                                        </span>
-                                                                        <span className="mt-0.5 text-xs text-muted-foreground group-focus:text-white/80 group-data-[highlighted]:text-white/80">
-                                                                            {
-                                                                                temp
-                                                                                    .specimen_type
-                                                                                    ?.name
-                                                                            }{' '}
-                                                                            -{' '}
-                                                                            {
-                                                                                temp
-                                                                                    .specimen_type_examination
-                                                                                    ?.name
-                                                                            }
-                                                                        </span>
-                                                                    </div>
-                                                                </SelectItem>
-                                                            ),
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                            ) : (
-                                                <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-left text-xs text-muted-foreground">
-                                                    <Info className="h-5 w-5 shrink-0 text-muted-foreground" />
-                                                    <div>
-                                                        <span className="mb-0.5 block font-semibold text-foreground">
-                                                            Sin plantillas
-                                                            disponibles
-                                                        </span>
-                                                        No se encontraron
-                                                        plantillas para este
-                                                        tipo de muestra y
-                                                        examen. Se creará un
-                                                        reporte en blanco.
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                            </div>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel
-                            onClick={() => setShowRegenerateConfirm(false)}
-                        >
-                            Cancelar
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => {
-                                setShowRegenerateConfirm(false);
-                                submitForm();
-                            }}
-                            disabled={isSubmitDisabled}
-                        >
-                            Actualizar y Regenerar
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                isGroupSpecimen={isGroupSpecimen}
+                isSpecimenTypeChanged={isSpecimenTypeChanged}
+                hasReport={!!specimen?.report_id}
+                isLoadingTemplates={isLoadingTemplates}
+                availableTemplates={availableTemplates}
+                selectedTemplateId={data.template_id}
+                onTemplateChange={(val) => setData('template_id', val)}
+                isSubmitDisabled={isSubmitDisabled}
+                onConfirm={submitForm}
+            />
 
-            <AlertDialog
+            <BlockedPaymentAlertDialog
                 open={showBlockedPaymentAlert}
                 onOpenChange={setShowBlockedPaymentAlert}
-            >
-                <AlertDialogContent className="max-w-[450px]">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Acción no permitida</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            No se puede cambiar el método de pago porque este
-                            crédito ya tiene pagos registrados en el sistema.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogAction
-                            onClick={() => setShowBlockedPaymentAlert(false)}
-                        >
-                            Aceptar
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            />
 
-            <AlertDialog
+            <SpecimenExamChangePriceAlertDialog
                 open={showExamChangePricePrompt}
                 onOpenChange={setShowExamChangePricePrompt}
-            >
-                <AlertDialogContent className="max-w-[480px]">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2 text-foreground">
-                            <AlertCircle className="h-5 w-5 shrink-0 text-amber-500" />
-                            Actualización de Precios y Facturación Requerida
-                        </AlertDialogTitle>
-                        <AlertDialogDescription asChild>
-                            <div className="space-y-3 pt-1 text-sm text-muted-foreground">
-                                <p>
-                                    Ha modificado el{' '}
-                                    <strong>tipo de muestra</strong> o los{' '}
-                                    <strong>exámenes a realizar</strong> de esta
-                                    muestra.
-                                </p>
-                                <div className="space-y-1 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-                                    <span className="block font-semibold text-amber-900 dark:text-amber-200">
-                                        Configuración requerida:
-                                    </span>
-                                    <span>
-                                        Debido a este cambio, debe seleccionar
-                                        los precios y configurar la facturación
-                                        de la muestra. A continuación se
-                                        habilitarán los pasos del formulario y
-                                        avanzará al{' '}
-                                        <strong>Paso 2 (Facturación)</strong>{' '}
-                                        para revisar los precios y valores
-                                        numéricos. La factura y el PDF serán
-                                        regenerados al guardar.
-                                    </span>
-                                </div>
-                            </div>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel
-                            onClick={() => setShowExamChangePricePrompt(false)}
-                        >
-                            Cancelar
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleConfirmExamChangePrompt}
-                            className="bg-primary text-primary-foreground hover:bg-primary/90"
-                        >
-                            Continuar a Facturación
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onConfirm={handleConfirmExamChangePrompt}
+            />
         </>
     );
 }

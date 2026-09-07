@@ -3408,10 +3408,6 @@ export default function ReportWorkspace({
 
                     <ManageCuttingsSheet
                         specimen={specimen}
-                        cuttingCodes={cutting_codes}
-                        cuttingPrefixes={cutting_prefixes}
-                        cuttingSlideTypes={cutting_slide_types}
-                        users={users}
                         open={isManageCuttingsOpen}
                         onOpenChange={setIsManageCuttingsOpen}
                         canEdit={isAssigned}

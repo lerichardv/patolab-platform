@@ -123,9 +123,9 @@ export interface ReportEditorProps {
     auth: ReportEditorAuth;
     pathologists?: any[];
     products?: any[];
-    cutting_codes: any[];
-    cutting_prefixes: any[];
-    cutting_slide_types: any[];
+    cutting_codes?: any[];
+    cutting_prefixes?: any[];
+    cutting_slide_types?: any[];
     users: any[];
     usersList?: any[];
     workOrderTypes?: any[];
