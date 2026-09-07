@@ -107,7 +107,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
+import { cn, matchesSearch } from '@/lib/utils';
 import CreditExtractSpecimenSheet from '../credits/credit-extract-specimen-sheet';
 import CreditFinalPaymentSheet from '../credits/credit-final-payment-sheet';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
@@ -257,7 +257,11 @@ function FormCombobox({
                 className="w-[--radix-popover-trigger-width] p-0"
                 align="start"
             >
-                <Command>
+                <Command
+                    filter={(value, search) =>
+                        matchesSearch(value, search) ? 1 : 0
+                    }
+                >
                     <CommandInput placeholder={`Buscar...`} />
                     <CommandList>
                         <CommandEmpty>{emptyMessage}</CommandEmpty>
@@ -1590,7 +1594,11 @@ export default function InvoicesIndex({
                                     className="w-[--radix-popover-trigger-width] p-0"
                                     align="start"
                                 >
-                                    <Command>
+                                    <Command
+                                        filter={(value, search) =>
+                                            matchesSearch(value, search) ? 1 : 0
+                                        }
+                                    >
                                         <CommandInput placeholder="Buscar grupo..." />
                                         <CommandList>
                                             <CommandEmpty>
@@ -2029,14 +2037,10 @@ export default function InvoicesIndex({
                                                                                     (
                                                                                         s: any,
                                                                                     ) =>
-                                                                                        (
-                                                                                            s.sequence_code ||
-                                                                                            ''
-                                                                                        )
-                                                                                            .toLowerCase()
-                                                                                            .includes(
-                                                                                                specimenSearchQuery.toLowerCase(),
-                                                                                            ),
+                                                                                        matchesSearch(
+                                                                                            s.sequence_code,
+                                                                                            specimenSearchQuery,
+                                                                                        ),
                                                                                 );
 
                                                                             return (

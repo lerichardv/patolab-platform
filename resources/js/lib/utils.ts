@@ -97,3 +97,5 @@ export function getContrastColor(hexColor: string): string {
 
     return luminance > 0.5 ? '#0f172a' : '#ffffff';
 }
+
+export * from './search-utils';

@@ -87,7 +87,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { cn } from '@/lib/utils';
+import { cn, matchesAnySearch, matchesSearch } from '@/lib/utils';
 import {
     getSpecimenDueDate,
     getSpecimenDueDateInfo,
@@ -528,8 +528,6 @@ export default function SpecimensIndex({
     }, [availableGroups, selectedGroupId]);
 
     const filteredPriorities = useMemo(() => {
-        const searchLower = searchQuery.trim().toLowerCase();
-
         return priorities.map((priority) => {
             const filteredSpecimens = priority.specimens.filter((specimen) => {
                 const matchesStatus = selectedStatuses.includes(
@@ -552,29 +550,17 @@ export default function SpecimensIndex({
                     ? specimen.group.invoice
                     : specimen.invoice_relation;
 
-                const matchesSearch =
-                    !searchLower ||
-                    (specimen.sequence_code &&
-                        specimen.sequence_code
-                            .toLowerCase()
-                            .includes(searchLower)) ||
-                    specimen.id.toString().includes(searchLower) ||
-                    (specimen.customer_relation?.name &&
-                        specimen.customer_relation.name
-                            .toLowerCase()
-                            .includes(searchLower)) ||
-                    (specimen.customer_relation?.id_number &&
-                        specimen.customer_relation.id_number
-                            .toLowerCase()
-                            .includes(searchLower)) ||
-                    (invoice?.full_invoice_number &&
-                        invoice.full_invoice_number
-                            .toLowerCase()
-                            .includes(searchLower)) ||
-                    (invoice?.invoice_number &&
-                        invoice.invoice_number
-                            .toLowerCase()
-                            .includes(searchLower));
+                const matchesSearch = matchesAnySearch(
+                    [
+                        specimen.sequence_code,
+                        specimen.id,
+                        specimen.customer_relation?.name,
+                        specimen.customer_relation?.id_number,
+                        invoice?.full_invoice_number,
+                        invoice?.invoice_number,
+                    ],
+                    searchQuery,
+                );
 
                 const specimenTypeId =
                     specimen.specimen_type || specimen.type?.id;
@@ -1173,7 +1159,11 @@ export default function SpecimensIndex({
                                 className="w-[200px] p-0"
                                 align="end"
                             >
-                                <Command>
+                                <Command
+                                    filter={(value, search) =>
+                                        matchesSearch(value, search) ? 1 : 0
+                                    }
+                                >
                                     <CommandInput placeholder="Buscar grupo..." />
                                     <CommandList>
                                         <CommandEmpty>

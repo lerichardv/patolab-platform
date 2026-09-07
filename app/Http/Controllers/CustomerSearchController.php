@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class CustomerSearchController extends Controller
 {
@@ -32,11 +33,39 @@ class CustomerSearchController extends Controller
 
         // Only run a text search when the query is at least 4 characters
         $searchResults = collect();
-        if (mb_strlen($q) >= 4) {
+        $asciiQ = Str::ascii($q);
+        $alphanumeric = preg_replace('/[^a-zA-Z0-9]/', '', $q);
+        $words = array_values(array_filter(preg_split('/\s+/', preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $q))));
+        $wordsAscii = array_values(array_filter(preg_split('/\s+/', preg_replace('/[^a-zA-Z0-9\s]/', ' ', $asciiQ))));
+
+        if (mb_strlen($q) >= 4 || mb_strlen($alphanumeric) >= 4) {
             $searchResults = Customer::where('active', true)
-                ->where(function ($query) use ($q) {
-                    $query->where('name', 'like', "%{$q}%")
-                        ->orWhere('id_number', 'like', "%{$q}%");
+                ->where(function ($query) use ($q, $asciiQ, $alphanumeric, $words, $wordsAscii) {
+                    $query->where('name', 'like', "%{$q}%");
+                    if ($asciiQ !== $q) {
+                        $query->orWhere('name', 'like', "%{$asciiQ}%");
+                    }
+
+                    if (count($words) > 1) {
+                        $query->orWhere(function ($wq) use ($words) {
+                            foreach ($words as $w) {
+                                $wq->where('name', 'like', "%{$w}%");
+                            }
+                        });
+                    }
+
+                    if (count($wordsAscii) > 1 && $wordsAscii !== $words) {
+                        $query->orWhere(function ($wq) use ($wordsAscii) {
+                            foreach ($wordsAscii as $w) {
+                                $wq->where('name', 'like', "%{$w}%");
+                            }
+                        });
+                    }
+
+                    $query->orWhere('id_number', 'like', "%{$q}%");
+                    if ($alphanumeric !== '') {
+                        $query->orWhereRaw("REPLACE(REPLACE(REPLACE(id_number, '-', ''), ' ', ''), '.', '') LIKE ?", ["%{$alphanumeric}%"]);
+                    }
                 })
                 ->when(! empty($selectedIds), fn ($query) => $query->whereNotIn('id', $selectedIds))
                 ->orderBy('name')

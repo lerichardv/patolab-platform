@@ -23,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -104,35 +105,7 @@ class InvoiceController extends Controller
 
         // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
         if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('full_invoice_number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', function ($cq) use ($search) {
-                        $cq->where('name', 'like', "%{$search}%")
-                            ->orWhere('id_number', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('group.specimens', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('groupSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.group.specimens', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    });
-            });
+            $this->applySearchFilter($query, (string) $request->get('search'));
         }
 
         // Resolve user cookies and query parameters
@@ -359,35 +332,7 @@ class InvoiceController extends Controller
 
         // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
         if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('full_invoice_number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', function ($cq) use ($search) {
-                        $cq->where('name', 'like', "%{$search}%")
-                            ->orWhere('id_number', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('group.specimens', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('groupSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.group.specimens', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    });
-            });
+            $this->applySearchFilter($query, (string) $request->get('search'));
         }
 
         // Filter by payment type
@@ -991,5 +936,87 @@ class InvoiceController extends Controller
         AuditLog::$currentOrigin = 'system';
 
         return response()->json(['message' => 'Cambio restaurado con éxito']);
+    }
+
+    /**
+     * Apply accent-insensitive, case-insensitive, and punctuation-insensitive search filters.
+     */
+    protected function applySearchFilter($query, string $search): void
+    {
+        $search = trim($search);
+        if ($search === '') {
+            return;
+        }
+
+        $asciiSearch = Str::ascii($search);
+        $alphanumeric = preg_replace('/[^a-zA-Z0-9]/', '', $search);
+        $words = array_values(array_filter(preg_split('/\s+/', preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $search))));
+        $wordsAscii = array_values(array_filter(preg_split('/\s+/', preg_replace('/[^a-zA-Z0-9\s]/', ' ', $asciiSearch))));
+
+        $query->where(function ($q) use ($search, $asciiSearch, $alphanumeric, $words, $wordsAscii) {
+            // 1. Full invoice number & invoice number
+            $q->where(function ($invQ) use ($search, $alphanumeric) {
+                $invQ->where('full_invoice_number', 'like', "%{$search}%")
+                    ->orWhere('invoice_number', 'like', "%{$search}%");
+
+                if ($alphanumeric !== '') {
+                    $invQ->orWhereRaw("REPLACE(REPLACE(full_invoice_number, '-', ''), ' ', '') LIKE ?", ["%{$alphanumeric}%"])
+                        ->orWhere('invoice_number', 'like', "%{$alphanumeric}%");
+                }
+            });
+
+            // 2. Customer name and ID number (RTN)
+            $q->orWhereHas('customer', function ($cq) use ($search, $asciiSearch, $alphanumeric, $words, $wordsAscii) {
+                $cq->where(function ($sub) use ($search, $asciiSearch, $alphanumeric, $words, $wordsAscii) {
+                    $sub->where('name', 'like', "%{$search}%");
+                    if ($asciiSearch !== $search) {
+                        $sub->orWhere('name', 'like', "%{$asciiSearch}%");
+                    }
+
+                    if (count($words) > 1) {
+                        $sub->orWhere(function ($wq) use ($words) {
+                            foreach ($words as $w) {
+                                $wq->where('name', 'like', "%{$w}%");
+                            }
+                        });
+                    }
+
+                    if (count($wordsAscii) > 1 && $wordsAscii !== $words) {
+                        $sub->orWhere(function ($wq) use ($wordsAscii) {
+                            foreach ($wordsAscii as $w) {
+                                $wq->where('name', 'like', "%{$w}%");
+                            }
+                        });
+                    }
+
+                    $sub->orWhere('id_number', 'like', "%{$search}%");
+                    if ($alphanumeric !== '') {
+                        $sub->orWhereRaw("REPLACE(REPLACE(REPLACE(id_number, '-', ''), ' ', ''), '.', '') LIKE ?", ["%{$alphanumeric}%"]);
+                    }
+                });
+            });
+
+            // 3. Specimen sequence code across all related specimens
+            $specimenRelations = [
+                'specimen',
+                'group.specimens',
+                'groupSpecimens.specimen',
+                'creditInvoiceSpecimens.specimen',
+                'creditRelation.specimen',
+                'creditRelation.group.specimens',
+                'creditRelation.creditInvoiceSpecimens.specimen',
+            ];
+
+            foreach ($specimenRelations as $relation) {
+                $q->orWhereHas($relation, function ($sq) use ($search, $alphanumeric) {
+                    $sq->where(function ($subSq) use ($search, $alphanumeric) {
+                        $subSq->where('sequence_code', 'like', "%{$search}%");
+                        if ($alphanumeric !== '') {
+                            $subSq->orWhereRaw("REPLACE(REPLACE(sequence_code, '-', ''), ' ', '') LIKE ?", ["%{$alphanumeric}%"]);
+                        }
+                    });
+                });
+            }
+        });
     }
 }
