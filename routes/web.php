@@ -6,6 +6,7 @@ use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerSearchController;
 use App\Http\Controllers\CuttingCodeController;
+use App\Http\Controllers\CuttingFormDataController;
 use App\Http\Controllers\CuttingPrefixController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Editor\CuttingController;
@@ -16,10 +17,12 @@ use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\InventoryProviderController;
 use App\Http\Controllers\InventoryPurchaseOrderController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InvoiceFormDataController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\MyAssignmentController;
 use App\Http\Controllers\MySpecimenTypeTemplateController;
 use App\Http\Controllers\MyWorkOrderController;
+use App\Http\Controllers\PathologistFormDataController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReferrerController;
 use App\Http\Controllers\ReferrerTypeController;
@@ -34,6 +37,7 @@ use App\Http\Controllers\SequenceController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SpecimenCategoryController;
 use App\Http\Controllers\SpecimenController;
+use App\Http\Controllers\SpecimenFormDataController;
 use App\Http\Controllers\SpecimenGroupController;
 use App\Http\Controllers\SpecimenSequenceController;
 use App\Http\Controllers\SpecimenTypeController;
@@ -47,13 +51,25 @@ use App\Http\Controllers\WorkOrderController;
 use App\Http\Controllers\WorkOrderTaskController;
 use App\Http\Controllers\WorkOrderTypeController;
 use App\Models\Department;
-use App\Models\Specimen;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
+
+Route::get('/logout', function (Request $request) {
+    Auth::guard('web')->logout();
+
+    if ($request->hasSession()) {
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+    }
+
+    return redirect('/');
+})->name('logout.get');
 
 Route::get('/v/{report_code}', ReportVerificationController::class)->name('report.verify');
 
@@ -124,15 +140,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('cuttings/{cutting}', [CuttingController::class, 'update'])->name('cuttings.update');
     Route::put('cuttings/{cutting}/status', [CuttingController::class, 'updateStatus'])->name('cuttings.update-status');
     Route::delete('cuttings/{cutting}', [CuttingController::class, 'destroy'])->name('cuttings.destroy');
+    Route::get('cuttings/form-data', CuttingFormDataController::class)->name('cuttings.form-data');
     Route::resource('cutting-codes', CuttingCodeController::class);
     Route::resource('cutting-prefixes', CuttingPrefixController::class);
     Route::post('specimens/{specimen:sequence_code}/generate-report', [SpecimenController::class, 'generateReport'])->name('specimens.generate-report');
     Route::get('specimens/quick-edit-metadata', [SpecimenController::class, 'quickEditMetadata'])->name('specimens.quick-edit-metadata');
     Route::post('specimens/{specimen}/quick-update', [SpecimenController::class, 'quickUpdate'])->name('specimens.quick-update');
+    Route::get('specimens/form-data', SpecimenFormDataController::class)->name('specimens.form-data');
+    Route::get('specimens/pathologists/form-data', PathologistFormDataController::class)->name('specimens.pathologists.form-data');
     Route::resource('specimens', SpecimenController::class);
     Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');
     Route::get('invoices/{invoice}/audit-history', [InvoiceController::class, 'auditHistory'])->name('invoices.audit-history');
     Route::post('invoices/{invoice}/restore-audit-change', [InvoiceController::class, 'restoreAuditChange'])->name('invoices.restore-audit-change');
+    Route::get('invoices/form-data', InvoiceFormDataController::class)->name('invoices.form-data');
     Route::resource('invoices', InvoiceController::class)->only(['index', 'update']);
     Route::get('reports/credit-group/export', [CreditGroupReportController::class, 'export'])->name('reports.credit-group.export');
     Route::get('reports/credit-group', [CreditGroupReportController::class, 'index'])->name('reports.credit-group.index');

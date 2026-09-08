@@ -11,21 +11,24 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { useInvoiceFormData } from '@/hooks/use-invoice-form-data';
 import GroupInvoiceForm from './group-invoice-form';
 import InvoiceForm from './invoice-form';
+import InvoiceFormSkeleton from './invoice-form-skeleton';
 
 interface Props {
-    invoice: any | null;
+    invoice?: any | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    banks: any[];
+    banks?: any[];
     specimenTypes?: any[];
     settings?: Record<string, string>;
 }
 
 export default function InvoiceSheet({
-    invoice,
+    invoice = null,
     open,
     onOpenChange,
     banks,
@@ -37,23 +40,44 @@ export default function InvoiceSheet({
         settings: pageSettings,
         examinations: pageExaminations,
     } = usePage<any>().props;
-    const finalSpecimenTypes = specimenTypes || pageSpecimenTypes || [];
-    const finalExaminations = pageExaminations || [];
-    const finalSettings = settings || pageSettings || {};
 
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
+    const {
+        data: formData,
+        isLoading,
+        error,
+        refetch,
+    } = useInvoiceFormData({
+        enabled: open,
+        invoiceId: invoice?.id,
+    });
+
+    const isDataReady = Boolean(
+        formData ||
+        (banks && banks.length > 0 && (specimenTypes || pageSpecimenTypes)),
+    );
+
+    const resolvedInvoice = formData?.invoice || invoice;
+    const resolvedBanks = formData?.banks || banks || [];
+    const resolvedSpecimenTypes =
+        formData?.specimenTypes || specimenTypes || pageSpecimenTypes || [];
+    const resolvedExaminations =
+        formData?.examinations || pageExaminations || [];
+    const resolvedSettings =
+        formData?.settings || settings || pageSettings || {};
+
     const isGroupInvoice = Boolean(
-        invoice &&
-        (invoice.is_group === true ||
-            invoice.is_group === 1 ||
-            invoice.is_group === '1' ||
-            Boolean(invoice.group_id) ||
-            Boolean(invoice.specimen_group_id) ||
-            Boolean(invoice.group) ||
-            invoice.specimen?.is_group === true ||
-            invoice.specimen?.is_group === 1),
+        resolvedInvoice &&
+        (resolvedInvoice.is_group === true ||
+            resolvedInvoice.is_group === 1 ||
+            resolvedInvoice.is_group === '1' ||
+            Boolean(resolvedInvoice.group_id) ||
+            Boolean(resolvedInvoice.specimen_group_id) ||
+            Boolean(resolvedInvoice.group) ||
+            resolvedInvoice.specimen?.is_group === true ||
+            resolvedInvoice.specimen?.is_group === 1),
     );
 
     useEffect(() => {
@@ -96,28 +120,53 @@ export default function InvoiceSheet({
                         }
                         description="Realice cambios en la información de la factura aquí. Todos los importes y datos de pago pueden ser ajustados."
                     />
-                    {invoice &&
-                        (isGroupInvoice ? (
+
+                    {error && !isDataReady ? (
+                        <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+                            <p className="text-sm font-medium text-destructive">
+                                {error}
+                            </p>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => refetch()}
+                            >
+                                Reintentar
+                            </Button>
+                        </div>
+                    ) : !isDataReady || isLoading ? (
+                        <InvoiceFormSkeleton isGroupInvoice={isGroupInvoice} />
+                    ) : resolvedInvoice ? (
+                        isGroupInvoice ? (
                             <GroupInvoiceForm
-                                invoice={invoice}
-                                banks={banks}
-                                specimenTypes={finalSpecimenTypes}
-                                examinations={finalExaminations}
-                                settings={finalSettings}
-                                onSuccess={() => onOpenChange(false)}
+                                key={`group_invoice_${resolvedInvoice.id}`}
+                                invoice={resolvedInvoice}
+                                banks={resolvedBanks}
+                                specimenTypes={resolvedSpecimenTypes}
+                                examinations={resolvedExaminations}
+                                settings={resolvedSettings}
+                                onSuccess={() => {
+                                    setIsFormDirty(false);
+                                    onOpenChange(false);
+                                }}
                                 setIsDirty={setIsFormDirty}
                             />
                         ) : (
                             <InvoiceForm
-                                invoice={invoice}
-                                banks={banks}
-                                specimenTypes={finalSpecimenTypes}
-                                examinations={finalExaminations}
-                                settings={finalSettings}
-                                onSuccess={() => onOpenChange(false)}
+                                key={`invoice_${resolvedInvoice.id}`}
+                                invoice={resolvedInvoice}
+                                banks={resolvedBanks}
+                                specimenTypes={resolvedSpecimenTypes}
+                                examinations={resolvedExaminations}
+                                settings={resolvedSettings}
+                                onSuccess={() => {
+                                    setIsFormDirty(false);
+                                    onOpenChange(false);
+                                }}
                                 setIsDirty={setIsFormDirty}
                             />
-                        ))}
+                        )
+                    ) : null}
                 </SheetContent>
             </Sheet>
 
@@ -144,6 +193,7 @@ export default function InvoiceSheet({
                         <AlertDialogAction
                             onClick={() => {
                                 setShowCloseConfirm(false);
+                                setIsFormDirty(false);
                                 onOpenChange(false);
                             }}
                             className="bg-destructive text-destructive-foreground text-white hover:bg-destructive/90"

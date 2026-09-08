@@ -359,13 +359,16 @@ export function KanbanCard({
                                             <div
                                                 suppressHydrationWarning
                                                 className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${dueInfo.colorClass}`}
-                                                title={`Fecha Estimada: ${dueInfo.fullDueDate}`}
+                                                title={`Fecha Estimada: ${dueInfo.fullDueDate}${dueInfo.isManual ? ' (Personalizada)' : ''}`}
                                             >
                                                 <CalendarClock className="h-3 w-3" />{' '}
                                                 {dueInfo.isExpired
                                                     ? 'Vencida:'
                                                     : 'Est:'}{' '}
                                                 {dueInfo.dueDateFormatted}
+                                                {dueInfo.isManual && (
+                                                    <span className="font-semibold">*</span>
+                                                )}
                                             </div>
                                         )}
                                     </div>

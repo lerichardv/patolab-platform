@@ -7,10 +7,14 @@ use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Events\ConnectionEstablished;
+use Illuminate\Database\SQLiteConnection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
@@ -29,6 +33,21 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        Event::listen(ConnectionEstablished::class, function ($event) {
+            if ($event->connection instanceof SQLiteConnection) {
+                $event->connection->getPdo()->sqliteCreateFunction('like', function ($pattern, $value) {
+                    if ($value === null || $pattern === null) {
+                        return 0;
+                    }
+                    $pattern = mb_strtolower(Str::ascii((string) $pattern));
+                    $value = mb_strtolower(Str::ascii((string) $value));
+                    $regex = '/^'.str_replace(['%', '_'], ['.*', '.'], preg_quote($pattern, '/')).'$/us';
+
+                    return preg_match($regex, $value) ? 1 : 0;
+                }, 2);
+            }
+        });
 
         Relation::morphMap([
             'product' => Product::class,

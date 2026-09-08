@@ -107,7 +107,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
+import { cn, matchesSearch } from '@/lib/utils';
 import CreditExtractSpecimenSheet from '../credits/credit-extract-specimen-sheet';
 import CreditFinalPaymentSheet from '../credits/credit-final-payment-sheet';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
@@ -200,7 +200,7 @@ interface Props {
         id: number;
         name: string;
     } | null;
-    specimenTypes: {
+    specimenTypes?: {
         id: number;
         name: string;
     }[];
@@ -213,14 +213,6 @@ interface Props {
         id: number;
         name: string;
     }[];
-    categories: any[];
-    referrers: any[];
-    referrerTypes: any[];
-    priorities: any[];
-    locations: any[];
-    sequences: any[];
-    activeLocationId: number | null;
-    products: any[];
     settings?: Record<string, string>;
     workOrderTypes?: any[];
     workOrderTasks?: any[];
@@ -265,7 +257,11 @@ function FormCombobox({
                 className="w-[--radix-popover-trigger-width] p-0"
                 align="start"
             >
-                <Command>
+                <Command
+                    filter={(value, search) =>
+                        matchesSearch(value, search) ? 1 : 0
+                    }
+                >
                     <CommandInput placeholder={`Buscar...`} />
                     <CommandList>
                         <CommandEmpty>{emptyMessage}</CommandEmpty>
@@ -631,17 +627,9 @@ export default function InvoicesIndex({
     invoices,
     filters,
     selectedCustomer,
-    specimenTypes,
+    specimenTypes = [],
     banks,
     examinations,
-    categories,
-    referrers,
-    referrerTypes,
-    priorities,
-    locations,
-    sequences,
-    activeLocationId,
-    products,
     groups,
     settings,
     workOrderTypes = [],
@@ -1606,7 +1594,11 @@ export default function InvoicesIndex({
                                     className="w-[--radix-popover-trigger-width] p-0"
                                     align="start"
                                 >
-                                    <Command>
+                                    <Command
+                                        filter={(value, search) =>
+                                            matchesSearch(value, search) ? 1 : 0
+                                        }
+                                    >
                                         <CommandInput placeholder="Buscar grupo..." />
                                         <CommandList>
                                             <CommandEmpty>
@@ -2045,14 +2037,10 @@ export default function InvoicesIndex({
                                                                                     (
                                                                                         s: any,
                                                                                     ) =>
-                                                                                        (
-                                                                                            s.sequence_code ||
-                                                                                            ''
-                                                                                        )
-                                                                                            .toLowerCase()
-                                                                                            .includes(
-                                                                                                specimenSearchQuery.toLowerCase(),
-                                                                                            ),
+                                                                                        matchesSearch(
+                                                                                            s.sequence_code,
+                                                                                            specimenSearchQuery,
+                                                                                        ),
                                                                                 );
 
                                                                             return (
@@ -3117,9 +3105,6 @@ export default function InvoicesIndex({
                 invoice={invoiceToEdit}
                 open={isEditSheetOpen}
                 onOpenChange={setIsEditSheetOpen}
-                banks={banks}
-                specimenTypes={specimenTypes}
-                settings={settings}
             />
 
             {/* Rental / Otros Cobros Invoice Editor Sheet */}
@@ -3156,17 +3141,6 @@ export default function InvoicesIndex({
                         setSelectedSpecimen(null);
                     }
                 }}
-                specimenTypes={specimenTypes}
-                examinations={examinations}
-                categories={categories}
-                referrers={referrers}
-                referrerTypes={referrerTypes}
-                priorities={priorities}
-                locations={locations}
-                sequences={sequences}
-                activeLocationId={activeLocationId}
-                products={products}
-                banks={banks}
             />
 
             <SpecimenViewSheet
@@ -3213,17 +3187,6 @@ export default function InvoicesIndex({
                     }
                 }}
                 group={selectedGroup}
-                specimenTypes={specimenTypes}
-                examinations={examinations}
-                categories={categories}
-                referrers={referrers}
-                referrerTypes={referrerTypes}
-                priorities={priorities}
-                locations={locations}
-                sequences={sequences}
-                activeLocationId={activeLocationId}
-                products={products}
-                banks={banks}
             />
 
             <SelectSpecimenGroupDialog

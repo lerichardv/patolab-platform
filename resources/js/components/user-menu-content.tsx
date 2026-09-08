@@ -1,4 +1,4 @@
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { LogOut, Settings, BookOpen } from 'lucide-react';
 import { index as myTemplatesIndex } from '@/actions/App/Http/Controllers/MySpecimenTypeTemplateController';
 import {
@@ -23,7 +23,6 @@ export function UserMenuContent({ user }: Props) {
 
     const handleLogout = () => {
         cleanup();
-        router.flushAll();
     };
 
     return (
@@ -64,17 +63,15 @@ export function UserMenuContent({ user }: Props) {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-                <Link
-                    className="block w-full cursor-pointer"
+                <a
+                    className="flex w-full cursor-pointer items-center"
                     href={logout().url}
-                    method="post"
-                    as="button"
                     onClick={handleLogout}
                     data-test="logout-button"
                 >
                     <LogOut className="mr-2" />
                     Cerrar sesión
-                </Link>
+                </a>
             </DropdownMenuItem>
         </>
     );

@@ -38,7 +38,14 @@ import {
     SheetDescription,
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn, addWithoutWeekends } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import {
+    getEstimatedDate,
+    getClientEstimatedDate,
+    getInternalDeliveryDuration,
+    getClientDeliveryDuration,
+    formatDurationText,
+} from '@/services/specimen-delivery-date';
 
 interface Props {
     specimenId?: number | null;
@@ -266,85 +273,23 @@ export default function SpecimenViewSheet({
           })
         : 'N/A';
 
-    const getEstimatedDate = () => {
-        if (
-            !specimen.category ||
-            !specimen.category.intern_unit ||
-            !specimen.category.intern_quantity ||
-            !specimen.created_at
-        ) {
-            return null;
-        }
-
-        const createdAt = new Date(specimen.created_at);
-
-        return addWithoutWeekends(
-            createdAt,
-            specimen.category.intern_quantity,
-            specimen.category.intern_unit,
-        );
-    };
-
-    const getClientEstimatedDate = () => {
-        if (
-            !specimen.category ||
-            !specimen.category.unit ||
-            !specimen.category.quantity ||
-            !specimen.created_at
-        ) {
-            return null;
-        }
-
-        const createdAt = new Date(specimen.created_at);
-
-        return addWithoutWeekends(
-            createdAt,
-            specimen.category.quantity,
-            specimen.category.unit,
-        );
-    };
-
-    const estimatedDate = getEstimatedDate();
+    const estimatedDate = getEstimatedDate(specimen);
     const formattedEstimatedDate = estimatedDate
         ? format(estimatedDate, "dd 'de' MMMM, yyyy - HH:mm", { locale: es })
         : null;
 
-    const clientEstimatedDate = getClientEstimatedDate();
+    const clientEstimatedDate = getClientEstimatedDate(specimen);
     const formattedClientEstimatedDate = clientEstimatedDate
         ? format(clientEstimatedDate, "dd 'de' MMMM, yyyy - HH:mm", {
               locale: es,
           })
         : null;
 
-    const durationText =
-        specimen.category?.intern_quantity && specimen.category?.intern_unit
-            ? `Int: ${specimen.category.intern_quantity} ${
-                  specimen.category.intern_unit === 'minutes'
-                      ? 'minutos'
-                      : specimen.category.intern_unit === 'hours'
-                        ? 'horas'
-                        : specimen.category.intern_unit === 'days'
-                          ? 'días'
-                          : specimen.category.intern_unit === 'weeks'
-                            ? 'semanas'
-                            : specimen.category.intern_unit
-              }`
-            : null;
+    const internalDuration = getInternalDeliveryDuration(specimen);
+    const clientDuration = getClientDeliveryDuration(specimen);
 
-    const clientDurationText =
-        specimen.category?.quantity && specimen.category?.unit
-            ? `Cli: ${specimen.category.quantity} ${
-                  specimen.category.unit === 'minutes'
-                      ? 'minutos'
-                      : specimen.category.unit === 'hours'
-                        ? 'horas'
-                        : specimen.category.unit === 'days'
-                          ? 'días'
-                          : specimen.category.unit === 'weeks'
-                            ? 'semanas'
-                            : specimen.category.unit
-              }`
-            : null;
+    const durationText = formatDurationText('Int', internalDuration);
+    const clientDurationText = formatDurationText('Cli', clientDuration);
 
     const isCompleted = ['finalized', 'delivered', 'cancelled'].includes(
         specimen.status,
@@ -368,7 +313,9 @@ export default function SpecimenViewSheet({
     let textClass = 'text-primary';
     let labelClass = 'text-muted-foreground';
     let iconClass = 'text-primary';
-    let badgeLabel = 'Fecha Estimada de Finalización (Interna)';
+    let badgeLabel = internalDuration?.isManual
+        ? 'Fecha Estimada de Finalización (Interna - Personalizada)'
+        : 'Fecha Estimada de Finalización (Interna)';
 
     if (isOverdue) {
         containerClass =
@@ -376,20 +323,27 @@ export default function SpecimenViewSheet({
         textClass = 'text-destructive';
         labelClass = 'text-destructive/80';
         iconClass = 'text-destructive';
-        badgeLabel = 'Fecha Estimada de Finalización (Interna - Vencida)';
+        badgeLabel = internalDuration?.isManual
+            ? 'Fecha Estimada de Finalización (Interna - Vencida - Personalizada)'
+            : 'Fecha Estimada de Finalización (Interna - Vencida)';
     } else if (isEstimatedToday) {
         containerClass =
             'bg-yellow-100/50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800/30 text-yellow-800 dark:text-yellow-300';
         textClass = 'text-yellow-800 dark:text-yellow-300';
         labelClass = 'text-yellow-800/80 dark:text-yellow-300/80';
         iconClass = 'text-yellow-600 dark:text-yellow-400';
-        badgeLabel = 'Fecha Estimada de Finalización (Interna - Hoy)';
+        badgeLabel = internalDuration?.isManual
+            ? 'Fecha Estimada de Finalización (Interna - Hoy - Personalizada)'
+            : 'Fecha Estimada de Finalización (Interna - Hoy)';
     } else if (isFuture) {
         containerClass =
             'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-300';
         textClass = 'text-emerald-800 dark:text-emerald-300';
         labelClass = 'text-emerald-800/80 dark:text-emerald-300/80';
         iconClass = 'text-emerald-600 dark:text-emerald-400';
+        badgeLabel = internalDuration?.isManual
+            ? 'Fecha Estimada de Finalización (Interna - A tiempo - Personalizada)'
+            : 'Fecha Estimada de Finalización (Interna - A tiempo)';
     }
 
     const getPaymentTypeLabel = (type: string) => {
@@ -839,6 +793,11 @@ export default function SpecimenViewSheet({
                                                     )}
                                                 />{' '}
                                                 Fecha de Entrega al Cliente
+                                                {clientDuration?.isManual && (
+                                                    <span className="ml-1 text-[10px] font-semibold text-primary">
+                                                        (Personalizada)
+                                                    </span>
+                                                )}
                                                 {isClientOverdue && (
                                                     <span className="ml-1 text-[10px] font-semibold text-destructive">
                                                         (Vencida)

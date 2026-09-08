@@ -1,13 +1,5 @@
 import { useForm, usePage } from '@inertiajs/react';
-import {
-    AlertCircle,
-    BadgePercent,
-    ChevronDown,
-    Edit2,
-    Info,
-    Receipt,
-    Tag,
-} from 'lucide-react';
+import { ChevronDown, Info, Receipt, Tag } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -449,6 +441,44 @@ export default function GroupInvoiceForm({
             localErrors.customer_id = 'El cliente / paciente es requerido.';
         }
 
+        if (!data.payment_type) {
+            localErrors.payment_type = 'El método de pago es requerido.';
+        }
+
+        const isSpecimenOrGroup = !!(
+            invoice?.specimen_id ||
+            invoice?.is_group ||
+            invoice?.group_id ||
+            invoice?.invoice_type === 'specimen' ||
+            invoice?.invoice_type === 'group'
+        );
+        const originalWasCredit =
+            invoice?.payment_type && invoice.payment_type === 'credit';
+        const originalWasNotCredit =
+            invoice?.payment_type && invoice.payment_type !== 'credit';
+        const hasInvoiceNumber = !!(
+            invoice?.invoice_number || invoice?.full_invoice_number
+        );
+
+        if (
+            isSpecimenOrGroup &&
+            originalWasNotCredit &&
+            hasInvoiceNumber &&
+            data.payment_type === 'credit'
+        ) {
+            localErrors.payment_type =
+                'Una factura con número de factura asignado no se puede cambiar a crédito.';
+        }
+
+        if (
+            isSpecimenOrGroup &&
+            originalWasCredit &&
+            data.payment_type !== 'credit'
+        ) {
+            localErrors.payment_type =
+                'Una factura registrada como crédito no se puede cambiar a otro método de pago. Debe procesarse mediante "Pago final" en el módulo de Créditos.';
+        }
+
         if (data.custom_amount_enabled) {
             if (!data.custom_amount || parseFloat(data.custom_amount) < 0) {
                 localErrors.custom_amount =
@@ -468,7 +498,12 @@ export default function GroupInvoiceForm({
             Object.entries(localErrors).forEach(([k, v]) =>
                 setError(k as any, v),
             );
-            toast.error('Por favor, corrija los errores en el formulario.');
+
+            if (localErrors.payment_type) {
+                toast.error(localErrors.payment_type);
+            } else {
+                toast.error('Por favor, corrija los errores en el formulario.');
+            }
 
             return false;
         }
@@ -1147,6 +1182,12 @@ export default function GroupInvoiceForm({
                                 banks={banks}
                                 className="mt-2"
                             />
+
+                            {errors.payment_type && (
+                                <p className="mt-1 text-xs text-destructive">
+                                    {errors.payment_type}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1329,6 +1370,57 @@ export default function GroupInvoiceForm({
                 totalAmount={totalVal}
                 paymentData={data}
                 onSave={(paymentData) => {
+                    const isSpecimenOrGroup = !!(
+                        invoice?.specimen_id ||
+                        invoice?.is_group ||
+                        invoice?.group_id ||
+                        invoice?.invoice_type === 'specimen' ||
+                        invoice?.invoice_type === 'group'
+                    );
+                    const originalWasCredit =
+                        invoice?.payment_type &&
+                        invoice.payment_type === 'credit';
+                    const originalWasNotCredit =
+                        invoice?.payment_type &&
+                        invoice.payment_type !== 'credit';
+                    const hasInvoiceNumber = !!(
+                        invoice?.invoice_number || invoice?.full_invoice_number
+                    );
+
+                    if (
+                        isSpecimenOrGroup &&
+                        originalWasCredit &&
+                        paymentData.payment_type !== 'credit'
+                    ) {
+                        toast.error(
+                            'Una factura registrada como crédito no se puede cambiar a otro método de pago. Debe procesarse mediante "Pago final" en el módulo de Créditos.',
+                        );
+                        setError(
+                            'payment_type',
+                            'Una factura registrada como crédito no se puede cambiar a otro método de pago. Debe procesarse mediante "Pago final" en el módulo de Créditos.',
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        isSpecimenOrGroup &&
+                        originalWasNotCredit &&
+                        hasInvoiceNumber &&
+                        paymentData.payment_type === 'credit'
+                    ) {
+                        toast.error(
+                            'Una factura con número de factura asignado no se puede cambiar a crédito.',
+                        );
+                        setError(
+                            'payment_type',
+                            'Una factura con número de factura asignado no se puede cambiar a crédito.',
+                        );
+
+                        return;
+                    }
+
+                    clearErrors('payment_type');
                     setData((d) => ({
                         ...d,
                         ...paymentData,
@@ -1351,7 +1443,11 @@ export default function GroupInvoiceForm({
                         </AlertDialogDescription>
                     </AlertDialogHeader>
 
-                    {data.payment_type === 'credit' && (
+                    {(data.payment_type === 'credit' ||
+                        invoice?.payment_type === 'credit' ||
+                        invoice?.credit_payment_id ||
+                        invoice?.creditRelation ||
+                        invoice?.credit) && (
                         <div className="my-2.5 flex items-start gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-800 dark:border-amber-950/40 dark:bg-amber-950/15 dark:text-amber-300">
                             <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                             <span>

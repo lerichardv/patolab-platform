@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import SpecimenFormDataController from '@/actions/App/Http/Controllers/SpecimenFormDataController';
 
 export interface SpecimenFormData {
     specimen?: any;
@@ -32,24 +33,38 @@ interface UseSpecimenFormDataReturn {
     refetch: () => void;
 }
 
+// Module-level in-memory cache for common catalogs to allow instant re-renders
+let cachedCatalogs: Partial<SpecimenFormData> | null = null;
+
+export function invalidateSpecimenCatalogsCache() {
+    cachedCatalogs = null;
+}
+
 /**
- * Fetches all reference data needed by the specimen form sheets.
+ * Fetches reference data and entity details needed by the specimen form sheets.
  *
- * Data is fetched fresh every time `enabled` becomes true, ensuring
- * the forms always display the most up-to-date information.
+ * While the initial request is in-flight, `isLoading` is true.
+ * If common catalogs have already been fetched, they can be utilized to prevent
+ * unnecessary empty screens while still re-fetching fresh sequence numbers.
  */
 export function useSpecimenFormData({
     enabled,
     specimenId,
     groupId,
 }: UseSpecimenFormDataOptions): UseSpecimenFormDataReturn {
-    const [data, setData] = useState<SpecimenFormData | null>(null);
+    const [data, setData] = useState<SpecimenFormData | null>(() => {
+        // If we only need reference data (no specific specimen or group), initialize from cache
+        if (cachedCatalogs && !specimenId && !groupId) {
+            return cachedCatalogs as SpecimenFormData;
+        }
+
+        return null;
+    });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const fetchData = useCallback(() => {
-        // Cancel any in-flight request
         abortControllerRef.current?.abort();
 
         const controller = new AbortController();
@@ -58,25 +73,39 @@ export function useSpecimenFormData({
         setIsLoading(true);
         setError(null);
 
-        const params: Record<string, string> = {};
+        const queryParams: Record<string, string> = {};
 
         if (specimenId) {
-            params.specimen_id = specimenId.toString();
+            queryParams.specimen_id = specimenId.toString();
         }
 
         if (groupId) {
-            params.group_id = groupId.toString();
+            queryParams.group_id = groupId.toString();
         }
 
+        const url = SpecimenFormDataController.url({ query: queryParams });
+
         axios
-            .get('/specimens/form-data', {
-                params,
+            .get(url, {
                 signal: controller.signal,
             })
             .then((response) => {
                 if (!controller.signal.aborted) {
-                    setData(response.data);
-                    console.log(response.data);
+                    const resData = response.data as SpecimenFormData;
+                    setData(resData);
+                    cachedCatalogs = {
+                        specimenTypes: resData.specimenTypes,
+                        examinations: resData.examinations,
+                        categories: resData.categories,
+                        referrers: resData.referrers,
+                        referrerTypes: resData.referrerTypes,
+                        priorities: resData.priorities,
+                        locations: resData.locations,
+                        products: resData.products,
+                        banks: resData.banks,
+                        settings: resData.settings,
+                        activeLocationId: resData.activeLocationId,
+                    };
                     setIsLoading(false);
                 }
             })
@@ -93,13 +122,12 @@ export function useSpecimenFormData({
 
     useEffect(() => {
         if (enabled) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             fetchData();
         } else {
-            // Reset state when sheet closes
-            setData((prev) => (prev !== null ? null : prev));
-            setError((prev) => (prev !== null ? null : prev));
-            setIsLoading(false);
+            // When closed, abort pending requests
             abortControllerRef.current?.abort();
+            setIsLoading(false);
         }
 
         return () => {

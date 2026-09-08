@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CuttingCode;
-use App\Models\CuttingPrefix;
 use App\Models\Priority;
 use App\Models\Specimen;
 use App\Models\SpecimenType;
@@ -145,9 +143,6 @@ class MyAssignmentController extends Controller
         $workOrderTypes = WorkOrderType::orderBy('name')->get();
         $workOrderTasks = WorkOrderTask::orderBy('name')->get();
         $usersList = User::where('active', true)->orderBy('name')->get();
-        $cuttingCodes = CuttingCode::orderByRaw('LENGTH(code) asc')->orderBy('code', 'asc')->get();
-        $cuttingPrefixes = CuttingPrefix::orderByRaw('LENGTH(prefix) asc')->orderBy('prefix', 'asc')->get();
-        $cuttingSlideTypes = WorkOrderType::all();
 
         return Inertia::render('my-assignments/index', [
             'specimens' => $specimens,
@@ -157,9 +152,6 @@ class MyAssignmentController extends Controller
             'workOrderTypes' => $workOrderTypes,
             'workOrderTasks' => $workOrderTasks,
             'usersList' => $usersList,
-            'cuttingCodes' => $cuttingCodes,
-            'cuttingPrefixes' => $cuttingPrefixes,
-            'cuttingSlideTypes' => $cuttingSlideTypes,
             'filters' => [
                 'status' => $statuses,
                 'specimen_type_id' => $specimenTypeIds === null ? 'all' : (empty($specimenTypeIds) ? 'none' : $specimenTypeIds),

@@ -25,6 +25,7 @@ import { Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { formatUnitSpanish } from '@/services/specimen-delivery-date';
 import {
     Command,
     CommandEmpty,
@@ -71,8 +72,19 @@ interface SpecimenReportRow {
     };
     examination_items?: ExaminationItem[];
     category?: {
+        id?: number;
         name: string;
+        quantity?: number;
+        unit?: string;
+        intern_quantity?: number;
+        intern_unit?: string;
     };
+    is_manual_delivery_date_enabled?: boolean;
+    delivery_date_unit?: string | null;
+    delivery_date_quantity?: number | null;
+    is_manual_delivery_date_intern_enabled?: boolean;
+    delivery_date_intern_unit?: string | null;
+    delivery_date_intern_quantity?: number | null;
     users?: {
         id: number;
         name: string;
@@ -1217,10 +1229,40 @@ export default function DeliveryReportIndex({
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge variant="outline">
-                                                        {row.category?.name ??
-                                                            'N/A'}
-                                                    </Badge>
+                                                    <div className="flex flex-col items-start gap-1">
+                                                        <Badge variant="outline">
+                                                            {row.category?.name ??
+                                                                'N/A'}
+                                                        </Badge>
+                                                        {row.is_manual_delivery_date_enabled && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="h-4 px-1.5 py-0 text-[10px] font-normal border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300"
+                                                                title="Fecha de entrega al cliente personalizada"
+                                                            >
+                                                                Cli: {row.delivery_date_quantity}{' '}
+                                                                {formatUnitSpanish(
+                                                                    row.delivery_date_unit ||
+                                                                        'days',
+                                                                )}{' '}
+                                                                (Manual)
+                                                            </Badge>
+                                                        )}
+                                                        {row.is_manual_delivery_date_intern_enabled && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="h-4 px-1.5 py-0 text-[10px] font-normal border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-800/60 dark:bg-purple-950/40 dark:text-purple-300"
+                                                                title="Fecha estimada interna personalizada"
+                                                            >
+                                                                Int: {row.delivery_date_intern_quantity}{' '}
+                                                                {formatUnitSpanish(
+                                                                    row.delivery_date_intern_unit ||
+                                                                        'days',
+                                                                )}{' '}
+                                                                (Manual)
+                                                            </Badge>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-center font-mono text-xs font-semibold">
                                                     {row.sequence_code}
@@ -1344,10 +1386,34 @@ export default function DeliveryReportIndex({
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-center text-xs text-muted-foreground">
-                                                    {expectedInternal}
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <span>
+                                                            {expectedInternal}
+                                                        </span>
+                                                        {row.is_manual_delivery_date_intern_enabled && (
+                                                            <span
+                                                                className="rounded bg-purple-100 px-1 text-[9px] font-bold text-purple-700 dark:bg-purple-950/50 dark:text-purple-300"
+                                                                title="Fecha estimada interna personalizada manualmente"
+                                                            >
+                                                                M
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="bg-yellow-500/[0.02] text-center font-bold">
-                                                    {expectedDelivery}
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <span>
+                                                            {expectedDelivery}
+                                                        </span>
+                                                        {row.is_manual_delivery_date_enabled && (
+                                                            <span
+                                                                className="rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+                                                                title="Fecha de entrega al cliente personalizada manualmente"
+                                                            >
+                                                                M
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium">
                                                     1

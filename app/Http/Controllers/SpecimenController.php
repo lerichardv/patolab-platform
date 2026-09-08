@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Bank;
 use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
@@ -15,8 +14,6 @@ use App\Models\Priority;
 use App\Models\PrioritySpecimenOrder;
 use App\Models\Product;
 use App\Models\Referrer;
-use App\Models\ReferrerType;
-use App\Models\Role;
 use App\Models\Sequence;
 use App\Models\Setting;
 use App\Models\Specimen;
@@ -166,60 +163,12 @@ class SpecimenController extends Controller
                 ->orderBy('specimen.created_at', 'desc');
         }]);
 
-        $activeCai = CaiRange::where('status', 'active')->first();
-        $activeLocationId = $activeCai ? $activeCai->location_id : null;
-        $sequences = Sequence::where('active', true)->get()->map(function ($sequence) {
-            $tempSequence = clone $sequence;
-            $currentMonth = now()->format('m');
-            $currentYear = now()->format('Y');
-            do {
-                $paddedSeq = str_pad($tempSequence->current_sequence, $tempSequence->fill ?? 4, '0', STR_PAD_LEFT);
-                $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
-                $sequenceCode = $tempSequence->prefix.$tempSequence->separator.$paddedSeq.$tempSequence->separator.$paddedMonth.$tempSequence->separator.$currentYear;
-
-                $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
-                if ($exists) {
-                    $tempSequence->current_sequence++;
-                }
-            } while ($exists);
-            $sequence->current_sequence = $tempSequence->current_sequence;
-
-            return $sequence;
-        });
-
-        $products = Product::where('active', true)
-            ->whereHas('inventory', function ($q) {
-                $q->where('active', true);
-            })
-            ->withSum(['inventory as total_stock' => function ($q) {
-                $q->where('active', true);
-            }], 'quantity')
-            ->with('prices')
-            ->get();
-
-        $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
-        $pathologists = [];
-        if ($pathologistRoleId) {
-            $assistantRole = Role::where('slug', 'assistant_pathologist')->first();
-            $roleIds = array_filter([$pathologistRoleId, $assistantRole?->id]);
-            $pathologists = User::where('active', true)->whereIn('role_id', $roleIds)->get();
-        }
-
         return Inertia::render('specimens/index', [
             'priorities' => $priorities,
             'specimenTypes' => SpecimenType::where('active', true)->get(),
             'examinations' => SpecimenTypeExamination::where('active', true)->with('prices')->get(),
-            'categories' => SpecimenCategory::where('active', true)->get(),
-            'referrers' => Referrer::where('active', true)->get(),
-            'referrerTypes' => ReferrerType::where('active', true)->get(),
-            'locations' => Location::where('active', true)->get(),
-            'sequences' => $sequences,
-            'activeLocationId' => $activeLocationId,
-            'products' => $products,
             'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
-            'pathologists' => $pathologists,
             'usersList' => User::where('active', true)->orderBy('name')->get(),
-            'banks' => Bank::all(),
             'filters' => [
                 'status' => $statuses,
                 'specimen_type_id' => $specimenTypeIds === null ? 'all' : (empty($specimenTypeIds) ? 'none' : $specimenTypeIds),
@@ -246,6 +195,12 @@ class SpecimenController extends Controller
             'status' => 'required|string',
             'priority_id' => 'required|exists:priorities,id',
             'sample_collection_date' => 'nullable|date',
+            'is_manual_delivery_date_intern_enabled' => 'nullable|boolean',
+            'delivery_date_intern_unit' => 'nullable|in:minutes,hours,days,weeks',
+            'delivery_date_intern_quantity' => 'nullable|integer|min:0',
+            'is_manual_delivery_date_enabled' => 'nullable|boolean',
+            'delivery_date_unit' => 'nullable|in:minutes,hours,days,weeks',
+            'delivery_date_quantity' => 'nullable|integer|min:0',
             'medical_order_file' => [
                 'nullable',
                 'file',
@@ -717,6 +672,12 @@ class SpecimenController extends Controller
             'status' => 'required|string',
             'priority_id' => 'required|exists:priorities,id',
             'sample_collection_date' => 'nullable|date',
+            'is_manual_delivery_date_intern_enabled' => 'nullable|boolean',
+            'delivery_date_intern_unit' => 'nullable|in:minutes,hours,days,weeks',
+            'delivery_date_intern_quantity' => 'nullable|integer|min:0',
+            'is_manual_delivery_date_enabled' => 'nullable|boolean',
+            'delivery_date_unit' => 'nullable|in:minutes,hours,days,weeks',
+            'delivery_date_quantity' => 'nullable|integer|min:0',
             'medical_order_file' => [
                 'nullable',
                 'file',
@@ -1330,6 +1291,15 @@ class SpecimenController extends Controller
             ]);
         }
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Patólogo asignado con éxito.',
+                'users' => $specimen->fresh()->users,
+                'collaborators' => $specimen->fresh()->collaborators,
+            ]);
+        }
+
         return redirect()->back()->with('success', 'Patólogo asignado con éxito.');
     }
 
@@ -1341,6 +1311,15 @@ class SpecimenController extends Controller
         ]);
 
         $specimen->users()->detach($validated['user_id']);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Patólogo desasignado con éxito.',
+                'users' => $specimen->fresh()->users,
+                'collaborators' => $specimen->fresh()->collaborators,
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Patólogo desasignado con éxito.');
     }
@@ -1373,6 +1352,15 @@ class SpecimenController extends Controller
             ]);
         }
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Colaborador asignado con éxito.',
+                'users' => $specimen->fresh()->users,
+                'collaborators' => $specimen->fresh()->collaborators,
+            ]);
+        }
+
         return redirect()->back()->with('success', 'Colaborador asignado con éxito.');
     }
 
@@ -1388,6 +1376,15 @@ class SpecimenController extends Controller
         ]);
 
         $specimen->collaborators()->detach($validated['user_id']);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Colaborador desasignado con éxito.',
+                'users' => $specimen->fresh()->users,
+                'collaborators' => $specimen->fresh()->collaborators,
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Colaborador desasignado con éxito.');
     }
@@ -1567,6 +1564,18 @@ class SpecimenController extends Controller
                 Specimen::whereIn('id', $ids)->update(['active' => false]);
             }
         });
+
+        if ($request->wantsJson()) {
+            $updatedSpecimens = in_array($action, ['assign_pathologist', 'unassign_pathologist', 'assign_collaborator', 'unassign_collaborator'])
+                ? Specimen::whereIn('id', $ids)->with(['users', 'collaborators'])->get()
+                : null;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Acción en bulk realizada con éxito.',
+                'specimens' => $updatedSpecimens,
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Acción en bulk realizada con éxito.');
     }

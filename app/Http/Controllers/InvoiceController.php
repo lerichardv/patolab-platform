@@ -4,22 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Bank;
-use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\InvoiceSpecimen;
-use App\Models\Location;
-use App\Models\Priority;
-use App\Models\Product;
-use App\Models\Referrer;
-use App\Models\ReferrerType;
 use App\Models\Sequence;
 use App\Models\Setting;
 use App\Models\Specimen;
-use App\Models\SpecimenCategory;
 use App\Models\SpecimenGroup;
-use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Models\User;
 use App\Models\WorkOrderTask;
@@ -31,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -112,35 +105,7 @@ class InvoiceController extends Controller
 
         // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
         if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('full_invoice_number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', function ($cq) use ($search) {
-                        $cq->where('name', 'like', "%{$search}%")
-                            ->orWhere('id_number', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('group.specimens', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('groupSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.group.specimens', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    });
-            });
+            $this->applySearchFilter($query, (string) $request->get('search'));
         }
 
         // Resolve user cookies and query parameters
@@ -309,46 +274,8 @@ class InvoiceController extends Controller
                 ->first();
         }
 
-        $specimenTypes = SpecimenType::where('active', true)->orderBy('name', 'asc')->get();
         $banks = Bank::all();
-
-        $examinations = SpecimenTypeExamination::where('active', true)->with('prices')->get();
-        $categories = SpecimenCategory::where('active', true)->get();
-        $referrers = Referrer::where('active', true)->get();
-        $referrerTypes = ReferrerType::where('active', true)->get();
-        $priorities = Priority::orderBy('order', 'desc')->get();
-        $locations = Location::where('active', true)->get();
-
-        $activeCai = CaiRange::where('status', 'active')->first();
-        $activeLocationId = $activeCai ? $activeCai->location_id : null;
-        $sequences = Sequence::where('active', true)->get()->map(function ($sequence) {
-            $tempSequence = clone $sequence;
-            $currentMonth = now()->format('m');
-            $currentYear = now()->format('Y');
-            do {
-                $paddedSeq = str_pad($tempSequence->current_sequence, $tempSequence->fill ?? 4, '0', STR_PAD_LEFT);
-                $paddedMonth = str_pad($currentMonth, 2, '0', STR_PAD_LEFT);
-                $sequenceCode = $tempSequence->prefix.$tempSequence->separator.$paddedSeq.$tempSequence->separator.$paddedMonth.$tempSequence->separator.$currentYear;
-
-                $exists = Specimen::where('sequence_code', $sequenceCode)->exists();
-                if ($exists) {
-                    $tempSequence->current_sequence++;
-                }
-            } while ($exists);
-            $sequence->current_sequence = $tempSequence->current_sequence;
-
-            return $sequence;
-        });
-
-        $products = Product::where('active', true)
-            ->whereHas('inventory', function ($q) {
-                $q->where('active', true);
-            })
-            ->withSum(['inventory as total_stock' => function ($q) {
-                $q->where('active', true);
-            }], 'quantity')
-            ->with('prices')
-            ->get();
+        $examinations = SpecimenTypeExamination::where('active', true)->select('id', 'name', 'specimen_type')->get();
 
         return Inertia::render('invoices/index', [
             'invoices' => $invoices,
@@ -363,19 +290,9 @@ class InvoiceController extends Controller
                 ]
             ),
             'selectedCustomer' => $selectedCustomer,
-            'specimenTypes' => $specimenTypes,
             'banks' => $banks,
             'examinations' => $examinations,
-            'categories' => $categories,
-            'referrers' => $referrers,
-            'referrerTypes' => $referrerTypes,
-            'priorities' => $priorities,
-            'locations' => $locations,
-            'sequences' => $sequences,
-            'activeLocationId' => $activeLocationId,
-            'products' => $products,
             'groups' => SpecimenGroup::orderBy('name', 'asc')->get(),
-            'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
             'workOrderTypes' => WorkOrderType::orderBy('name')->get(),
             'workOrderTasks' => WorkOrderTask::orderBy('name')->get(),
             'usersList' => User::where('active', true)->orderBy('name')->get(),
@@ -415,35 +332,7 @@ class InvoiceController extends Controller
 
         // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
         if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('full_invoice_number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', function ($cq) use ($search) {
-                        $cq->where('name', 'like', "%{$search}%")
-                            ->orWhere('id_number', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('group.specimens', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('groupSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.group.specimens', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('creditRelation.creditInvoiceSpecimens.specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    });
-            });
+            $this->applySearchFilter($query, (string) $request->get('search'));
         }
 
         // Filter by payment type
@@ -725,7 +614,7 @@ class InvoiceController extends Controller
             'pay_isv' => 'nullable|boolean',
         ]);
 
-        $isSpecimenOrGroup = (bool) ($invoice->specimen_id || $invoice->is_group || $invoice->group_id || $invoice->invoice_type === 'specimen');
+        $isSpecimenOrGroup = (bool) ($invoice->specimen_id || $invoice->is_group || $invoice->group_id || $invoice->invoice_type === 'specimen' || $invoice->invoice_type === 'group');
         $hasInvoiceNumber = ! empty($invoice->invoice_number) || ! empty($invoice->full_invoice_number);
         $wasCredit = $invoice->payment_type === 'credit';
         $wasNotCredit = $invoice->payment_type !== 'credit';
@@ -738,7 +627,7 @@ class InvoiceController extends Controller
 
         if ($isSpecimenOrGroup && $wasCredit && $validated['payment_type'] !== 'credit') {
             throw ValidationException::withMessages([
-                'payment_type' => 'Una factura registrada como crédito no se puede cambiar a otro método de pago. Debe procesarse mediante "Pago final" en el módulo de créditos o facturación.',
+                'payment_type' => 'Una factura registrada como crédito no se puede cambiar a otro método de pago. Debe procesarse mediante "Pago final" en el módulo de Créditos.',
             ]);
         }
 
@@ -1047,5 +936,87 @@ class InvoiceController extends Controller
         AuditLog::$currentOrigin = 'system';
 
         return response()->json(['message' => 'Cambio restaurado con éxito']);
+    }
+
+    /**
+     * Apply accent-insensitive, case-insensitive, and punctuation-insensitive search filters.
+     */
+    protected function applySearchFilter($query, string $search): void
+    {
+        $search = trim($search);
+        if ($search === '') {
+            return;
+        }
+
+        $asciiSearch = Str::ascii($search);
+        $alphanumeric = preg_replace('/[^a-zA-Z0-9]/', '', $search);
+        $words = array_values(array_filter(preg_split('/\s+/', preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $search))));
+        $wordsAscii = array_values(array_filter(preg_split('/\s+/', preg_replace('/[^a-zA-Z0-9\s]/', ' ', $asciiSearch))));
+
+        $query->where(function ($q) use ($search, $asciiSearch, $alphanumeric, $words, $wordsAscii) {
+            // 1. Full invoice number & invoice number
+            $q->where(function ($invQ) use ($search, $alphanumeric) {
+                $invQ->where('full_invoice_number', 'like', "%{$search}%")
+                    ->orWhere('invoice_number', 'like', "%{$search}%");
+
+                if ($alphanumeric !== '') {
+                    $invQ->orWhereRaw("REPLACE(REPLACE(full_invoice_number, '-', ''), ' ', '') LIKE ?", ["%{$alphanumeric}%"])
+                        ->orWhere('invoice_number', 'like', "%{$alphanumeric}%");
+                }
+            });
+
+            // 2. Customer name and ID number (RTN)
+            $q->orWhereHas('customer', function ($cq) use ($search, $asciiSearch, $alphanumeric, $words, $wordsAscii) {
+                $cq->where(function ($sub) use ($search, $asciiSearch, $alphanumeric, $words, $wordsAscii) {
+                    $sub->where('name', 'like', "%{$search}%");
+                    if ($asciiSearch !== $search) {
+                        $sub->orWhere('name', 'like', "%{$asciiSearch}%");
+                    }
+
+                    if (count($words) > 1) {
+                        $sub->orWhere(function ($wq) use ($words) {
+                            foreach ($words as $w) {
+                                $wq->where('name', 'like', "%{$w}%");
+                            }
+                        });
+                    }
+
+                    if (count($wordsAscii) > 1 && $wordsAscii !== $words) {
+                        $sub->orWhere(function ($wq) use ($wordsAscii) {
+                            foreach ($wordsAscii as $w) {
+                                $wq->where('name', 'like', "%{$w}%");
+                            }
+                        });
+                    }
+
+                    $sub->orWhere('id_number', 'like', "%{$search}%");
+                    if ($alphanumeric !== '') {
+                        $sub->orWhereRaw("REPLACE(REPLACE(REPLACE(id_number, '-', ''), ' ', ''), '.', '') LIKE ?", ["%{$alphanumeric}%"]);
+                    }
+                });
+            });
+
+            // 3. Specimen sequence code across all related specimens
+            $specimenRelations = [
+                'specimen',
+                'group.specimens',
+                'groupSpecimens.specimen',
+                'creditInvoiceSpecimens.specimen',
+                'creditRelation.specimen',
+                'creditRelation.group.specimens',
+                'creditRelation.creditInvoiceSpecimens.specimen',
+            ];
+
+            foreach ($specimenRelations as $relation) {
+                $q->orWhereHas($relation, function ($sq) use ($search, $alphanumeric) {
+                    $sq->where(function ($subSq) use ($search, $alphanumeric) {
+                        $subSq->where('sequence_code', 'like', "%{$search}%");
+                        if ($alphanumeric !== '') {
+                            $subSq->orWhereRaw("REPLACE(REPLACE(sequence_code, '-', ''), ' ', '') LIKE ?", ["%{$alphanumeric}%"]);
+                        }
+                    });
+                });
+            }
+        });
     }
 }

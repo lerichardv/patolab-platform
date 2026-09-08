@@ -87,7 +87,11 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { cn, addWithoutWeekends } from '@/lib/utils';
+import { cn, matchesAnySearch, matchesSearch } from '@/lib/utils';
+import {
+    getSpecimenDueDate,
+    getSpecimenDueDateInfo,
+} from '@/services/specimen-delivery-date';
 import InvoiceSheet from '../invoices/invoice-sheet';
 import { KanbanBoard } from './kanban/kanban-board';
 import SpecimenBulkCollaboratorSheet from './specimen-bulk-collaborator-sheet';
@@ -123,6 +127,12 @@ export interface Specimen {
     group?: any;
     group_id?: any;
     is_group?: any;
+    is_manual_delivery_date_enabled?: boolean;
+    delivery_date_unit?: 'minutes' | 'hours' | 'days' | 'weeks' | null;
+    delivery_date_quantity?: number | null;
+    is_manual_delivery_date_intern_enabled?: boolean;
+    delivery_date_intern_unit?: 'minutes' | 'hours' | 'days' | 'weeks' | null;
+    delivery_date_intern_quantity?: number | null;
 }
 
 export interface Priority {
@@ -136,16 +146,16 @@ interface Props {
     priorities: Priority[];
     specimenTypes: any[];
     examinations: any[];
-    categories: any[];
-    referrers: any[];
-    referrerTypes: any[];
-    locations: any[];
-    sequences: any[];
-    activeLocationId: number | null;
-    products: any[];
-    pathologists: any[];
+    pathologists?: any[];
     usersList?: any[];
-    banks: any[];
+    banks?: any[];
+    categories?: any[];
+    referrers?: any[];
+    referrerTypes?: any[];
+    locations?: any[];
+    sequences?: any[];
+    activeLocationId?: number | null;
+    products?: any[];
     filters: {
         status?: string[];
         specimen_type_id?: string;
@@ -156,83 +166,11 @@ interface Props {
 }
 
 export const getDueDate = (specimen: Specimen): Date => {
-    const createdAt = new Date(specimen.created_at);
-
-    const unit = specimen.category?.intern_unit || specimen.category?.unit;
-    const quantity =
-        specimen.category?.intern_quantity || specimen.category?.quantity;
-
-    if (!unit || !quantity) {
-        return createdAt;
-    }
-
-    return addWithoutWeekends(createdAt, quantity, unit);
+    return getSpecimenDueDate(specimen);
 };
 
 export const getDueDateInfo = (specimen: Specimen) => {
-    if (!specimen.category) {
-        return null;
-    }
-
-    const unit = specimen.category.intern_unit || specimen.category.unit;
-    const quantity =
-        specimen.category.intern_quantity || specimen.category.quantity;
-
-    if (!unit || !quantity) {
-        return null;
-    }
-
-    const dueDate = getDueDate(specimen);
-
-    const isCompleted = ['finalized', 'delivered', 'cancelled'].includes(
-        specimen.status,
-    );
-
-    const timeDefined = `${quantity} ${
-        unit === 'minutes'
-            ? 'minutos'
-            : unit === 'hours'
-              ? 'horas'
-              : unit === 'days'
-                ? 'días'
-                : unit === 'weeks'
-                  ? 'semanas'
-                  : unit
-    }`;
-
-    const dueDateFormatted = formatDistanceToNow(dueDate, {
-        addSuffix: true,
-        locale: es,
-    });
-    const fullDueDate = format(dueDate, 'dd/MM/yyyy HH:mm');
-
-    const isExpired = isPast(dueDate);
-    const isWithinOneDay =
-        !isExpired && dueDate.getTime() - Date.now() <= 24 * 60 * 60 * 1000;
-
-    let colorClass =
-        'bg-secondary text-secondary-foreground border-transparent';
-
-    if (!isCompleted) {
-        if (isExpired) {
-            colorClass =
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800/50';
-        } else if (isWithinOneDay) {
-            colorClass =
-                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800/50';
-        } else {
-            colorClass =
-                'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50';
-        }
-    }
-
-    return {
-        timeDefined,
-        dueDateFormatted,
-        fullDueDate,
-        colorClass,
-        isExpired,
-    };
+    return getSpecimenDueDateInfo(specimen);
 };
 
 const ALL_STATUSES = [
@@ -281,9 +219,9 @@ export default function SpecimensIndex({
     sequences,
     activeLocationId,
     products,
-    pathologists,
+    pathologists = [],
     usersList = [],
-    banks,
+    banks = [],
     filters,
 }: Props) {
     const { props } = usePage() as any;
@@ -590,8 +528,6 @@ export default function SpecimensIndex({
     }, [availableGroups, selectedGroupId]);
 
     const filteredPriorities = useMemo(() => {
-        const searchLower = searchQuery.trim().toLowerCase();
-
         return priorities.map((priority) => {
             const filteredSpecimens = priority.specimens.filter((specimen) => {
                 const matchesStatus = selectedStatuses.includes(
@@ -614,29 +550,17 @@ export default function SpecimensIndex({
                     ? specimen.group.invoice
                     : specimen.invoice_relation;
 
-                const matchesSearch =
-                    !searchLower ||
-                    (specimen.sequence_code &&
-                        specimen.sequence_code
-                            .toLowerCase()
-                            .includes(searchLower)) ||
-                    specimen.id.toString().includes(searchLower) ||
-                    (specimen.customer_relation?.name &&
-                        specimen.customer_relation.name
-                            .toLowerCase()
-                            .includes(searchLower)) ||
-                    (specimen.customer_relation?.id_number &&
-                        specimen.customer_relation.id_number
-                            .toLowerCase()
-                            .includes(searchLower)) ||
-                    (invoice?.full_invoice_number &&
-                        invoice.full_invoice_number
-                            .toLowerCase()
-                            .includes(searchLower)) ||
-                    (invoice?.invoice_number &&
-                        invoice.invoice_number
-                            .toLowerCase()
-                            .includes(searchLower));
+                const matchesSearch = matchesAnySearch(
+                    [
+                        specimen.sequence_code,
+                        specimen.id,
+                        specimen.customer_relation?.name,
+                        specimen.customer_relation?.id_number,
+                        invoice?.full_invoice_number,
+                        invoice?.invoice_number,
+                    ],
+                    searchQuery,
+                );
 
                 const specimenTypeId =
                     specimen.specimen_type || specimen.type?.id;
@@ -1235,7 +1159,11 @@ export default function SpecimensIndex({
                                 className="w-[200px] p-0"
                                 align="end"
                             >
-                                <Command>
+                                <Command
+                                    filter={(value, search) =>
+                                        matchesSearch(value, search) ? 1 : 0
+                                    }
+                                >
                                     <CommandInput placeholder="Buscar grupo..." />
                                     <CommandList>
                                         <CommandEmpty>
@@ -1954,17 +1882,6 @@ export default function SpecimensIndex({
                 }
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
-                specimenTypes={specimenTypes}
-                examinations={examinations}
-                categories={categories}
-                referrers={referrers}
-                referrerTypes={referrerTypes}
-                priorities={initialPriorities}
-                locations={locations}
-                sequences={sequences}
-                activeLocationId={activeLocationId}
-                products={products}
-                banks={banks}
             />
 
             <SpecimenGroupSheet
@@ -1977,17 +1894,6 @@ export default function SpecimensIndex({
                     }
                 }}
                 group={selectedGroup}
-                specimenTypes={specimenTypes}
-                examinations={examinations}
-                categories={categories}
-                referrers={referrers}
-                referrerTypes={referrerTypes}
-                priorities={initialPriorities}
-                locations={locations}
-                sequences={sequences}
-                activeLocationId={activeLocationId}
-                products={products}
-                banks={banks}
             />
 
             <SelectSpecimenGroupDialog
@@ -2030,30 +1936,24 @@ export default function SpecimensIndex({
                 invoice={selectedInvoice}
                 open={isInvoiceSheetOpen}
                 onOpenChange={setIsInvoiceSheetOpen}
-                banks={banks}
             />
 
             <SpecimenPathologistSheet
                 specimen={activeAssignSpecimen}
                 open={isAssignSheetOpen}
                 onOpenChange={setIsAssignSheetOpen}
-                pathologists={pathologists}
-                usersList={usersList}
             />
 
             <SpecimenBulkPathologistSheet
                 selectedSpecimens={selectedSpecimens}
                 open={isBulkAssignSheetOpen}
                 onOpenChange={setIsBulkAssignSheetOpen}
-                pathologists={pathologists}
             />
 
             <SpecimenBulkCollaboratorSheet
                 selectedSpecimens={selectedSpecimens}
                 open={isBulkCollaboratorSheetOpen}
                 onOpenChange={setIsBulkCollaboratorSheetOpen}
-                usersList={usersList}
-                pathologists={pathologists}
             />
 
             <AlertDialog

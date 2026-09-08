@@ -31,7 +31,9 @@ class SpecimenFormDataController extends Controller
      */
     public function __invoke(Request $request): JsonResponse
     {
-        Gate::authorize('specimens.view');
+        if (! Gate::check('specimens.view') && ! Gate::check('invoices.view')) {
+            Gate::authorize('specimens.view');
+        }
 
         $activeCai = CaiRange::where('status', 'active')->first();
         $activeLocationId = $activeCai?->location_id;
@@ -66,11 +68,11 @@ class SpecimenFormDataController extends Controller
             ->get();
 
         $data = [
-            'specimenTypes' => SpecimenType::where('active', true)->get(),
+            'specimenTypes' => SpecimenType::where('active', true)->orderBy('name', 'asc')->get(),
             'examinations' => SpecimenTypeExamination::where('active', true)->with('prices')->get(),
-            'categories' => SpecimenCategory::where('active', true)->get(),
-            'referrers' => Referrer::where('active', true)->get(),
-            'referrerTypes' => ReferrerType::where('active', true)->get(),
+            'categories' => SpecimenCategory::where('active', true)->orderBy('name', 'asc')->get(),
+            'referrers' => Referrer::where('active', true)->orderBy('name', 'asc')->get(),
+            'referrerTypes' => ReferrerType::where('active', true)->orderBy('name', 'asc')->get(),
             'priorities' => Priority::orderBy('order', 'desc')->get(),
             'locations' => Location::where('active', true)->get(),
             'sequences' => $sequences,

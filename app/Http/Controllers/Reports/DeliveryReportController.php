@@ -33,14 +33,22 @@ class DeliveryReportController extends Controller
         Gate::authorize('reports.delivery.view');
 
         $userId = auth()->id();
-        $resolvedDates = DateFilterService::resolveFilter(
-            $request->cookie("date_filter_report_delivery_user_{$userId}"),
-            $request->get('date_from'),
-            $request->get('date_to')
-        );
+        $hasInternalDate = $request->filled('internal_date_from') || $request->filled('internal_date_to');
+        $hasDeliveryDate = $request->filled('date_from') || $request->filled('date_to');
 
-        $dateFrom = $resolvedDates['from'];
-        $dateTo = $resolvedDates['to'];
+        if ($hasInternalDate && ! $hasDeliveryDate) {
+            $dateFrom = $request->get('date_from');
+            $dateTo = $request->get('date_to');
+        } else {
+            $resolvedDates = DateFilterService::resolveFilter(
+                $request->cookie("date_filter_report_delivery_user_{$userId}"),
+                $request->get('date_from'),
+                $request->get('date_to')
+            );
+
+            $dateFrom = $resolvedDates['from'];
+            $dateTo = $resolvedDates['to'];
+        }
 
         $internalDateFrom = $request->get('internal_date_from');
         $internalDateTo = $request->get('internal_date_to');
@@ -270,14 +278,22 @@ class DeliveryReportController extends Controller
         Gate::authorize('reports.delivery.view');
 
         $userId = auth()->id();
-        $resolvedDates = DateFilterService::resolveFilter(
-            $request->cookie("date_filter_report_delivery_user_{$userId}"),
-            $request->get('date_from'),
-            $request->get('date_to')
-        );
+        $hasInternalDate = $request->filled('internal_date_from') || $request->filled('internal_date_to');
+        $hasDeliveryDate = $request->filled('date_from') || $request->filled('date_to');
 
-        $dateFrom = $resolvedDates['from'];
-        $dateTo = $resolvedDates['to'];
+        if ($hasInternalDate && ! $hasDeliveryDate) {
+            $dateFrom = $request->get('date_from');
+            $dateTo = $request->get('date_to');
+        } else {
+            $resolvedDates = DateFilterService::resolveFilter(
+                $request->cookie("date_filter_report_delivery_user_{$userId}"),
+                $request->get('date_from'),
+                $request->get('date_to')
+            );
+
+            $dateFrom = $resolvedDates['from'];
+            $dateTo = $resolvedDates['to'];
+        }
 
         $internalDateFrom = $request->get('internal_date_from');
         $internalDateTo = $request->get('internal_date_to');
@@ -568,10 +584,22 @@ class DeliveryReportController extends Controller
                 ? $specimen->users->pluck('name')->join(', ')
                 : 'Sin asignar';
 
+            $categoryName = $specimen->category?->name ?? 'N/A';
+            $overrides = [];
+            if ($specimen->is_manual_delivery_date_enabled && $specimen->delivery_date_quantity) {
+                $overrides[] = "Cli: {$specimen->delivery_date_quantity} {$specimen->delivery_date_unit}";
+            }
+            if ($specimen->is_manual_delivery_date_intern_enabled && $specimen->delivery_date_intern_quantity) {
+                $overrides[] = "Int: {$specimen->delivery_date_intern_quantity} {$specimen->delivery_date_intern_unit}";
+            }
+            if (! empty($overrides)) {
+                $categoryName .= ' (Manual: '.implode(', ', $overrides).')';
+            }
+
             $sheet->setCellValue('A'.$currentRow, $specimen->customerRelation?->name ?? 'N/A');
             $sheet->setCellValue('B'.$currentRow, $specimen->customerRelation?->id_number ?? 'N/A');
             $sheet->setCellValue('C'.$currentRow, $service);
-            $sheet->setCellValue('D'.$currentRow, $specimen->category?->name ?? 'N/A');
+            $sheet->setCellValue('D'.$currentRow, $categoryName);
             $sheet->setCellValue('E'.$currentRow, $specimen->sequence_code ?? 'N/A');
             $sheet->setCellValue('F'.$currentRow, $pathologists);
             $sheet->setCellValue('G'.$currentRow, $statusName);

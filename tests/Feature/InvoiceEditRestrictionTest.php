@@ -176,3 +176,37 @@ test('cannot edit a credit specimen invoice to non-credit payment method', funct
     $response->assertSessionHasErrors(['payment_type']);
     expect($invoice->fresh()->payment_type)->toBe('credit');
 });
+
+test('cannot edit a credit group invoice to non-credit payment method', function () {
+    $invoice = Invoice::create([
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'credit',
+        'quantity' => 2,
+        'amount' => 2000.00,
+        'discount' => 0.00,
+        'subtotal' => 2000.00,
+        'exempt_amount' => 2000.00,
+        'total' => 2000.00,
+        'total_paid' => 0.00,
+        'invoice_type' => 'group',
+        'is_group' => true,
+        'invoice_file' => 'dummy.pdf',
+        'invoice_number' => null,
+        'full_invoice_number' => null,
+    ]);
+
+    $response = $this->put(route('invoices.update', $invoice->id), [
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 2,
+        'amount' => 2000.00,
+        'discount' => 0.00,
+        'subtotal' => 2000.00,
+        'exempt_amount' => 2000.00,
+        'total' => 2000.00,
+        'total_paid' => 2000.00,
+    ]);
+
+    $response->assertSessionHasErrors(['payment_type']);
+    expect($invoice->fresh()->payment_type)->toBe('credit');
+});
