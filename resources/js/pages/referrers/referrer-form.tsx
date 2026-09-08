@@ -55,7 +55,7 @@ interface SpecimenItem {
 interface Props {
     referrer: Referrer | null;
     referrerTypes: ReferrerType[];
-    onSuccess: () => void;
+    onSuccess: (referrer?: any) => void;
     initialData?: {
         name?: string;
         referrer_type?: string;
@@ -150,18 +150,22 @@ export default function ReferrerForm({
         }
 
         put(updateReferrer(currentReferrer.id).url, {
-            onSuccess: () => {
+            onSuccess: (page) => {
                 toast.success('Remitente actualizado');
-                onSuccess();
+                const updated =
+                    (page?.props as any)?.flash?.updated_referrer ||
+                    currentReferrer;
+                onSuccess(updated);
             },
         });
     };
 
     const submitStore = () => {
         post(storeReferrer().url, {
-            onSuccess: () => {
+            onSuccess: (page) => {
                 toast.success('Remitente creado');
-                onSuccess();
+                const created = (page?.props as any)?.flash?.created_referrer;
+                onSuccess(created);
             },
         });
     };

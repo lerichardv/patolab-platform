@@ -24,14 +24,16 @@ import {
 	Layers,
 	Search,
 } from 'lucide-react';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import type { CustomerOption } from '@/components/async-customer-combobox';
+import { DeliveryDatePreview } from '@/components/delivery-date-preview';
 import FormCombobox from '@/components/form-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import SpecimenGroupInvoiceSummaryAlertDialog from '@/components/specimen-group-invoice-summary-alert-dialog';
+import { invalidateSpecimenCatalogsCache } from '@/hooks/use-specimen-form-data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -220,11 +222,43 @@ export default function SpecimenGroupForm({
 		useState<CustomerOption | null>(null);
 	const [selectedNestedCustomerData, setSelectedNestedCustomerData] =
 		useState<CustomerOption | null>(null);
-	const prevReferrersRef = useRef<any[]>(referrers);
+	const [localReferrers, setLocalReferrers] = useState<any[]>(referrers || []);
+	const prevReferrersRef = useRef<any[]>(referrers || []);
 	const [isReferrerSheetOpen, setIsReferrerSheetOpen] = useState(false);
 	const [editingReferrer, setEditingReferrer] = useState<any | null>(null);
 	const [referrerInitialData, setReferrerInitialData] = useState<any | null>(
 		null,
+	);
+
+	useEffect(() => {
+		if (referrers && referrers.length > 0) {
+			setLocalReferrers(referrers);
+		}
+	}, [referrers]);
+
+	const reloadReferrers = useCallback(
+		async (selectReferrerId?: string | number) => {
+			try {
+				const response = await axios.get('/referrers', {
+					headers: { Accept: 'application/json' },
+				});
+
+				if (Array.isArray(response.data)) {
+					setLocalReferrers(response.data);
+
+					if (selectReferrerId) {
+						setNestedReferrer(selectReferrerId.toString());
+						setNestedErrors((prev) => ({
+							...prev,
+							referrer: '',
+						}));
+					}
+				}
+			} catch {
+				// Silently fallback if endpoint fails
+			}
+		},
+		[],
 	);
 	const [isSequenceSheetOpen, setIsSequenceSheetOpen] = useState(false);
 	const [isSpecimenTypeSheetOpen, setIsSpecimenTypeSheetOpen] =
@@ -522,7 +556,11 @@ export default function SpecimenGroupForm({
 							is_manual_delivery_date_enabled: Boolean(
 								s.is_manual_delivery_date_enabled,
 							),
-							delivery_date_unit: s.delivery_date_unit || 'days',
+							delivery_date_unit:
+								s.is_manual_delivery_date_enabled &&
+								s.delivery_date_unit
+									? s.delivery_date_unit
+									: 'days',
 							delivery_date_quantity:
 								s.delivery_date_quantity != null
 									? s.delivery_date_quantity
@@ -531,7 +569,10 @@ export default function SpecimenGroupForm({
 								s.is_manual_delivery_date_intern_enabled,
 							),
 							delivery_date_intern_unit:
-								s.delivery_date_intern_unit || 'days',
+								s.is_manual_delivery_date_intern_enabled &&
+								s.delivery_date_intern_unit
+									? s.delivery_date_intern_unit
+									: 'days',
 							delivery_date_intern_quantity:
 								s.delivery_date_intern_quantity != null
 									? s.delivery_date_intern_quantity
@@ -673,23 +714,68 @@ export default function SpecimenGroupForm({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [createdCustomerId]);
 
+	// Auto-select a newly created referrer via flash data from the server
+	const createdReferrerId = flash?.created_referrer?.id as number | undefined;
+
 	useEffect(() => {
-		if (referrers.length > prevReferrersRef.current.length) {
-			const newReferrers = referrers.filter(
+		if (!flash?.created_referrer) {
+			return;
+		}
+
+		const createdReferrer = flash.created_referrer as any;
+
+		if (!createdReferrer.id) {
+			return;
+		}
+
+		setLocalReferrers((prev) => {
+			const exists = prev.some((r) => r.id === createdReferrer.id);
+
+			if (exists) {
+				return prev.map((r) =>
+					r.id === createdReferrer.id ? createdReferrer : r,
+				);
+			}
+
+			return [...prev, createdReferrer].sort((a, b) =>
+				(a.name || '').localeCompare(b.name || ''),
+			);
+		});
+
+		setNestedReferrer(createdReferrer.id.toString());
+		setNestedErrors((prev) => ({
+			...prev,
+			referrer: '',
+		}));
+		toast.success(
+			`Médico "${createdReferrer.name}" seleccionado automáticamente`,
+		);
+		invalidateSpecimenCatalogsCache();
+		reloadReferrers(createdReferrer.id);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [createdReferrerId]);
+
+	useEffect(() => {
+		if (localReferrers.length > prevReferrersRef.current.length) {
+			const newReferrers = localReferrers.filter(
 				(r) =>
 					!prevReferrersRef.current.some((prev) => prev.id === r.id),
 			);
 
 			if (newReferrers.length > 0) {
 				setNestedReferrer(newReferrers[0].id.toString());
+				setNestedErrors((prev) => ({
+					...prev,
+					referrer: '',
+				}));
 				toast.success(
 					`Médico "${newReferrers[0].name}" seleccionado automáticamente`,
 				);
 			}
 		}
 
-		prevReferrersRef.current = referrers;
-	}, [referrers]);
+		prevReferrersRef.current = localReferrers;
+	}, [localReferrers]);
 
 	// Active customer details
 	const selectedGlobalCustomer = selectedGlobalCustomerData;
@@ -771,7 +857,11 @@ export default function SpecimenGroupForm({
 		setNestedIsManualDeliveryDateEnabled(
 			Boolean(spec.is_manual_delivery_date_enabled),
 		);
-		setNestedDeliveryDateUnit(spec.delivery_date_unit || 'days');
+		setNestedDeliveryDateUnit(
+			spec.is_manual_delivery_date_enabled && spec.delivery_date_unit
+				? spec.delivery_date_unit
+				: 'days',
+		);
 		setNestedDeliveryDateQuantity(
 			spec.delivery_date_quantity != null
 				? spec.delivery_date_quantity
@@ -781,7 +871,10 @@ export default function SpecimenGroupForm({
 			Boolean(spec.is_manual_delivery_date_intern_enabled),
 		);
 		setNestedDeliveryDateInternUnit(
-			spec.delivery_date_intern_unit || 'days',
+			spec.is_manual_delivery_date_intern_enabled &&
+				spec.delivery_date_intern_unit
+				? spec.delivery_date_intern_unit
+				: 'days',
 		);
 		setNestedDeliveryDateInternQuantity(
 			spec.delivery_date_intern_quantity != null
@@ -1041,13 +1134,13 @@ export default function SpecimenGroupForm({
 			medical_order_file: nestedMedicalOrderFile,
 			is_manual_delivery_date_enabled:
 				nestedIsManualDeliveryDateEnabled,
-			delivery_date_unit: nestedDeliveryDateUnit,
+			delivery_date_unit: nestedDeliveryDateUnit || 'days',
 			delivery_date_quantity: nestedIsManualDeliveryDateEnabled
-				? parseInt(String(nestedDeliveryDateQuantity || '0'), 10)
+				? parseInt(String(nestedDeliveryDateQuantity || '0'), 10) || 0
 				: 0,
 			is_manual_delivery_date_intern_enabled:
 				nestedIsManualDeliveryDateInternEnabled,
-			delivery_date_intern_unit: nestedDeliveryDateInternUnit,
+			delivery_date_intern_unit: nestedDeliveryDateInternUnit || 'days',
 			delivery_date_intern_quantity:
 				nestedIsManualDeliveryDateInternEnabled
 					? parseInt(
@@ -2108,7 +2201,7 @@ export default function SpecimenGroupForm({
 												</TableCell>
 												<TableCell>
 													<span className="text-xs text-muted-foreground">
-														{referrers.find(
+														{localReferrers.find(
 															(r) =>
 																r.id ===
 																spec.referrer,
@@ -3401,7 +3494,7 @@ export default function SpecimenGroupForm({
 										<button
 											type="button"
 											onClick={() => {
-												const selected = referrers.find(
+												const selected = localReferrers.find(
 													(r) =>
 														r.id.toString() ===
 														nestedReferrer,
@@ -3444,7 +3537,7 @@ export default function SpecimenGroupForm({
 										referrer: '',
 									}));
 								}}
-								options={referrers.map((r) => ({
+								options={localReferrers.map((r) => ({
 									label:
 										r.notes && r.notes.trim()
 											? `(ID: ${r.id}) ${r.name} - ${r.notes.trim()}`
@@ -3949,6 +4042,7 @@ export default function SpecimenGroupForm({
 										setNestedIsManualDeliveryDateEnabled(
 											checked,
 										);
+
 										if (checked) {
 											if (
 												!nestedDeliveryDateQuantity &&
@@ -3958,11 +4052,12 @@ export default function SpecimenGroupForm({
 													selectedCat.quantity,
 												);
 											}
-											if (selectedCat?.unit) {
-												setNestedDeliveryDateUnit(
-													selectedCat.unit,
-												);
-											}
+
+											setNestedDeliveryDateUnit(
+												selectedCat?.unit ||
+													nestedDeliveryDateUnit ||
+													'days',
+											);
 										}
 									}}
 								/>
@@ -3970,7 +4065,7 @@ export default function SpecimenGroupForm({
 
 							{nestedIsManualDeliveryDateEnabled && (
 								<div className="space-y-4 border-t border-border/40 pt-2">
-									<div className="grid grid-cols-2 gap-4">
+									<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 										<div className="grid gap-2">
 											<Label htmlFor="nested_delivery_date_quantity">
 												Cantidad
@@ -3989,6 +4084,7 @@ export default function SpecimenGroupForm({
 													)
 												}
 												placeholder="Ej. 24"
+												className="w-full"
 											/>
 										</div>
 
@@ -3997,12 +4093,12 @@ export default function SpecimenGroupForm({
 												Unidad
 											</Label>
 											<Select
-												value={nestedDeliveryDateUnit}
+												value={nestedDeliveryDateUnit || 'days'}
 												onValueChange={(v: any) =>
 													setNestedDeliveryDateUnit(v)
 												}
 											>
-												<SelectTrigger id="nested_delivery_date_unit">
+												<SelectTrigger id="nested_delivery_date_unit" className="w-full">
 													<SelectValue placeholder="Unidad" />
 												</SelectTrigger>
 												<SelectContent className="z-[9999]">
@@ -4019,6 +4115,21 @@ export default function SpecimenGroupForm({
 												</SelectContent>
 											</Select>
 										</div>
+
+										<DeliveryDatePreview
+											startDate={
+												nestedSpecimenToEditId
+													? specimens.find(
+															(s) =>
+																s.client_id ===
+																nestedSpecimenToEditId,
+														)?.created_at
+													: undefined
+											}
+											quantity={nestedDeliveryDateQuantity}
+											unit={nestedDeliveryDateUnit}
+											variant="client"
+										/>
 									</div>
 								</div>
 							)}
@@ -4053,6 +4164,7 @@ export default function SpecimenGroupForm({
 										setNestedIsManualDeliveryDateInternEnabled(
 											checked,
 										);
+
 										if (checked) {
 											if (
 												!nestedDeliveryDateInternQuantity &&
@@ -4062,11 +4174,12 @@ export default function SpecimenGroupForm({
 													selectedCat.intern_quantity,
 												);
 											}
-											if (selectedCat?.intern_unit) {
-												setNestedDeliveryDateInternUnit(
-													selectedCat.intern_unit,
-												);
-											}
+
+											setNestedDeliveryDateInternUnit(
+												selectedCat?.intern_unit ||
+													nestedDeliveryDateInternUnit ||
+													'days',
+											);
 										}
 									}}
 								/>
@@ -4074,7 +4187,7 @@ export default function SpecimenGroupForm({
 
 							{nestedIsManualDeliveryDateInternEnabled && (
 								<div className="space-y-4 border-t border-border/40 pt-2">
-									<div className="grid grid-cols-2 gap-4">
+									<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 										<div className="grid gap-2">
 											<Label htmlFor="nested_delivery_date_intern_quantity">
 												Cantidad
@@ -4093,6 +4206,7 @@ export default function SpecimenGroupForm({
 													)
 												}
 												placeholder="Ej. 1"
+												className="w-full"
 											/>
 										</div>
 
@@ -4102,7 +4216,7 @@ export default function SpecimenGroupForm({
 											</Label>
 											<Select
 												value={
-													nestedDeliveryDateInternUnit
+													nestedDeliveryDateInternUnit || 'days'
 												}
 												onValueChange={(v: any) =>
 													setNestedDeliveryDateInternUnit(
@@ -4110,7 +4224,7 @@ export default function SpecimenGroupForm({
 													)
 												}
 											>
-												<SelectTrigger id="nested_delivery_date_intern_unit">
+												<SelectTrigger id="nested_delivery_date_intern_unit" className="w-full">
 													<SelectValue placeholder="Unidad" />
 												</SelectTrigger>
 												<SelectContent className="z-[9999]">
@@ -4127,6 +4241,21 @@ export default function SpecimenGroupForm({
 												</SelectContent>
 											</Select>
 										</div>
+
+										<DeliveryDatePreview
+											startDate={
+												nestedSpecimenToEditId
+													? specimens.find(
+															(s) =>
+																s.client_id ===
+																nestedSpecimenToEditId,
+														)?.created_at
+													: undefined
+											}
+											quantity={nestedDeliveryDateInternQuantity}
+											unit={nestedDeliveryDateInternUnit}
+											variant="internal"
+										/>
 									</div>
 								</div>
 							)}
@@ -4717,17 +4846,82 @@ export default function SpecimenGroupForm({
 						referrer={editingReferrer}
 						referrerTypes={referrerTypes}
 						initialData={referrerInitialData}
-						onSuccess={() => setIsReferrerSheetOpen(false)}
+						onSuccess={(savedReferrer) => {
+							setIsReferrerSheetOpen(false);
+
+							if (savedReferrer?.id) {
+								setLocalReferrers((prev) => {
+									const exists = prev.some(
+										(r) => r.id === savedReferrer.id,
+									);
+
+									if (exists) {
+										return prev.map((r) =>
+											r.id === savedReferrer.id
+												? savedReferrer
+												: r,
+										);
+									}
+
+									return [...prev, savedReferrer].sort(
+										(a, b) =>
+											(a.name || '').localeCompare(
+												b.name || '',
+											),
+									);
+								});
+								setNestedReferrer(savedReferrer.id.toString());
+								setNestedErrors((prev) => ({
+									...prev,
+									referrer: '',
+								}));
+								toast.success(
+									`Médico "${savedReferrer.name}" seleccionado automáticamente`,
+								);
+							}
+
+							invalidateSpecimenCatalogsCache();
+							reloadReferrers(savedReferrer?.id);
+						}}
 						onSwitchToCreateNew={(formData) => {
 							setReferrerInitialData(formData);
 							setEditingReferrer(null);
 						}}
 						onSelectExistingReferrer={(existingReferrer) => {
+							if (existingReferrer?.id) {
+								setLocalReferrers((prev) => {
+									const exists = prev.some(
+										(r) => r.id === existingReferrer.id,
+									);
+
+									if (exists) {
+										return prev.map((r) =>
+											r.id === existingReferrer.id
+												? existingReferrer
+												: r,
+										);
+									}
+
+									return [...prev, existingReferrer].sort(
+										(a, b) =>
+											(a.name || '').localeCompare(
+												b.name || '',
+											),
+									);
+								});
+							}
+
 							setNestedReferrer(existingReferrer.id.toString());
+							setNestedErrors((prev) => ({
+								...prev,
+								referrer: '',
+							}));
 							setIsReferrerSheetOpen(false);
 							toast.info(
 								`Se seleccionó el remitente existente: ${existingReferrer.name} (${existingReferrer.notes || 'Sin hospital'})`,
 							);
+							invalidateSpecimenCatalogsCache();
+							reloadReferrers(existingReferrer.id);
 						}}
 					/>
 				</SheetContent>

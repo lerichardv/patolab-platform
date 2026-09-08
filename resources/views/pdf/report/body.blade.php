@@ -632,16 +632,16 @@
                         <table class="patient-card">
                             <tr>
                                 <td style="width: 50%;">
-                                    <strong>Nombre:</strong> {{ $customer->name ?? 'N/A' }}<br>
-                                    <strong>Edad:</strong> {{ $customer->age ?? 'N/A' }} {{ $customer->age && $customer->age > 0 ? 'años' : '' }} &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ in_array(strtolower($customer->gender ?? ''), ['m', 'masculino', 'hombre']) ? 'M' : (in_array(strtolower($customer->gender ?? ''), ['f', 'femenino', 'mujer']) ? 'F' : (in_array(strtolower($customer->gender ?? ''), ['o', 'otro']) ? 'O' : 'N/A')) }}<br>
-                                    <strong>Remitente:</strong> {{ $referrer->name ?? 'N/A' }}<br>
+                                    <strong>Nombre:</strong> {{ $customer->name ?? 'N/C' }}<br>
+                                    <strong>Edad:</strong> {{ $customer->age ?? 'N/C' }} {{ $customer->age && $customer->age > 0 ? 'años' : '' }} &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ in_array(strtolower($customer->gender ?? ''), ['m', 'masculino', 'hombre']) ? 'M' : (in_array(strtolower($customer->gender ?? ''), ['f', 'femenino', 'mujer']) ? 'F' : (in_array(strtolower($customer->gender ?? ''), ['o', 'otro']) ? 'O' : 'N/C')) }}<br>
+                                    <strong>Remitente:</strong> {{ $referrer->name ?? 'N/C' }}<br>
                                     <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? '' }}
                                 </td>
                                 <td style="width: 50%; padding-left: 12px;">
                                     <strong>Diagnóstico:</strong> {{ $specimen->diagnosis ?? '' }}<br>
                                     <strong>Sitio Anatómico:</strong> {{ $specimen->anatomic_site ?? 'N/A' }}<br>
-									<strong>Fecha de la toma:</strong> {{ $specimen->sample_collection_date_na ? 'N/A' : ($specimen->sample_collection_date ? \Carbon\Carbon::parse($specimen->sample_collection_date)->format('d/m/Y') : 'N/A') }}<br>
-									<strong>Fecha de Recepción:</strong> {{ $report->report_date ? \Carbon\Carbon::parse($report->report_date)->format('d/m/Y') : 'N/A' }}
+									<strong>Fecha de la toma:</strong> {{ $specimen->sample_collection_date_na ? 'N/C' : ($specimen->sample_collection_date ? \Carbon\Carbon::parse($specimen->sample_collection_date)->format('d/m/Y') : 'N/C') }}<br>
+									<strong>Fecha de Recepción:</strong> {{ $report->report_date ? \Carbon\Carbon::parse($report->report_date)->format('d/m/Y') : 'N/C' }}
                                 </td>
                             </tr>
                         </table>
@@ -673,11 +673,11 @@
                                         @foreach($row as $pathologist)
                                             <div class="signature-item" style="width: 58.21mm; text-align: center; display: flex; flex-direction: column; align-items: center;">
                                                 @if(!empty($pathologist->signature_base64))
-                                                    <img src="{{ $pathologist->signature_base64 }}" style="max-height: 12mm; width: auto; margin-bottom: 2mm; display: block;" />
+                                                    <img src="{{ $pathologist->signature_base64 }}" style="max-height: 16mm; max-width: 100%; width: auto; margin-bottom: 2mm; display: block;" />
                                                 @elseif(!empty($pathologist->signature_url))
-                                                    <img src="{{ $pathologist->signature_url }}" style="max-height: 12mm; width: auto; margin-bottom: 2mm; display: block;" />
+                                                    <img src="{{ $pathologist->signature_url }}" style="max-height: 16mm; max-width: 100%; width: auto; margin-bottom: 2mm; display: block;" />
                                                 @else
-                                                    <div style="height: 14mm;"></div>
+                                                    <div style="height: 18mm;"></div>
                                                 @endif
                                                 <div class="signature-line" style="width: 100%; border-top: 0.40mm solid #4b5563; margin-bottom: 1.32mm;"></div>
                                                 <div class="pathologist-name" style="font-size: 2.65mm; font-weight: 700; color: #1f2937; text-transform: uppercase;">{{ $pathologist->name }}</div>

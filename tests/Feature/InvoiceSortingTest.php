@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\CaiRange;
+use App\Models\Credit;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Location;
@@ -108,5 +109,92 @@ test('invoice listing can be sorted by invoice number', function () {
         $data = $page->toArray()['props']['invoices']['data'];
         expect($data[0]['invoice_number'])->toEqual('00000050');
         expect($data[1]['invoice_number'])->toEqual('00000010');
+    });
+});
+
+test('invoice listing can be sorted by credit and supplies credit_payment_id regardless of payment method', function () {
+    $role = Role::create(['slug' => 'admin', 'name' => 'Admin']);
+    $user = User::factory()->create([
+        'role_id' => $role->id,
+        'active' => true,
+    ]);
+
+    $viewPermission = Permission::create(['slug' => 'invoices.view', 'name' => 'Ver Facturas']);
+    $role->permissions()->attach($viewPermission);
+
+    $customer = Customer::create([
+        'name' => 'Credit Customer',
+        'id_number' => '0801199012399',
+        'phone' => '88888888',
+        'gender' => 'hombre',
+        'type' => 'individual',
+    ]);
+
+    $credit = Credit::create([
+        'customer_id' => $customer->id,
+        'credit_amount' => 500.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 500.00,
+    ]);
+
+    // Invoice without credit (cash payment)
+    $invWithoutCredit = Invoice::create([
+        'invoice_number' => '00000101',
+        'full_invoice_number' => '000-001-01-00000101',
+        'customer_id' => $customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'amount' => 200.00,
+        'discount' => 0.00,
+        'subtotal' => 200.00,
+        'total' => 200.00,
+        'is_group' => false,
+        'invoice_type' => 'specimen',
+        'invoice_file' => 'inv_101.pdf',
+        'credit_payment_id' => null,
+    ]);
+
+    // Invoice with credit, but payment_type is cash (not 'credit')
+    $invWithCreditCash = Invoice::create([
+        'invoice_number' => '00000102',
+        'full_invoice_number' => '000-001-01-00000102',
+        'customer_id' => $customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'amount' => 300.00,
+        'discount' => 0.00,
+        'subtotal' => 300.00,
+        'total' => 300.00,
+        'is_group' => false,
+        'invoice_type' => 'specimen',
+        'invoice_file' => 'inv_102.pdf',
+        'credit_payment_id' => $credit->id,
+    ]);
+
+    // Sort by credit desc (invoices with credit first)
+    $response = $this->actingAs($user)->get(route('invoices.index', [
+        'sort_field' => 'credit',
+        'sort_direction' => 'desc',
+    ]));
+
+    $response->assertStatus(200);
+    $response->assertInertia(function (Assert $page) use ($invWithCreditCash, $credit) {
+        $data = $page->toArray()['props']['invoices']['data'];
+        expect($data[0]['id'])->toEqual($invWithCreditCash->id);
+        expect($data[0]['credit_payment_id'])->toEqual($credit->id);
+        expect($data[0]['payment_type'])->toEqual('cash');
+    });
+
+    // Sort by credit asc (invoices without credit first)
+    $response = $this->actingAs($user)->get(route('invoices.index', [
+        'sort_field' => 'credit',
+        'sort_direction' => 'asc',
+    ]));
+
+    $response->assertStatus(200);
+    $response->assertInertia(function (Assert $page) use ($invWithoutCredit) {
+        $data = $page->toArray()['props']['invoices']['data'];
+        expect($data[0]['id'])->toEqual($invWithoutCredit->id);
+        expect($data[0]['credit_payment_id'])->toBeNull();
     });
 });

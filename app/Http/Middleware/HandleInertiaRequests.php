@@ -52,6 +52,8 @@ class HandleInertiaRequests extends Middleware
                 'new_invoice_url' => $request->session()->get('new_invoice_url'),
                 'new_payment_invoice_url' => $request->session()->get('new_payment_invoice_url'),
                 'created_customer' => $request->session()->get('created_customer'),
+                'created_referrer' => $request->session()->get('created_referrer'),
+                'updated_referrer' => $request->session()->get('updated_referrer'),
                 'new_purchase_order_url' => $request->session()->get('new_purchase_order_url'),
             ],
         ];

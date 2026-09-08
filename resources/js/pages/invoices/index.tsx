@@ -1722,8 +1722,10 @@ export default function InvoicesIndex({
                                         'Detalle',
                                     )}
                                 </TableHead>
-                                <TableHead className="min-w-[120px] text-right">
-                                    <div className="flex">Crédito</div>
+                                <TableHead className="min-w-[120px]">
+                                    <div className="flex">
+                                        {renderSortHeader('credit', 'Crédito')}
+                                    </div>
                                 </TableHead>
                                 <TableHead className="min-w-[120px] text-right">
                                     <div className="flex justify-end">
@@ -1774,6 +1776,9 @@ export default function InvoicesIndex({
                                             invoice,
                                             filters,
                                         );
+                                    const creditId =
+                                        invoice.credit_payment_id ||
+                                        invoice.credit_relation?.id;
 
                                     return (
                                         <TableRow
@@ -2340,16 +2345,10 @@ export default function InvoicesIndex({
                                             </TableCell>
                                             <TableCell>
                                                 {/* Información del Crédito (si aplica) */}
-                                                {(invoice.invoice_type ===
-                                                    'credit payment' ||
-                                                    invoice.payment_type ===
-                                                        'credit') && (
+                                                {creditId ? (
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="w-max rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
-                                                            Crédito #
-                                                            {
-                                                                invoice.credit_payment_id
-                                                            }
+                                                            Crédito #{creditId}
                                                         </span>
                                                         <Button
                                                             variant="ghost"
@@ -2360,8 +2359,7 @@ export default function InvoicesIndex({
                                                                     '/credits',
                                                                     {
                                                                         search: String(
-                                                                            invoice.credit_payment_id ||
-                                                                                '',
+                                                                            creditId,
                                                                         ),
                                                                     },
                                                                 )
@@ -2371,6 +2369,10 @@ export default function InvoicesIndex({
                                                             <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                                         </Button>
                                                     </div>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground italic">
+                                                        -
+                                                    </span>
                                                 )}
                                             </TableCell>
                                             <TableCell className="min-w-[120px] text-right font-medium text-muted-foreground">

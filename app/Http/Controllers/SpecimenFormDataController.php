@@ -71,7 +71,7 @@ class SpecimenFormDataController extends Controller
             'specimenTypes' => SpecimenType::where('active', true)->orderBy('name', 'asc')->get(),
             'examinations' => SpecimenTypeExamination::where('active', true)->with('prices')->get(),
             'categories' => SpecimenCategory::where('active', true)->orderBy('name', 'asc')->get(),
-            'referrers' => Referrer::where('active', true)->orderBy('name', 'asc')->get(),
+            'referrers' => Referrer::with('type')->where('active', true)->orderBy('name', 'asc')->get(),
             'referrerTypes' => ReferrerType::where('active', true)->orderBy('name', 'asc')->get(),
             'priorities' => Priority::orderBy('order', 'desc')->get(),
             'locations' => Location::where('active', true)->get(),

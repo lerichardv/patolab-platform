@@ -23,7 +23,7 @@ interface Props {
     referrerTypes: ReferrerType[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSuccess?: () => void;
+    onSuccess?: (referrer?: any) => void;
     initialData?: {
         name?: string;
         referrer_type?: string;
@@ -78,8 +78,8 @@ export default function ReferrerSheet({
                     referrer={sheetReferrer}
                     referrerTypes={referrerTypes}
                     initialData={initialData}
-                    onSuccess={() => {
-                        onSuccess?.();
+                    onSuccess={(savedReferrer) => {
+                        onSuccess?.(savedReferrer);
                         onOpenChange(false);
                     }}
                     onSwitchToCreateNew={(formData) => {

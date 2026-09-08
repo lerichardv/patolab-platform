@@ -46,7 +46,7 @@ export function PatientMetadataCard({
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Edad:
                         </strong>{' '}
-                        {specimen.customer_relation.age ?? 'N/A'}{' '}
+                        {specimen.customer_relation.age ?? 'N/C'}{' '}
                         {specimen.customer_relation.age &&
                         specimen.customer_relation.age > 0
                             ? 'años'
@@ -74,7 +74,7 @@ export function PatientMetadataCard({
                                       ).toLowerCase(),
                                   )
                                 ? 'O'
-                                : 'N/A'}
+                                : 'N/C'}
                         <br />
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Remitente:
@@ -110,12 +110,12 @@ export function PatientMetadataCard({
                             Fecha de la toma:
                         </strong>{' '}
                         {specimen.sample_collection_date_na
-                            ? 'N/A'
+                            ? 'N/C'
                             : sampleCollectionDate
                               ? new Date(
                                     sampleCollectionDate + 'T00:00:00',
                                 ).toLocaleDateString('es-HN')
-                              : 'N/A'}
+                              : 'N/C'}
                         <br />
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>
                             Fecha de Recepción:
@@ -212,14 +212,15 @@ export function SignatureBlock({
                                     src={pathologist.signature_url}
                                     alt={`Firma de ${pathologist.name}`}
                                     style={{
-                                        maxHeight: '12mm',
+                                        maxHeight: '16mm',
+                                        maxWidth: '100%',
                                         width: 'auto',
                                         marginBottom: '2mm',
                                         display: 'block',
                                     }}
                                 />
                             ) : (
-                                <div style={{ height: '14mm' }} />
+                                <div style={{ height: '18mm' }} />
                             )}
                             <div
                                 style={{
