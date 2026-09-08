@@ -223,19 +223,26 @@ export default function ReportWorkspace({
         (u: any) => u.id === auth.user.id,
     );
 
+    const isAdmin = auth.user?.role?.slug === 'admin';
+    const isAssignedPathologist = Boolean(currentUserSpecimenRelation);
+    const canEnableEditing = isAdmin || isAssignedPathologist;
+
     const hasMacroAccess =
+        isAdmin ||
         !!currentUserSpecimenRelation?.pivot?.macroscopy_access ||
         !!currentUserCollaboratorRelation?.pivot?.macroscopy_access;
     const hasMicroAccess =
+        isAdmin ||
         !!currentUserSpecimenRelation?.pivot?.microscopy_access ||
         !!currentUserCollaboratorRelation?.pivot?.microscopy_access;
 
     const isAssigned =
-        !!currentUserSpecimenRelation || !!currentUserCollaboratorRelation;
+        isAdmin ||
+        !!currentUserSpecimenRelation ||
+        !!currentUserCollaboratorRelation;
 
     const hasCuttingsPermission =
-        auth.user.role?.slug === 'admin' ||
-        auth.permissions?.includes('cuttings.manage');
+        isAdmin || auth.permissions?.includes('cuttings.manage');
 
     let accessBadgeLabel = 'Solo Lectura';
     let accessBadgeStyle = {
@@ -250,6 +257,17 @@ export default function ReportWorkspace({
             backgroundColor: 'rgba(239, 68, 68, 0.15)',
             color: '#ef4444',
             borderColor: 'rgba(239, 68, 68, 0.25)',
+        };
+    } else if (
+        isAdmin &&
+        !currentUserSpecimenRelation &&
+        !currentUserCollaboratorRelation
+    ) {
+        accessBadgeLabel = 'Acceso Administrador';
+        accessBadgeStyle = {
+            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+            color: '#10b981',
+            borderColor: 'rgba(16, 185, 129, 0.25)',
         };
     } else if (hasMacroAccess && hasMicroAccess) {
         accessBadgeLabel = 'Acceso a Macro y Microscopía';
@@ -2178,7 +2196,16 @@ export default function ReportWorkspace({
                                 <div className="flex items-center gap-2">
                                     {isFinished && !sessionEditingEnabled && (
                                         <EnableEditingDialog
+                                            disabled={!canEnableEditing}
                                             onConfirm={() => {
+                                                if (!canEnableEditing) {
+                                                    toast.error(
+                                                        'No tienes permisos para activar la edición de este reporte.',
+                                                    );
+
+                                                    return;
+                                                }
+
                                                 setSessionEditingEnabled(true);
                                                 toast.success(
                                                     'Edición activada para esta sesión',

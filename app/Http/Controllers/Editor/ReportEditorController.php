@@ -1477,6 +1477,10 @@ class ReportEditorController extends Controller
      */
     private function getUserAccess(Specimen $specimen)
     {
+        if (auth()->user()?->role?->slug === 'admin') {
+            return [true, true];
+        }
+
         $userId = auth()->id();
 
         $assignment = DB::table('specimen_user')
@@ -1503,6 +1507,10 @@ class ReportEditorController extends Controller
      */
     private function authorizeSpecimenAccess(Specimen $specimen): void
     {
+        if (auth()->user()?->role?->slug === 'admin') {
+            return;
+        }
+
         $userId = auth()->id();
 
         $isAssigned = DB::table('specimen_user')

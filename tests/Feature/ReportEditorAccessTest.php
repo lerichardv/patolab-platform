@@ -6,6 +6,7 @@ use App\Models\Municipality;
 use App\Models\Priority;
 use App\Models\Referrer;
 use App\Models\ReferrerType;
+use App\Models\Role;
 use App\Models\Specimen;
 use App\Models\SpecimenCategory;
 use App\Models\SpecimenType;
@@ -281,4 +282,39 @@ test('saving report editor auto-creates report row if specimen has no report yet
         ->and($this->specimen->report)->not->toBeNull()
         ->and($this->specimen->status)->toBe('macroscopic_review')
         ->and($this->specimen->report->diagnosis_html)->toBe('<p>Diagnóstico Directo</p>');
+});
+
+test('admin user can save report even if not assigned to the specimen', function () {
+    $adminRole = Role::create([
+        'name' => 'Administrador',
+        'slug' => 'admin',
+    ]);
+
+    $adminUser = User::factory()->create([
+        'role_id' => $adminRole->id,
+    ]);
+
+    $this->actingAs($adminUser);
+
+    $response = $this->postJson(route('specimens.report-editor.save', $this->specimen->sequence_code), [
+        'diagnosis_html' => '<p>Diagnóstico por Admin</p>',
+    ]);
+
+    $response->assertOk()
+        ->assertJson([
+            'status' => 'success',
+        ]);
+
+    $this->specimen->refresh();
+    expect($this->specimen->report->diagnosis_html)->toBe('<p>Diagnóstico por Admin</p>');
+});
+
+test('unassigned non-admin user is forbidden from saving report', function () {
+    $this->actingAs($this->unassignedUser);
+
+    $response = $this->postJson(route('specimens.report-editor.save', $this->specimen->sequence_code), [
+        'diagnosis_html' => '<p>Diagnóstico no autorizado</p>',
+    ]);
+
+    $response->assertStatus(403);
 });

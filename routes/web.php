@@ -51,13 +51,25 @@ use App\Http\Controllers\WorkOrderController;
 use App\Http\Controllers\WorkOrderTaskController;
 use App\Http\Controllers\WorkOrderTypeController;
 use App\Models\Department;
-use App\Models\Specimen;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
+
+Route::get('/logout', function (Request $request) {
+    Auth::guard('web')->logout();
+
+    if ($request->hasSession()) {
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+    }
+
+    return redirect('/');
+})->name('logout.get');
 
 Route::get('/v/{report_code}', ReportVerificationController::class)->name('report.verify');
 
