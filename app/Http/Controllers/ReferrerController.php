@@ -13,7 +13,16 @@ class ReferrerController extends Controller
 {
     public function index(Request $request)
     {
-        Gate::authorize('referrers.view');
+        if (! Gate::check('referrers.view') && ! Gate::check('specimens.create') && ! Gate::check('specimens.edit') && ! Gate::check('specimens.view')) {
+            Gate::authorize('referrers.view');
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json(
+                Referrer::with('type')->where('active', true)->orderBy('name', 'asc')->get()
+            );
+        }
+
         $query = Referrer::query()->with('type')->where('active', true)->orderBy('created_at', 'desc');
 
         if ($request->has('search')) {
@@ -48,9 +57,14 @@ class ReferrerController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        Referrer::create($request->all() + ['active' => true]);
+        $referrer = Referrer::create($request->all() + ['active' => true]);
+        $referrer->load('type');
 
-        return redirect()->back();
+        if ($request->wantsJson()) {
+            return response()->json($referrer);
+        }
+
+        return redirect()->back()->with('created_referrer', $referrer);
     }
 
     public function update(Request $request, Referrer $referrer)
@@ -66,8 +80,13 @@ class ReferrerController extends Controller
         ]);
 
         $referrer->update($request->all());
+        $referrer->load('type');
 
-        return redirect()->back();
+        if ($request->wantsJson()) {
+            return response()->json($referrer);
+        }
+
+        return redirect()->back()->with('updated_referrer', $referrer);
     }
 
     public function destroy(Referrer $referrer)

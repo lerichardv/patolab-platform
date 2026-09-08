@@ -33,11 +33,13 @@ import {
 import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import type { CustomerOption } from '@/components/async-customer-combobox';
 import BlockedPaymentAlertDialog from '@/components/blocked-payment-alert-dialog';
+import { DeliveryDatePreview } from '@/components/delivery-date-preview';
 import FormCombobox from '@/components/form-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import SpecimenExamChangePriceAlertDialog from '@/components/specimen-exam-change-price-alert-dialog';
 import SpecimenInvoiceSummaryAlertDialog from '@/components/specimen-invoice-summary-alert-dialog';
 import SpecimenRegenerateConfirmAlertDialog from '@/components/specimen-regenerate-confirm-alert-dialog';
+import { invalidateSpecimenCatalogsCache } from '@/hooks/use-specimen-form-data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -147,6 +149,9 @@ export default function SpecimenForm({
 	const [customerToEdit, setCustomerToEdit] =
 		React.useState<CustomerOption | null>(null);
 	const [isReferrerSheetOpen, setIsReferrerSheetOpen] = React.useState(false);
+	const [localReferrers, setLocalReferrers] = React.useState<any[]>(
+		referrers || [],
+	);
 	const [editingReferrer, setEditingReferrer] = React.useState<any | null>(
 		null,
 	);
@@ -166,7 +171,13 @@ export default function SpecimenForm({
 	const prevSpecimenTypesRef = React.useRef<any[]>(specimenTypes);
 	const prevExaminationsRef = React.useRef<any[]>(examinations);
 	const prevCategoriesRef = React.useRef<any[]>(categories);
-	const prevReferrersRef = React.useRef<any[]>(referrers);
+	const prevReferrersRef = React.useRef<any[]>(referrers || []);
+
+	React.useEffect(() => {
+		if (referrers && referrers.length > 0) {
+			setLocalReferrers(referrers);
+		}
+	}, [referrers]);
 	// Track the currently-selected customer locally (for display + detail panel)
 	const [selectedCustomerData, setSelectedCustomerData] =
 		React.useState<CustomerOption | null>(
@@ -263,23 +274,7 @@ export default function SpecimenForm({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [createdCustomerId]);
 
-	React.useEffect(() => {
-		if (referrers.length > prevReferrersRef.current.length) {
-			const newReferrers = referrers.filter(
-				(r) =>
-					!prevReferrersRef.current.some((prev) => prev.id === r.id),
-			);
 
-			if (newReferrers.length > 0) {
-				setData('referrer', newReferrers[0].id.toString());
-				toast.success(
-					`Médico "${newReferrers[0].name}" seleccionado automáticamente`,
-				);
-			}
-		}
-
-		prevReferrersRef.current = referrers;
-	}, [referrers]);
 
 	const [localSequences, setLocalSequences] =
 		React.useState<any[]>(sequences);
@@ -415,14 +410,20 @@ export default function SpecimenForm({
 			specimen?.is_manual_delivery_date_intern_enabled,
 		),
 		delivery_date_intern_unit:
-			specimen?.delivery_date_intern_unit || 'minutes',
+			specimen?.is_manual_delivery_date_intern_enabled &&
+			specimen?.delivery_date_intern_unit
+				? specimen.delivery_date_intern_unit
+				: 'days',
 		delivery_date_intern_quantity:
 			specimen?.delivery_date_intern_quantity ?? '',
 		is_manual_delivery_date_enabled: Boolean(
 			specimen?.is_manual_delivery_date_enabled,
 		),
 		delivery_date_unit:
-			specimen?.delivery_date_unit || 'minutes',
+			specimen?.is_manual_delivery_date_enabled &&
+			specimen?.delivery_date_unit
+				? specimen.delivery_date_unit
+				: 'days',
 		delivery_date_quantity:
 			specimen?.delivery_date_quantity ?? '',
 		referrer: specimen?.referrer ? specimen.referrer.toString() : '',
@@ -525,6 +526,82 @@ export default function SpecimenForm({
 			prices: any[];
 		}>,
 	});
+ 
+	const reloadReferrers = React.useCallback(
+		async (selectReferrerId?: string | number) => {
+			try {
+				const response = await axios.get('/referrers', {
+					headers: { Accept: 'application/json' },
+				});
+
+				if (Array.isArray(response.data)) {
+					setLocalReferrers(response.data);
+
+					if (selectReferrerId) {
+						setData('referrer', selectReferrerId.toString());
+					}
+				}
+			} catch {
+				// Silently fallback if endpoint fails
+			}
+		},
+		[setData],
+	);
+
+	// Auto-select a newly created referrer via flash data from the server
+	const createdReferrerId = flash?.created_referrer?.id as number | undefined;
+
+	React.useEffect(() => {
+		if (!flash?.created_referrer) {
+			return;
+		}
+
+		const createdReferrer = flash.created_referrer as any;
+
+		if (!createdReferrer.id) {
+			return;
+		}
+
+		setLocalReferrers((prev) => {
+			const exists = prev.some((r) => r.id === createdReferrer.id);
+
+			if (exists) {
+				return prev.map((r) =>
+					r.id === createdReferrer.id ? createdReferrer : r,
+				);
+			}
+
+			return [...prev, createdReferrer].sort((a, b) =>
+				(a.name || '').localeCompare(b.name || ''),
+			);
+		});
+
+		setData('referrer', createdReferrer.id.toString());
+		toast.success(
+			`Médico "${createdReferrer.name}" seleccionado automáticamente`,
+		);
+		invalidateSpecimenCatalogsCache();
+		reloadReferrers(createdReferrer.id);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [createdReferrerId]);
+
+	React.useEffect(() => {
+		if (localReferrers.length > prevReferrersRef.current.length) {
+			const newReferrers = localReferrers.filter(
+				(r) =>
+					!prevReferrersRef.current.some((prev) => prev.id === r.id),
+			);
+
+			if (newReferrers.length > 0) {
+				setData('referrer', newReferrers[0].id.toString());
+				toast.success(
+					`Médico "${newReferrers[0].name}" seleccionado automáticamente`,
+				);
+			}
+		}
+
+		prevReferrersRef.current = localReferrers;
+	}, [localReferrers]);
 
 	React.useEffect(() => {
 		transform((d: any) => {
@@ -1892,7 +1969,7 @@ export default function SpecimenForm({
 													type="button"
 													onClick={() => {
 														const selected =
-															referrers.find(
+															localReferrers.find(
 																(r) =>
 																	r.id.toString() ===
 																	data.referrer,
@@ -1932,7 +2009,7 @@ export default function SpecimenForm({
 										placeholder="Seleccionar médico"
 										value={data.referrer}
 										onChange={(v) => setData('referrer', v)}
-										options={referrers.map((r) => ({
+										options={localReferrers.map((r) => ({
 											label:
 												r.notes && r.notes.trim()
 													? `(ID: ${r.id}) ${r.name} - ${r.notes.trim()}`
@@ -2471,7 +2548,7 @@ export default function SpecimenForm({
 														? (prev.delivery_date_quantity || selectedCat?.quantity || '')
 														: prev.delivery_date_quantity,
 													delivery_date_unit: checked
-														? (prev.delivery_date_unit || selectedCat?.unit || 'minutes')
+														? (prev.delivery_date_unit || selectedCat?.unit || 'days')
 														: prev.delivery_date_unit,
 												}));
 											}}
@@ -2480,7 +2557,7 @@ export default function SpecimenForm({
 
 									{data.is_manual_delivery_date_enabled && (
 										<div className="space-y-4 pt-2 border-t border-border/40">
-											<div className="grid grid-cols-2 gap-4">
+											<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 												<div className="grid gap-2">
 													<Label htmlFor="delivery_date_quantity">Cantidad</Label>
 													<Input
@@ -2493,6 +2570,7 @@ export default function SpecimenForm({
 															setData('delivery_date_quantity', e.target.value)
 														}
 														placeholder="Ej. 24"
+														className="w-full"
 													/>
 													{errors.delivery_date_quantity && (
 														<p className="text-sm text-destructive">
@@ -2504,12 +2582,12 @@ export default function SpecimenForm({
 												<div className="grid gap-2">
 													<Label htmlFor="delivery_date_unit">Unidad</Label>
 													<Select
-														value={data.delivery_date_unit}
+														value={data.delivery_date_unit || 'days'}
 														onValueChange={(v) =>
 															setData('delivery_date_unit', v)
 														}
 													>
-														<SelectTrigger id="delivery_date_unit">
+														<SelectTrigger id="delivery_date_unit" className="w-full">
 															<SelectValue placeholder="Unidad" />
 														</SelectTrigger>
 														<SelectContent>
@@ -2528,6 +2606,13 @@ export default function SpecimenForm({
 														</p>
 													)}
 												</div>
+
+												<DeliveryDatePreview
+													startDate={specimen?.created_at}
+													quantity={data.delivery_date_quantity}
+													unit={data.delivery_date_unit}
+													variant="client"
+												/>
 											</div>
 										</div>
 									)}
@@ -2569,7 +2654,7 @@ export default function SpecimenForm({
 
 									{data.is_manual_delivery_date_intern_enabled && (
 										<div className="space-y-4 pt-2 border-t border-border/40">
-											<div className="grid grid-cols-2 gap-4">
+											<div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 												<div className="grid gap-2">
 													<Label htmlFor="delivery_date_intern_quantity">Cantidad</Label>
 													<Input
@@ -2582,6 +2667,7 @@ export default function SpecimenForm({
 															setData('delivery_date_intern_quantity', e.target.value)
 														}
 														placeholder="Ej. 1"
+														className="w-full"
 													/>
 													{errors.delivery_date_intern_quantity && (
 														<p className="text-sm text-destructive">
@@ -2593,12 +2679,12 @@ export default function SpecimenForm({
 												<div className="grid gap-2">
 													<Label htmlFor="delivery_date_intern_unit">Unidad</Label>
 													<Select
-														value={data.delivery_date_intern_unit}
+														value={data.delivery_date_intern_unit || 'days'}
 														onValueChange={(v) =>
 															setData('delivery_date_intern_unit', v)
 														}
 													>
-														<SelectTrigger id="delivery_date_intern_unit">
+														<SelectTrigger id="delivery_date_intern_unit" className="w-full">
 															<SelectValue placeholder="Unidad" />
 														</SelectTrigger>
 														<SelectContent>
@@ -2617,6 +2703,13 @@ export default function SpecimenForm({
 														</p>
 													)}
 												</div>
+
+												<DeliveryDatePreview
+													startDate={specimen?.created_at}
+													quantity={data.delivery_date_intern_quantity}
+													unit={data.delivery_date_intern_unit}
+													variant="internal"
+												/>
 											</div>
 										</div>
 									)}
@@ -4757,12 +4850,70 @@ export default function SpecimenForm({
 							referrer={editingReferrer}
 							referrerTypes={referrerTypes}
 							initialData={referrerInitialData}
-							onSuccess={() => setIsReferrerSheetOpen(false)}
+							onSuccess={(savedReferrer) => {
+								setIsReferrerSheetOpen(false);
+
+								if (savedReferrer?.id) {
+									setLocalReferrers((prev) => {
+										const exists = prev.some(
+											(r) => r.id === savedReferrer.id,
+										);
+
+										if (exists) {
+											return prev.map((r) =>
+												r.id === savedReferrer.id
+													? savedReferrer
+													: r,
+											);
+										}
+
+										return [...prev, savedReferrer].sort(
+											(a, b) =>
+												(a.name || '').localeCompare(
+													b.name || '',
+												),
+										);
+									});
+									setData(
+										'referrer',
+										savedReferrer.id.toString(),
+									);
+									toast.success(
+										`Médico "${savedReferrer.name}" seleccionado automáticamente`,
+									);
+								}
+
+								invalidateSpecimenCatalogsCache();
+								reloadReferrers(savedReferrer?.id);
+							}}
 							onSwitchToCreateNew={(formData) => {
 								setReferrerInitialData(formData);
 								setEditingReferrer(null);
 							}}
 							onSelectExistingReferrer={(existingReferrer) => {
+								if (existingReferrer?.id) {
+									setLocalReferrers((prev) => {
+										const exists = prev.some(
+											(r) => r.id === existingReferrer.id,
+										);
+
+										if (exists) {
+											return prev.map((r) =>
+												r.id === existingReferrer.id
+													? existingReferrer
+													: r,
+											);
+										}
+
+										return [...prev, existingReferrer].sort(
+											(a, b) =>
+												(a.name || '').localeCompare(
+													b.name || '',
+												),
+										);
+									});
+								}
+
 								setData(
 									'referrer',
 									existingReferrer.id.toString(),
@@ -4771,6 +4922,8 @@ export default function SpecimenForm({
 								toast.info(
 									`Se seleccionó el remitente existente: ${existingReferrer.name} (${existingReferrer.notes || 'Sin hospital'})`,
 								);
+								invalidateSpecimenCatalogsCache();
+								reloadReferrers(existingReferrer.id);
 							}}
 						/>
 					</div>
