@@ -23,6 +23,8 @@ use App\Http\Controllers\MyAssignmentController;
 use App\Http\Controllers\MySpecimenTypeTemplateController;
 use App\Http\Controllers\MyWorkOrderController;
 use App\Http\Controllers\PathologistFormDataController;
+use App\Http\Controllers\PriceQuoteController;
+use App\Http\Controllers\PriceQuoteFormDataController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReferrerController;
 use App\Http\Controllers\ReferrerTypeController;
@@ -54,7 +56,6 @@ use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::get('/', function () {
     return view('welcome');
@@ -154,6 +155,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('invoices/{invoice}/restore-audit-change', [InvoiceController::class, 'restoreAuditChange'])->name('invoices.restore-audit-change');
     Route::get('invoices/form-data', InvoiceFormDataController::class)->name('invoices.form-data');
     Route::resource('invoices', InvoiceController::class)->only(['index', 'update']);
+    Route::get('price-quotes/form-data', PriceQuoteFormDataController::class)->name('price-quotes.form-data');
+    Route::post('price-quotes/{price_quote}/send-email', [PriceQuoteController::class, 'sendEmail'])->name('price-quotes.send-email');
+    Route::resource('price-quotes', PriceQuoteController::class);
     Route::get('reports/credit-group/export', [CreditGroupReportController::class, 'export'])->name('reports.credit-group.export');
     Route::get('reports/credit-group', [CreditGroupReportController::class, 'index'])->name('reports.credit-group.index');
     Route::get('reports/cuttings/export', [CuttingsReportController::class, 'export'])->name('reports.cuttings.export');
