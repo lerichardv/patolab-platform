@@ -413,7 +413,7 @@
                     <span class="specimen-value" style="font-size: 13px; font-weight: 800; color: #1e3a8a; background-color: #fff5a8ff; padding: 1px 4px; border-radius: 4px; display: inline-block; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
                         {{ $invoice->specimen->expected_finalization_date ? $invoice->specimen->expected_finalization_date->format('d/m/Y') : 'N/A' }}
                     </span>
-                    <span style="font-size: 9.5px; font-weight: 700; color: #1f2937; margin-top: 2px;">A partir de las 4:00 pm</span>
+                    <span style="font-size: 9.5px; font-weight: 800; color: #1e3a8a; background-color: #fff5a8ff; padding: 1px 4px; border-radius: 4px; display: inline-block; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin-top: 2px;">A partir de las 4:00 pm</span>
                 </div>
                 <div style="grid-column: span 3; border-top: 1px solid #bfdbfe; margin: 4px 0;"></div>
             @endif
