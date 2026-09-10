@@ -24,6 +24,7 @@ import {
     Tv,
     FileSpreadsheet,
     BarChart3,
+    Calculator,
 } from 'lucide-react';
 import { index as caiRangesIndex } from '@/actions/App/Http/Controllers/CaiRangeController';
 import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
@@ -39,6 +40,7 @@ import { index as invoicesIndex } from '@/actions/App/Http/Controllers/InvoiceCo
 import { index as locationsIndex } from '@/actions/App/Http/Controllers/LocationController';
 import { index as myAssignmentsIndex } from '@/actions/App/Http/Controllers/MyAssignmentController';
 import { index as myWorkOrdersIndex } from '@/actions/App/Http/Controllers/MyWorkOrderController';
+import { index as priceQuotesIndex } from '@/actions/App/Http/Controllers/PriceQuoteController';
 import { index as productsIndex } from '@/actions/App/Http/Controllers/ProductController';
 import { index as referrersIndex } from '@/actions/App/Http/Controllers/ReferrerController';
 import { index as referrerTypesIndex } from '@/actions/App/Http/Controllers/ReferrerTypeController';
@@ -97,6 +99,12 @@ const mainNavItems: NavItem[] = [
         href: invoicesIndex(),
         icon: Receipt,
         permission: 'invoices.view',
+    },
+    {
+        title: 'Cotizaciones',
+        href: priceQuotesIndex(),
+        icon: Calculator,
+        permission: 'price_quotes.view',
     },
     {
         title: 'Tablero de Muestras',

@@ -497,6 +497,17 @@ const permissionRows: PermissionRow[] = [
             manage: 'credits.manage',
         },
     },
+    {
+        label: 'Cotizaciones',
+        description: 'Gestión y presupuestos previos para clientes.',
+        module: 'Facturación y Créditos',
+        slugs: {
+            view: 'price_quotes.view',
+            create: 'price_quotes.create',
+            edit: 'price_quotes.edit',
+            delete: 'price_quotes.delete',
+        },
+    },
 ];
 
 export default function RolesIndex({

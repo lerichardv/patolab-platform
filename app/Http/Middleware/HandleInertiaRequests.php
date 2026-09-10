@@ -55,6 +55,7 @@ class HandleInertiaRequests extends Middleware
                 'created_referrer' => $request->session()->get('created_referrer'),
                 'updated_referrer' => $request->session()->get('updated_referrer'),
                 'new_purchase_order_url' => $request->session()->get('new_purchase_order_url'),
+                'new_price_quote_url' => $request->session()->get('new_price_quote_url'),
             ],
         ];
     }

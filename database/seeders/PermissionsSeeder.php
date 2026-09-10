@@ -177,6 +177,16 @@ class PermissionsSeeder extends Seeder
 
             /*
             |--------------------------------------------------------------------------
+            | Cotizaciones
+            |--------------------------------------------------------------------------
+            */
+            ['name' => 'Ver Cotizaciones', 'slug' => 'price_quotes.view'],
+            ['name' => 'Crear Cotizaciones', 'slug' => 'price_quotes.create'],
+            ['name' => 'Editar Cotizaciones', 'slug' => 'price_quotes.edit'],
+            ['name' => 'Eliminar Cotizaciones', 'slug' => 'price_quotes.delete'],
+
+            /*
+            |--------------------------------------------------------------------------
             | Rentals
             |--------------------------------------------------------------------------
             */
