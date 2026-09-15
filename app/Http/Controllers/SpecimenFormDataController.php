@@ -68,7 +68,7 @@ class SpecimenFormDataController extends Controller
             ->get();
 
         $data = [
-            'specimenTypes' => SpecimenType::where('active', true)->orderBy('name', 'asc')->get(),
+            'specimenTypes' => SpecimenType::with('activeStates')->where('active', true)->orderBy('name', 'asc')->get(),
             'examinations' => SpecimenTypeExamination::where('active', true)->with('prices')->get(),
             'categories' => SpecimenCategory::where('active', true)->orderBy('name', 'asc')->get(),
             'referrers' => Referrer::with('type')->where('active', true)->orderBy('name', 'asc')->get(),

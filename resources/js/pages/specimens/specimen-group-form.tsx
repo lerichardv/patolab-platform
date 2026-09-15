@@ -893,6 +893,49 @@ export default function SpecimenGroupForm({
 		setIsFormDirty(true);
 	};
 
+	const nestedSelectedSpecimenType = useMemo(() => {
+		if (!nestedSpecimenType) {
+			return null;
+		}
+
+		return specimenTypes.find(
+			(t) => t.id.toString() === nestedSpecimenType.toString(),
+		);
+	}, [specimenTypes, nestedSpecimenType]);
+
+	const nestedAvailableStatuses = useMemo(() => {
+		const defaultAll = [
+			{ label: 'Recibida', value: 'received', color: '#3b82f6', step_order: 1 },
+			{ label: 'Revisión Macroscópica', value: 'macroscopic_review', color: '#8b5cf6', step_order: 2 },
+			{ label: 'En Proceso', value: 'processing', color: '#f59e0b', step_order: 3 },
+			{ label: 'Revisión Microscópica', value: 'microscopic_review', color: '#d946ef', step_order: 4 },
+			{ label: 'Finalizada', value: 'finalized', color: '#10b981', step_order: 5 },
+			{ label: 'Entregada', value: 'delivered', color: '#64748b', step_order: 6 },
+			{ label: 'Cancelada', value: 'cancelled', color: '#ef4444', step_order: 7 },
+		];
+
+		const activeStates =
+			nestedSelectedSpecimenType?.active_states ||
+			nestedSelectedSpecimenType?.activeStates;
+
+		if (!activeStates || !Array.isArray(activeStates) || activeStates.length === 0) {
+			return defaultAll;
+		}
+
+		const activeStatusMap = new Map<string, number>();
+		activeStates.forEach((st: any) => {
+			activeStatusMap.set(st.status, st.step_order);
+		});
+
+		return defaultAll
+			.filter((s) => activeStatusMap.has(s.value))
+			.map((s) => ({
+				...s,
+				step_order: activeStatusMap.get(s.value) ?? s.step_order,
+			}))
+			.sort((a, b) => a.step_order - b.step_order);
+	}, [nestedSelectedSpecimenType]);
+
 	// Filter products for nested search
 	const filteredProducts = useMemo(() => {
 		return products.filter(
@@ -3609,6 +3652,23 @@ export default function SpecimenGroupForm({
 																setNestedSpecimenType(
 																	t.id.toString(),
 																);
+																const typeActiveStates =
+																	t.active_states ||
+																	t.activeStates;
+
+																if (
+																	typeActiveStates &&
+																	Array.isArray(typeActiveStates) &&
+																	typeActiveStates.length > 0
+																) {
+																	const sorted = [...typeActiveStates].sort(
+																		(a: any, b: any) =>
+																			a.step_order - b.step_order,
+																	);
+
+																	setNestedStatus(sorted[0].status);
+																}
+
 																setNestedReservedCode(
 																	'',
 																);
@@ -4297,49 +4357,12 @@ export default function SpecimenGroupForm({
 											status: '',
 										}));
 									}}
-									options={[
-										{
-											label: 'Recibida',
-											value: 'received',
-											color: '#3b82f6',
-										},
-										{
-											label: 'Revisión Macroscópica',
-											value: 'macroscopic_review',
-											color: '#8b5cf6',
-											disabled: true,
-										},
-										{
-											label: 'En Proceso',
-											value: 'processing',
-											color: '#f59e0b',
-											disabled: true,
-										},
-										{
-											label: 'Revisión Microscópica',
-											value: 'microscopic_review',
-											color: '#d946ef',
-											disabled: true,
-										},
-										{
-											label: 'Finalizada',
-											value: 'finalized',
-											color: '#10b981',
-											disabled: true,
-										},
-										{
-											label: 'Entregada',
-											value: 'delivered',
-											color: '#64748b',
-											disabled: true,
-										},
-										{
-											label: 'Cancelada',
-											value: 'cancelled',
-											color: '#ef4444',
-											disabled: true,
-										},
-									]}
+									options={nestedAvailableStatuses.map((s, idx) => ({
+										label: s.label,
+										value: s.value,
+										color: s.color,
+										disabled: !nestedSpecimenToEditId ? idx !== 0 : nestedStatus !== s.value,
+									}))}
 								/>
 								{nestedErrors.status && (
 									<p className="text-xs text-destructive">

@@ -22,6 +22,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { Specimen } from '../index';
 import { getDueDateInfo } from '../index';
 
@@ -141,23 +147,59 @@ export function KanbanCard({
                                             )}
                                             {auth.permissions?.includes(
                                                 'report_editor.view',
-                                            ) && (
-                                                <DropdownMenuItem
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        window.open(
-                                                            `/specimens/${
-                                                                specimen.sequence_code ||
-                                                                specimen.id
-                                                            }/report-editor`,
-                                                            '_blank',
-                                                        );
-                                                    }}
-                                                >
-                                                    <FileText className="mr-2 h-4 w-4" />
-                                                    <span>Abrir Reporte</span>
-                                                </DropdownMenuItem>
-                                            )}
+                                            ) &&
+                                                ((specimen.type
+                                                    ?.requires_report ??
+                                                true) ? (
+                                                    <DropdownMenuItem
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            window.open(
+                                                                `/specimens/${
+                                                                    specimen.sequence_code ||
+                                                                    specimen.id
+                                                                }/report-editor`,
+                                                                '_blank',
+                                                            );
+                                                        }}
+                                                    >
+                                                        <FileText className="mr-2 h-4 w-4" />
+                                                        <span>
+                                                            Abrir Reporte
+                                                        </span>
+                                                    </DropdownMenuItem>
+                                                ) : (
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger
+                                                                asChild
+                                                            >
+                                                                <div className="w-full">
+                                                                    <DropdownMenuItem
+                                                                        disabled
+                                                                        className="cursor-not-allowed opacity-50"
+                                                                        onClick={(
+                                                                            e,
+                                                                        ) =>
+                                                                            e.stopPropagation()
+                                                                        }
+                                                                    >
+                                                                        <FileText className="mr-2 h-4 w-4" />
+                                                                        <span>
+                                                                            Abrir
+                                                                            Reporte
+                                                                        </span>
+                                                                    </DropdownMenuItem>
+                                                                </div>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="left">
+                                                                <span>
+                                                                    {`El espécimen "${specimen.sequence_code || specimen.type?.name || specimen.id}" no requiere informe`}
+                                                                </span>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                ))}
                                             {specimen.is_group &&
                                                 specimen.group && (
                                                     <DropdownMenuItem
@@ -367,7 +409,9 @@ export function KanbanCard({
                                                     : 'Est:'}{' '}
                                                 {dueInfo.dueDateFormatted}
                                                 {dueInfo.isManual && (
-                                                    <span className="font-semibold">*</span>
+                                                    <span className="font-semibold">
+                                                        *
+                                                    </span>
                                                 )}
                                             </div>
                                         )}

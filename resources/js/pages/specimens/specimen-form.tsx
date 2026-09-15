@@ -887,6 +887,48 @@ export default function SpecimenForm({
 		);
 	}, [specimenTypes]);
 
+	const currentSelectedSpecimenType = React.useMemo(() => {
+		if (!data.specimen_type) {
+			return null;
+		}
+
+		return specimenTypes.find(
+			(t) => t.id.toString() === data.specimen_type.toString(),
+		);
+	}, [specimenTypes, data.specimen_type]);
+
+	const availableStatuses = React.useMemo(() => {
+		const defaultAll = [
+			{ label: 'Recibida', value: 'received', color: '#3b82f6', step_order: 1 },
+			{ label: 'Revisión Macroscópica', value: 'macroscopic_review', color: '#8b5cf6', step_order: 2 },
+			{ label: 'En Proceso', value: 'processing', color: '#f59e0b', step_order: 3 },
+			{ label: 'Revisión Microscópica', value: 'microscopic_review', color: '#d946ef', step_order: 4 },
+			{ label: 'Finalizada', value: 'finalized', color: '#10b981', step_order: 5 },
+			{ label: 'Entregada', value: 'delivered', color: '#64748b', step_order: 6 },
+			{ label: 'Cancelada', value: 'cancelled', color: '#ef4444', step_order: 7 },
+		];
+
+		const activeStates = currentSelectedSpecimenType?.active_states || currentSelectedSpecimenType?.activeStates;
+
+		if (!activeStates || !Array.isArray(activeStates) || activeStates.length === 0) {
+			return defaultAll;
+		}
+
+		// Filter default all to keep only active states and sort by step_order
+		const activeStatusMap = new Map<string, number>();
+		activeStates.forEach((st: any) => {
+			activeStatusMap.set(st.status, st.step_order);
+		});
+
+		return defaultAll
+			.filter((s) => activeStatusMap.has(s.value))
+			.map((s) => ({
+				...s,
+				step_order: activeStatusMap.get(s.value) ?? s.step_order,
+			}))
+			.sort((a, b) => a.step_order - b.step_order);
+	}, [currentSelectedSpecimenType]);
+
 	const filteredExaminations = React.useMemo(() => {
 		if (!data.specimen_type) {
 			return [];
@@ -2080,6 +2122,17 @@ export default function SpecimenForm({
 																	key={t.id}
 																	value={t.name}
 																	onSelect={() => {
+																		const activeStates = t.active_states || t.activeStates || [];
+																		let initialStatus = 'received';
+																		if (Array.isArray(activeStates) && activeStates.length > 0) {
+																			const sorted = [...activeStates]
+																				.filter((s: any) => s.status !== 'cancelled')
+																				.sort((a: any, b: any) => a.step_order - b.step_order);
+																			if (sorted.length > 0) {
+																				initialStatus = sorted[0].status;
+																			}
+																		}
+
 																		setData(
 																			(
 																				d,
@@ -2087,6 +2140,7 @@ export default function SpecimenForm({
 																				...d,
 																				specimen_type:
 																					t.id.toString(),
+																				status: !specimen ? initialStatus : (activeStates.some((s: any) => s.status === d.status) ? d.status : initialStatus),
 																				selected_examination_ids:
 																					[],
 																				specimen_type_examination:
@@ -2752,57 +2806,12 @@ export default function SpecimenForm({
 										placeholder="Seleccionar estado"
 										value={data.status}
 										onChange={(v) => setData('status', v)}
-										options={[
-											{
-												label: 'Recibida',
-												value: 'received',
-												color: '#3b82f6',
-											},
-											{
-												label: 'Revisión Macroscópica',
-												value: 'macroscopic_review',
-												color: '#8b5cf6',
-												disabled:
-													data.status !==
-													'macroscopic_review',
-											},
-											{
-												label: 'En Proceso',
-												value: 'processing',
-												color: '#f59e0b',
-												disabled:
-													data.status !== 'processing',
-											},
-											{
-												label: 'Revisión Microscópica',
-												value: 'microscopic_review',
-												color: '#d946ef',
-												disabled:
-													data.status !==
-													'microscopic_review',
-											},
-											{
-												label: 'Finalizada',
-												value: 'finalized',
-												color: '#10b981',
-												disabled:
-													data.status !== 'finalized',
-											},
-											{
-												label: 'Entregada',
-												value: 'delivered',
-												color: '#64748b',
-												disabled:
-													data.status !== 'delivered',
-											},
-											{
-												label: 'Cancelada',
-												value: 'cancelled',
-												color: '#ef4444',
-												disabled:
-													data.status !== 'cancelled',
-											},
-										]}
+										options={availableStatuses.map((s, idx) => ({
+											label: s.label,
+											value: s.value,
+											color: s.color,
+											disabled: !specimen ? idx !== 0 : data.status !== s.value,
+										}))}
 									/>
 									{errors.status && (
 										<p className="text-sm text-destructive">

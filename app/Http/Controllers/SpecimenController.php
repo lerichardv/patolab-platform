@@ -28,10 +28,12 @@ use App\Services\ImageOptimizerService;
 use App\Services\InvoiceCalculationService;
 use App\Services\InvoicePdfService;
 use App\Services\ReportPdfService;
+use App\Services\SpecimenStatusService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -165,7 +167,7 @@ class SpecimenController extends Controller
 
         return Inertia::render('specimens/index', [
             'priorities' => $priorities,
-            'specimenTypes' => SpecimenType::where('active', true)->get(),
+            'specimenTypes' => SpecimenType::with('activeStates')->where('active', true)->get(),
             'examinations' => SpecimenTypeExamination::where('active', true)->with('prices')->get(),
             'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
             'usersList' => User::where('active', true)->orderBy('name')->get(),
@@ -280,7 +282,7 @@ class SpecimenController extends Controller
         $invoice = null;
         $paymentInvoice = null;
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($request, $validated, &$specimen, &$invoice, &$paymentInvoice) {
+        DB::transaction(function () use ($request, $validated, &$specimen, &$invoice, &$paymentInvoice) {
             $isCredit = $validated['payment_type'] === 'credit';
             $caiRange = CaiRange::where('status', 'active')->lockForUpdate()->first();
             if (! $caiRange && ! $isCredit) {
@@ -779,7 +781,7 @@ class SpecimenController extends Controller
 
         $oldPriorityId = $specimen->priority_id;
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($specimen, &$validated, $oldPriorityId, $request) {
+        DB::transaction(function () use ($specimen, &$validated, $oldPriorityId, $request) {
             $oldSpecimenType = (int) $specimen->specimen_type;
             $newSpecimenType = (int) $validated['specimen_type'];
 
@@ -844,7 +846,7 @@ class SpecimenController extends Controller
                     ->where(function ($query) {
                         $query->where('user_id', auth()->id())
                             ->orWhereExists(function ($q) {
-                                $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                                $q->select(DB::raw(1))
                                     ->from('user_templates_permissions')
                                     ->whereColumn('user_templates_permissions.template_id', 'specimen_type_templates.id')
                                     ->where('user_templates_permissions.shared_with_id', auth()->id());
@@ -875,7 +877,7 @@ class SpecimenController extends Controller
                         'headings_toggles' => $template->headings_toggles ?? null,
                     ]);
 
-                    \Illuminate\Support\Facades\DB::table('specimen_reports')->where('id', $report->id)->update([
+                    DB::table('specimen_reports')->where('id', $report->id)->update([
                         'yjs_macroscopy_state' => null,
                         'yjs_microscopy_state' => null,
                         'yjs_diagnosis_state' => null,
@@ -1135,7 +1137,7 @@ class SpecimenController extends Controller
             'items.*.order' => 'required|integer',
         ]);
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($validated) {
+        DB::transaction(function () use ($validated) {
             foreach ($validated['items'] as $item) {
                 $specimen = Specimen::find($item['id']);
                 if ($specimen && $specimen->priority_id != $item['priority_id']) {
@@ -1389,6 +1391,113 @@ class SpecimenController extends Controller
         return redirect()->back()->with('success', 'Colaborador desasignado con éxito.');
     }
 
+    public function changeStatus(Request $request, Specimen $specimen, SpecimenStatusService $statusService)
+    {
+        Gate::authorize('specimens.edit');
+
+        $validated = $request->validate([
+            'status' => 'required|string',
+            'cancellation_reason' => 'nullable|string',
+        ]);
+
+        if ($validated['status'] === 'cancelled' && empty($validated['cancellation_reason'])) {
+            $request->validate([
+                'cancellation_reason' => 'required|string',
+            ], [
+                'cancellation_reason.required' => 'El motivo de cancelación es obligatorio.',
+            ]);
+        }
+
+        $targetStatus = $validated['status'];
+
+        try {
+            $statusService->transition($specimen, $targetStatus, [
+                'cancellation_reason' => $validated['cancellation_reason'] ?? null,
+                'user' => $request->user(),
+            ]);
+        } catch (ValidationException $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'errors' => $e->errors(),
+                ], 422);
+            }
+
+            return redirect()->back()->withErrors($e->errors());
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Estado de la muestra actualizado con éxito.',
+                'specimen' => $specimen->fresh(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Estado de la muestra actualizado con éxito.');
+    }
+
+    public function advanceStatus(Request $request, Specimen $specimen, SpecimenStatusService $statusService)
+    {
+        $user = $request->user();
+        $isAssigned = DB::table('specimen_user')
+            ->where('specimen_id', $specimen->id)
+            ->where('user_id', $user->id)
+            ->exists()
+            || DB::table('specimen_collaborators')
+                ->where('specimen_id', $specimen->id)
+                ->where('user_id', $user->id)
+                ->exists();
+
+        if (! Gate::allows('specimens.edit') && ! ($isAssigned && Gate::allows('my_assignments.view'))) {
+            abort(403, 'No tienes permiso para modificar el estado de esta muestra.');
+        }
+
+        $nextStatus = $statusService->getNextStatus($specimen);
+
+        if (! $nextStatus) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La muestra no tiene un siguiente estado al que avanzar.',
+                ], 422);
+            }
+
+            return redirect()->back()->withErrors(['status' => 'La muestra no tiene un siguiente estado al que avanzar.']);
+        }
+
+        try {
+            $statusService->transition($specimen, $nextStatus, [
+                'user' => $user,
+            ]);
+        } catch (ValidationException $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'errors' => $e->errors(),
+                ], 422);
+            }
+
+            return redirect()->back()->withErrors($e->errors());
+        }
+
+        $meta = $statusService->getStatusMetadata($nextStatus);
+        $message = "Muestra avanzada a '{$meta['label']}' con éxito.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'next_status' => $nextStatus,
+                'specimen' => $specimen->fresh(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+
     public function bulkAction(Request $request)
     {
         $validated = $request->validate([
@@ -1434,66 +1543,18 @@ class SpecimenController extends Controller
             Gate::authorize('specimens.delete');
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($ids, $action, $value, $cancellationReason) {
+        DB::transaction(function () use ($ids, $action, $value, $cancellationReason) {
             if ($action === 'change_status') {
-                $updateData = ['status' => $value];
-                $dateColumn = Specimen::STATUS_DATE_COLUMNS[$value] ?? null;
-                if ($dateColumn) {
-                    $updateData[$dateColumn] = now();
-                }
-                $allIds = $ids;
-                if ($value === 'cancelled') {
-                    $updateData['cancellation_reason'] = $cancellationReason;
-                    $updateData['cancelled_at'] = now();
-                    $updateData['cancelled_by_id'] = auth()->id();
-
-                    $resolvedIds = collect($ids);
-                    foreach ($ids as $id) {
-                        $spec = Specimen::find($id);
-                        if ($spec && $spec->is_group && $spec->group_id) {
-                            $groupSpecimenIds = Specimen::where('group_id', $spec->group_id)->pluck('id')->toArray();
-                            $resolvedIds = $resolvedIds->merge($groupSpecimenIds);
-                        }
-                    }
-                    $allIds = $resolvedIds->unique()->toArray();
-
-                    $invoicesToRegenerate = [];
-                    foreach ($allIds as $id) {
-                        $specimen = Specimen::find($id);
-                        if ($specimen) {
-                            $invoice = $specimen->invoiceRelation;
-                            if (! $invoice && $specimen->is_group && $specimen->group) {
-                                $invoice = $specimen->group->invoice;
-                            }
-
-                            if ($invoice) {
-                                // Update status to cancelled first
-                                $invoice->update([
-                                    'invoice_type' => 'cancelled',
-                                ]);
-                                $invoicesToRegenerate[$invoice->id] = $invoice;
-                            }
-
-                            $credit = Credit::where('specimen_id', $specimen->id)->first();
-                            if (! $credit && $specimen->is_group && $specimen->group_id) {
-                                $credit = Credit::where('group_id', $specimen->group_id)->first();
-                            }
-
-                            if ($credit) {
-                                $credit->delete();
-                            }
-                        }
-                    }
-
-                    foreach ($invoicesToRegenerate as $invoiceToRegen) {
-                        try {
-                            app(InvoicePdfService::class)->generateAndStoreInvoice($invoiceToRegen);
-                        } catch (\Exception $e) {
-                            \Log::warning('Error regenerating invoice PDF during bulk cancellation: '.$e->getMessage());
-                        }
+                $statusService = app(SpecimenStatusService::class);
+                foreach ($ids as $id) {
+                    $specimen = Specimen::find($id);
+                    if ($specimen) {
+                        $statusService->transition($specimen, $value, [
+                            'cancellation_reason' => $cancellationReason,
+                            'bypass_validation' => true,
+                        ]);
                     }
                 }
-                Specimen::whereIn('id', $allIds)->update($updateData);
             } elseif ($action === 'change_priority') {
                 Specimen::whereIn('id', $ids)->update(['priority_id' => $value]);
 
@@ -1590,7 +1651,15 @@ class SpecimenController extends Controller
         $specimen = Specimen::where('sequence_code', $specimen_code)
             ->where('access_token', $token)
             ->where('active', true)
-            ->with(['customerRelation', 'type', 'examination', 'category', 'referrerRelation', 'group'])
+            ->with([
+                'customerRelation',
+                'type.activeStates',
+                'examination',
+                'specimenExaminations.examination',
+                'category',
+                'referrerRelation',
+                'group',
+            ])
             ->first();
 
         if (! $specimen) {
@@ -1733,7 +1802,7 @@ class SpecimenController extends Controller
 
         $oldPriorityId = $specimen->priority_id;
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($specimen, $validated, $oldPriorityId) {
+        DB::transaction(function () use ($specimen, $validated, $oldPriorityId) {
             $specimen->update($validated);
 
             if ($oldPriorityId != $validated['priority_id']) {

@@ -1,17 +1,14 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
     Microscope,
     Layers,
-    ExternalLink,
     ShieldAlert,
     User,
     Tag,
     Clock,
     ArrowRight,
-    AlertCircle,
-    FileText,
     ChevronDown,
     CheckCircle2,
     Loader2,
@@ -297,22 +294,48 @@ export default function PublicGroupProgress({ group }: Props) {
                                                         <div className="space-y-0.5">
                                                             <span className="flex items-center gap-1 text-[10px] font-bold tracking-wider text-muted-foreground/80 uppercase">
                                                                 <Tag className="h-3 w-3" />{' '}
-                                                                Examen
-                                                                Solicitado
+                                                                Examen(es)
+                                                                Solicitado(s)
                                                             </span>
-                                                            <p className="font-semibold text-foreground">
-                                                                {
-                                                                    specimen
-                                                                        .type
-                                                                        ?.name
-                                                                }{' '}
-                                                                -{' '}
-                                                                {
-                                                                    specimen
-                                                                        .examination
-                                                                        ?.name
-                                                                }
-                                                            </p>
+                                                            <div className="font-semibold text-foreground">
+                                                                <p>{specimen.type?.name || 'N/A'}</p>
+                                                                {(() => {
+                                                                    const rawExams =
+                                                                        specimen.specimen_examinations ||
+                                                                        specimen.specimenExaminations ||
+                                                                        specimen.examinations ||
+                                                                        [];
+
+                                                                    const examNames: string[] = rawExams
+                                                                        .map((item: any) => item.examination?.name || item.name)
+                                                                        .filter(Boolean);
+
+                                                                    if (examNames.length === 0 && specimen.examination?.name) {
+                                                                        examNames.push(specimen.examination.name);
+                                                                    }
+
+                                                                    if (examNames.length === 0) {
+                                                                        return (
+                                                                            <p className="text-[11px] font-normal text-muted-foreground">
+                                                                                Sin exámenes especificados
+                                                                            </p>
+                                                                        );
+                                                                    }
+
+                                                                    return (
+                                                                        <div className="mt-1 flex flex-wrap gap-1">
+                                                                            {examNames.map((name, idx) => (
+                                                                                <span
+                                                                                    key={`${name}-${idx}`}
+                                                                                    className="inline-flex items-center rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                                                                                >
+                                                                                    {name}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -381,22 +404,37 @@ export default function PublicGroupProgress({ group }: Props) {
                                                             </h4>
 
                                                             <div className="relative space-y-5 pl-6 before:absolute before:top-2 before:bottom-2 before:left-[9px] before:w-[1.5px] before:bg-border/60">
-                                                                {STATUS_STEPS.map(
-                                                                    (
-                                                                        step,
-                                                                        idx,
-                                                                    ) => {
-                                                                        const isDelivered =
-                                                                            specimen.status ===
-                                                                            'delivered';
-                                                                        const currentStepIndex =
-                                                                            STATUS_STEPS.findIndex(
-                                                                                (
-                                                                                    s,
-                                                                                ) =>
-                                                                                    s.key ===
-                                                                                    specimen.status,
-                                                                            );
+                                                                {(() => {
+                                                                    const activeConfig: Array<{ status: string }> =
+                                                                        specimen.type?.active_states ||
+                                                                        specimen.type?.activeStates ||
+                                                                        [];
+
+                                                                    const steps =
+                                                                        activeConfig.length > 0
+                                                                            ? (activeConfig
+                                                                                  .map((st) =>
+                                                                                      STATUS_STEPS.find(
+                                                                                          (s) =>
+                                                                                              s.key ===
+                                                                                              st.status,
+                                                                                      ),
+                                                                                  )
+                                                                                  .filter(
+                                                                                      Boolean,
+                                                                                  ) as typeof STATUS_STEPS)
+                                                                            : STATUS_STEPS;
+
+                                                                    const isDelivered =
+                                                                        specimen.status === 'delivered';
+                                                                    const currentStepIndex =
+                                                                        steps.findIndex(
+                                                                            (s) =>
+                                                                                s.key ===
+                                                                                specimen.status,
+                                                                        );
+
+                                                                    return steps.map((step, idx) => {
                                                                         const isPastStep =
                                                                             isDelivered
                                                                                 ? true
@@ -410,9 +448,7 @@ export default function PublicGroupProgress({ group }: Props) {
 
                                                                         return (
                                                                             <div
-                                                                                key={
-                                                                                    step.key
-                                                                                }
+                                                                                key={step.key}
                                                                                 className="group relative"
                                                                             >
                                                                                 {/* Step Node Icon/Indicator */}
@@ -465,8 +501,8 @@ export default function PublicGroupProgress({ group }: Props) {
                                                                                 </div>
                                                                             </div>
                                                                         );
-                                                                    },
-                                                                )}
+                                                                    });
+                                                                })()}
                                                             </div>
                                                         </div>
                                                     )}

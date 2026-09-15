@@ -77,32 +77,40 @@ class SendSpecimenEmailJob implements ShouldQueue
                 return;
             }
 
-            $subject = "Reporte Listo — {$this->specimen->sequence_code}";
+            $requiresReport = $this->specimen->type ? (bool) $this->specimen->type->requires_report : true;
+
+            $subject = $requiresReport
+                ? "Reporte Listo — {$this->specimen->sequence_code}"
+                : "Muestra Finalizada — {$this->specimen->sequence_code}";
+
             $statusUrl = route('specimens.show-public', [
                 'specimen_code' => $this->specimen->sequence_code,
                 'token' => $this->specimen->access_token,
                 'delivery_token' => $this->specimen->delivery_token,
             ]);
 
-            // Add the report PDF as a standard email attachment
-            if ($this->specimen->report && $this->specimen->report->report_file) {
-                $reportFile = $this->specimen->report->report_file;
-                if (Storage::disk('public')->exists($reportFile)) {
-                    $attachments[] = [
-                        'content' => base64_encode(Storage::disk('public')->get($reportFile)),
-                        'filename' => "Reporte_{$this->specimen->sequence_code}.pdf",
-                    ];
+            // Add the report PDF as a standard email attachment only if report is required
+            if ($requiresReport) {
+                if ($this->specimen->report && $this->specimen->report->report_file) {
+                    $reportFile = $this->specimen->report->report_file;
+                    if (Storage::disk('public')->exists($reportFile)) {
+                        $attachments[] = [
+                            'content' => base64_encode(Storage::disk('public')->get($reportFile)),
+                            'filename' => "Reporte_{$this->specimen->sequence_code}.pdf",
+                        ];
+                    } else {
+                        Log::error("SendSpecimenEmailJob: PDF report file not found on public storage at: {$reportFile}");
+                    }
                 } else {
-                    Log::error("SendSpecimenEmailJob: PDF report file not found on public storage at: {$reportFile}");
+                    Log::error("SendSpecimenEmailJob: Specimen report or report file path not found for finalized Specimen ID {$this->specimen->id}.");
                 }
-            } else {
-                Log::error("SendSpecimenEmailJob: Specimen report or report file path not found for finalized Specimen ID {$this->specimen->id}.");
             }
 
             $htmlContent = view('emails.specimen_finalized', [
                 'specimen' => $this->specimen,
                 'customer' => $customer,
                 'statusUrl' => $statusUrl,
+                'requiresReport' => $requiresReport,
             ])->render();
         } else {
             Log::error("SendSpecimenEmailJob: Invalid notification type: '{$this->type}' specified for Specimen ID {$this->specimen->id}.");

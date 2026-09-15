@@ -21,12 +21,26 @@ class SpecimenType extends Model
     protected $fillable = [
         'name',
         'description',
+        'requires_report',
         'active',
     ];
 
     protected $casts = [
+        'requires_report' => 'boolean',
         'active' => 'boolean',
     ];
+
+    public function states(): HasMany
+    {
+        return $this->hasMany(SpecimenTypeState::class, 'specimen_type_id')->orderBy('step_order');
+    }
+
+    public function activeStates(): HasMany
+    {
+        return $this->hasMany(SpecimenTypeState::class, 'specimen_type_id')
+            ->where('active', true)
+            ->orderBy('step_order');
+    }
 
     public function examinations(): HasMany
     {

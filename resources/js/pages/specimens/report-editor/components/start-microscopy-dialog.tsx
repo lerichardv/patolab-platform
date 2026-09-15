@@ -15,29 +15,39 @@ import { Button } from '@/components/ui/button';
 
 export interface StartMicroscopyDialogProps {
     onConfirm: () => void;
+    targetStatusLabel?: string;
+    buttonClassName?: string;
+    buttonSize?: 'default' | 'sm' | 'lg' | 'icon';
 }
 
 export function StartMicroscopyDialog({
     onConfirm,
+    targetStatusLabel = 'Microscopía',
+    buttonClassName,
+    buttonSize,
 }: StartMicroscopyDialogProps) {
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>
-                <Button className="cursor-pointer bg-fuchsia-600 font-semibold text-white shadow-sm hover:bg-fuchsia-700">
-                    Iniciar Fase de Microscopía
+                <Button
+                    size={buttonSize}
+                    className={
+                        buttonClassName ||
+                        'cursor-pointer bg-fuchsia-600 font-semibold text-white shadow-sm hover:bg-fuchsia-700'
+                    }
+                >
+                    Avanzar a {targetStatusLabel}
                 </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>
-                        ¿Iniciar fase de microscopía?
+                        ¿Avanzar a {targetStatusLabel}?
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                        Esta acción dará por finalizado el procesamiento
-                        físico/químico en laboratorio y habilitará la edición de
-                        la descripción microscópica y el diagnóstico de forma
-                        colaborativa. El estado cambiará a{' '}
-                        <strong>Microscopía</strong>.
+                        Esta acción dará por finalizada la fase actual y
+                        habilitará la siguiente fase ({targetStatusLabel}). El
+                        estado cambiará a <strong>{targetStatusLabel}</strong>.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

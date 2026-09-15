@@ -139,6 +139,8 @@ export interface ReportEditorProps {
     priorities?: any[];
     locations?: any[];
     sequences?: any[];
+    nextStatus?: string | null;
+    availableStates?: any[];
     activeLocationId?: number | null;
     banks?: any[];
 }

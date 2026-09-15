@@ -15,16 +15,28 @@ import { Button } from '@/components/ui/button';
 
 export interface CompleteMacroscopyDialogProps {
     onConfirm: () => void;
+    targetStatusLabel?: string;
+    buttonClassName?: string;
+    buttonSize?: 'default' | 'sm' | 'lg' | 'icon';
 }
 
 export function CompleteMacroscopyDialog({
     onConfirm,
+    targetStatusLabel = 'Procesamiento',
+    buttonClassName,
+    buttonSize,
 }: CompleteMacroscopyDialogProps) {
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>
-                <Button className="cursor-pointer bg-violet-600 font-semibold text-white shadow-sm hover:bg-violet-700">
-                    Completar Macroscopía y Enviar a Procesamiento
+                <Button
+                    size={buttonSize}
+                    className={
+                        buttonClassName ||
+                        'cursor-pointer bg-violet-600 font-semibold text-white shadow-sm hover:bg-violet-700'
+                    }
+                >
+                    Completar Macroscopía y Enviar a {targetStatusLabel}
                 </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -34,9 +46,9 @@ export function CompleteMacroscopyDialog({
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                         Esta acción marcará la descripción macroscópica como
-                        completada y enviará la muestra a la fase de
-                        procesamiento en laboratorio. El estado de la muestra
-                        cambiará a <strong>Procesando</strong>.
+                        completada y enviará la muestra a la siguiente fase (
+                        {targetStatusLabel}). El estado de la muestra cambiará a{' '}
+                        <strong>{targetStatusLabel}</strong>.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

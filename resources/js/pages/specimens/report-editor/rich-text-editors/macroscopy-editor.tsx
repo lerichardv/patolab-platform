@@ -11,6 +11,7 @@ import {
 import { CollaborativeEditor } from '../components/collaborative-editor';
 import { CompleteMacroscopyDialog } from '../components/complete-macroscopy-dialog';
 import { ReadOnlyEditor } from '../components/read-only-editor';
+import type { SpecimenStatus } from '../types';
 import type { MacroscopyEditorProps } from './types';
 
 export function MacroscopyEditor({
@@ -32,7 +33,22 @@ export function MacroscopyEditor({
     handleEditorFocus,
     handleEditorBlur,
     dragHandleProps,
+    nextStatus = null,
+    availableStates = [],
 }: MacroscopyEditorProps) {
+    const nextStateObj = availableStates.find(
+        (s: any) => (s.status ?? s) === nextStatus,
+    );
+    const nextStatusLabel =
+        nextStateObj?.label ||
+        (nextStatus === 'processing'
+            ? 'Procesamiento'
+            : nextStatus === 'microscopic_review'
+              ? 'Microscopía'
+              : nextStatus === 'finalized'
+                ? 'Finalizado'
+                : nextStatus || 'Siguiente Fase');
+
     return (
         <>
             <div
@@ -68,24 +84,25 @@ export function MacroscopyEditor({
                                             )
                                         }
                                         className="scale-75"
-                                        disabled={!isAssigned}
                                     />
                                 </div>
                             </TooltipTrigger>
-                            <TooltipContent side="top">
-                                {(headingsToggles['macroscopy_html'] ?? true)
-                                    ? 'Ocultar título en PDF'
-                                    : 'Mostrar título en PDF'}
+                            <TooltipContent>
+                                Mostrar u ocultar sección
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
+
                     {hasCuttingsPermission && (
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-8 cursor-pointer gap-1.5 border-violet-500/30 text-violet-600 hover:bg-violet-50 hover:text-violet-700 dark:border-violet-500/20 dark:text-violet-400 dark:hover:bg-violet-500/10"
-                            onClick={onManageCuttingsClick}
+                            className="h-8 gap-1.5 border-violet-200 bg-violet-50/50 text-xs font-semibold text-violet-700 hover:bg-violet-100 hover:text-violet-800 dark:border-violet-900/50 dark:bg-violet-950/20 dark:text-violet-300 dark:hover:bg-violet-900/40"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onManageCuttingsClick();
+                            }}
                         >
                             <Scissors className="h-3.5 w-3.5" />
                             <span>Gestionar Cortes</span>
@@ -115,10 +132,13 @@ export function MacroscopyEditor({
                 <ReadOnlyEditor content={macroscopyHtml} />
             )}
 
-            {specimen.status === 'macroscopic_review' && (
+            {specimen.status === 'macroscopic_review' && nextStatus && (
                 <div className="flex justify-end pt-2">
                     <CompleteMacroscopyDialog
-                        onConfirm={() => onTransitionState('processing')}
+                        targetStatusLabel={nextStatusLabel}
+                        onConfirm={() =>
+                            onTransitionState(nextStatus as SpecimenStatus)
+                        }
                     />
                 </div>
             )}
