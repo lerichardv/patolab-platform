@@ -518,27 +518,39 @@ export default function SpecimenQuickEditForm({
                                 <SelectValue placeholder="Seleccionar estado" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="received">
-                                    Recibido
-                                </SelectItem>
-                                <SelectItem value="macroscopic_review">
-                                    Revisión Macroscópica
-                                </SelectItem>
-                                <SelectItem value="processing">
-                                    Procesamiento
-                                </SelectItem>
-                                <SelectItem value="microscopic_review">
-                                    Revisión Microscópica
-                                </SelectItem>
-                                <SelectItem value="finalized">
-                                    Finalizado
-                                </SelectItem>
-                                <SelectItem value="delivered">
-                                    Entregado
-                                </SelectItem>
-                                <SelectItem value="cancelled">
-                                    Cancelado
-                                </SelectItem>
+                                {(() => {
+                                    const defaultOptions = [
+                                        { value: 'received', label: 'Recibido', step_order: 1 },
+                                        { value: 'macroscopic_review', label: 'Revisión Macroscópica', step_order: 2 },
+                                        { value: 'processing', label: 'Procesamiento', step_order: 3 },
+                                        { value: 'microscopic_review', label: 'Revisión Microscópica', step_order: 4 },
+                                        { value: 'finalized', label: 'Finalizado', step_order: 5 },
+                                        { value: 'delivered', label: 'Entregado', step_order: 6 },
+                                        { value: 'cancelled', label: 'Cancelado', step_order: 7 },
+                                    ];
+
+                                    const typeStates = specimen?.type?.active_states || specimen?.type?.activeStates;
+
+                                    let options = defaultOptions;
+                                    if (Array.isArray(typeStates) && typeStates.length > 0) {
+                                        const activeMap = new Map<string, number>();
+                                        typeStates.forEach((ts: any) => activeMap.set(ts.status, ts.step_order));
+
+                                        options = defaultOptions
+                                            .filter((opt) => activeMap.has(opt.value) || opt.value === data.status)
+                                            .map((opt) => ({
+                                                ...opt,
+                                                step_order: activeMap.get(opt.value) ?? opt.step_order,
+                                            }))
+                                            .sort((a, b) => a.step_order - b.step_order);
+                                    }
+
+                                    return options.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </SelectItem>
+                                    ));
+                                })()}
                             </SelectContent>
                         </Select>
                         {errors.status && (

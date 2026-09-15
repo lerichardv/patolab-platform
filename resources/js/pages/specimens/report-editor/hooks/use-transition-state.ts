@@ -1,3 +1,4 @@
+import { transitionState } from '@/actions/App/Http/Controllers/Editor/ReportEditorController';
 import { router } from '@inertiajs/react';
 import { useCallback, useState } from 'react';
 import type React from 'react';
@@ -41,7 +42,7 @@ export function useTransitionState({
             }
 
             router.post(
-                `/specimens/${specimen.sequence_code}/report-editor/transition-state`,
+                transitionState.url(specimen.sequence_code),
                 {
                     status: targetStatus,
                 },

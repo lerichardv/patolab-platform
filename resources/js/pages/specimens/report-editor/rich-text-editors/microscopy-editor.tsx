@@ -11,6 +11,7 @@ import {
 import { CollaborativeEditor } from '../components/collaborative-editor';
 import { ReadOnlyEditor } from '../components/read-only-editor';
 import { StartMicroscopyDialog } from '../components/start-microscopy-dialog';
+import type { SpecimenStatus } from '../types';
 import type { MicroscopyEditorProps } from './types';
 
 export function MicroscopyEditor({
@@ -34,7 +35,20 @@ export function MicroscopyEditor({
     handleEditorFocus,
     handleEditorBlur,
     dragHandleProps,
+    nextStatus = null,
+    availableStates = [],
 }: MicroscopyEditorProps) {
+    const nextStateObj = availableStates.find(
+        (s: any) => (s.status ?? s) === nextStatus,
+    );
+    const nextStatusLabel =
+        nextStateObj?.label ||
+        (nextStatus === 'microscopic_review'
+            ? 'Microscopía'
+            : nextStatus === 'finalized'
+              ? 'Finalizado'
+              : nextStatus || 'Siguiente Fase');
+
     return (
         <>
             <div
@@ -96,20 +110,21 @@ export function MicroscopyEditor({
                 </div>
             )}
 
-            {specimen.status === 'processing' && (
+            {specimen.status === 'processing' && nextStatus && (
                 <div className="relative flex min-h-[160px] flex-col items-center justify-center overflow-hidden rounded-lg border bg-muted/10 p-6 text-center">
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 p-4 backdrop-blur-xs">
                         <h4 className="mb-2 text-xs font-bold">
                             Fase de Procesamiento en Curso
                         </h4>
                         <p className="mb-4 max-w-xs text-[10px] text-muted-foreground">
-                            Haga clic a continuación para pasar la muestra a
-                            revisión microscópica e iniciar la redacción
+                            Haga clic a continuación para avanzar la muestra a{' '}
+                            {nextStatusLabel} e iniciar la redacción
                             colaborativa del reporte.
                         </p>
                         <StartMicroscopyDialog
+                            targetStatusLabel={nextStatusLabel}
                             onConfirm={() =>
-                                onTransitionState('microscopic_review')
+                                onTransitionState(nextStatus as SpecimenStatus)
                             }
                         />
                     </div>

@@ -107,6 +107,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimens/reserve-code', [SpecimenSequenceController::class, 'reserve'])->name('specimens.reserve-code');
     Route::post('specimens/update-order', [SpecimenController::class, 'updateOrder'])->name('specimens.update-order');
     Route::post('specimens/bulk-action', [SpecimenController::class, 'bulkAction'])->name('specimens.bulk-action');
+    Route::post('specimens/{specimen}/change-status', [SpecimenController::class, 'changeStatus'])->name('specimens.change-status');
     Route::post('specimens/{specimen}/assign-user', [SpecimenController::class, 'assignUser'])->name('specimens.assign-user');
     Route::post('specimens/{specimen}/unassign-user', [SpecimenController::class, 'unassignUser'])->name('specimens.unassign-user');
     Route::post('specimens/{specimen}/assign-collaborator', [SpecimenController::class, 'assignCollaborator'])->name('specimens.assign-collaborator');
@@ -188,6 +189,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('specimen-types/import', [SpecimenTypeController::class, 'importPage'])->name('specimen-types.import-page');
     Route::post('specimen-types/import/parse', [SpecimenTypeController::class, 'parseImport'])->name('specimen-types.import-parse');
     Route::post('specimen-types/import/row', [SpecimenTypeController::class, 'importRow'])->name('specimen-types.import-row');
+    Route::get('specimen-types/{specimen_type}/states', [SpecimenTypeController::class, 'getStates'])->name('specimen-types.get-states');
+    Route::put('specimen-types/{specimen_type}/states', [SpecimenTypeController::class, 'updateStates'])->name('specimen-types.update-states');
     Route::resource('specimen-types', SpecimenTypeController::class);
     Route::get('specimen-type-examinations/import', [SpecimenTypeExaminationController::class, 'importPage'])->name('specimen-type-examinations.import-page');
     Route::post('specimen-type-examinations/import/parse', [SpecimenTypeExaminationController::class, 'parseImport'])->name('specimen-type-examinations.import-parse');

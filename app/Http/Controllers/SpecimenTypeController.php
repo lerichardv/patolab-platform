@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\SpecimenType;
+use App\Models\SpecimenTypeState;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -53,10 +55,29 @@ class SpecimenTypeController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        SpecimenType::create([
+        $specimenType = SpecimenType::create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
         ]);
+
+        // Automatically initialize default states
+        $defaultStates = [
+            1 => 'received',
+            2 => 'macroscopic_review',
+            3 => 'processing',
+            4 => 'microscopic_review',
+            5 => 'finalized',
+            6 => 'delivered',
+            7 => 'cancelled',
+        ];
+
+        foreach ($defaultStates as $order => $status) {
+            $specimenType->states()->create([
+                'status' => $status,
+                'step_order' => $order,
+                'active' => true,
+            ]);
+        }
 
         return redirect()->back();
     }
@@ -83,6 +104,99 @@ class SpecimenTypeController extends Controller
         $specimenType->update(['active' => false]);
 
         return redirect()->back();
+    }
+
+    /**
+     * Get configured states for a specific specimen type.
+     */
+    public function getStates(SpecimenType $specimenType)
+    {
+        Gate::authorize('specimen_types.view');
+
+        $states = $specimenType->states()->orderBy('step_order')->get();
+
+        // If for any reason no states exist, provide defaults
+        if ($states->isEmpty()) {
+            $defaultStates = [
+                1 => 'received',
+                2 => 'macroscopic_review',
+                3 => 'processing',
+                4 => 'microscopic_review',
+                5 => 'finalized',
+                6 => 'delivered',
+                7 => 'cancelled',
+            ];
+            foreach ($defaultStates as $order => $status) {
+                $states->push($specimenType->states()->create([
+                    'status' => $status,
+                    'step_order' => $order,
+                    'active' => true,
+                ]));
+            }
+        }
+
+        // Attach metadata to each state
+        $statesWithMeta = $states->map(function ($state) {
+            $meta = SpecimenTypeState::ALL_STATUSES[$state->status] ?? [
+                'label' => ucfirst(str_replace('_', ' ', $state->status)),
+                'color' => '#cbd5e1',
+                'description' => '',
+            ];
+
+            return [
+                'id' => $state->id,
+                'status' => $state->status,
+                'step_order' => (int) $state->step_order,
+                'active' => (bool) $state->active,
+                'label' => $meta['label'],
+                'color' => $meta['color'],
+                'description' => $meta['description'],
+            ];
+        });
+
+        return response()->json([
+            'specimen_type' => [
+                'id' => $specimenType->id,
+                'name' => $specimenType->name,
+            ],
+            'states' => $statesWithMeta,
+        ]);
+    }
+
+    /**
+     * Update configured states and orders for a specimen type.
+     */
+    public function updateStates(Request $request, SpecimenType $specimenType)
+    {
+        Gate::authorize('specimen_types.edit');
+
+        $validated = $request->validate([
+            'states' => 'required|array|min:1',
+            'states.*.status' => 'required|string|in:received,macroscopic_review,processing,microscopic_review,finalized,delivered,cancelled',
+            'states.*.step_order' => 'required|integer|min:1',
+            'states.*.active' => 'required|boolean',
+        ]);
+
+        $activeStates = collect($validated['states'])->where('active', true);
+        if ($activeStates->isEmpty()) {
+            throw ValidationException::withMessages([
+                'states' => ['Debe haber al menos un estado activo en el flujo.'],
+            ]);
+        }
+
+        DB::transaction(function () use ($specimenType, $validated) {
+            foreach ($validated['states'] as $stateData) {
+                $specimenType->states()->updateOrCreate(
+                    ['status' => $stateData['status']],
+                    [
+                        'step_order' => $stateData['step_order'],
+                        'active' => $stateData['active'],
+                    ]
+                );
+            }
+        });
+
+        return redirect()->back()->with('success', 'Flujo de estados actualizado con éxito.');
     }
 
     public function importPage()
@@ -160,6 +274,24 @@ class SpecimenTypeController extends Controller
             $validated['active'] = true;
 
             $specimenType = SpecimenType::create($validated);
+
+            $defaultStates = [
+                1 => 'received',
+                2 => 'macroscopic_review',
+                3 => 'processing',
+                4 => 'microscopic_review',
+                5 => 'finalized',
+                6 => 'delivered',
+                7 => 'cancelled',
+            ];
+
+            foreach ($defaultStates as $order => $status) {
+                $specimenType->states()->create([
+                    'status' => $status,
+                    'step_order' => $order,
+                    'active' => true,
+                ]);
+            }
 
             return response()->json([
                 'success' => true,

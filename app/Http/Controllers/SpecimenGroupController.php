@@ -1540,8 +1540,9 @@ class SpecimenGroupController extends Controller
             ->where('access_token', $token)
             ->with([
                 'specimens.customerRelation',
-                'specimens.type',
+                'specimens.type.activeStates',
                 'specimens.examination',
+                'specimens.specimenExaminations.examination',
                 'specimens.category',
                 'specimens.referrerRelation',
                 'specimens.priority',

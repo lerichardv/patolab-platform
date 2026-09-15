@@ -113,7 +113,6 @@ import type { Collaborator } from './components/collaborators-list';
 import { CompleteMicroscopyDialog } from './components/complete-microscopy-dialog';
 import { EditorRegistryContext } from './components/editor-registry-context';
 import { editorStyles } from './components/editor-styles';
-import { EnableEditingDialog } from './components/enable-editing-dialog';
 import { LoadingReportScreen } from './components/loading-report-screen';
 import { MissingSignaturesDialog } from './components/missing-signatures-dialog';
 import TemplateSelector from './components/template-selector';
@@ -146,6 +145,7 @@ import {
 	ProtocolsEditor,
 } from './rich-text-editors';
 import { ReportPaginator } from './services';
+import SpecimenActionBar from './specimen-action-bar';
 import SpecimenInsumosCard from './specimen-insumos-card';
 import { EditorToolbar } from './toolbar';
 import type {
@@ -177,6 +177,8 @@ export default function ReportWorkspace({
 	priorities = [],
 	locations = [],
 	sequences = [],
+	nextStatus = null,
+	availableStates = [],
 	activeLocationId = null,
 	banks = [],
 }: Props) {
@@ -2036,6 +2038,8 @@ export default function ReportWorkspace({
 		return (
 			<BlankReportScreen
 				specimen={specimen}
+				nextStatus={nextStatus}
+				availableStates={availableStates}
 				templates={templates}
 				isAssigned={isAssigned}
 			/>
@@ -2194,25 +2198,6 @@ export default function ReportWorkspace({
 									</div>
 								</div>
 								<div className="flex items-center gap-2">
-									{isFinished && !sessionEditingEnabled && (
-										<EnableEditingDialog
-											disabled={!canEnableEditing}
-											onConfirm={() => {
-												if (!canEnableEditing) {
-													toast.error(
-														'No tienes permisos para activar la edición de este reporte.',
-													);
-
-													return;
-												}
-
-												setSessionEditingEnabled(true);
-												toast.success(
-													'Edición activada para esta sesión',
-												);
-											}}
-										/>
-									)}
 									{isFinished && sessionEditingEnabled && (
 										<div className="flex items-center gap-2">
 											<span className="animate-pulse rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-amber-600 uppercase dark:text-amber-400">
@@ -2249,45 +2234,77 @@ export default function ReportWorkspace({
 											<span className="text-[10px] tracking-tight text-muted-foreground uppercase">
 												Fase actual
 											</span>
-											<span
-												className="rounded-full px-2.5 py-1 text-xs font-semibold tracking-wider uppercase"
-												style={{
-													backgroundColor:
-														specimen.status ===
-															'macroscopic_review'
-															? '#8b5cf620'
-															: specimen.status ===
-																'processing'
-																? '#f59e0b20'
-																: specimen.status ===
-																	'microscopic_review'
-																	? '#d946ef20'
-																	: '#10b98120',
-													color:
-														specimen.status ===
-															'macroscopic_review'
-															? '#8b5cf6'
-															: specimen.status ===
-																'processing'
-																? '#d97706'
-																: specimen.status ===
-																	'microscopic_review'
-																	? '#d946ef'
-																	: '#059669',
-													border: `1px solid ${specimen.status === 'macroscopic_review' ? '#8b5cf630' : specimen.status === 'processing' ? '#d9770630' : specimen.status === 'microscopic_review' ? '#d946ef30' : '#05966930'}`,
-												}}
-											>
-												{specimen.status ===
-													'macroscopic_review'
-													? 'Macroscopía'
-													: specimen.status ===
-														'processing'
-														? 'Procesando'
-														: specimen.status ===
-															'microscopic_review'
-															? 'Microscopía'
-															: 'Finalizado'}
-											</span>
+											{(() => {
+												const stateFromAvailable =
+													availableStates?.find(
+														(s: any) =>
+															(s.status ?? s) ===
+															specimen.status,
+													);
+												const defaultStyles: Record<
+													string,
+													{
+														label: string;
+														color: string;
+													}
+												> = {
+													received: {
+														label: 'Recibido',
+														color: '#3b82f6',
+													},
+													macroscopic_review: {
+														label: 'Macroscopía',
+														color: '#8b5cf6',
+													},
+													processing: {
+														label: 'Procesando',
+														color: '#d97706',
+													},
+													microscopic_review: {
+														label: 'Microscopía',
+														color: '#d946ef',
+													},
+													finalized: {
+														label: 'Finalizado',
+														color: '#059669',
+													},
+													delivered: {
+														label: 'Entregado',
+														color: '#64748b',
+													},
+													cancelled: {
+														label: 'Cancelado',
+														color: '#ef4444',
+													},
+												};
+
+												const currentMeta =
+													defaultStyles[
+														specimen.status
+													] || {
+														label: specimen.status,
+														color: '#64748b',
+													};
+												const label =
+													stateFromAvailable?.label ||
+													currentMeta.label;
+												const color =
+													stateFromAvailable?.color ||
+													currentMeta.color;
+
+												return (
+													<span
+														className="rounded-full px-2.5 py-1 text-xs font-semibold tracking-wider uppercase"
+														style={{
+															backgroundColor: `${color}20`,
+															color: color,
+															border: `1px solid ${color}35`,
+														}}
+													>
+														{label}
+													</span>
+												);
+											})()}
 											{hasCuttingsPermission && (
 												<Button
 													type="button"
@@ -3041,6 +3058,12 @@ export default function ReportWorkspace({
 																				dragHandleProps={
 																					provided.dragHandleProps
 																				}
+																				nextStatus={
+																					nextStatus
+																				}
+																				availableStates={
+																					availableStates
+																				}
 																			/>
 																		)}
 
@@ -3112,6 +3135,12 @@ export default function ReportWorkspace({
 																				}
 																				dragHandleProps={
 																					provided.dragHandleProps
+																				}
+																				nextStatus={
+																					nextStatus
+																				}
+																				availableStates={
+																					availableStates
 																				}
 																			/>
 																		)}
@@ -3404,6 +3433,34 @@ export default function ReportWorkspace({
 							renderPreviewPage={renderPreviewPage}
 							pages={pages}
 							onBeforeDownload={saveReportEditorAsync}
+						/>
+
+						<SpecimenActionBar
+							specimen={specimen}
+							nextStatus={nextStatus}
+							availableStates={availableStates}
+							isFinished={isFinished}
+							sessionEditingEnabled={sessionEditingEnabled}
+							canEnableEditing={canEnableEditing}
+							isGeneratingPdf={isGeneratingPdf}
+							hasMacroAccess={hasMacroAccess}
+							hasMicroAccess={hasMicroAccess}
+							onEnableEditingClick={() => {
+								if (!canEnableEditing) {
+									toast.error(
+										'No tienes permisos para activar la edición de este reporte.',
+									);
+
+									return;
+								}
+
+								setSessionEditingEnabled(true);
+								toast.success(
+									'Modo de edición activado para esta sesión.',
+								);
+							}}
+							onTransitionState={handleTransitionState}
+							onStartMicroscopyFinalization={handleStartMicroscopyFinalization}
 						/>
 					</div>
 

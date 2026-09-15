@@ -59,6 +59,8 @@ export interface MacroscopyEditorProps extends BaseRichTextEditorProps {
     hasCuttingsPermission?: boolean;
     onManageCuttingsClick: () => void;
     onTransitionState: (state: SpecimenStatus) => void;
+    nextStatus?: string | null;
+    availableStates?: any[];
 }
 
 export interface MicroscopyEditorProps extends BaseRichTextEditorProps {
@@ -71,6 +73,8 @@ export interface MicroscopyEditorProps extends BaseRichTextEditorProps {
     isGeneratingPdf: boolean;
     onTransitionState: (state: SpecimenStatus) => void;
     onStartMicroscopyFinalization: () => void;
+    nextStatus?: string | null;
+    availableStates?: any[];
 }
 
 export interface CommentsNotesEditorProps extends BaseRichTextEditorProps {

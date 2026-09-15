@@ -34,8 +34,11 @@ import { cn } from '@/lib/utils';
 export interface BlankReportScreenProps {
     specimen: {
         sequence_code: string;
+        status?: string;
         [key: string]: any;
     };
+    nextStatus?: string | null;
+    availableStates?: any[];
     templates?: any[];
     isAssigned: boolean;
     onCreateReport?: (templateIds: string[] | string | null) => void;
@@ -43,6 +46,8 @@ export interface BlankReportScreenProps {
 
 export function BlankReportScreen({
     specimen,
+    nextStatus = null,
+    availableStates = [],
     templates = [],
     isAssigned,
     onCreateReport,
@@ -129,9 +134,7 @@ export function BlankReportScreen({
             },
             {
                 onSuccess: () => {
-                    toast.success(
-                        'Reporte creado y estado actualizado a revisión macroscópica',
-                    );
+                    toast.success('Reporte creado con éxito');
                 },
                 onError: (errors) => {
                     toast.error('Error al crear el reporte');
@@ -140,6 +143,30 @@ export function BlankReportScreen({
             },
         );
     };
+
+    const targetStateObj = availableStates.find(
+        (s: any) => (s.status ?? s) === nextStatus,
+    );
+    const targetStatusLabel =
+        targetStateObj?.label ||
+        (nextStatus === 'macroscopic_review'
+            ? 'Revisión Macroscópica'
+            : nextStatus === 'processing'
+              ? 'Procesamiento'
+              : nextStatus === 'microscopic_review'
+                ? 'Revisión Microscópica'
+                : nextStatus === 'finalized'
+                  ? 'Finalizado'
+                  : nextStatus || 'Siguiente Fase');
+
+    const currentStateObj = availableStates.find(
+        (s: any) => (s.status ?? s) === specimen.status,
+    );
+    const currentStatusLabel =
+        currentStateObj?.label ||
+        (specimen.status === 'received'
+            ? 'Recibido'
+            : specimen.status || 'Inicial');
 
     return (
         <EditorLayout
@@ -163,11 +190,11 @@ export function BlankReportScreen({
                         iniciar el reporte se creará la plantilla del documento
                         y el estado cambiará de{' '}
                         <span className="font-semibold text-primary">
-                            Recibido
+                            {currentStatusLabel}
                         </span>{' '}
                         a{' '}
                         <span className="font-semibold text-violet-500">
-                            Revisión Macroscópica
+                            {targetStatusLabel}
                         </span>
                         .
                     </p>

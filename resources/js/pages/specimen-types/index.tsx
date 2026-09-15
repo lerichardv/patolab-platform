@@ -10,6 +10,7 @@ import {
     Search,
     Trash2,
     Upload,
+    Workflow,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -40,6 +41,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import SpecimenTypeSheet from './specimen-type-sheet';
+import SpecimenTypeStatesSheet from './specimen-type-states-sheet';
 
 interface SpecimenType {
     id: number;
@@ -76,6 +78,9 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
     const canDelete = auth.permissions?.includes('specimen_types.delete');
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [isStatesSheetOpen, setIsStatesSheetOpen] = useState(false);
+    const [selectedTypeForStates, setSelectedTypeForStates] =
+        useState<SpecimenType | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedSpecimenType, setSelectedSpecimenType] =
         useState<SpecimenType | null>(null);
@@ -278,15 +283,34 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                                             {(canEdit || canDelete) && (
                                                 <div className="flex justify-end gap-2">
                                                     {canEdit && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() =>
-                                                                handleEdit(type)
-                                                            }
-                                                        >
-                                                            <Edit2 className="h-4 w-4" />
-                                                        </Button>
+                                                        <>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => {
+                                                                    setSelectedTypeForStates(
+                                                                        type,
+                                                                    );
+                                                                    setIsStatesSheetOpen(
+                                                                        true,
+                                                                    );
+                                                                }}
+                                                                title="Gestionar Flujo de Estados"
+                                                                className="text-violet-600 hover:bg-violet-50 hover:text-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/40"
+                                                            >
+                                                                <Workflow className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() =>
+                                                                    handleEdit(type)
+                                                                }
+                                                                title="Editar Tipo de Muestra"
+                                                            >
+                                                                <Edit2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </>
                                                     )}
                                                     {canDelete && (
                                                         <Button
@@ -298,6 +322,7 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                                                                     type,
                                                                 )
                                                             }
+                                                            title="Desactivar"
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
@@ -335,6 +360,12 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                 specimenType={selectedSpecimenType}
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
+            />
+
+            <SpecimenTypeStatesSheet
+                specimenType={selectedTypeForStates}
+                open={isStatesSheetOpen}
+                onOpenChange={setIsStatesSheetOpen}
             />
 
             <AlertDialog

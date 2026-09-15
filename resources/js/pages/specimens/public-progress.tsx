@@ -1,9 +1,8 @@
 import { Head, Link } from '@inertiajs/react';
-import { format, add, isPast, isToday } from 'date-fns';
+import { format, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
     Microscope,
-    Calendar,
     Clock,
     Tag,
     User,
@@ -11,9 +10,6 @@ import {
     AlertTriangle,
     Loader2,
     ShieldAlert,
-    MapPin,
-    Activity,
-    FileText,
     ArrowLeft,
 } from 'lucide-react';
 import React from 'react';
@@ -62,6 +58,27 @@ const STATUS_STEPS = [
 ];
 
 export default function PublicProgress({ specimen }: Props) {
+    const dynamicSteps = React.useMemo(() => {
+        if (!specimen) {
+            return STATUS_STEPS;
+        }
+
+        const activeStatesConfig: Array<{ status: string }> =
+            specimen.type?.active_states || specimen.type?.activeStates || [];
+
+        if (activeStatesConfig && activeStatesConfig.length > 0) {
+            const mapped = activeStatesConfig
+                .map((state) => STATUS_STEPS.find((s) => s.key === state.status))
+                .filter(Boolean) as typeof STATUS_STEPS;
+
+            if (mapped.length > 0) {
+                return mapped;
+            }
+        }
+
+        return STATUS_STEPS;
+    }, [specimen]);
+
     if (!specimen) {
         return (
             <GuestLayout showLogo={true} title="Error">
@@ -102,7 +119,7 @@ export default function PublicProgress({ specimen }: Props) {
         : false;
 
     // Determine active step index
-    const currentStepIndex = STATUS_STEPS.findIndex(
+    const currentStepIndex = dynamicSteps.findIndex(
         (step) => step.key === specimen.status,
     );
     const isCancelled = specimen.status === 'cancelled';
@@ -228,13 +245,47 @@ export default function PublicProgress({ specimen }: Props) {
                             </div>
                             <div className="space-y-1">
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Tag className="h-3.5 w-3.5" /> Examen
-                                    Solicitado
+                                    <Tag className="h-3.5 w-3.5" /> Examen(es) Solicitado(s)
                                 </span>
-                                <p className="text-sm font-semibold">
-                                    {specimen.type?.name} -{' '}
-                                    {specimen.examination?.name}
-                                </p>
+                                <div className="text-sm font-semibold">
+                                    <p className="text-foreground">{specimen.type?.name || 'N/A'}</p>
+                                    {(() => {
+                                        const rawExams =
+                                            specimen.specimen_examinations ||
+                                            specimen.specimenExaminations ||
+                                            specimen.examinations ||
+                                            [];
+
+                                        const examNames: string[] = rawExams
+                                            .map((item: any) => item.examination?.name || item.name)
+                                            .filter(Boolean);
+
+                                        if (examNames.length === 0 && specimen.examination?.name) {
+                                            examNames.push(specimen.examination.name);
+                                        }
+
+                                        if (examNames.length === 0) {
+                                            return (
+                                                <p className="text-xs font-normal text-muted-foreground">
+                                                    Sin exámenes especificados
+                                                </p>
+                                            );
+                                        }
+
+                                        return (
+                                            <div className="mt-1 flex flex-wrap gap-1.5">
+                                                {examNames.map((name, idx) => (
+                                                    <span
+                                                        key={`${name}-${idx}`}
+                                                        className="inline-flex items-center rounded-md border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary"
+                                                    >
+                                                        {name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
                             </div>
 
                             {formattedEstimatedDate && !isCompleted && (
@@ -285,7 +336,7 @@ export default function PublicProgress({ specimen }: Props) {
                                 </h3>
 
                                 <div className="relative space-y-8 pl-6 before:absolute before:top-2 before:bottom-2 before:left-[11px] before:w-[2px] before:bg-border/60 md:pl-8">
-                                    {STATUS_STEPS.map((step, idx) => {
+                                    {dynamicSteps.map((step, idx) => {
                                         const isDelivered =
                                             specimen.status === 'delivered';
                                         const isPastStep = isDelivered

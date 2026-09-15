@@ -27,7 +27,7 @@ use App\Models\WorkOrderTask;
 use App\Models\WorkOrderType;
 use App\Services\ImageOptimizerService;
 use App\Services\ReportPdfService;
-use App\Services\WhatsAppService;
+use App\Services\SpecimenStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -443,10 +443,16 @@ class ReportEditorController extends Controller
         $workOrderTypes = WorkOrderType::orderBy('name')->get();
         $workOrderTasks = WorkOrderTask::orderBy('name')->get();
 
+        $statusService = app(SpecimenStatusService::class);
+        $nextStatus = $statusService->getNextStatus($specimen);
+        $availableStates = $statusService->getAvailableStatesForType($specimen->specimen_type);
+
         return Inertia::render('specimens/report-editor/report-editor', [
             'specimen' => $specimen,
             'report' => $specimen->report,
             'templates' => $templates,
+            'nextStatus' => $nextStatus,
+            'availableStates' => $availableStates,
             'auth' => [
                 'user' => [
                     'id' => auth()->user()->id,
@@ -506,7 +512,9 @@ class ReportEditorController extends Controller
 
         $updateData = ['report_id' => $report->id];
         if (in_array($specimen->status, ['registered', 'received', 'pending'])) {
-            $updateData['status'] = 'macroscopic_review';
+            $statusService = app(SpecimenStatusService::class);
+            $targetStatus = $statusService->getNextStatus($specimen) ?? $specimen->status;
+            $updateData['status'] = $targetStatus;
         }
 
         $specimen->update($updateData);
@@ -639,23 +647,30 @@ class ReportEditorController extends Controller
                 'headings_toggles' => $firstTemplate?->headings_toggles ?? null,
             ]);
 
+            $statusService = app(SpecimenStatusService::class);
+            $targetStatus = $statusService->getNextStatus($specimen) ?? $specimen->status;
+
             $specimen->update([
                 'report_id' => $report->id,
-                'status' => 'macroscopic_review',
+                'status' => $targetStatus,
             ]);
 
             $createdReport = $report;
         });
 
+        $statusMeta = app(SpecimenStatusService::class)->getStatusMetadata($specimen->status);
+        $statusLabel = $statusMeta['label'] ?? $specimen->status;
+        $successMessage = "Reporte creado y estado de muestra actualizado a {$statusLabel}.";
+
         if (! $request->header('X-Inertia') && ($request->wantsJson() || $request->ajax())) {
             return response()->json([
                 'status' => 'success',
-                'message' => 'Reporte creado y estado de muestra actualizado a revisión macroscópica.',
+                'message' => $successMessage,
                 'report' => $createdReport ?? $specimen->report,
             ]);
         }
 
-        return redirect()->back()->with('success', 'Reporte creado y estado de muestra actualizado a revisión macroscópica.');
+        return redirect()->back()->with('success', $successMessage);
     }
 
     /**
@@ -984,98 +999,29 @@ class ReportEditorController extends Controller
     {
         $this->authorizeSpecimenAccess($specimen);
 
+        $statusService = app(SpecimenStatusService::class);
+
         $request->validate([
-            'status' => 'required|string|in:macroscopic_review,processing,microscopic_review,finalized',
+            'status' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) use ($statusService, $specimen) {
+                    if (! $statusService->canTransitionTo($specimen, $value)) {
+                        $fail('El estado solicitado no está habilitado para el tipo de muestra actual.');
+                    }
+                },
+            ],
         ]);
 
-        $report = $this->ensureReport($specimen);
+        $this->ensureReport($specimen);
 
-        $status = $request->status;
-
-        if ($status === 'finalized') {
-            if (! $request->user()?->can('specimens.finalize')) {
-                return redirect()->back()->withErrors([
-                    'error' => 'No tienes permiso para finalizar el reporte de esta muestra.',
-                ]);
-            }
-
-            $unsignedUsers = $specimen->users()->where(function ($q) {
-                $q->whereNull('user_signature')->orWhere('user_signature', '');
-            })->get();
-
-            if ($unsignedUsers->isNotEmpty()) {
-                $names = $unsignedUsers->pluck('name')->implode(', ');
-
-                return redirect()->back()->withErrors([
-                    'error' => "No se puede finalizar el reporte porque los siguientes patólogos no han definido su firma: {$names}.",
-                ]);
-            }
-        }
-
-        $reportData = [];
-
-        if ($status === 'processing') {
-            $reportData['macroscopy_finalization_datetime'] = now();
-        } elseif ($status === 'microscopic_review') {
-            $reportData['microscopy_finalization_datetime'] = now();
-        } elseif ($status === 'finalized') {
-            $reportData['report_finalization_datetime'] = now();
-            if ($report->auto_finalization_date || empty($report->finalization_date)) {
-                $reportData['finalization_date'] = now()->format('Y-m-d');
-            }
-            $reportData['auto_finalization_date'] = false;
-        }
-
-        DB::transaction(function () use ($specimen, $report, $status, $reportData) {
-            if (! empty($reportData)) {
-                $report->update($reportData);
-            }
-            $specimen->update([
-                'status' => $status,
+        try {
+            $statusService->transition($specimen, $request->status, [
+                'user' => $request->user(),
             ]);
-
-            if ($status === 'finalized') {
-                $report->ensureValidationQrCode();
-
-                app(ReportPdfService::class)->generateAndStoreReport($specimen);
-
-                $this->calculateCommissions($specimen);
-
-                // Enviar notificación de WhatsApp al paciente
-                try {
-                    $customer = $specimen->customerRelation;
-                    if ($customer) {
-                        $link = route('specimens.show-public', [
-                            'specimen_code' => $specimen->sequence_code,
-                            'token' => $specimen->access_token,
-                            'delivery_token' => $specimen->delivery_token,
-                        ]);
-                        $patientName = $customer->name;
-                        $message = "Hola, {$patientName}. El reporte de su muestra con código {$specimen->sequence_code} ha sido finalizado. Puede ver el progreso y descargar su reporte en el siguiente enlace: {$link}";
-
-                        $phone = $customer->phone;
-                        $cleanPhone = preg_replace('/\D/', '', $phone);
-                        if (strlen($cleanPhone) === 8) {
-                            $cleanPhone = '504'.$cleanPhone;
-                        }
-
-                        // All messages will be sent to +504 3366-6885 while testing
-                        if (config('app.env') !== 'production') {
-                            $cleanPhone = '50433666885';
-                        }
-
-                        if (! empty($cleanPhone)) {
-                            $whatsapp = app(WhatsAppService::class);
-                            $whatsapp->sendText($cleanPhone, $message);
-                        }
-
-                        Log::info('WhatsApp de finalización de reporte enviado: '.$message);
-                    }
-                } catch (\Exception $e) {
-                    Log::error('Error enviando notificación de WhatsApp de finalización: '.$e->getMessage());
-                }
-            }
-        });
+        } catch (ValidationException $e) {
+            return redirect()->back()->withErrors($e->errors());
+        }
 
         return redirect()->back()->with('success', 'Estado de la muestra actualizado con éxito.');
     }

@@ -1,3 +1,4 @@
+import { Unlock } from 'lucide-react';
 import React from 'react';
 
 import {
@@ -23,11 +24,13 @@ import { cn } from '@/lib/utils';
 export interface EnableEditingDialogProps {
     onConfirm: () => void;
     disabled?: boolean;
+    className?: string;
 }
 
 export function EnableEditingDialog({
     onConfirm,
     disabled = false,
+    className,
 }: EnableEditingDialogProps) {
     const triggerButton = (
         <Button
@@ -35,11 +38,13 @@ export function EnableEditingDialog({
             size="sm"
             disabled={disabled}
             className={cn(
-                'border-amber-500/50 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400',
+                'gap-2 border-amber-500/50 bg-amber-500/10 text-xs font-semibold text-amber-600 hover:bg-amber-500/20 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-500/20 dark:hover:text-amber-300',
                 disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+                className,
             )}
         >
-            Activar edición
+            <Unlock className="h-3.5 w-3.5" />
+            <span>Activar edición</span>
         </Button>
     );
 
