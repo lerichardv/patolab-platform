@@ -382,3 +382,35 @@ test('specimen creation does not dispatch individual created email if it has a g
 
     Queue::assertNotPushed(SendSpecimenEmailJob::class);
 });
+
+test('finalized specimen with requires_report false sends email without attachment', function () {
+    $noReportType = SpecimenType::create([
+        'name' => 'Examen Sin Reporte',
+        'requires_report' => false,
+    ]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'BIO-0099-2026',
+        'customer' => $this->customer->id,
+        'specimen_type' => $noReportType->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'finalized',
+    ]);
+
+    $mockResend = Mockery::mock(ResendService::class);
+    $mockResend->shouldReceive('sendEmail')
+        ->once()
+        ->with(
+            $this->customer->email,
+            Mockery::on(fn ($subj) => str_contains($subj, 'Muestra Finalizada') && str_contains($subj, 'BIO-0099-2026')),
+            Mockery::on(fn ($html) => str_contains($html, '¡Su Muestra ha sido Finalizada!') && ! str_contains($html, 'Reporte Adjunto')),
+            Mockery::on(fn ($attachs) => count($attachs) === 0)
+        )
+        ->andReturn(true);
+
+    $job = new SendSpecimenEmailJob($specimen, 'finalized');
+    $job->handle($mockResend);
+});

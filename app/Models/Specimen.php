@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Jobs\SendSpecimenEmailJob;
+use App\Services\SpecimenStatusService;
 use App\Traits\Auditable;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -139,6 +140,8 @@ class Specimen extends Model
         'status_color',
         'expected_finalization_date',
         'expected_internal_finalization_date',
+        'next_status',
+        'next_status_label',
     ];
 
     public function resolveRouteBinding($value, $field = null)
@@ -156,6 +159,22 @@ class Specimen extends Model
     public function getStatusColorAttribute(): string
     {
         return self::STATUS_COLORS[$this->status] ?? '#cbd5e1';
+    }
+
+    public function getNextStatusAttribute(): ?string
+    {
+        return app(SpecimenStatusService::class)->getNextStatus($this);
+    }
+
+    public function getNextStatusLabelAttribute(): ?string
+    {
+        $next = $this->next_status;
+
+        if (! $next) {
+            return null;
+        }
+
+        return SpecimenTypeState::ALL_STATUSES[$next]['label'] ?? ucfirst(str_replace('_', ' ', $next));
     }
 
     public function customerRelation(): BelongsTo

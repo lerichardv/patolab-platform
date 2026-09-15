@@ -350,6 +350,10 @@ class ReportEditorController extends Controller
      */
     public function show(Specimen $specimen)
     {
+        if ($specimen->type && ! $specimen->type->requires_report) {
+            return redirect()->back()->with('error', "La muestra {$specimen->sequence_code} no requiere informe médico.");
+        }
+
         $specimen->load([
             'customerRelation',
             'type',

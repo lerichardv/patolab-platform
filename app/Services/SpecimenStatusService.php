@@ -17,6 +17,11 @@ use Illuminate\Validation\ValidationException;
 class SpecimenStatusService
 {
     /**
+     * Cache for states by specimen type id during request lifecycle.
+     */
+    protected array $statesCache = [];
+
+    /**
      * Get all configured states for a given specimen type, ordered by step_order.
      *
      * @param  SpecimenType|int|null  $specimenType
@@ -29,15 +34,15 @@ class SpecimenStatusService
             return $this->getDefaultSystemStates();
         }
 
-        $states = SpecimenTypeState::where('specimen_type_id', $typeId)
-            ->orderBy('step_order')
-            ->get();
+        if (! isset($this->statesCache[$typeId])) {
+            $states = SpecimenTypeState::where('specimen_type_id', $typeId)
+                ->orderBy('step_order')
+                ->get();
 
-        if ($states->isEmpty()) {
-            return $this->getDefaultSystemStates();
+            $this->statesCache[$typeId] = $states->isEmpty() ? $this->getDefaultSystemStates() : $states;
         }
 
-        return $states;
+        return $this->statesCache[$typeId];
     }
 
     /**
@@ -175,23 +180,26 @@ class SpecimenStatusService
         }
 
         $user = $options['user'] ?? auth()->user();
+        $requiresReport = $specimen->type ? (bool) $specimen->type->requires_report : true;
 
         if ($targetStatus === 'finalized') {
             if ($user && ! $user->can('specimens.finalize')) {
                 throw ValidationException::withMessages([
-                    'error' => ['No tienes permiso para finalizar el reporte de esta muestra.'],
+                    'error' => ['No tienes permiso para finalizar esta muestra.'],
                 ]);
             }
 
-            $unsignedUsers = $specimen->users()->where(function ($q) {
-                $q->whereNull('user_signature')->orWhere('user_signature', '');
-            })->get();
+            if ($requiresReport) {
+                $unsignedUsers = $specimen->users()->where(function ($q) {
+                    $q->whereNull('user_signature')->orWhere('user_signature', '');
+                })->get();
 
-            if ($unsignedUsers->isNotEmpty()) {
-                $names = $unsignedUsers->pluck('name')->implode(', ');
-                throw ValidationException::withMessages([
-                    'error' => ["No se puede finalizar el reporte porque los siguientes patólogos no han definido su firma: {$names}."],
-                ]);
+                if ($unsignedUsers->isNotEmpty()) {
+                    $names = $unsignedUsers->pluck('name')->implode(', ');
+                    throw ValidationException::withMessages([
+                        'error' => ["No se puede finalizar el reporte porque los siguientes patólogos no han definido su firma: {$names}."],
+                    ]);
+                }
             }
         }
 
@@ -201,7 +209,7 @@ class SpecimenStatusService
             ]);
         }
 
-        DB::transaction(function () use ($specimen, $targetStatus, $options, $user) {
+        DB::transaction(function () use ($specimen, $targetStatus, $options, $user, $requiresReport) {
             $report = $specimen->report;
             $reportData = [];
 
@@ -242,13 +250,15 @@ class SpecimenStatusService
 
             $specimen->update($specimenUpdate);
 
-            if ($targetStatus === 'finalized' && $report) {
-                $report->ensureValidationQrCode();
+            if ($targetStatus === 'finalized') {
+                if ($requiresReport && $report) {
+                    $report->ensureValidationQrCode();
 
-                try {
-                    app(ReportPdfService::class)->generateAndStoreReport($specimen);
-                } catch (\Throwable $e) {
-                    Log::warning('Error generating PDF for specimen '.$specimen->sequence_code.': '.$e->getMessage());
+                    try {
+                        app(ReportPdfService::class)->generateAndStoreReport($specimen);
+                    } catch (\Throwable $e) {
+                        Log::warning('Error generating PDF for specimen '.$specimen->sequence_code.': '.$e->getMessage());
+                    }
                 }
 
                 $this->calculateCommissions($specimen);
@@ -427,7 +437,12 @@ class SpecimenStatusService
                     'delivery_token' => $specimen->delivery_token,
                 ]);
                 $patientName = $customer->name;
-                $message = "Hola, {$patientName}. El reporte de su muestra con código {$specimen->sequence_code} ha sido finalizado. Puede ver el progreso y descargar su reporte en el siguiente enlace: {$link}";
+                $requiresReport = $specimen->type ? (bool) $specimen->type->requires_report : true;
+                if ($requiresReport) {
+                    $message = "Hola, {$patientName}. El reporte de su muestra con código {$specimen->sequence_code} ha sido finalizado. Puede ver el progreso y descargar su reporte en el siguiente enlace: {$link}";
+                } else {
+                    $message = "Hola, {$patientName}. Su muestra con código {$specimen->sequence_code} ha sido finalizada. Puede ver el progreso y estado en el siguiente enlace: {$link}";
+                }
 
                 $phone = $customer->phone;
                 $cleanPhone = preg_replace('/\D/', '', $phone ?? '');

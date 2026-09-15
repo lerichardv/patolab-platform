@@ -108,6 +108,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimens/update-order', [SpecimenController::class, 'updateOrder'])->name('specimens.update-order');
     Route::post('specimens/bulk-action', [SpecimenController::class, 'bulkAction'])->name('specimens.bulk-action');
     Route::post('specimens/{specimen}/change-status', [SpecimenController::class, 'changeStatus'])->name('specimens.change-status');
+    Route::post('specimens/{specimen}/advance-status', [SpecimenController::class, 'advanceStatus'])->name('specimens.advance-status');
     Route::post('specimens/{specimen}/assign-user', [SpecimenController::class, 'assignUser'])->name('specimens.assign-user');
     Route::post('specimens/{specimen}/unassign-user', [SpecimenController::class, 'unassignUser'])->name('specimens.unassign-user');
     Route::post('specimens/{specimen}/assign-collaborator', [SpecimenController::class, 'assignCollaborator'])->name('specimens.assign-collaborator');

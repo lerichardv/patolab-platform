@@ -8,12 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '../../components/ui/textarea';
 
 interface SpecimenType {
     id: number;
     name: string;
     description: string | null;
+    requires_report?: boolean;
 }
 
 interface Props {
@@ -25,6 +27,10 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
     const { data, setData, post, put, processing, errors } = useForm({
         name: specimenType?.name || '',
         description: specimenType?.description || '',
+        requires_report:
+            specimenType && specimenType.requires_report !== undefined
+                ? Boolean(specimenType.requires_report)
+                : true,
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -78,6 +84,28 @@ export default function SpecimenTypeForm({ specimenType, onSuccess }: Props) {
                         {errors.description}
                     </p>
                 )}
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3.5 shadow-xs">
+                <div className="space-y-0.5 pr-4">
+                    <Label
+                        htmlFor="requires_report"
+                        className="cursor-pointer text-sm font-medium"
+                    >
+                        Requiere Informe
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                        Si está activo, las muestras de este tipo generarán
+                        informe médico y se enviará por correo al finalizar.
+                    </p>
+                </div>
+                <Switch
+                    id="requires_report"
+                    checked={data.requires_report}
+                    onCheckedChange={(checked) =>
+                        setData('requires_report', checked)
+                    }
+                />
             </div>
 
             <div className="flex justify-end gap-3 pt-4">

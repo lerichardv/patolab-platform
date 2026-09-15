@@ -21,10 +21,12 @@ class SpecimenType extends Model
     protected $fillable = [
         'name',
         'description',
+        'requires_report',
         'active',
     ];
 
     protected $casts = [
+        'requires_report' => 'boolean',
         'active' => 'boolean',
     ];
 

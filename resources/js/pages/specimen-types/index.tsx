@@ -47,6 +47,7 @@ interface SpecimenType {
     id: number;
     name: string;
     description: string | null;
+    requires_report?: boolean;
     created_at: string;
 }
 
@@ -254,6 +255,9 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                                     )}
                                 </TableHead>
                                 <TableHead>Fecha Creación</TableHead>
+                                <TableHead className="text-center">
+                                    Requiere Informe
+                                </TableHead>
                                 <TableHead className="text-right">
                                     {(canEdit || canDelete) && 'Acciones'}
                                 </TableHead>
@@ -278,6 +282,17 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                                                 month: '2-digit',
                                                 year: 'numeric',
                                             })}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            {(type.requires_report ?? true) ? (
+                                                <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/20 ring-inset dark:bg-emerald-950/40 dark:text-emerald-400 dark:ring-emerald-500/30">
+                                                    Sí
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-500/20 ring-inset dark:bg-zinc-800 dark:text-zinc-400">
+                                                    No
+                                                </span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {(canEdit || canDelete) && (
@@ -304,7 +319,9 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 onClick={() =>
-                                                                    handleEdit(type)
+                                                                    handleEdit(
+                                                                        type,
+                                                                    )
                                                                 }
                                                                 title="Editar Tipo de Muestra"
                                                             >
@@ -335,7 +352,7 @@ export default function SpecimenTypesIndex({ specimenTypes, filters }: Props) {
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={4}
+                                        colSpan={5}
                                         className="h-24 text-center"
                                     >
                                         No se encontraron resultados.

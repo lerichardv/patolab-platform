@@ -237,3 +237,133 @@ test('specimens.change-status endpoint changes specimen status', function () {
     $specimen->refresh();
     expect($specimen->status)->toBe('macroscopic_review');
 });
+
+test('specimens.advance-status endpoint advances specimen to next logical state', function () {
+    $user = User::factory()->create();
+    $role = Role::create(['name' => 'Admin', 'slug' => 'admin']);
+    $user->update(['role_id' => $role->id]);
+
+    $type = SpecimenType::create(['name' => 'Citología Advance Test', 'active' => true, 'requires_report' => false]);
+    $type->states()->create(['status' => 'received', 'step_order' => 1, 'active' => true]);
+    $type->states()->create(['status' => 'processing', 'step_order' => 2, 'active' => true]);
+    $type->states()->create(['status' => 'finalized', 'step_order' => 3, 'active' => true]);
+
+    $priority = Priority::create(['name' => 'Normal 4', 'order' => 1, 'color' => '#000000']);
+    $customer = Customer::factory()->create();
+    $category = SpecimenCategory::create(['name' => 'Cat Test 4', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Médico Test 4', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Dr. Ref Test 4', 'referrer_type' => $referrerType->id, 'active' => true]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'TEST-ADV-01-2026',
+        'status' => 'received',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+    ]);
+
+    expect($specimen->next_status)->toBe('processing');
+    expect($specimen->next_status_label)->toBe('En Procesamiento');
+
+    $response = $this->actingAs($user)->postJson(route('specimens.advance-status', $specimen));
+
+    $response->assertOk()
+        ->assertJson([
+            'success' => true,
+            'next_status' => 'processing',
+        ]);
+
+    $specimen->refresh();
+    expect($specimen->status)->toBe('processing');
+});
+
+test('transition to finalized with requires_report false skips signature check', function () {
+    $user = User::factory()->create();
+    $role = Role::create(['name' => 'Admin', 'slug' => 'admin']);
+    $user->update(['role_id' => $role->id]);
+
+    $type = SpecimenType::create(['name' => 'Pap Smear No Report', 'active' => true, 'requires_report' => false]);
+    $type->states()->create(['status' => 'processing', 'step_order' => 1, 'active' => true]);
+    $type->states()->create(['status' => 'finalized', 'step_order' => 2, 'active' => true]);
+
+    $priority = Priority::create(['name' => 'Normal 5', 'order' => 1, 'color' => '#000000']);
+    $customer = Customer::factory()->create();
+    $category = SpecimenCategory::create(['name' => 'Cat Test 5', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Médico Test 5', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Dr. Ref Test 5', 'referrer_type' => $referrerType->id, 'active' => true]);
+
+    // Pathologist without signature
+    $pathologist = User::factory()->create(['user_signature' => null]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'TEST-NOREP-01-2026',
+        'status' => 'processing',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+    ]);
+
+    $specimen->users()->attach($pathologist->id, ['macroscopy_access' => true, 'microscopy_access' => true]);
+
+    $service = app(SpecimenStatusService::class);
+    $transitioned = $service->transition($specimen, 'finalized', ['user' => $user]);
+
+    expect($transitioned->status)->toBe('finalized');
+});
+
+test('report editor show redirects with error when specimen does not require report', function () {
+    $user = User::factory()->create();
+    $role = Role::create(['name' => 'Admin', 'slug' => 'admin']);
+    $user->update(['role_id' => $role->id]);
+
+    $type = SpecimenType::create(['name' => 'No Report Specimen', 'active' => true, 'requires_report' => false]);
+
+    $priority = Priority::create(['name' => 'Normal 6', 'order' => 1, 'color' => '#000000']);
+    $customer = Customer::factory()->create();
+    $category = SpecimenCategory::create(['name' => 'Cat Test 6', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Médico Test 6', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Dr. Ref Test 6', 'referrer_type' => $referrerType->id, 'active' => true]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'TEST-NOREP-02-2026',
+        'status' => 'received',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+    ]);
+
+    $response = $this->actingAs($user)->get(route('specimens.report-editor', $specimen));
+    $response->assertRedirect();
+    $response->assertSessionHas('error');
+});
+
+test('specimen type can be stored and updated with requires_report', function () {
+    $user = User::factory()->create();
+    $role = Role::create(['name' => 'Admin', 'slug' => 'admin']);
+    $user->update(['role_id' => $role->id]);
+
+    $this->actingAs($user)->post(route('specimen-types.store'), [
+        'name' => 'Tipo Sin Reporte',
+        'description' => 'Test Desc',
+        'requires_report' => false,
+    ]);
+
+    $type = SpecimenType::where('name', 'Tipo Sin Reporte')->first();
+    expect($type)->not->toBeNull();
+    expect($type->requires_report)->toBeFalse();
+
+    $this->actingAs($user)->put(route('specimen-types.update', $type), [
+        'name' => 'Tipo Con Reporte',
+        'requires_report' => true,
+    ]);
+
+    $type->refresh();
+    expect($type->name)->toBe('Tipo Con Reporte');
+    expect($type->requires_report)->toBeTrue();
+});

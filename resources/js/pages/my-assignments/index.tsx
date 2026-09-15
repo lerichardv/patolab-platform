@@ -29,6 +29,7 @@ import {
     UserPlus,
     ArrowUp,
     ArrowDown,
+    ArrowRight,
     Loader2,
 } from 'lucide-react';
 import { Scissors } from 'lucide-react';
@@ -51,6 +52,16 @@ import {
     CommandItem,
     CommandList,
 } from '@/components/ui/command';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
     Dialog,
     DialogContent,
@@ -82,6 +93,13 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { advanceStatus as advanceSpecimenStatus } from '@/actions/App/Http/Controllers/SpecimenController';
 import { cn } from '@/lib/utils';
 import {
     getSpecimenDueDate,
@@ -108,6 +126,7 @@ interface Specimen {
     type?: {
         id: number;
         name: string;
+        requires_report?: boolean;
     };
     examination?: {
         id: number;
@@ -142,6 +161,8 @@ interface Specimen {
     is_manual_delivery_date_intern_enabled?: boolean;
     delivery_date_intern_unit?: 'minutes' | 'hours' | 'days' | 'weeks' | null;
     delivery_date_intern_quantity?: number | null;
+    next_status?: string | null;
+    next_status_label?: string | null;
 }
 
 interface Priority {
@@ -561,6 +582,39 @@ export default function MyAssignmentsIndex({
     const toggleSelectSpecimen = (id: number) => {
         setSelectedIds((prev) =>
             prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+        );
+    };
+
+    const [specimenToAdvance, setSpecimenToAdvance] =
+        useState<Specimen | null>(null);
+
+    const handleAdvanceStatus = (specimen: Specimen) => {
+        setSpecimenToAdvance(specimen);
+    };
+
+    const confirmAdvanceStatus = () => {
+        if (!specimenToAdvance) { return; }
+        const specimen = specimenToAdvance;
+        router.post(
+            advanceSpecimenStatus(specimen.id).url,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSpecimenToAdvance(null);
+                    toast.success(
+                        `Muestra ${specimen.sequence_code || specimen.id} avanzada a ${specimen.next_status_label || 'siguiente estado'} exitosamente.`,
+                    );
+                },
+                onError: (err: any) => {
+                    setSpecimenToAdvance(null);
+                    toast.error(
+                        err?.status ||
+                            err?.message ||
+                            'Error al avanzar el estado de la muestra',
+                    );
+                },
+            },
         );
     };
 
@@ -1795,7 +1849,11 @@ export default function MyAssignmentsIndex({
                                                                                 specimen.id,
                                                                             );
                                                                         } else if (
-                                                                            hasReportEditorPermission
+                                                                            hasReportEditorPermission &&
+                                                                            (specimen
+                                                                                .type
+                                                                                ?.requires_report ??
+                                                                                true)
                                                                         ) {
                                                                             router.get(
                                                                                 `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
@@ -2272,25 +2330,85 @@ export default function MyAssignmentsIndex({
                                                                                 </DropdownMenuTrigger>
                                                                                 <DropdownMenuContent
                                                                                     align="end"
-                                                                                    className="w-52"
+                                                                                    className="w-56"
                                                                                 >
-                                                                                    {hasReportEditorPermission && (
-                                                                                        <DropdownMenuItem
-                                                                                            onClick={() => {
-                                                                                                router.get(
-                                                                                                    `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
-                                                                                                );
-                                                                                            }}
-                                                                                            className="group cursor-pointer"
-                                                                                        >
-                                                                                            <FileText className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
-                                                                                            <span>
-                                                                                                Editor
-                                                                                                de
-                                                                                                Reporte
-                                                                                            </span>
-                                                                                        </DropdownMenuItem>
-                                                                                    )}
+                                                                                    {!(
+                                                                                        specimen
+                                                                                            .type
+                                                                                            ?.requires_report ??
+                                                                                        true
+                                                                                    ) &&
+                                                                                        specimen.next_status && (
+                                                                                            <DropdownMenuItem
+                                                                                                onClick={() =>
+                                                                                                    handleAdvanceStatus(
+                                                                                                        specimen,
+                                                                                                    )
+                                                                                                }
+                                                                                                className="group cursor-pointer font-medium text-emerald-600 focus:bg-emerald-50 focus:text-emerald-700 dark:text-emerald-400 dark:focus:bg-emerald-950/40"
+                                                                                            >
+                                                                                                <ArrowRight className="mr-2 h-4 w-4 text-emerald-600 transition-transform group-hover:translate-x-0.5 dark:text-emerald-400" />
+                                                                                                <span>
+                                                                                                    Avanzar
+                                                                                                    a{' '}
+                                                                                                    {specimen.next_status_label ||
+                                                                                                        specimen.next_status}
+                                                                                                </span>
+                                                                                            </DropdownMenuItem>
+                                                                                        )}
+                                                                                    {hasReportEditorPermission &&
+                                                                                        ((specimen
+                                                                                            .type
+                                                                                            ?.requires_report ??
+                                                                                        true) ? (
+                                                                                            <DropdownMenuItem
+                                                                                                onClick={() => {
+                                                                                                    router.get(
+                                                                                                        `/specimens/${specimen.sequence_code || specimen.id}/report-editor`,
+                                                                                                    );
+                                                                                                }}
+                                                                                                className="group cursor-pointer"
+                                                                                            >
+                                                                                                <FileText className="mr-2 h-4 w-4 text-muted-foreground transition-colors group-hover:text-white group-focus:text-white" />
+                                                                                                <span>
+                                                                                                    Editor
+                                                                                                    de
+                                                                                                    Reporte
+                                                                                                </span>
+                                                                                            </DropdownMenuItem>
+                                                                                        ) : (
+                                                                                            <TooltipProvider>
+                                                                                                <Tooltip>
+                                                                                                    <TooltipTrigger
+                                                                                                        asChild
+                                                                                                    >
+                                                                                                        <div className="w-full">
+                                                                                                            <DropdownMenuItem
+                                                                                                                disabled
+                                                                                                                className="cursor-not-allowed opacity-50"
+                                                                                                                onClick={(
+                                                                                                                    e,
+                                                                                                                ) =>
+                                                                                                                    e.stopPropagation()
+                                                                                                                }
+                                                                                                            >
+                                                                                                                <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                                                                <span>
+                                                                                                                    Editor
+                                                                                                                    de
+                                                                                                                    Reporte
+                                                                                                                </span>
+                                                                                                            </DropdownMenuItem>
+                                                                                                        </div>
+                                                                                                    </TooltipTrigger>
+                                                                                                    <TooltipContent side="left">
+                                                                                                        <span>
+                                                                                                            {`El espécimen "${specimen.sequence_code || specimen.type?.name || specimen.id}" no requiere informe`}
+                                                                                                        </span>
+                                                                                                    </TooltipContent>
+                                                                                                </Tooltip>
+                                                                                            </TooltipProvider>
+                                                                                        ))}
                                                                                     {hasCuttingsPermission && (
                                                                                         <DropdownMenuItem
                                                                                             onClick={() => {
@@ -2487,6 +2605,40 @@ export default function MyAssignmentsIndex({
                     }
                 }}
             />
+
+            <AlertDialog
+                open={specimenToAdvance !== null}
+                onOpenChange={(open) => {
+                    if (!open) { setSpecimenToAdvance(null); }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Confirmar avance de estado
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            ¿Estás seguro de que deseas avanzar la muestra{' '}
+                            <span className="font-semibold text-foreground">
+                                {specimenToAdvance?.sequence_code ||
+                                    specimenToAdvance?.id}
+                            </span>{' '}
+                            al estado{' '}
+                            <span className="font-semibold text-foreground">
+                                {specimenToAdvance?.next_status_label ||
+                                    specimenToAdvance?.next_status}
+                            </span>
+                            ?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmAdvanceStatus}>
+                            Confirmar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }

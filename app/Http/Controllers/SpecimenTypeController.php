@@ -53,11 +53,13 @@ class SpecimenTypeController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'requires_report' => 'sometimes|boolean',
         ]);
 
         $specimenType = SpecimenType::create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
+            'requires_report' => $request->boolean('requires_report', true),
         ]);
 
         // Automatically initialize default states
@@ -88,11 +90,13 @@ class SpecimenTypeController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'requires_report' => 'sometimes|boolean',
         ]);
 
         $specimenType->update([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
+            'requires_report' => $request->boolean('requires_report', true),
         ]);
 
         return redirect()->back();
@@ -269,8 +273,10 @@ class SpecimenTypeController extends Controller
             $validated = validator($data, [
                 'name' => 'required|string|max:255|unique:specimen_type,name',
                 'description' => 'nullable|string',
+                'requires_report' => 'sometimes|boolean',
             ])->validate();
 
+            $validated['requires_report'] = $request->has('requires_report') ? $request->boolean('requires_report') : true;
             $validated['active'] = true;
 
             $specimenType = SpecimenType::create($validated);
