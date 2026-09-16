@@ -2,6 +2,7 @@
 
 use App\Models\Customer;
 use App\Models\DeliveryNote;
+use App\Models\Permission;
 use App\Models\Priority;
 use App\Models\Referrer;
 use App\Models\ReferrerType;
@@ -25,6 +26,12 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->role = Role::create(['slug' => 'pathologist', 'name' => 'Patólogo']);
+    $this->permission = Permission::create([
+        'slug' => 'delivery_notes.manage',
+        'name' => 'Gestionar Notas de Entrega',
+    ]);
+    $this->role->permissions()->attach($this->permission->id);
+
     $this->user = User::factory()->create([
         'role_id' => $this->role->id,
         'active' => true,
@@ -212,4 +219,26 @@ test('it reuses existing delivery note when show is called and does not overwrit
     $current = DeliveryNote::where('work_order_id', $this->workOrder->id)->first();
     expect($current->content_html)->toBe('<p>Nota existente personalizada</p>');
     expect($current->id)->toBe($existing->id);
+});
+
+test('it forbids users without delivery_notes.manage permission from accessing delivery note routes', function () {
+    $unauthorizedRole = Role::create(['slug' => 'clerk', 'name' => 'Recepcionista']);
+    $unauthorizedUser = User::factory()->create([
+        'role_id' => $unauthorizedRole->id,
+        'active' => true,
+    ]);
+
+    $this->actingAs($unauthorizedUser)
+        ->get(route('work-orders.delivery-note.show', $this->workOrder->id))
+        ->assertForbidden();
+
+    $this->actingAs($unauthorizedUser)
+        ->postJson(route('work-orders.delivery-note.save', $this->workOrder->id), [
+            'content_html' => '<p>Unauthorized update</p>',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($unauthorizedUser)
+        ->get(route('work-orders.delivery-note.pdf', $this->workOrder->id))
+        ->assertForbidden();
 });

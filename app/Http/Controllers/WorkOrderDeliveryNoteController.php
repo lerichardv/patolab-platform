@@ -8,6 +8,7 @@ use App\Services\DeliveryNotePdfService;
 use App\Services\ImageOptimizerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -22,6 +23,8 @@ class WorkOrderDeliveryNoteController extends Controller
      */
     public function show(WorkOrder $workOrder): Response
     {
+        Gate::authorize('delivery_notes.manage');
+
         $workOrder->load([
             'specimen.customerRelation',
             'specimen.type',
@@ -70,6 +73,8 @@ class WorkOrderDeliveryNoteController extends Controller
      */
     public function save(Request $request, WorkOrder $workOrder): JsonResponse
     {
+        Gate::authorize('delivery_notes.manage');
+
         $request->validate([
             'content_html' => 'nullable|string',
         ]);
@@ -111,6 +116,8 @@ class WorkOrderDeliveryNoteController extends Controller
      */
     public function downloadPdf(WorkOrder $workOrder): SymfonyResponse
     {
+        Gate::authorize('delivery_notes.manage');
+
         $workOrder->load(['deliveryNote', 'specimen']);
         $deliveryNote = $workOrder->deliveryNote;
 
@@ -133,6 +140,7 @@ class WorkOrderDeliveryNoteController extends Controller
      */
     public function uploadImage(Request $request, WorkOrder $workOrder): JsonResponse
     {
+        Gate::authorize('delivery_notes.manage');
         $request->validate([
             'image' => 'required|image|max:10240',
         ]);

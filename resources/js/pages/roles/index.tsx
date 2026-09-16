@@ -356,6 +356,15 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Notas de Entrega',
+        description:
+            'Permite gestionar las notas de entrega de las órdenes de trabajo.',
+        module: 'Órdenes de Trabajo',
+        slugs: {
+            manage: 'delivery_notes.manage',
+        },
+    },
+    {
         label: 'Plantillas de Muestra',
         description:
             'Plantillas prediseñadas para diagnósticos rápidos de muestras.',
