@@ -22,7 +22,7 @@ import {
     FileText,
 } from 'lucide-react';
 import * as React from 'react';
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import {
     assignTechnician,
@@ -62,6 +62,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
     Table,
@@ -316,12 +317,50 @@ export default function HistotechnologistWorkOrdersControl({
             to: filters.date_to || '',
         }),
     );
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return (
+                new URLSearchParams(window.location.search).get('search') || ''
+            );
+        }
+
+        return '';
+    });
     const [showDeliveryNotesOnly, setShowDeliveryNotesOnly] = useState(false);
     const canManageDeliveryNotes = Boolean(
         props.auth?.permissions?.includes('delivery_notes.manage'),
     );
+    const [isLoading, setIsLoading] = useState(false);
     const [isReloading, setIsReloading] = useState(false);
+
+    useEffect(() => {
+        const removeStart = router.on('start', () => {
+            setIsLoading(true);
+        });
+        const removeFinish = router.on('finish', () => {
+            setIsLoading(false);
+        });
+
+        const handlePopState = () => {
+            router.reload();
+        };
+
+        const handlePageShow = (event: PageTransitionEvent) => {
+            if (event.persisted) {
+                router.reload();
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        window.addEventListener('pageshow', handlePageShow);
+
+        return () => {
+            removeStart();
+            removeFinish();
+            window.removeEventListener('popstate', handlePopState);
+            window.removeEventListener('pageshow', handlePageShow);
+        };
+    }, []);
     const [selectedWorkOrder, setSelectedWorkOrder] =
         useState<WorkOrder | null>(null);
     const [openAssignWorkOrderId, setOpenAssignWorkOrderId] = useState<
@@ -345,7 +384,11 @@ export default function HistotechnologistWorkOrdersControl({
         const hasDeliveryNote = Boolean(wo.delivery_note);
 
         if (hasDeliveryNote) {
-            router.visit(showDeliveryNote(wo.id).url);
+            const currentUrl =
+                window.location.pathname + window.location.search;
+            router.visit(
+                `${showDeliveryNote(wo.id).url}?from=${encodeURIComponent(currentUrl)}`,
+            );
         } else {
             setConfirmDeliveryNoteOrder(wo);
             setIsCreateDeliveryNoteDialogOpen(true);
@@ -492,6 +535,7 @@ export default function HistotechnologistWorkOrdersControl({
 
     useEffect(() => {
         if (filters.status) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSelectedStatuses(filters.status);
         }
 
@@ -507,55 +551,45 @@ export default function HistotechnologistWorkOrdersControl({
         }
     }, [filters]);
 
-    // Filter work orders client-side
-    const filteredWorkOrders = useMemo(() => {
-        const searchLower = searchQuery.trim().toLowerCase();
+    // Filter work orders client-side directly on render (no useMemo to prevent stale cached data)
+    const searchLower = searchQuery.trim().toLowerCase();
+    const filteredWorkOrders = (workOrders || []).filter((wo) => {
+        if (showDeliveryNotesOnly && !wo.delivery_note) {
+            return false;
+        }
 
-        return workOrders.filter((wo) => {
-            if (showDeliveryNotesOnly && !wo.delivery_note) {
-                return false;
-            }
+        const matchesStatus = selectedStatuses.includes(wo.status);
 
-            const matchesStatus = selectedStatuses.includes(wo.status);
+        const woDateStr = format(new Date(wo.created_at), 'yyyy-MM-dd');
+        const matchesDate =
+            (!dateRange.from || woDateStr >= dateRange.from) &&
+            (!dateRange.to || woDateStr <= dateRange.to);
 
-            const woDateStr = format(new Date(wo.created_at), 'yyyy-MM-dd');
-            const matchesDate =
-                (!dateRange.from || woDateStr >= dateRange.from) &&
-                (!dateRange.to || woDateStr <= dateRange.to);
+        const matchesSearch =
+            !searchLower ||
+            wo.id.toString().includes(searchLower) ||
+            (wo.specimen?.sequence_code &&
+                wo.specimen.sequence_code
+                    .toLowerCase()
+                    .includes(searchLower)) ||
+            (wo.specimen?.customer_relation?.name &&
+                wo.specimen.customer_relation.name
+                    .toLowerCase()
+                    .includes(searchLower)) ||
+            (wo.types &&
+                wo.types.some((t) =>
+                    t.name.toLowerCase().includes(searchLower),
+                )) ||
+            (wo.type?.name &&
+                wo.type.name.toLowerCase().includes(searchLower)) ||
+            (wo.users &&
+                wo.users.some((u) =>
+                    u.name.toLowerCase().includes(searchLower),
+                )) ||
+            (wo.comments && wo.comments.toLowerCase().includes(searchLower));
 
-            const matchesSearch =
-                !searchLower ||
-                wo.id.toString().includes(searchLower) ||
-                (wo.specimen?.sequence_code &&
-                    wo.specimen.sequence_code
-                        .toLowerCase()
-                        .includes(searchLower)) ||
-                (wo.specimen?.customer_relation?.name &&
-                    wo.specimen.customer_relation.name
-                        .toLowerCase()
-                        .includes(searchLower)) ||
-                (wo.types &&
-                    wo.types.some((t) =>
-                        t.name.toLowerCase().includes(searchLower),
-                    )) ||
-                (wo.type?.name &&
-                    wo.type.name.toLowerCase().includes(searchLower)) ||
-                (wo.users &&
-                    wo.users.some((u) =>
-                        u.name.toLowerCase().includes(searchLower),
-                    )) ||
-                (wo.comments &&
-                    wo.comments.toLowerCase().includes(searchLower));
-
-            return matchesStatus && matchesDate && matchesSearch;
-        });
-    }, [
-        workOrders,
-        selectedStatuses,
-        dateRange,
-        searchQuery,
-        showDeliveryNotesOnly,
-    ]);
+        return matchesStatus && matchesDate && matchesSearch;
+    });
 
     const handleUpdateStatus = (
         workOrderId: number,
@@ -931,13 +965,13 @@ export default function HistotechnologistWorkOrdersControl({
                         <Button
                             variant="default"
                             size="icon"
-                            disabled={isReloading}
+                            disabled={isReloading || isLoading}
                             onClick={handleReload}
                             className="h-10 w-10 shrink-0 bg-emerald-600 text-white transition-transform hover:bg-emerald-700 active:scale-95 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                             title="Recargar órdenes"
                         >
                             <RefreshCw
-                                className={`h-4 w-4 ${isReloading ? 'animate-spin' : ''}`}
+                                className={`h-4 w-4 ${isReloading || isLoading ? 'animate-spin' : ''}`}
                             />
                         </Button>
                     </div>
@@ -1028,7 +1062,88 @@ export default function HistotechnologistWorkOrdersControl({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredWorkOrders.length > 0 ? (
+                                {isLoading || isReloading ? (
+                                    Array.from({ length: 6 }).map(
+                                        (_, index) => (
+                                            <TableRow
+                                                key={`skeleton-row-${index}`}
+                                                className="border-border/40"
+                                            >
+                                                {/* N° Orden */}
+                                                <TableCell className="w-[80px] py-3.5">
+                                                    <Skeleton className="h-4 w-12" />
+                                                </TableCell>
+
+                                                {/* Técnicos Asignados */}
+                                                <TableCell className="min-w-[180px] py-3.5">
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        <Skeleton className="h-5 w-20 rounded-md" />
+                                                        <Skeleton className="h-5 w-16 rounded-md" />
+                                                    </div>
+                                                </TableCell>
+
+                                                {/* Estado */}
+                                                <TableCell className="w-[110px] py-3.5 text-center">
+                                                    <Skeleton className="mx-auto h-6 w-20 rounded-full" />
+                                                </TableCell>
+
+                                                {/* Prioridad */}
+                                                <TableCell className="w-[100px] py-3.5 text-center">
+                                                    <Skeleton className="mx-auto h-6 w-16 rounded-md" />
+                                                </TableCell>
+
+                                                {/* Vencimiento */}
+                                                <TableCell className="min-w-[170px] py-3.5">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <Skeleton className="h-12 w-14 rounded-md" />
+                                                        <div className="flex flex-col gap-1">
+                                                            <Skeleton className="h-3 w-16" />
+                                                            <Skeleton className="h-3 w-12" />
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+
+                                                {/* Muestra */}
+                                                <TableCell className="w-[100px] py-3.5">
+                                                    <Skeleton className="h-4 w-16 font-mono" />
+                                                </TableCell>
+
+                                                {/* Tarea */}
+                                                <TableCell className="min-w-[120px] py-3.5">
+                                                    <Skeleton className="h-4 w-24" />
+                                                </TableCell>
+
+                                                {/* Tipo de Orden */}
+                                                <TableCell className="min-w-[120px] py-3.5">
+                                                    <Skeleton className="h-4 w-20" />
+                                                </TableCell>
+
+                                                {/* Cantidad */}
+                                                <TableCell className="w-[80px] py-3.5 text-center">
+                                                    <Skeleton className="mx-auto h-4 w-6" />
+                                                </TableCell>
+
+                                                {/* Creado por */}
+                                                <TableCell className="w-[120px] py-3.5">
+                                                    <Skeleton className="h-4 w-20" />
+                                                </TableCell>
+
+                                                {/* Comentarios */}
+                                                <TableCell className="w-[400px] max-w-[400px] py-3.5">
+                                                    <Skeleton className="h-4 w-3/4" />
+                                                </TableCell>
+
+                                                {/* Acción */}
+                                                <TableCell className="sticky right-0 z-10 w-[150px] min-w-[150px] border-l border-border bg-card py-3.5 text-right">
+                                                    <div className="flex items-center justify-end gap-1.5">
+                                                        <Skeleton className="h-8 w-8 rounded-md" />
+                                                        <Skeleton className="h-8 w-16 rounded-md" />
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ),
+                                    )
+                                ) : filteredWorkOrders.length > 0 ? (
                                     filteredWorkOrders.map((wo) => {
                                         const pMeta =
                                             PRIORITY_METADATA[wo.priority] ||
@@ -1500,7 +1615,7 @@ export default function HistotechnologistWorkOrdersControl({
                                 ) : (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={11}
+                                            colSpan={12}
                                             className="h-24 text-center text-sm text-muted-foreground/60"
                                         >
                                             No se encontraron órdenes de
@@ -1598,7 +1713,12 @@ export default function HistotechnologistWorkOrdersControl({
                                     const id = confirmDeliveryNoteOrder.id;
                                     setIsCreateDeliveryNoteDialogOpen(false);
                                     setConfirmDeliveryNoteOrder(null);
-                                    router.visit(showDeliveryNote(id).url);
+                                    const currentUrl =
+                                        window.location.pathname +
+                                        window.location.search;
+                                    router.visit(
+                                        `${showDeliveryNote(id).url}?from=${encodeURIComponent(currentUrl)}`,
+                                    );
                                 }
                             }}
                             className="border-none bg-emerald-600 text-white hover:bg-emerald-700"

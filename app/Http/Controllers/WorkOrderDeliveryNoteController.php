@@ -7,6 +7,7 @@ use App\Models\WorkOrder;
 use App\Services\DeliveryNotePdfService;
 use App\Services\ImageOptimizerService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -43,7 +44,10 @@ class WorkOrderDeliveryNoteController extends Controller
             $orderTypes = $workOrder->types->pluck('name')->implode(', ');
             $dateFormatted = now()->translatedFormat('d \d\e F Y');
 
-            $defaultHtml = '<p>Entrega de bloques con <strong>ACCESO No. '.htmlspecialchars($specimen?->sequence_code ?? '').'</strong> correspondientes a la paciente <em>'.htmlspecialchars($customer?->name ?? 'N/A').'</em></p>'
+            $comments = trim((string) ($workOrder->comments ?? ''));
+            $intro = $comments !== '' ? $comments : 'Entrega de bloques';
+
+            $defaultHtml = '<p>'.htmlspecialchars($intro).' con <strong>ACCESO No. '.htmlspecialchars($specimen?->sequence_code ?? '').'</strong> correspondientes a la paciente <em>'.htmlspecialchars($customer?->name ?? 'N/A').'</em></p>'
                 .'<p><strong>Descripción del material:</strong> '.(int) $workOrder->quantity.' '.htmlspecialchars($orderTypes ?: 'Muestra').' ('.htmlspecialchars($specimen?->sequence_code ?? '').')</p>'
                 .'<p></p>'
                 .'<p><strong>El laboratorio no se hace responsable por el manejo otorgado fuera de nuestra unidad.<br>Se brinda instrucciones de su manejo a la persona encargada del traslado.</strong></p>'
@@ -156,5 +160,32 @@ class WorkOrderDeliveryNoteController extends Controller
         return response()->json([
             'url' => Storage::disk('public')->url($path),
         ]);
+    }
+
+    /**
+     * Delete the delivery note for the given work order.
+     */
+    public function destroy(WorkOrder $workOrder): JsonResponse|RedirectResponse
+    {
+        Gate::authorize('delivery_notes.manage');
+
+        $deliveryNote = $workOrder->deliveryNote ?: DeliveryNote::where('work_order_id', $workOrder->id)->first();
+
+        if ($deliveryNote) {
+            if ($deliveryNote->pdf_path && Storage::disk('public')->exists($deliveryNote->pdf_path)) {
+                Storage::disk('public')->delete($deliveryNote->pdf_path);
+            }
+            $deliveryNote->delete();
+        }
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Nota de entrega eliminada correctamente.',
+                'redirect_url' => url('/histotechnologist-work-orders'),
+            ]);
+        }
+
+        return redirect()->to('/histotechnologist-work-orders')->with('success', 'Nota de entrega eliminada correctamente.');
     }
 }

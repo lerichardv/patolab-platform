@@ -118,9 +118,12 @@ test('unauthenticated users cannot access delivery note routes', function () {
 
     $this->post(route('work-orders.delivery-note.upload-image', $this->workOrder->id))
         ->assertRedirect(route('login'));
+
+    $this->delete(route('work-orders.delivery-note.destroy', $this->workOrder->id))
+        ->assertRedirect(route('login'));
 });
 
-test('it loads delivery note editor and auto-creates note with pre-filled content', function () {
+test('it loads delivery note editor and auto-creates note with pre-filled content using work order comments', function () {
     expect(DeliveryNote::where('work_order_id', $this->workOrder->id)->count())->toBe(0);
 
     $response = $this->actingAs($this->user)
@@ -128,10 +131,10 @@ test('it loads delivery note editor and auto-creates note with pre-filled conten
 
     $response->assertSuccessful();
 
-    // Assert that a DeliveryNote record was created
+    // Assert that a DeliveryNote record was created with work order comments in first paragraph
     $deliveryNote = DeliveryNote::where('work_order_id', $this->workOrder->id)->first();
     expect($deliveryNote)->not->toBeNull();
-    expect($deliveryNote->content_html)->toContain('ACCESO No. B-042-2026');
+    expect($deliveryNote->content_html)->toContain('Manejar con cuidado con <strong>ACCESO No. B-042-2026</strong> correspondientes a la paciente <em>María Rodriguez</em>');
     expect($deliveryNote->content_html)->toContain('María Rodriguez');
 
     // Assert Inertia page
@@ -141,6 +144,19 @@ test('it loads delivery note editor and auto-creates note with pre-filled conten
         ->has('deliveryNote')
         ->where('workOrder.id', $this->workOrder->id)
     );
+});
+
+test('it falls back to Entrega de bloques when work order comments is empty', function () {
+    $this->workOrder->update(['comments' => null]);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('work-orders.delivery-note.show', $this->workOrder->id));
+
+    $response->assertSuccessful();
+
+    $deliveryNote = DeliveryNote::where('work_order_id', $this->workOrder->id)->first();
+    expect($deliveryNote)->not->toBeNull();
+    expect($deliveryNote->content_html)->toContain('Entrega de bloques con <strong>ACCESO No. B-042-2026</strong> correspondientes a la paciente <em>María Rodriguez</em>');
 });
 
 test('it saves updated delivery note content', function () {
@@ -241,4 +257,71 @@ test('it forbids users without delivery_notes.manage permission from accessing d
     $this->actingAs($unauthorizedUser)
         ->get(route('work-orders.delivery-note.pdf', $this->workOrder->id))
         ->assertForbidden();
+
+    $this->actingAs($unauthorizedUser)
+        ->delete(route('work-orders.delivery-note.destroy', $this->workOrder->id))
+        ->assertForbidden();
+});
+
+test('it successfully redirects work-orders/control to histotechnologist-work-orders without triggering WorkOrderTypeController show error', function () {
+    $adminViewPermission = Permission::create([
+        'slug' => 'work_orders.admin_view',
+        'name' => 'Ver Control de Órdenes',
+    ]);
+    $this->role->permissions()->attach($adminViewPermission->id);
+
+    $response = $this->actingAs($this->user)
+        ->get('/work-orders/control?search='.$this->specimen->sequence_code);
+
+    $response->assertRedirect('/histotechnologist-work-orders?search='.$this->specimen->sequence_code);
+
+    $followingResponse = $this->actingAs($this->user)
+        ->get('/histotechnologist-work-orders?search='.$this->specimen->sequence_code);
+
+    $followingResponse->assertSuccessful();
+    $followingResponse->assertInertia(fn (Assert $page) => $page->component('work-orders/control'));
+});
+
+test('it deletes delivery note and removes associated pdf file from storage', function () {
+    Storage::fake('public');
+    $dummyPdf = 'delivery_notes/test_delete.pdf';
+    Storage::disk('public')->put($dummyPdf, 'dummy pdf content');
+
+    $deliveryNote = DeliveryNote::create([
+        'work_order_id' => $this->workOrder->id,
+        'specimen_id' => $this->specimen->id,
+        'content_html' => '<p>To be deleted</p>',
+        'pdf_path' => $dummyPdf,
+        'created_by_id' => $this->user->id,
+    ]);
+
+    expect(Storage::disk('public')->exists($dummyPdf))->toBeTrue();
+
+    // Call DELETE endpoint via JSON
+    $response = $this->actingAs($this->user)
+        ->deleteJson(route('work-orders.delivery-note.destroy', $this->workOrder->id));
+
+    $response->assertSuccessful();
+    $response->assertJson([
+        'status' => 'success',
+    ]);
+
+    expect(DeliveryNote::find($deliveryNote->id))->toBeNull();
+    expect(Storage::disk('public')->exists($dummyPdf))->toBeFalse();
+
+    // Verify it can immediately be re-created without unique constraint violation
+    $recreateResponse = $this->actingAs($this->user)
+        ->get(route('work-orders.delivery-note.show', $this->workOrder->id));
+
+    $recreateResponse->assertSuccessful();
+    expect(DeliveryNote::where('work_order_id', $this->workOrder->id)->count())->toBe(1);
+});
+
+test('it returns work order json representation via work-order-records.show', function () {
+    $response = $this->actingAs($this->user)
+        ->getJson(route('work-order-records.show', $this->workOrder->id));
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('id', $this->workOrder->id);
+    $response->assertJsonPath('specimen.sequence_code', 'B-042-2026');
 });

@@ -750,13 +750,18 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                             size="icon"
                                                             variant="ghost"
                                                             className="h-8 w-8 text-sky-600 hover:bg-sky-50 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-950/50"
-                                                            onClick={() =>
+                                                            onClick={() => {
+                                                                const currentUrl =
+                                                                    window
+                                                                        .location
+                                                                        .pathname +
+                                                                    window
+                                                                        .location
+                                                                        .search;
                                                                 router.visit(
-                                                                    showDeliveryNote(
-                                                                        wo.id,
-                                                                    ).url,
-                                                                )
-                                                            }
+                                                                    `${showDeliveryNote(wo.id).url}?from=${encodeURIComponent(currentUrl)}`,
+                                                                );
+                                                            }}
                                                             title="Nota de entrega"
                                                         >
                                                             <FileText className="h-4 w-4" />

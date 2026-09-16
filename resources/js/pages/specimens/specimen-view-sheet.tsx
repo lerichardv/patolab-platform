@@ -239,7 +239,60 @@ export default function SpecimenViewSheet({
     };
 
     if (!specimen) {
-        return null;
+        if (!open) {
+            return null;
+        }
+
+        return (
+            <Sheet open={open} onOpenChange={onOpenChange}>
+                <SheetContent
+                    className="w-full overflow-y-auto sm:max-w-[90vw] md:max-w-[700px] lg:max-w-[850px]"
+                    onPointerDownOutside={(e) => {
+                        if (preventCloseOnOutsideClick) {
+                            e.preventDefault();
+                        }
+                    }}
+                >
+                    <div className="mb-5 flex h-full flex-col gap-6 pb-8">
+                        {/* Header skeleton */}
+                        <div className="flex flex-col gap-4 border-b pr-12 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="space-y-2">
+                                <Skeleton className="h-8 w-64" />
+                                <Skeleton className="h-4 w-40" />
+                            </div>
+                        </div>
+
+                        {/* Content skeletons */}
+                        <div className="space-y-6 px-5">
+                            <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                <Skeleton className="h-6 w-48" />
+                                <Separator />
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <Skeleton className="h-10 w-full" />
+                                    <Skeleton className="h-10 w-full" />
+                                    <Skeleton className="h-10 w-full sm:col-span-2" />
+                                    <Skeleton className="h-10 w-full" />
+                                    <Skeleton className="h-10 w-full" />
+                                </div>
+                            </div>
+                            <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                <Skeleton className="h-6 w-40" />
+                                <Separator />
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <Skeleton className="h-10 w-full" />
+                                    <Skeleton className="h-10 w-full" />
+                                </div>
+                            </div>
+                            <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                <Skeleton className="h-6 w-36" />
+                                <Separator />
+                                <Skeleton className="h-20 w-full" />
+                            </div>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
+        );
     }
 
     const copyPublicLink = () => {
