@@ -2,12 +2,16 @@ import { Head, router } from '@inertiajs/react';
 import type { Editor } from '@tiptap/react';
 import {
     ArrowLeft,
+    Briefcase,
     Download,
     FileText,
     Loader2,
-    Save,
-    User as UserIcon,
+    Microscope,
+    MoreVertical,
     Package,
+    Save,
+    Trash2,
+    User as UserIcon,
 } from 'lucide-react';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
@@ -15,11 +19,30 @@ import {
     EditorToolbar,
     RichTextEditorArea,
 } from '@/components/rich-text-editor';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import EditorLayout from '@/layouts/editor-layout';
+import WorkOrderViewSheet from '@/pages/my-work-orders/work-order-view-sheet';
 import { editorStyles } from '@/pages/specimens/report-editor/components/editor-styles';
 import { UnsavedChangesDialog } from '@/pages/specimens/report-editor/components/unsaved-changes-dialog';
+import SpecimenViewSheet from '@/pages/specimens/specimen-view-sheet';
 import DeliveryNoteLivePdfPreview from './live-pdf-preview';
 import { DeliveryNotePaginator } from './services/delivery-note-paginator';
 import type {
@@ -47,6 +70,10 @@ export default function DeliveryNoteEditor({
     const [isDownloading, setIsDownloading] = useState(false);
     const [showNavGuard, setShowNavGuard] = useState(false);
     const [isSavingForNav, setIsSavingForNav] = useState(false);
+    const [isSpecimenSheetOpen, setIsSpecimenSheetOpen] = useState(false);
+    const [isWorkOrderSheetOpen, setIsWorkOrderSheetOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const pendingNavigationRef = useRef<(() => void) | null>(null);
 
     const isDirtyRef = useRef(false);
@@ -286,25 +313,68 @@ export default function DeliveryNoteEditor({
         setTimeout(() => setIsDownloading(false), 1500);
     };
 
+    const handleDeleteReport = async () => {
+        setIsDeleting(true);
+
+        try {
+            const response = await fetch(
+                `/work-orders/${workOrder.id}/delivery-note`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN':
+                            (
+                                document.querySelector(
+                                    'meta[name="csrf-token"]',
+                                ) as HTMLMetaElement
+                            )?.content ?? '',
+                    },
+                },
+            );
+
+            if (response.ok) {
+                isDirtyRef.current = false;
+                toast.success('Nota de entrega eliminada correctamente.');
+                setIsDeleteDialogOpen(false);
+                router.visit(getReturnUrl());
+            } else {
+                toast.error('Error al eliminar la nota de entrega.');
+                setIsDeleting(false);
+            }
+        } catch {
+            toast.error('Error de conexión al eliminar la nota de entrega.');
+            setIsDeleting(false);
+        }
+    };
+
+    const getReturnUrl = () => {
+        if (typeof window !== 'undefined') {
+            const fromParam = new URLSearchParams(window.location.search).get(
+                'from',
+            );
+
+            if (fromParam && fromParam.startsWith('/')) {
+                return fromParam;
+            }
+        }
+
+        return '/histotechnologist-work-orders';
+    };
+
     const handleBack = () => {
+        const targetUrl = getReturnUrl();
+
         if (isDirtyRef.current) {
             pendingNavigationRef.current = () => {
-                if (window.history.length > 1) {
-                    window.history.back();
-                } else {
-                    router.visit('/work-orders/control');
-                }
+                router.visit(targetUrl);
             };
             setShowNavGuard(true);
 
             return;
         }
 
-        if (window.history.length > 1) {
-            window.history.back();
-        } else {
-            router.visit('/work-orders/control');
-        }
+        router.visit(targetUrl);
     };
 
     // Clean up timer on unmount
@@ -326,10 +396,13 @@ export default function DeliveryNoteEditor({
     return (
         <EditorLayout
             breadcrumbs={[
-                { title: 'Órdenes de Trabajo', href: '/work-orders/control' },
+                {
+                    title: 'Órdenes de Trabajo',
+                    href: getReturnUrl(),
+                },
                 {
                     title: sequenceCode,
-                    href: `/work-orders/control?search=${sequenceCode}`,
+                    href: `/histotechnologist-work-orders?search=${sequenceCode}`,
                 },
                 { title: 'Nota de Entrega', href: '#' },
             ]}
@@ -493,6 +566,62 @@ export default function DeliveryNoteEditor({
                                             {workOrder.quantity}{' '}
                                             {orderTypesNames}
                                         </Badge>
+
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 cursor-pointer rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                    title="Más opciones"
+                                                >
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent
+                                                align="end"
+                                                className="w-56"
+                                            >
+                                                <DropdownMenuItem
+                                                    onClick={() =>
+                                                        setIsSpecimenSheetOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                    className="cursor-pointer gap-2"
+                                                >
+                                                    <Microscope className="h-4 w-4 text-muted-foreground" />
+                                                    <span>Ver Muestra</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() =>
+                                                        setIsWorkOrderSheetOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                    className="cursor-pointer gap-2"
+                                                >
+                                                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                                                    <span>
+                                                        Ver Orden de Trabajo
+                                                    </span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    onClick={() =>
+                                                        setIsDeleteDialogOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                    className="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    <span>
+                                                        Eliminar Reporte
+                                                    </span>
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
                                 </div>
                             </div>
@@ -572,6 +701,58 @@ export default function DeliveryNoteEditor({
                     }
                 }}
             />
+
+            {/* Lazy loaded sheets */}
+            <SpecimenViewSheet
+                specimenId={workOrder.specimen_id}
+                open={isSpecimenSheetOpen}
+                onOpenChange={setIsSpecimenSheetOpen}
+            />
+
+            <WorkOrderViewSheet
+                workOrderId={workOrder.id}
+                open={isWorkOrderSheetOpen}
+                onOpenChange={setIsWorkOrderSheetOpen}
+            />
+
+            {/* Delete confirmation dialog */}
+            <AlertDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            ¿Eliminar nota de entrega?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción eliminará la nota de entrega para la
+                            orden de trabajo #{workOrder.id} ({sequenceCode}).
+                            Se perderán el contenido redactado y el documento
+                            PDF asociado.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteReport}
+                            disabled={isDeleting}
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Eliminando...
+                                </>
+                            ) : (
+                                'Eliminar'
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </EditorLayout>
     );
 }

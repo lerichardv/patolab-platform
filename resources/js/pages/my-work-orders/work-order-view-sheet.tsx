@@ -11,9 +11,11 @@ import {
     ClipboardList,
     Hash,
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import HeadingSheet from '@/components/heading-sheet';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Specimen {
     id: number;
@@ -65,7 +67,8 @@ interface WorkOrder {
 }
 
 interface Props {
-    workOrder: WorkOrder | null;
+    workOrderId?: number | null;
+    workOrder?: WorkOrder | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
@@ -77,12 +80,99 @@ const PRIORITY_METADATA: Record<number, { label: string; color: string }> = {
 };
 
 export default function WorkOrderViewSheet({
-    workOrder,
+    workOrderId: initialWorkOrderId,
+    workOrder: initialWorkOrder,
     open,
     onOpenChange,
 }: Props) {
+    const targetId = initialWorkOrderId || initialWorkOrder?.id;
+    const [fetchedWorkOrder, setFetchedWorkOrder] = useState<WorkOrder | null>(null);
+    const [loading, setLoading] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (open && targetId) {
+            if (!initialWorkOrder) {
+                setLoading(true);
+                fetch(`/work-order-records/${targetId}`, {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                })
+                    .then((res) => {
+                        if (!res.ok) {
+                            throw new Error('Error al cargar la orden de trabajo');
+                        }
+                        return res.json();
+                    })
+                    .then((data) => {
+                        setFetchedWorkOrder(data);
+                    })
+                    .catch((err) => {
+                        console.error('Error fetching work order details:', err);
+                    })
+                    .finally(() => {
+                        setLoading(false);
+                    });
+            }
+        } else if (!open) {
+            setFetchedWorkOrder(null);
+            setLoading(false);
+        }
+    }, [open, targetId, initialWorkOrder]);
+
+    const workOrder = fetchedWorkOrder || initialWorkOrder || null;
+
     if (!workOrder) {
-        return null;
+        if (!open) {
+            return null;
+        }
+
+        return (
+            <Sheet open={open} onOpenChange={onOpenChange}>
+                <SheetContent className="w-full overflow-y-auto sm:max-w-[90vw] md:max-w-[650px] lg:max-w-[750px]">
+                    <div className="flex h-full flex-col gap-6 pb-8">
+                        {/* Header Skeleton */}
+                        <div className="flex flex-col gap-4 border-b pr-12 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="space-y-2">
+                                <Skeleton className="h-7 w-60" />
+                                <Skeleton className="h-4 w-36" />
+                            </div>
+                        </div>
+
+                        {/* Content Skeletons */}
+                        <div className="space-y-6 px-5">
+                            <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                <Skeleton className="h-6 w-48" />
+                                <Separator />
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <Skeleton className="h-10 w-full" />
+                                    <Skeleton className="h-10 w-full" />
+                                    <Skeleton className="h-10 w-full sm:col-span-2" />
+                                    <Skeleton className="h-10 w-full" />
+                                    <Skeleton className="h-10 w-full" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                <Skeleton className="h-6 w-40" />
+                                <Separator />
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <Skeleton className="h-10 w-full" />
+                                    <Skeleton className="h-10 w-full" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm">
+                                <Skeleton className="h-6 w-36" />
+                                <Separator />
+                                <Skeleton className="h-16 w-full" />
+                            </div>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
+        );
     }
 
     const pMeta = PRIORITY_METADATA[workOrder.priority] || PRIORITY_METADATA[3];

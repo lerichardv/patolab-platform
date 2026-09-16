@@ -6,13 +6,11 @@ use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DeliveryNote extends Model
 {
     use Auditable;
     use HasFactory;
-    use SoftDeletes;
 
     protected $fillable = [
         'work_order_id',

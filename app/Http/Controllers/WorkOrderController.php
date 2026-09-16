@@ -270,6 +270,22 @@ class WorkOrderController extends Controller
     }
 
     /**
+     * Devuelve una orden de trabajo con sus relaciones en formato JSON.
+     */
+    public function show(WorkOrder $workOrder)
+    {
+        $workOrder->load([
+            'specimen.customerRelation',
+            'task',
+            'users',
+            'completedBy',
+            'assignedTechnician',
+        ]);
+
+        return response()->json($workOrder);
+    }
+
+    /**
      * Elimina una orden de trabajo (soft delete).
      */
     public function destroy(WorkOrder $workOrder)

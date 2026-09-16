@@ -198,10 +198,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimen-type-examinations/import/parse', [SpecimenTypeExaminationController::class, 'parseImport'])->name('specimen-type-examinations.import-parse');
     Route::post('specimen-type-examinations/import/row', [SpecimenTypeExaminationController::class, 'importRow'])->name('specimen-type-examinations.import-row');
     Route::resource('specimen-type-examinations', SpecimenTypeExaminationController::class);
-    Route::resource('work-orders', WorkOrderTypeController::class)->parameters([
-        'work-orders' => 'work_order_type',
-    ]);
+    Route::get('work-orders/control', function (Request $request) {
+        $query = $request->getQueryString();
+
+        return redirect()->to('/histotechnologist-work-orders'.($query ? '?'.$query : ''));
+    })->name('work-orders.control');
+    Route::resource('work-orders', WorkOrderTypeController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters([
+            'work-orders' => 'work_order_type',
+        ]);
     Route::resource('work-order-tasks', WorkOrderTaskController::class);
+    Route::get('work-order-records/{work_order}', [WorkOrderController::class, 'show'])->name('work-order-records.show');
     Route::post('work-order-records', [WorkOrderController::class, 'store'])->name('work-order-records.store');
     Route::put('work-order-records/{work_order}', [WorkOrderController::class, 'update'])->name('work-order-records.update');
     Route::delete('work-order-records/{work_order}', [WorkOrderController::class, 'destroy'])->name('work-order-records.destroy');
@@ -212,6 +220,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Work Order Delivery Notes
     Route::get('work-orders/{work_order}/delivery-note', [WorkOrderDeliveryNoteController::class, 'show'])->name('work-orders.delivery-note.show');
     Route::post('work-orders/{work_order}/delivery-note/save', [WorkOrderDeliveryNoteController::class, 'save'])->name('work-orders.delivery-note.save');
+    Route::delete('work-orders/{work_order}/delivery-note', [WorkOrderDeliveryNoteController::class, 'destroy'])->name('work-orders.delivery-note.destroy');
     Route::get('work-orders/{work_order}/delivery-note/pdf', [WorkOrderDeliveryNoteController::class, 'downloadPdf'])->name('work-orders.delivery-note.pdf');
     Route::post('work-orders/{work_order}/delivery-note/upload-image', [WorkOrderDeliveryNoteController::class, 'uploadImage'])->name('work-orders.delivery-note.upload-image');
 
