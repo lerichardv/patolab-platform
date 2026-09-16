@@ -210,6 +210,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Eliminar Tarea de Orden de trabajo', 'slug' => 'work_order_tasks.delete'],
             ['name' => 'Ver Todas las Órdenes de Trabajo', 'slug' => 'work_orders.admin_view'],
             ['name' => 'Ver Mis Órdenes de Trabajo', 'slug' => 'my_work_orders.view'],
+            ['name' => 'Gestionar Notas de Entrega', 'slug' => 'delivery_notes.manage'],
 
             /*
             |--------------------------------------------------------------------------

@@ -1,0 +1,24 @@
+@php
+    $logoPath = public_path('images/patolab-logo-horizontal-full.png');
+    $logoBase64 = '';
+    if (file_exists($logoPath)) {
+        $logoData = base64_encode(file_get_contents($logoPath));
+        $logoBase64 = 'data:image/png;base64,' . $logoData;
+    }
+@endphp
+
+<header class="report-header">
+    <div class="header-table">
+        <div class="header-logo-cell">
+            @if(!empty($logoBase64))
+                <img class="header-logo-img" src="{{ $logoBase64 }}" alt="Logo PatoLab">
+            @else
+                <div style="font-size: 5.2mm; font-weight: 800; color: #1e3a8a; font-family: Arial, Helvetica, sans-serif; text-align: center;">PatoLab</div>
+                <div style="font-size: 1.8mm; color: #6b7280; font-family: Arial, Helvetica, sans-serif; letter-spacing: 0.13mm; text-align: center;">LABORATORIO DE PATOLOGÍA & CITOLOGÍA</div>
+            @endif
+        </div>
+    </div>
+    <div class="report-pre-title">Calidad diagnóstica a su servicio</div>
+    <div class="report-title">NOTA DE ENTREGA</div>
+    <div class="header-divider"></div>
+</header>

@@ -50,6 +50,7 @@ use App\Http\Controllers\UserCommissionController;
 use App\Http\Controllers\UserCommissionRuleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkOrderController;
+use App\Http\Controllers\WorkOrderDeliveryNoteController;
 use App\Http\Controllers\WorkOrderTaskController;
 use App\Http\Controllers\WorkOrderTypeController;
 use App\Models\Department;
@@ -207,6 +208,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('admin-work-orders', [WorkOrderController::class, 'index'])->name('admin-work-orders.index');
     Route::get('my-work-orders', [MyWorkOrderController::class, 'index'])->name('my-work-orders.index');
     Route::put('my-work-orders/{work_order}/status', [MyWorkOrderController::class, 'updateStatus'])->name('my-work-orders.update-status');
+
+    // Work Order Delivery Notes
+    Route::get('work-orders/{work_order}/delivery-note', [WorkOrderDeliveryNoteController::class, 'show'])->name('work-orders.delivery-note.show');
+    Route::post('work-orders/{work_order}/delivery-note/save', [WorkOrderDeliveryNoteController::class, 'save'])->name('work-orders.delivery-note.save');
+    Route::get('work-orders/{work_order}/delivery-note/pdf', [WorkOrderDeliveryNoteController::class, 'downloadPdf'])->name('work-orders.delivery-note.pdf');
+    Route::post('work-orders/{work_order}/delivery-note/upload-image', [WorkOrderDeliveryNoteController::class, 'uploadImage'])->name('work-orders.delivery-note.upload-image');
 
     // Histotechnologist Work Orders Control routes
     Route::get('histotechnologist-work-orders', [HistotechnologistWorkOrderController::class, 'index'])->name('histotechnologist-work-orders.index');

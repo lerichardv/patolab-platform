@@ -109,6 +109,7 @@ class HistotechnologistWorkOrderController extends Controller
             'completedBy',
             'createdBy',
             'users',
+            'deliveryNote',
         ])
             ->get();
 

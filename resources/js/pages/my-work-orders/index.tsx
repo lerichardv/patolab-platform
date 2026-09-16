@@ -13,11 +13,13 @@ import {
     ChevronDown,
     RefreshCw,
     Eye,
+    FileText,
 } from 'lucide-react';
 import * as React from 'react';
 import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import { updateStatus as updateWorkOrderStatus } from '@/actions/App/Http/Controllers/MyWorkOrderController';
+import { show as showDeliveryNote } from '@/actions/App/Http/Controllers/WorkOrderDeliveryNoteController';
 import {
     DateRangePicker,
     setCookie,
@@ -743,6 +745,23 @@ export default function MyWorkOrdersIndex({ workOrders, filters }: Props) {
                                                 </TableCell>
                                                 <TableCell className="sticky right-0 z-10 w-[150px] min-w-[150px] border-l border-border bg-card text-right transition-colors group-hover:bg-muted">
                                                     <div className="flex items-center justify-end gap-2">
+                                                        <Button
+                                                            type="button"
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="h-8 w-8 text-sky-600 hover:bg-sky-50 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-950/50"
+                                                            onClick={() =>
+                                                                router.visit(
+                                                                    showDeliveryNote(
+                                                                        wo.id,
+                                                                    ).url,
+                                                                )
+                                                            }
+                                                            title="Nota de entrega"
+                                                        >
+                                                            <FileText className="h-4 w-4" />
+                                                        </Button>
+
                                                         <Button
                                                             type="button"
                                                             size="icon"

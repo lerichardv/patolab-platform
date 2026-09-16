@@ -87,6 +87,7 @@ export default function SpecimenTypeStatesForm({ specimenTypeId, onSuccess }: Pr
 
             if (activeCount === 0) {
                 toast.error('Debe haber al menos un estado activo en el flujo.');
+
                 return;
             }
         }
@@ -118,6 +119,7 @@ export default function SpecimenTypeStatesForm({ specimenTypeId, onSuccess }: Pr
 
         if (activeCount === 0) {
             toast.error('Debe haber al menos un estado activo en el flujo.');
+
             return;
         }
 

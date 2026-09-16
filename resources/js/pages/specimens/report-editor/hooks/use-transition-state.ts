@@ -1,9 +1,9 @@
-import { transitionState } from '@/actions/App/Http/Controllers/Editor/ReportEditorController';
 import { router } from '@inertiajs/react';
 import { useCallback, useState } from 'react';
 import type React from 'react';
 import { toast } from 'sonner';
 import type * as Y from 'yjs';
+import { transitionState } from '@/actions/App/Http/Controllers/Editor/ReportEditorController';
 import type { Specimen, SpecimenStatus, SpecimenUserRelation } from '../types';
 
 export interface UseTransitionStateOptions {

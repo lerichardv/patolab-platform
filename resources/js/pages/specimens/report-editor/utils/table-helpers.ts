@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/react';
 
 export function isSelectionInTable(editor: Editor | null): boolean {
-    if (!editor) {
+    if (!editor || editor.isDestroyed || !editor.view || !editor.state) {
         return false;
     }
 
@@ -73,14 +73,18 @@ export function isSelectionInTable(editor: Editor | null): boolean {
             }
         }
 
-        if (
-            editor.can().addColumnAfter() ||
-            editor.can().addRowAfter() ||
-            editor.can().deleteTable() ||
-            editor.can().deleteColumn() ||
-            editor.can().deleteRow()
-        ) {
-            return true;
+        try {
+            if (
+                editor.can().addColumnAfter() ||
+                editor.can().addRowAfter() ||
+                editor.can().deleteTable() ||
+                editor.can().deleteColumn() ||
+                editor.can().deleteRow()
+            ) {
+                return true;
+            }
+        } catch {
+            // safe ignore
         }
 
         if (typeof window !== 'undefined' && editor.view?.dom) {

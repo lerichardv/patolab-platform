@@ -21,6 +21,8 @@ import {
 import type { Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import {
+    BetweenHorizontalEnd,
+    BetweenVerticalEnd,
     Bold,
     Italic,
     Underline as UnderlineIcon,
@@ -37,7 +39,7 @@ import {
     Quote,
     ImagePlus,
     LayoutGrid,
-    Grid3x3,
+    Sheet as SheetIcon,
     Undo2,
     Redo2,
     Trash2,
@@ -45,6 +47,8 @@ import {
     CaseSensitive,
     ChevronDown,
     X,
+    Check,
+    Lock,
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -71,6 +75,7 @@ import {
     handleListAndBlockKeyDown,
 } from '@/pages/specimens/report-editor/components/tiptap-extensions';
 import ImageGridComponent from '@/pages/specimens/report-editor/image-grid-component';
+import { isSelectionInTable } from '@/pages/specimens/report-editor/utils';
 import {
     cleanPastedHtml,
     cleanPastedText,
@@ -766,7 +771,7 @@ const CustomImage = Image.extend({
                     if ($pos.parent && $pos.parent.type.name === 'imageGrid') {
                         isInsideGrid = true;
                     }
-                } catch (e) {
+                } catch {
                     // ignore
                 }
             }
@@ -1539,20 +1544,28 @@ function ToolbarBtn({
     active,
     title,
     disabled = false,
+    onMouseDown,
     children,
 }: {
     onClick: () => void;
     active?: boolean;
     title: string;
     disabled?: boolean;
+    onMouseDown?: (e: React.MouseEvent<HTMLButtonElement>) => void;
     children: React.ReactNode;
 }) {
+    const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        onMouseDown?.(e);
+    };
+
     return (
         <Tooltip>
             <TooltipTrigger asChild>
                 <button
                     type="button"
                     onClick={onClick}
+                    onMouseDown={handleMouseDown}
                     disabled={disabled}
                     className={cn(
                         'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-sm transition-colors',
@@ -1572,10 +1585,16 @@ function ToolbarBtn({
     );
 }
 
-export function EditorToolbar({ editor }: { editor: Editor | null }) {
+export function EditorToolbar({
+    editor,
+    uploadUrl,
+}: {
+    editor: Editor | null;
+    uploadUrl?: string;
+}) {
     const [, setTick] = useState(0);
     useEffect(() => {
-        if (!editor) {
+        if (!editor || editor.isDestroyed || !editor.view) {
             return;
         }
 
@@ -1585,7 +1604,9 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
         editor.on('transaction', handleUpdate);
 
         return () => {
-            editor.off('transaction', handleUpdate);
+            if (!editor.isDestroyed) {
+                editor.off('transaction', handleUpdate);
+            }
         };
     }, [editor]);
 
@@ -1607,10 +1628,12 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
                 const isMyTemplates = window.location.pathname.includes(
                     '/my-specimen-type-templates',
                 );
-                const uploadUrl = isMyTemplates
-                    ? `/my-specimen-type-templates/upload-image`
-                    : `/specimen-type-templates/upload-image`;
-                const response = await fetch(uploadUrl, {
+                const targetUploadUrl =
+                    uploadUrl ||
+                    (isMyTemplates
+                        ? `/my-specimen-type-templates/upload-image`
+                        : `/specimen-type-templates/upload-image`);
+                const response = await fetch(targetUploadUrl, {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN':
@@ -1739,7 +1762,30 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
             .run();
     };
 
-    const inTable = editor?.isActive('table');
+    const isEditorReady = Boolean(
+        editor && !editor.isDestroyed && editor.view && editor.state,
+    );
+
+    const safeCan = (fn: (can: ReturnType<Editor['can']>) => boolean) => {
+        if (!isEditorReady || !editor) {
+            return false;
+        }
+
+        try {
+            return Boolean(fn(editor.can()));
+        } catch {
+            return false;
+        }
+    };
+
+    const inTable = isEditorReady ? isSelectionInTable(editor) : false;
+    const canUndo = safeCan((can) => can.undo());
+    const canRedo = safeCan((can) => can.redo());
+    const canAddColumnAfter = safeCan((can) => can.addColumnAfter());
+    const canAddRowAfter = safeCan((can) => can.addRowAfter());
+    const canDeleteColumn = safeCan((can) => can.deleteColumn());
+    const canDeleteRow = safeCan((can) => can.deleteRow());
+    const canDeleteTable = safeCan((can) => can.deleteTable());
 
     return (
         <TooltipProvider delayDuration={400}>
@@ -1747,14 +1793,14 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
                 <ToolbarBtn
                     onClick={() => editor?.chain().focus().undo().run()}
                     title="Deshacer (Ctrl+Z)"
-                    disabled={!editor?.can().undo()}
+                    disabled={!canUndo}
                 >
                     <Undo2 className="h-3.5 w-3.5" />
                 </ToolbarBtn>
                 <ToolbarBtn
                     onClick={() => editor?.chain().focus().redo().run()}
                     title="Rehacer (Ctrl+Y)"
-                    disabled={!editor?.can().redo()}
+                    disabled={!canRedo}
                 >
                     <Redo2 className="h-3.5 w-3.5" />
                 </ToolbarBtn>
@@ -2211,7 +2257,7 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
                     }
                     title="Insertar tabla 3×3"
                 >
-                    <Grid3x3 className="h-3.5 w-3.5" />
+                    <SheetIcon className="h-3.5 w-3.5" />
                 </ToolbarBtn>
 
                 {inTable && (
@@ -2224,47 +2270,44 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
                             onClick={() =>
                                 editor?.chain().focus().addColumnAfter().run()
                             }
-                            title="Añadir columna"
+                            title="Añadir columna a la derecha"
+                            disabled={!canAddColumnAfter}
                         >
-                            <span className="text-[9px] leading-none font-bold">
-                                +C
-                            </span>
+                            <BetweenVerticalEnd className="h-3.5 w-3.5" />
                         </ToolbarBtn>
                         <ToolbarBtn
                             onClick={() =>
                                 editor?.chain().focus().addRowAfter().run()
                             }
-                            title="Añadir fila"
+                            title="Añadir fila abajo"
+                            disabled={!canAddRowAfter}
                         >
-                            <span className="text-[9px] leading-none font-bold">
-                                +F
-                            </span>
+                            <BetweenHorizontalEnd className="h-3.5 w-3.5" />
                         </ToolbarBtn>
                         <ToolbarBtn
                             onClick={() =>
                                 editor?.chain().focus().deleteColumn().run()
                             }
-                            title="Eliminar columna"
+                            title="Eliminar columna actual"
+                            disabled={!canDeleteColumn}
                         >
-                            <span className="text-[9px] leading-none font-bold text-red-500">
-                                −C
-                            </span>
+                            <BetweenVerticalEnd className="h-3.5 w-3.5 text-red-500" />
                         </ToolbarBtn>
                         <ToolbarBtn
                             onClick={() =>
                                 editor?.chain().focus().deleteRow().run()
                             }
-                            title="Eliminar fila"
+                            title="Eliminar fila actual"
+                            disabled={!canDeleteRow}
                         >
-                            <span className="text-[9px] leading-none font-bold text-red-500">
-                                −F
-                            </span>
+                            <BetweenHorizontalEnd className="h-3.5 w-3.5 text-red-500" />
                         </ToolbarBtn>
                         <ToolbarBtn
                             onClick={() =>
                                 editor?.chain().focus().deleteTable().run()
                             }
-                            title="Eliminar tabla"
+                            title="Eliminar tabla completa"
+                            disabled={!canDeleteTable}
                         >
                             <Trash2 className="h-3.5 w-3.5 text-red-500" />
                         </ToolbarBtn>
@@ -2275,12 +2318,13 @@ export function EditorToolbar({ editor }: { editor: Editor | null }) {
     );
 }
 
-interface RichTextEditorAreaProps {
-    content: string;
+export interface RichTextEditorAreaProps {
+    content: string | null;
     onChange: (html: string) => void;
     onFocus: (editor: Editor) => void;
     onBlur: () => void;
-    field:
+    onEditorReady?: (editor: Editor) => void;
+    field?:
         | 'diagnosis'
         | 'macroscopy'
         | 'microscopy'
@@ -2289,9 +2333,14 @@ interface RichTextEditorAreaProps {
         | 'protocols'
         | 'legend'
         | 'open_text'
-        | 'addendum';
-    label: string;
+        | 'addendum'
+        | (string & {});
+    label?: string;
     editorRef?: React.MutableRefObject<Editor | null>;
+    minHeight?: string;
+    className?: string;
+    editable?: boolean;
+    badge?: React.ReactNode;
 }
 
 export function RichTextEditorArea({
@@ -2299,9 +2348,14 @@ export function RichTextEditorArea({
     onChange,
     onFocus,
     onBlur,
-    field,
+    field = 'delivery_note',
     label,
     editorRef,
+    minHeight = 'min-h-[160px]',
+    className,
+    editable = true,
+    badge,
+    onEditorReady,
 }: RichTextEditorAreaProps) {
     const [isFocused, setIsFocused] = useState(false);
     const [characterCount, setCharacterCount] = useState(0);
@@ -2319,7 +2373,7 @@ export function RichTextEditorArea({
             ...sharedExtensions,
         ],
         content,
-        editable: true,
+        editable,
         editorProps: {
             handleKeyDown: (view, event) => {
                 return handleListAndBlockKeyDown(view, event);
@@ -2327,6 +2381,7 @@ export function RichTextEditorArea({
         },
         onCreate({ editor }) {
             setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
+            onEditorReady?.(editor);
         },
         onUpdate({ editor }) {
             setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
@@ -2377,7 +2432,6 @@ export function RichTextEditorArea({
     useEffect(() => {
         if (editor && content !== editor.getHTML() && !editor.isFocused) {
             editor.commands.setContent(content);
-            setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
         }
     }, [content, editor]);
 
@@ -2406,20 +2460,24 @@ export function RichTextEditorArea({
 
     return (
         <div className="space-y-1">
-            {label && (
-                <label className="block text-xs font-bold tracking-wider text-muted-foreground uppercase">
+            {label ? (
+                <span className="block text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
                     {label}
-                </label>
-            )}
+                </span>
+            ) : null}
             <div
                 className={cn(
-                    'relative rounded-lg border bg-card text-card-foreground shadow-xs transition-all duration-200',
+                    'relative overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs transition-all duration-200',
                     isFocused ? focusColorClass : 'border-border',
                 )}
             >
                 <EditorContent
                     editor={editor}
-                    className="min-h-[160px] p-4 focus:outline-hidden"
+                    className={cn(
+                        minHeight || 'min-h-[160px]',
+                        'p-4 focus:outline-hidden',
+                        className,
+                    )}
                 />
             </div>
             <div className="flex items-center justify-between pt-1">
@@ -2436,6 +2494,17 @@ export function RichTextEditorArea({
                     {characterCount.toLocaleString()} / 65,535 caracteres
                     {characterCount >= 65535 && ' (Límite alcanzado)'}
                 </span>
+                {badge !== undefined ? (
+                    badge
+                ) : editable !== false ? (
+                    <span className="flex items-center gap-1 rounded border border-emerald-500/10 bg-emerald-500/5 px-2 py-0.5 text-[9px] font-bold tracking-wider text-emerald-600 uppercase">
+                        <Check className="h-3.5 w-3.5" /> Editable
+                    </span>
+                ) : (
+                    <span className="flex items-center gap-1 rounded border border-slate-500/10 bg-slate-500/5 px-2 py-0.5 text-[9px] font-bold tracking-wider text-slate-500 uppercase">
+                        <Lock className="h-3.5 w-3.5" /> Solo lectura
+                    </span>
+                )}
             </div>
         </div>
     );

@@ -20,11 +20,13 @@ import {
     Edit,
     Trash2,
     MoreHorizontal,
+    FileText,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import * as React from 'react';
 import { toast } from 'sonner';
 import { index as adminWorkOrdersIndex } from '@/actions/App/Http/Controllers/WorkOrderController';
+import { show as showDeliveryNote } from '@/actions/App/Http/Controllers/WorkOrderDeliveryNoteController';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Pagination } from '@/components/pagination';
 import {
@@ -519,6 +521,23 @@ export default function WorkOrdersAdminIndex({
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        type="button"
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-8 w-8 text-sky-600 hover:bg-sky-50 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-950/50"
+                                                        onClick={() =>
+                                                            router.visit(
+                                                                showDeliveryNote(
+                                                                    order.id,
+                                                                ).url,
+                                                            )
+                                                        }
+                                                        title="Nota de entrega"
+                                                    >
+                                                        <FileText className="h-4 w-4" />
+                                                    </Button>
+
                                                     <Button
                                                         type="button"
                                                         variant="ghost"

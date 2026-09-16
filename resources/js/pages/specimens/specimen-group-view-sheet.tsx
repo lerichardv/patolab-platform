@@ -429,6 +429,7 @@ export default function SpecimenGroupViewSheet({
                                                                 const internDur = getInternalDeliveryDuration(specimen);
                                                                 const clientTxt = formatDurationText('Cli', clientDur);
                                                                 const internTxt = formatDurationText('Int', internDur);
+
                                                                 return (
                                                                     <>
                                                                         {clientTxt && (

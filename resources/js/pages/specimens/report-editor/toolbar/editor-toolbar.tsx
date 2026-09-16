@@ -382,14 +382,22 @@ export function EditorToolbar({
         return null;
     }
 
+    const safeCan = (fn: (can: ReturnType<Editor['can']>) => boolean) => {
+        try {
+            return Boolean(fn(editor.can()));
+        } catch {
+            return false;
+        }
+    };
+
     const inTable = isSelectionInTable(editor);
-    const canUndo = Boolean(editor.can?.()?.undo?.());
-    const canRedo = Boolean(editor.can?.()?.redo?.());
-    const canAddColumnAfter = Boolean(editor.can?.()?.addColumnAfter?.());
-    const canAddRowAfter = Boolean(editor.can?.()?.addRowAfter?.());
-    const canDeleteColumn = Boolean(editor.can?.()?.deleteColumn?.());
-    const canDeleteRow = Boolean(editor.can?.()?.deleteRow?.());
-    const canDeleteTable = Boolean(editor.can?.()?.deleteTable?.());
+    const canUndo = safeCan((can) => can.undo());
+    const canRedo = safeCan((can) => can.redo());
+    const canAddColumnAfter = safeCan((can) => can.addColumnAfter());
+    const canAddRowAfter = safeCan((can) => can.addRowAfter());
+    const canDeleteColumn = safeCan((can) => can.deleteColumn());
+    const canDeleteRow = safeCan((can) => can.deleteRow());
+    const canDeleteTable = safeCan((can) => can.deleteTable());
 
     return (
         <ToolbarContext.Provider value={{ isDictating }}>

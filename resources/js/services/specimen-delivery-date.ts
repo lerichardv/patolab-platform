@@ -48,6 +48,7 @@ export function getInternalDeliveryDuration(specimen: any): DeliveryDuration | n
     if (specimen.is_manual_delivery_date_intern_enabled) {
         const qty = Number(specimen.delivery_date_intern_quantity ?? 0);
         const unit = specimen.delivery_date_intern_unit || 'minutes';
+
         if (qty > 0 && unit) {
             return { quantity: qty, unit, isManual: true };
         }
@@ -76,6 +77,7 @@ export function getClientDeliveryDuration(specimen: any): DeliveryDuration | nul
     if (specimen.is_manual_delivery_date_enabled) {
         const qty = Number(specimen.delivery_date_quantity ?? 0);
         const unit = specimen.delivery_date_unit || 'minutes';
+
         if (qty > 0 && unit) {
             return { quantity: qty, unit, isManual: true };
         }
@@ -101,6 +103,7 @@ export function getEstimatedDate(specimen: any): Date | null {
     }
 
     const duration = getInternalDeliveryDuration(specimen);
+
     if (!duration) {
         return null;
     }
@@ -119,6 +122,7 @@ export function getClientEstimatedDate(specimen: any): Date | null {
     }
 
     const duration = getClientDeliveryDuration(specimen);
+
     if (!duration) {
         return null;
     }
@@ -182,11 +186,13 @@ export function getSpecimenDueDate(specimen: any): Date {
     const createdAt = new Date(specimen?.created_at || Date.now());
 
     const internalDuration = getInternalDeliveryDuration(specimen);
+
     if (internalDuration) {
         return addDeliveryDuration(createdAt, internalDuration.quantity, internalDuration.unit);
     }
 
     const clientDuration = getClientDeliveryDuration(specimen);
+
     if (clientDuration) {
         return addDeliveryDuration(createdAt, clientDuration.quantity, clientDuration.unit);
     }

@@ -298,6 +298,7 @@ export default function InvoiceAuditSheet({
             if (hasRestoredAny) {
                 onOpenChange(false);
                 setShowPostRestoreDialog(true);
+
                 return;
             }
         }
@@ -750,6 +751,7 @@ export default function InvoiceAuditSheet({
                 open={showPostRestoreDialog}
                 onOpenChange={(open) => {
                     setShowPostRestoreDialog(open);
+
                     if (!open) {
                         setHasRestoredAny(false);
                     }
@@ -789,6 +791,7 @@ export default function InvoiceAuditSheet({
                             onClick={() => {
                                 setShowPostRestoreDialog(false);
                                 setHasRestoredAny(false);
+
                                 if (invoice && onEditInvoice) {
                                     onEditInvoice(invoice);
                                 }

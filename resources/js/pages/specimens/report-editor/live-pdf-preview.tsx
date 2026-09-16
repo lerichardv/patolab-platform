@@ -8,6 +8,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { editorStyles } from './components/editor-styles';
 import { DebugHudPanel } from './page-preview/debug';
 import type { MeasuredBlock } from './page-preview/types';
 
@@ -116,6 +117,7 @@ export default function LivePdfPreview({
 
     return (
         <>
+            <style dangerouslySetInnerHTML={{ __html: editorStyles }} />
             {/* RIGHT COLUMN: Live PDF Preview */}
             <div className="left-[50vw] block flex h-[calc(100vh-64px)] min-h-[500px] w-screen flex-col space-y-3 lg:fixed lg:top-[64px] lg:w-[50vw]">
                 <div
@@ -270,6 +272,7 @@ export default function LivePdfPreview({
                     side="bottom"
                     className="mx-auto flex h-[96vh] w-[98vw] max-w-none flex-col justify-start overflow-hidden rounded-t-2xl border-t bg-slate-200 p-0 dark:bg-slate-950/20 [&>button]:top-4 [&>button]:right-6 [&>button]:h-8 [&>button]:w-8 [&>button]:rounded-full [&>button]:border [&>button]:bg-background/80 [&>button]:shadow-xs [&>button]:backdrop-blur-xs"
                 >
+                    <style dangerouslySetInnerHTML={{ __html: editorStyles }} />
                     <div className="flex items-center justify-between border-b bg-background px-6 py-3 shadow-xs">
                         <div className="flex items-center gap-2">
                             <FileText className="h-5 w-5 text-primary" />
