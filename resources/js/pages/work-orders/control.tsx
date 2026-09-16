@@ -1,12 +1,11 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { format, add, formatDistanceToNow, isPast } from 'date-fns';
+import { format, formatDistanceToNow, isPast } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
     Briefcase,
     Play,
     CheckCircle,
     Search,
-    Clock,
     AlertCircle,
     Filter,
     ChevronDown,
@@ -14,14 +13,13 @@ import {
     Eye,
     Maximize2,
     Minimize2,
-    Plus,
     X,
     UserPlus,
     CalendarClock,
     ClipboardList,
-    Check,
     ChevronUp,
     ChevronsUpDown,
+    FileText,
 } from 'lucide-react';
 import * as React from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -31,6 +29,7 @@ import {
     unassignTechnician,
     updateStatus,
 } from '@/actions/App/Http/Controllers/HistotechnologistWorkOrderController';
+import { show as showDeliveryNote } from '@/actions/App/Http/Controllers/WorkOrderDeliveryNoteController';
 import {
     DateRangePicker,
     setCookie,
@@ -57,18 +56,13 @@ import {
     CommandItem,
     CommandList,
 } from '@/components/ui/command';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import {
     Table,
     TableBody,
@@ -150,6 +144,11 @@ interface WorkOrder {
     } | null;
     created_by?: {
         name: string;
+    } | null;
+    delivery_note?: {
+        id: number;
+        content_html?: string | null;
+        pdf_path?: string | null;
     } | null;
 }
 
@@ -318,6 +317,7 @@ export default function HistotechnologistWorkOrdersControl({
         }),
     );
     const [searchQuery, setSearchQuery] = useState('');
+    const [showDeliveryNotesOnly, setShowDeliveryNotesOnly] = useState(false);
     const [isReloading, setIsReloading] = useState(false);
     const [selectedWorkOrder, setSelectedWorkOrder] =
         useState<WorkOrder | null>(null);
@@ -333,6 +333,22 @@ export default function HistotechnologistWorkOrdersControl({
         workOrderId: number;
         nextStatus: 'En Proceso' | 'Finalizada';
     } | null>(null);
+    const [confirmDeliveryNoteOrder, setConfirmDeliveryNoteOrder] =
+        useState<WorkOrder | null>(null);
+    const [isCreateDeliveryNoteDialogOpen, setIsCreateDeliveryNoteDialogOpen] =
+        useState(false);
+
+    const handleDeliveryNoteClick = (wo: WorkOrder) => {
+        const hasDeliveryNote = Boolean(wo.delivery_note);
+
+        if (hasDeliveryNote) {
+            router.visit(showDeliveryNote(wo.id).url);
+        } else {
+            setConfirmDeliveryNoteOrder(wo);
+            setIsCreateDeliveryNoteDialogOpen(true);
+        }
+    };
+
     const [selectedTasks, setSelectedTasks] = useState<number[]>(
         () => filters.task_ids?.map(Number) || tasks.map((t) => t.id),
     );
@@ -493,6 +509,10 @@ export default function HistotechnologistWorkOrdersControl({
         const searchLower = searchQuery.trim().toLowerCase();
 
         return workOrders.filter((wo) => {
+            if (showDeliveryNotesOnly && !wo.delivery_note) {
+                return false;
+            }
+
             const matchesStatus = selectedStatuses.includes(wo.status);
 
             const woDateStr = format(new Date(wo.created_at), 'yyyy-MM-dd');
@@ -526,7 +546,13 @@ export default function HistotechnologistWorkOrdersControl({
 
             return matchesStatus && matchesDate && matchesSearch;
         });
-    }, [workOrders, selectedStatuses, dateRange, searchQuery]);
+    }, [
+        workOrders,
+        selectedStatuses,
+        dateRange,
+        searchQuery,
+        showDeliveryNotesOnly,
+    ]);
 
     const handleUpdateStatus = (
         workOrderId: number,
@@ -859,6 +885,7 @@ export default function HistotechnologistWorkOrdersControl({
                             variant="outline"
                             className="h-10 w-full gap-2 px-5 text-sm md:w-auto"
                             onClick={() => {
+                                setShowDeliveryNotesOnly(false);
                                 const userId = props.auth?.user?.id;
 
                                 if (userId) {
@@ -913,7 +940,7 @@ export default function HistotechnologistWorkOrdersControl({
                     </div>
                 </div>
 
-                {/* Second Row: Buscador */}
+                {/* Second Row: Buscador y Filtros */}
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                     <div className="relative w-full shrink-0 sm:w-72">
                         <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -923,6 +950,25 @@ export default function HistotechnologistWorkOrdersControl({
                             className="h-10 w-full bg-card pl-9"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Switch Mostrar solo con nota de entrega */}
+                    <div
+                        className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-between gap-2 rounded-md border bg-card px-3 transition-colors select-none hover:bg-accent/50 sm:w-auto sm:justify-start"
+                        onClick={() => {
+                            setShowDeliveryNotesOnly((prev) => !prev);
+                        }}
+                    >
+                        <span className="text-sm font-medium">
+                            Con nota de entrega
+                        </span>
+                        <Switch
+                            checked={showDeliveryNotesOnly}
+                            onCheckedChange={(checked) => {
+                                setShowDeliveryNotesOnly(checked);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
                         />
                     </div>
                 </div>
@@ -1333,6 +1379,30 @@ export default function HistotechnologistWorkOrdersControl({
                                                             type="button"
                                                             size="icon"
                                                             variant="ghost"
+                                                            className={cn(
+                                                                'h-8 w-8 transition-colors',
+                                                                wo.delivery_note
+                                                                    ? 'text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/50'
+                                                                    : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800',
+                                                            )}
+                                                            onClick={() =>
+                                                                handleDeliveryNoteClick(
+                                                                    wo,
+                                                                )
+                                                            }
+                                                            title={
+                                                                wo.delivery_note
+                                                                    ? 'Ver nota de entrega'
+                                                                    : 'Crear nota de entrega'
+                                                            }
+                                                        >
+                                                            <FileText className="h-4 w-4" />
+                                                        </Button>
+
+                                                        <Button
+                                                            type="button"
+                                                            size="icon"
+                                                            variant="ghost"
                                                             className="h-8 w-8 text-primary"
                                                             onClick={() => {
                                                                 setSelectedWorkOrder(
@@ -1477,6 +1547,56 @@ export default function HistotechnologistWorkOrdersControl({
                             }
                         >
                             Confirmar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={isCreateDeliveryNoteDialogOpen}
+                onOpenChange={(open) => {
+                    setIsCreateDeliveryNoteDialogOpen(open);
+
+                    if (!open) {
+                        setConfirmDeliveryNoteOrder(null);
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Nota de entrega no encontrada
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta orden de trabajo{' '}
+                            {confirmDeliveryNoteOrder?.specimen?.sequence_code
+                                ? `(${confirmDeliveryNoteOrder.specimen.sequence_code})`
+                                : `#${confirmDeliveryNoteOrder?.id}`}{' '}
+                            no tiene una nota de entrega creada. ¿Desea crearla
+                            ahora?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            onClick={() => {
+                                setIsCreateDeliveryNoteDialogOpen(false);
+                                setConfirmDeliveryNoteOrder(null);
+                            }}
+                        >
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (confirmDeliveryNoteOrder) {
+                                    const id = confirmDeliveryNoteOrder.id;
+                                    setIsCreateDeliveryNoteDialogOpen(false);
+                                    setConfirmDeliveryNoteOrder(null);
+                                    router.visit(showDeliveryNote(id).url);
+                                }
+                            }}
+                            className="border-none bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                            Crear nota de entrega
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

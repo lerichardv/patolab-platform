@@ -105,6 +105,7 @@ export function usePriceQuoteFormData({
         if (!enabled) {
             abortControllerRef.current?.abort();
             setIsLoading(false);
+
             return;
         }
 
@@ -112,6 +113,7 @@ export function usePriceQuoteFormData({
         if (!priceQuoteId && cachedPriceQuoteCatalogs) {
             setData(cachedPriceQuoteCatalogs as PriceQuoteFormData);
             setIsLoading(false);
+
             return;
         }
 

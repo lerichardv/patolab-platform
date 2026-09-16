@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WorkOrder extends Model
@@ -74,6 +75,14 @@ class WorkOrder extends Model
     public function specimen(): BelongsTo
     {
         return $this->belongsTo(Specimen::class, 'specimen_id');
+    }
+
+    /**
+     * Obtiene la nota de entrega asociada a la orden de trabajo.
+     */
+    public function deliveryNote(): HasOne
+    {
+        return $this->hasOne(DeliveryNote::class, 'work_order_id');
     }
 
     /**

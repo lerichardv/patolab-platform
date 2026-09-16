@@ -25,7 +25,6 @@ import { Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { formatUnitSpanish } from '@/services/specimen-delivery-date';
 import {
     Command,
     CommandEmpty,
@@ -50,6 +49,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { formatUnitSpanish } from '@/services/specimen-delivery-date';
 import SpecimenViewSheet from '../../specimens/specimen-view-sheet';
 
 interface ExaminationItem {

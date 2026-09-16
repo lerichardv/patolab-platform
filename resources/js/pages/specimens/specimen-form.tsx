@@ -39,7 +39,6 @@ import HeadingSheet from '@/components/heading-sheet';
 import SpecimenExamChangePriceAlertDialog from '@/components/specimen-exam-change-price-alert-dialog';
 import SpecimenInvoiceSummaryAlertDialog from '@/components/specimen-invoice-summary-alert-dialog';
 import SpecimenRegenerateConfirmAlertDialog from '@/components/specimen-regenerate-confirm-alert-dialog';
-import { invalidateSpecimenCatalogsCache } from '@/hooks/use-specimen-form-data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -83,6 +82,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { invalidateSpecimenCatalogsCache } from '@/hooks/use-specimen-form-data';
 import { findInaccessibleFile } from '@/lib/file-utils';
 import { cn } from '@/lib/utils';
 import {
@@ -2124,10 +2124,12 @@ export default function SpecimenForm({
 																	onSelect={() => {
 																		const activeStates = t.active_states || t.activeStates || [];
 																		let initialStatus = 'received';
+
 																		if (Array.isArray(activeStates) && activeStates.length > 0) {
 																			const sorted = [...activeStates]
 																				.filter((s: any) => s.status !== 'cancelled')
 																				.sort((a: any, b: any) => a.step_order - b.step_order);
+
 																			if (sorted.length > 0) {
 																				initialStatus = sorted[0].status;
 																			}

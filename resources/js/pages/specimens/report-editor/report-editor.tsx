@@ -2169,7 +2169,7 @@ export default function ReportWorkspace({
 						{/* LEFT COLUMN: Inputs and Editors */}
 						<div className="h-[calc(100vh-64px)] w-screen overflow-auto lg:w-[50vw]">
 							{/* Header bar with Back button and Status Badge */}
-							<div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background p-6">
+							<div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background px-6 py-3">
 								<div className="flex items-center gap-3">
 									<Button
 										variant="ghost"
@@ -2187,12 +2187,20 @@ export default function ReportWorkspace({
 												<h1 className="text-xl font-bold tracking-tight">
 													Editor de Informe
 												</h1>
-												<p className="text-xs text-muted-foreground">
-													{specimen.type?.name || ''}
-													{examinationNames
-														? ` • ${examinationNames}`
-														: ''}
-												</p>
+
+												<div className="flex items-center gap-2">
+													<span className="text-[10px] tracking-tight text-muted-foreground uppercase">
+														Su acceso:
+													</span>
+													<span
+														className="text-[11px] font-bold tracking-wider uppercase"
+														style={{
+															color: accessBadgeStyle.color,
+														}}
+													>
+														{accessBadgeLabel}
+													</span>
+												</div>
 											</div>
 										</div>
 									</div>
@@ -2280,7 +2288,7 @@ export default function ReportWorkspace({
 
 												const currentMeta =
 													defaultStyles[
-														specimen.status
+													specimen.status
 													] || {
 														label: specimen.status,
 														color: '#64748b',
@@ -2322,19 +2330,6 @@ export default function ReportWorkspace({
 												</Button>
 											)}
 										</div>
-										<div className="flex items-center gap-2">
-											<span className="text-[10px] tracking-tight text-muted-foreground uppercase">
-												Su acceso:
-											</span>
-											<span
-												className="text-[11px] font-bold tracking-wider uppercase"
-												style={{
-													color: accessBadgeStyle.color,
-												}}
-											>
-												{accessBadgeLabel}
-											</span>
-										</div>
 									</div>
 								</div>
 							</div>
@@ -2343,8 +2338,8 @@ export default function ReportWorkspace({
 							{activeEditor &&
 								!activeEditor.isDestroyed &&
 								activeEditor.view && (
-									<div className="sticky top-[93px] z-10 bg-background/95 transition-all duration-205">
-										<div className="justify-strech flex items-center border-b border-border bg-muted/40 px-6">
+									<div className="sticky top-[68px] z-10 bg-background/95 transition-all duration-205">
+										<div className="justify-strech flex items-center border-b border-border bg-muted/40 pr-3">
 											<div className="flex min-h-[36px] w-full justify-between overflow-x-auto">
 												<EditorToolbar
 													editor={activeEditor}

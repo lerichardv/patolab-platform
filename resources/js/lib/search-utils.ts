@@ -59,11 +59,13 @@ export function matchesSearch(
     if (!query || !query.trim()) {
         return true;
     }
+
     if (target === null || target === undefined) {
         return false;
     }
 
     const normQuery = normalizeSearchText(query);
+
     if (!normQuery) {
         return true;
     }
@@ -78,12 +80,14 @@ export function matchesSearch(
     // 2. Compact match (ignoring dashes, slashes, dots, spaces, etc.)
     const compactQuery = stripSearchPunctuationAndWhitespace(query);
     const compactTarget = stripSearchPunctuationAndWhitespace(target);
+
     if (compactQuery && compactTarget.includes(compactQuery)) {
         return true;
     }
 
     // 3. Multi-word token match (all words in query must appear in target)
     const tokens = normQuery.split(' ').filter(Boolean);
+
     if (
         tokens.length > 1 &&
         tokens.every((token) => normTarget.includes(token))

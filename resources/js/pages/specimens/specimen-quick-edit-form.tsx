@@ -532,6 +532,7 @@ export default function SpecimenQuickEditForm({
                                     const typeStates = specimen?.type?.active_states || specimen?.type?.activeStates;
 
                                     let options = defaultOptions;
+
                                     if (Array.isArray(typeStates) && typeStates.length > 0) {
                                         const activeMap = new Map<string, number>();
                                         typeStates.forEach((ts: any) => activeMap.set(ts.status, ts.step_order));

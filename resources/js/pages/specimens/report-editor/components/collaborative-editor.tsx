@@ -190,6 +190,7 @@ function CollaborativeEditorInner({
         },
         onUpdate({ editor }) {
             setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
+
             if (provider?.isSynced && hasSeededRef.current) {
                 setTimeout(() => {
                     onUpdateRef.current?.(editor.getHTML());

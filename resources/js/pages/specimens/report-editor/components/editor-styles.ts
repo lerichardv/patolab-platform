@@ -320,8 +320,8 @@ export const editorStyles = `
 
   /* ── Image Grid ── */
   .preview-content div[data-type="image-grid"] {
-    display: flex;
-    flex-wrap: nowrap;
+    display: flex !important;
+    flex-wrap: nowrap !important;
     gap: 1.50mm;
     margin: 1.00mm 0mm;
     max-width: 100%;
@@ -340,6 +340,14 @@ export const editorStyles = `
     margin: 0 !important;
     display: block;
     border-radius: 4px;
+  }
+
+  .preview-content div[data-type="image-grid"] > img {
+    flex: 1 1 0px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: auto;
+    object-fit: cover;
   }
 
   /* Active Editor inside TipTap (React Node View container) */

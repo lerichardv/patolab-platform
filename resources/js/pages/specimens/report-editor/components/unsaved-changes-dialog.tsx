@@ -20,6 +20,8 @@ export interface UnsavedChangesDialogProps {
     onLeave: () => void;
     /** Save first, then navigate. Returns a promise — dialog stays open until resolved. */
     onSaveAndLeave: () => Promise<void>;
+    /** Optional custom description */
+    description?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function UnsavedChangesDialog({
     onCancel,
     onLeave,
     onSaveAndLeave,
+    description,
 }: UnsavedChangesDialogProps) {
     return (
         <AlertDialog
@@ -53,8 +56,8 @@ export function UnsavedChangesDialog({
                         ¿Salir sin guardar los cambios?
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                        Tienes cambios sin guardar en el reporte. Si sales
-                        ahora, podrías perder los últimos cambios realizados.
+                        {description ??
+                            'Tienes cambios sin guardar en el reporte. Si sales ahora, podrías perder los últimos cambios realizados.'}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 

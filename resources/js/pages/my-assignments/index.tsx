@@ -35,12 +35,23 @@ import {
 import { Scissors } from 'lucide-react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { advanceStatus as advanceSpecimenStatus } from '@/actions/App/Http/Controllers/SpecimenController';
 import {
     DateRangePicker,
     getCookie,
     setCookie,
     getLast2WeeksRange,
 } from '@/components/date-range-picker';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -52,16 +63,6 @@ import {
     CommandItem,
     CommandList,
 } from '@/components/ui/command';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import {
     Dialog,
     DialogContent,
@@ -99,7 +100,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { advanceStatus as advanceSpecimenStatus } from '@/actions/App/Http/Controllers/SpecimenController';
 import { cn } from '@/lib/utils';
 import {
     getSpecimenDueDate,
@@ -593,7 +593,10 @@ export default function MyAssignmentsIndex({
     };
 
     const confirmAdvanceStatus = () => {
-        if (!specimenToAdvance) { return; }
+        if (!specimenToAdvance) {
+ return; 
+}
+
         const specimen = specimenToAdvance;
         router.post(
             advanceSpecimenStatus(specimen.id).url,
@@ -2609,7 +2612,9 @@ export default function MyAssignmentsIndex({
             <AlertDialog
                 open={specimenToAdvance !== null}
                 onOpenChange={(open) => {
-                    if (!open) { setSpecimenToAdvance(null); }
+                    if (!open) {
+ setSpecimenToAdvance(null); 
+}
                 }}
             >
                 <AlertDialogContent>
