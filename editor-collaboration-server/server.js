@@ -14,6 +14,7 @@ import Highlight from '@tiptap/extension-highlight';
 import { Image } from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
+import Underline from '@tiptap/extension-underline';
 import { generateJSON, generateHTML } from '@tiptap/html/server';
 import StarterKit from '@tiptap/starter-kit';
 import cors from 'cors';
@@ -128,6 +129,23 @@ const CustomImage = Image.extend({
 	addAttributes() {
 		return {
 			...this.parent?.(),
+			order: {
+				default: null,
+				parseHTML: element => {
+					const order = element.getAttribute('data-order');
+
+					return order ? parseInt(order, 10) : null;
+				},
+				renderHTML: attributes => {
+					if (attributes.order === null || attributes.order === undefined) {
+						return {};
+					}
+
+					return {
+						'data-order': attributes.order,
+					};
+				},
+			},
 			caption: {
 				default: '',
 				parseHTML: element =>
@@ -236,13 +254,19 @@ const CustomImage = Image.extend({
 			styles.push(`height: ${HTMLAttributes.height}px`);
 		}
 
+		const extra = {
+			'data-align': HTMLAttributes.alignment || 'center',
+			class: `align-${HTMLAttributes.alignment || 'center'}`,
+			style: styles.join('; ') + ';'
+		};
+
+		if (HTMLAttributes.order !== null && HTMLAttributes.order !== undefined) {
+			extra['data-order'] = HTMLAttributes.order;
+		}
+
 		return [
 			'img',
-			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-				'data-align': HTMLAttributes.alignment || 'center',
-				class: `align-${HTMLAttributes.alignment || 'center'}`,
-				style: styles.join('; ') + ';'
-			})
+			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, extra)
 		];
 	},
 });
@@ -356,6 +380,7 @@ const extensions = [
 	StarterKit.configure({
 		undoRedo: false,
 		bulletList: false,
+		trailingNode: false,
 	}),
 	TextStyle,
 	FontSize,
@@ -373,6 +398,7 @@ const extensions = [
 	}),
 	TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
 	Highlight.configure({ multicolor: true }),
+	Underline,
 	ImageGrid,
 ];
 

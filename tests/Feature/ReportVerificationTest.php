@@ -89,6 +89,7 @@ test('returns 200 valid view when report code and token match a finalized specim
 
     $response->assertStatus(200);
     $response->assertSee('Informe Auténtico');
+    $response->assertSee('Por favor descargar el reporte para comparar y verificar su autenticidad.');
     $response->assertSee('VERIFY123456');
     $response->assertSee('TEST-VERIFY-001');
     $response->assertSee('Juan Pérez Validador');

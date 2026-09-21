@@ -26,6 +26,7 @@ use App\Models\UserCommissionRule;
 use App\Models\WorkOrderTask;
 use App\Models\WorkOrderType;
 use App\Services\ImageOptimizerService;
+use App\Services\ReportPaginator;
 use App\Services\ReportPdfService;
 use App\Services\SpecimenStatusService;
 use Illuminate\Http\JsonResponse;
@@ -185,7 +186,7 @@ class ReportEditorController extends Controller
                 ]);
             }
             if ($event === 'onChange') {
-                $htmlValue = $payload['html'] ?? '[]';
+                $htmlValue = $this->sanitizeJsonField($payload['html'] ?? '[]', '[]');
                 DB::table('specimen_reports')
                     ->where('id', $reportId)
                     ->update([
@@ -244,7 +245,7 @@ class ReportEditorController extends Controller
                 ]);
             }
             if ($event === 'onChange') {
-                $htmlValue = $payload['html'] ?? '{}';
+                $htmlValue = $this->sanitizeJsonField($payload['html'] ?? '{}', '{}');
                 DB::table('specimen_reports')
                     ->where('id', $reportId)
                     ->update([
@@ -306,13 +307,13 @@ class ReportEditorController extends Controller
         // SCENARIO C: Document initialization/load (called when room is created on server)
         if ($event === 'create') {
             return response()->json([
-                'content' => $report->$htmlColumn ?? '',
+                'content' => ReportPaginator::removeHyperlinks($report->$htmlColumn ?? ''),
             ]);
         }
 
         // SCENARIO B: Typing pause threshold reached (Background automatic save process)
         if ($event === 'onChange') {
-            $htmlValue = $payload['html'] ?? '';
+            $htmlValue = ReportPaginator::removeHyperlinks($payload['html'] ?? '');
             $cleanText = trim(strip_tags(str_replace(['&nbsp;', "\xc2\xa0"], ' ', $htmlValue)));
             $hasMediaOrTable = (bool) preg_match('/<img|<table/i', $htmlValue);
 
@@ -1475,5 +1476,71 @@ class ReportEditorController extends Controller
         if (! $isAssigned) {
             abort(403, 'No estás asignado a esta muestra y no puedes acceder al editor de reportes.');
         }
+    }
+
+    /**
+     * Sanitize a JSON field value that may have been corrupted by Yjs CRDT concurrent writes.
+     *
+     * When two clients simultaneously delete and re-insert the same Y.Text field, Yjs may
+     * merge the two string insertions into a concatenated result like "{...}{...}" or "[...][...]".
+     * MySQL's JSON column rejects this with SQLSTATE[22032]. This method extracts the last
+     * syntactically complete JSON value from the raw string and falls back to $default on failure.
+     *
+     * @param  string  $raw  The raw string received from the Hocuspocus onChange payload.
+     * @param  string  $default  A valid JSON fallback value (e.g. '{}' or '[]').
+     */
+    private function sanitizeJsonField(string $raw, string $default = '{}'): string
+    {
+        $raw = trim($raw);
+
+        if ($raw === '') {
+            return $default;
+        }
+
+        // Fast path: the value is already valid JSON.
+        if (json_validate($raw)) {
+            return $raw;
+        }
+
+        // Slow path: try to extract the last complete JSON object {} or array [] from a
+        // potentially concatenated string produced by concurrent Yjs Y.Text operations.
+        $lastValid = null;
+        $len = strlen($raw);
+
+        for ($i = $len - 1; $i >= 0; $i--) {
+            $char = $raw[$i];
+
+            if ($char !== '}' && $char !== ']') {
+                continue;
+            }
+
+            // Find the matching opening delimiter by scanning backwards.
+            $openChar = $char === '}' ? '{' : '[';
+            $depth = 0;
+
+            for ($j = $i; $j >= 0; $j--) {
+                if ($raw[$j] === $char) {
+                    $depth++;
+                } elseif ($raw[$j] === $openChar) {
+                    $depth--;
+
+                    if ($depth === 0) {
+                        $candidate = substr($raw, $j, $i - $j + 1);
+
+                        if (json_validate($candidate)) {
+                            $lastValid = $candidate;
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            if ($lastValid !== null) {
+                break;
+            }
+        }
+
+        return $lastValid ?? $default;
     }
 }

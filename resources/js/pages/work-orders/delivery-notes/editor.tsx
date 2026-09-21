@@ -42,6 +42,7 @@ import EditorLayout from '@/layouts/editor-layout';
 import WorkOrderViewSheet from '@/pages/my-work-orders/work-order-view-sheet';
 import { editorStyles } from '@/pages/specimens/report-editor/components/editor-styles';
 import { UnsavedChangesDialog } from '@/pages/specimens/report-editor/components/unsaved-changes-dialog';
+import { removeHyperlinks } from '@/pages/specimens/report-editor/utils/paste-cleaner';
 import SpecimenViewSheet from '@/pages/specimens/specimen-view-sheet';
 import DeliveryNoteLivePdfPreview from './live-pdf-preview';
 import { DeliveryNotePaginator } from './services/delivery-note-paginator';
@@ -145,6 +146,7 @@ export default function DeliveryNoteEditor({
             setSaveState('saving');
 
             try {
+                const cleanHtml = removeHyperlinks(htmlToSave);
                 const response = await fetch(
                     `/work-orders/${workOrder.id}/delivery-note/save`,
                     {
@@ -161,7 +163,7 @@ export default function DeliveryNoteEditor({
                                 )?.content ?? '',
                         },
                         body: JSON.stringify({
-                            content_html: htmlToSave,
+                            content_html: cleanHtml,
                         }),
                     },
                 );

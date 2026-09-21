@@ -20,6 +20,13 @@
             margin-top: 0 !important;
         }
 
+        a, a:visited, a:hover, a:active {
+            color: inherit !important;
+            text-decoration: none !important;
+            pointer-events: none !important;
+            cursor: text !important;
+        }
+
  
         @page {
             size: 215.9mm 279.4mm;
@@ -53,10 +60,10 @@
             page-break-after: avoid;
         }
 
-        /* Content height budget (adjusted to 212.79mm) */
+        /* Content height budget (adjusted to 208.90mm) */
         .page-content {
             width: 100%;
-            height: 212.79mm;
+            height: 208.90mm;
             display: flex;
             flex-direction: column;
             justify-content: flex-start;

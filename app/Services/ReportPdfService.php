@@ -67,16 +67,17 @@ class ReportPdfService
             }
         }
 
-        // Convert all local/remote images in editor contents to Base64 data URIs so Browsershot can render them.
-        $report->diagnosis_html = $this->convertImagesToBase64($report->diagnosis_html);
-        $report->macroscopy_html = $this->convertImagesToBase64($report->macroscopy_html);
-        $report->microscopy_html = $this->convertImagesToBase64($report->microscopy_html);
-        $report->clinical_details_html = $this->convertImagesToBase64($report->clinical_details_html);
-        $report->comments_notes_html = $this->convertImagesToBase64($report->comments_notes_html);
-        $report->protocols_html = $this->convertImagesToBase64($report->protocols_html);
-        $report->legend_html = $this->convertImagesToBase64($report->legend_html);
-        $report->open_text_html = $this->convertImagesToBase64($report->open_text_html);
-        $report->addendum_html = $this->convertImagesToBase64($report->addendum_html);
+        // Convert all local/remote images in editor contents to Base64 data URIs so Browsershot can render them,
+        // and remove all hyperlinks so the PDF contains no clickable/styled hyperlinks.
+        $report->diagnosis_html = ReportPaginator::removeHyperlinks($this->convertImagesToBase64($report->diagnosis_html ?? ''));
+        $report->macroscopy_html = ReportPaginator::removeHyperlinks($this->convertImagesToBase64($report->macroscopy_html ?? ''));
+        $report->microscopy_html = ReportPaginator::removeHyperlinks($this->convertImagesToBase64($report->microscopy_html ?? ''));
+        $report->clinical_details_html = ReportPaginator::removeHyperlinks($this->convertImagesToBase64($report->clinical_details_html ?? ''));
+        $report->comments_notes_html = ReportPaginator::removeHyperlinks($this->convertImagesToBase64($report->comments_notes_html ?? ''));
+        $report->protocols_html = ReportPaginator::removeHyperlinks($this->convertImagesToBase64($report->protocols_html ?? ''));
+        $report->legend_html = ReportPaginator::removeHyperlinks($this->convertImagesToBase64($report->legend_html ?? ''));
+        $report->open_text_html = ReportPaginator::removeHyperlinks($this->convertImagesToBase64($report->open_text_html ?? ''));
+        $report->addendum_html = ReportPaginator::removeHyperlinks($this->convertImagesToBase64($report->addendum_html ?? ''));
 
         $isMicroscopyVisible = in_array($specimen->status, ['microscopic_review', 'finalized', 'delivered']);
 

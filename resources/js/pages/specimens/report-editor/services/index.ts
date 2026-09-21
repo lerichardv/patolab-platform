@@ -6,4 +6,8 @@ export {
     TextCaseTransformer,
     type TextTransformType,
 } from './text-case-transformer';
-export { cleanPastedHtml, cleanPastedText } from '../utils/paste-cleaner';
+export {
+    cleanPastedHtml,
+    cleanPastedText,
+    removeHyperlinks,
+} from '../utils/paste-cleaner';

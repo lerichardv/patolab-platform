@@ -300,8 +300,8 @@ export default function Body({
         <div
             style={{
                 width: '100%',
-                height: '212.79mm',
-                maxHeight: '212.79mm',
+                height: '208.90mm',
+                maxHeight: '208.90mm',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'flex-start',

@@ -12,7 +12,7 @@ import type * as Y from 'yjs';
 import { cn } from '@/lib/utils';
 import { uploadReportImage } from '../actions';
 import { ImageCropperDialog } from '../image-grid-component';
-import { isSelectionInTable } from '../utils';
+import { isSelectionInTable, removeHyperlinks } from '../utils';
 import { EditorRegistryContext } from './editor-registry-context';
 import {
     CustomBulletList,
@@ -37,7 +37,6 @@ interface CollaborativeEditorProps {
 }
 
 function CollaborativeEditorInner({
-    reportId,
     field,
     userName,
     cursorColor,
@@ -129,6 +128,7 @@ function CollaborativeEditorInner({
     const onUpdateRef = useRef(onUpdate);
     onUpdateRef.current = onUpdate;
     const hasSeededRef = useRef(false);
+    const lastEmittedHtmlRef = useRef<string | null>(null);
 
     const editor = useEditor({
         extensions: [
@@ -301,66 +301,61 @@ function CollaborativeEditorInner({
             return;
         }
 
-        const updateState = () => {
+        /**
+         * Called once when the Yjs document is fully synced from the server.
+         * The server (Hocuspocus) is the single authoritative source for seeding;
+         * the client must NOT call setContent here to avoid CRDT double-insertion.
+         */
+        const handleSynced = () => {
             if (!provider.isSynced) {
                 return;
             }
 
-            setTimeout(() => {
-                const currentHtml = editor.getHTML();
-                const cleanText = editor.getText().trim();
-                const hasMediaOrTable = /<img|<table/i.test(currentHtml);
-                const isEmpty = cleanText === '' && !hasMediaOrTable;
+            // Mark as seeded so the transaction handler can start emitting updates.
+            hasSeededRef.current = true;
 
-                if (isEmpty && initialContent) {
-                    const initialCleanText = initialContent
-                        .replace(/<[^>]*>/g, '')
-                        .replace(/&nbsp;/gi, ' ')
-                        .trim();
-                    const initialHasMediaOrTable = /<img|<table/i.test(
-                        initialContent,
-                    );
+            // Emit initial HTML to parent so its state reflects the server content.
+            const newHtml = removeHyperlinks(editor.getHTML());
 
-                    if (initialCleanText !== '' || initialHasMediaOrTable) {
-                        console.log(
-                            `[CollaborativeEditor] Seeding empty editor with initialContent for ${field}:`,
-                            initialContent,
-                        );
-                        editor.commands.setContent(initialContent);
-                        hasSeededRef.current = true;
-
-                        return;
-                    }
-                }
-
-                hasSeededRef.current = true;
-                onUpdate(editor.getHTML());
-            }, 50);
+            if (lastEmittedHtmlRef.current !== newHtml) {
+                lastEmittedHtmlRef.current = newHtml;
+                onUpdateRef.current?.(newHtml);
+            }
         };
 
-        // Listen to synced event
-        provider.on('synced', updateState);
-
-        // Listen to transactions to capture both local & remote collaborative edits
+        // Listen to transactions to capture both local & remote collaborative edits.
         const handleTransaction = () => {
             if (!provider.isSynced || !hasSeededRef.current) {
                 return;
             }
 
-            onUpdate(editor.getHTML());
+            const newHtml = removeHyperlinks(editor.getHTML());
+
+            // Only emit when the HTML actually changed to avoid unnecessary re-renders
+            // in the parent (report-editor.tsx) that would create a new initialContent
+            // string, remount this effect, and start the ghost-text feedback loop.
+            if (lastEmittedHtmlRef.current !== newHtml) {
+                lastEmittedHtmlRef.current = newHtml;
+                onUpdateRef.current?.(newHtml);
+            }
         };
+
+        provider.on('synced', handleSynced);
         editor.on('transaction', handleTransaction);
 
-        // If it's already synced, trigger a deferred pull of the content
+        // If already synced (e.g. reconnection), handle immediately.
         if (provider.isSynced) {
-            updateState();
+            handleSynced();
         }
 
         return () => {
-            provider.off('synced', updateState);
+            provider.off('synced', handleSynced);
             editor.off('transaction', handleTransaction);
         };
-    }, [editor, provider, onUpdate, initialContent, field]);
+        // Intentionally omit initialContent and onUpdate — using refs instead
+        // so this effect never remounts on content changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editor, provider, field]);
 
     useEffect(() => {
         if (!editor) {

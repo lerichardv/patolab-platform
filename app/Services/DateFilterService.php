@@ -23,8 +23,12 @@ class DateFilterService
             $from = $reqFrom ?? '';
             $to = $reqTo ?? '';
 
-            $resolvedTo = ($to === 'today') ? $today->toDateString() : $to;
-            $resolvedFrom = ($from === 'today') ? $today->toDateString() : $from;
+            $resolvedFrom = self::normalizeDate($from, $to);
+            $resolvedTo = self::normalizeDate($to, $from);
+
+            if (! empty($resolvedFrom) && ! empty($resolvedTo) && $resolvedFrom > $resolvedTo) {
+                [$resolvedFrom, $resolvedTo] = [$resolvedTo, $resolvedFrom];
+            }
 
             $range = self::determineRange($resolvedFrom, $resolvedTo, $today);
 
@@ -40,21 +44,12 @@ class DateFilterService
             $decoded = json_decode($cookieValue, true);
             if (is_array($decoded)) {
                 $range = $decoded['range'] ?? null;
-                $decodedFrom = $decoded['from'] ?? '';
-                $decodedTo = $decoded['to'] ?? '';
+                $decodedFrom = self::normalizeDate($decoded['from'] ?? '', $decoded['to'] ?? '');
+                $decodedTo = self::normalizeDate($decoded['to'] ?? '', $decoded['from'] ?? '');
 
                 // If legacy cookie without 'range' key, determine it from 'from' and 'to'
                 if ($range === null) {
-                    $resolvedTo = ($decodedTo === 'today') ? $today->toDateString() : $decodedTo;
-                    $resolvedFrom = ($decodedFrom === 'today') ? $today->toDateString() : $decodedFrom;
-                    $range = self::determineRange($resolvedFrom, $resolvedTo, $today);
-                }
-
-                if ($decodedTo === 'today') {
-                    $decodedTo = $today->toDateString();
-                }
-                if ($decodedFrom === 'today') {
-                    $decodedFrom = $today->toDateString();
+                    $range = self::determineRange($decodedFrom, $decodedTo, $today);
                 }
 
                 switch ($range) {
@@ -114,6 +109,106 @@ class DateFilterService
     }
 
     /**
+     * Normalize various date input formats into standard Y-m-d.
+     * Handles YYYY-MM-DD, MM-DD-YYYY, DD-MM-YYYY, slashed versions, and "today".
+     */
+    public static function normalizeDate(?string $date, ?string $pairedDate = null): string
+    {
+        if ($date === null || trim($date) === '') {
+            return '';
+        }
+
+        $date = trim($date);
+
+        if ($date === 'today') {
+            return Carbon::today()->toDateString();
+        }
+
+        // 1. Standard ISO YYYY-MM-DD
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $matches)) {
+            $y = (int) $matches[1];
+            $m = (int) $matches[2];
+            $d = (int) $matches[3];
+            if (checkdate($m, $d, $y)) {
+                return sprintf('%04d-%02d-%02d', $y, $m, $d);
+            }
+        }
+
+        // 2. YYYY/MM/DD or with timestamps (e.g. ISO 8601 YYYY-MM-DDTHH:mm:ss)
+        if (preg_match('/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/', $date, $matches)) {
+            $y = (int) $matches[1];
+            $m = (int) $matches[2];
+            $d = (int) $matches[3];
+            if (checkdate($m, $d, $y)) {
+                return sprintf('%04d-%02d-%02d', $y, $m, $d);
+            }
+        }
+
+        // 3. 3 components with 4-digit year at end: MM-DD-YYYY or DD-MM-YYYY
+        if (preg_match('/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/', $date, $matches)) {
+            $p1 = (int) $matches[1];
+            $p2 = (int) $matches[2];
+            $y = (int) $matches[3];
+
+            // Case A: p1 > 12 means p1 is day, p2 is month (DD-MM-YYYY)
+            if ($p1 > 12 && $p2 <= 12) {
+                if (checkdate($p2, $p1, $y)) {
+                    return sprintf('%04d-%02d-%02d', $y, $p2, $p1);
+                }
+            }
+
+            // Case B: p2 > 12 means p1 is month, p2 is day (MM-DD-YYYY)
+            if ($p2 > 12 && $p1 <= 12) {
+                if (checkdate($p1, $p2, $y)) {
+                    return sprintf('%04d-%02d-%02d', $y, $p1, $p2);
+                }
+            }
+
+            // Case C: Both <= 12 -> use paired date context to disambiguate
+            if (! empty($pairedDate) && preg_match('/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/', trim($pairedDate), $pm)) {
+                $pp1 = (int) $pm[1];
+                $pp2 = (int) $pm[2];
+
+                // If paired date had p2 > 12 (MM-DD-YYYY), this one is also MM-DD-YYYY
+                if ($pp2 > 12 && $pp1 <= 12) {
+                    if (checkdate($p1, $p2, $y)) {
+                        return sprintf('%04d-%02d-%02d', $y, $p1, $p2);
+                    }
+                }
+
+                // If paired date had p1 > 12 (DD-MM-YYYY), this one is also DD-MM-YYYY
+                if ($pp1 > 12 && $pp2 <= 12) {
+                    if (checkdate($p2, $p1, $y)) {
+                        return sprintf('%04d-%02d-%02d', $y, $p2, $p1);
+                    }
+                }
+
+                // If first component is identical (e.g. 08-01-2026 to 08-10-2026), 08 is the common month
+                if ($p1 === $pp1 && $p2 !== $pp2) {
+                    if (checkdate($p1, $p2, $y)) {
+                        return sprintf('%04d-%02d-%02d', $y, $p1, $p2);
+                    }
+                }
+            }
+
+            // Default fallback for ambiguous 3-component: try MM-DD-YYYY first then DD-MM-YYYY
+            if (checkdate($p1, $p2, $y)) {
+                return sprintf('%04d-%02d-%02d', $y, $p1, $p2);
+            }
+            if (checkdate($p2, $p1, $y)) {
+                return sprintf('%04d-%02d-%02d', $y, $p2, $p1);
+            }
+        }
+
+        // 4. General Carbon parse fallback
+        try {
+            return Carbon::parse($date)->toDateString();
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+    /**
      * Helper to determine range name from raw dates.
      */
     public static function determineRange(string $from, string $to, Carbon $today): string
@@ -153,20 +248,20 @@ class DateFilterService
         $today = Carbon::today();
         $todayStr = $today->toDateString();
 
-        $resolvedTo = ($to === 'today') ? $todayStr : $to;
-        $resolvedFrom = ($from === 'today') ? $todayStr : $from;
+        $resolvedFrom = self::normalizeDate($from, $to);
+        $resolvedTo = self::normalizeDate($to, $from);
 
         if ($range === null) {
             $range = self::determineRange($resolvedFrom, $resolvedTo, $today);
         }
 
-        $cookieTo = ($resolvedTo === $todayStr) ? 'today' : $to;
+        $cookieTo = ($resolvedTo === $todayStr) ? 'today' : $resolvedTo;
 
         return cookie(
             $cookieName,
             json_encode([
                 'range' => $range,
-                'from' => $from,
+                'from' => $resolvedFrom,
                 'to' => $cookieTo,
             ]),
             525600, // 1 year

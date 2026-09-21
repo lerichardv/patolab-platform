@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DeliveryNote;
 use App\Models\WorkOrder;
+use App\Services\DeliveryNotePaginator;
 use App\Services\DeliveryNotePdfService;
 use App\Services\ImageOptimizerService;
 use Illuminate\Http\JsonResponse;
@@ -83,19 +84,21 @@ class WorkOrderDeliveryNoteController extends Controller
             'content_html' => 'nullable|string',
         ]);
 
+        $cleanHtml = DeliveryNotePaginator::removeHyperlinks($request->input('content_html', ''));
+
         $deliveryNote = $workOrder->deliveryNote ?: DeliveryNote::where('work_order_id', $workOrder->id)->first();
         if (! $deliveryNote) {
             $deliveryNote = DeliveryNote::firstOrCreate(
                 ['work_order_id' => $workOrder->id],
                 [
                     'specimen_id' => $workOrder->specimen_id,
-                    'content_html' => $request->input('content_html', ''),
+                    'content_html' => $cleanHtml,
                     'created_by_id' => auth()->id(),
                 ]
             );
         } else {
             $deliveryNote->update([
-                'content_html' => $request->input('content_html', ''),
+                'content_html' => $cleanHtml,
                 'updated_by_id' => auth()->id(),
             ]);
         }

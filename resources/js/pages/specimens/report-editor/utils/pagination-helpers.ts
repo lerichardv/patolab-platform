@@ -75,29 +75,137 @@ export function parseColumnPercentages(
         : Array(colCount).fill(100.0 / colCount);
 }
 
+export function parseTopLevelListItems(listHtml: string): {
+    full: string;
+    inner: string;
+}[] {
+    const items: { full: string; inner: string }[] = [];
+    const firstListMatch = listHtml.match(/<(ul|ol)[^>]*>/i);
+
+    if (!firstListMatch) {
+        return items;
+    }
+
+    let index = (firstListMatch.index || 0) + firstListMatch[0].length;
+
+    while (index < listHtml.length) {
+        const nextLiStart = listHtml.slice(index).search(/<li\b[^>]*>/i);
+
+        if (nextLiStart === -1) {
+            break;
+        }
+
+        const liStartIndex = index + nextLiStart;
+        const liTagMatch = listHtml.slice(liStartIndex).match(/^<li\b[^>]*>/i);
+
+        if (!liTagMatch) {
+            break;
+        }
+
+        let depth = 1;
+        let searchIndex = liStartIndex + liTagMatch[0].length;
+
+        while (depth > 0 && searchIndex < listHtml.length) {
+            const nextTagMatch = listHtml
+                .slice(searchIndex)
+                .match(/<\/?(?:li|ul|ol)\b[^>]*>/i);
+
+            if (!nextTagMatch) {
+                searchIndex = listHtml.length;
+                break;
+            }
+
+            const tag = nextTagMatch[0].toLowerCase();
+            const tagPos = searchIndex + (nextTagMatch.index || 0);
+            searchIndex = tagPos + tag.length;
+
+            if (tag.startsWith('<li')) {
+                depth++;
+            } else if (tag.startsWith('</li')) {
+                depth--;
+
+                if (depth === 0) {
+                    const full = listHtml.substring(liStartIndex, searchIndex);
+                    const inner = full
+                        .replace(/^<li\b[^>]*>/i, '')
+                        .replace(/<\/li>$/i, '');
+                    items.push({ full, inner });
+                    index = searchIndex;
+                    break;
+                }
+            }
+        }
+
+        if (depth !== 0) {
+            break;
+        }
+    }
+
+    return items;
+}
+
 export function paginateList(
     listHtml: string,
     maxCharsPerLine: number = 130,
     fontLineHeight: number = 3.53,
     itemSpacing: number = LIST_ITEM_SPACING,
 ) {
-    const tag = listHtml.startsWith('<ol') ? 'ol' : 'ul';
-    const itemRegex = /<li[^>]*>(.*?)<\/li>/gis;
+    let tag = listHtml.startsWith('<ol') ? 'ol' : 'ul';
+    let listStyleType: string | null = null;
+    let styleAttr: string | null = null;
     const items: {
         html: string;
         height: number;
         lineCount: number;
         textLength: number;
     }[] = [];
-    let match;
 
     // List has 6.35mm left padding + bullet, taking ~15 characters equivalent
     const listCharsPerLine = Math.max(20, maxCharsPerLine - 15);
 
     const matches: { full: string; inner: string }[] = [];
 
-    while ((match = itemRegex.exec(listHtml)) !== null) {
-        matches.push({ full: match[0], inner: match[1] });
+    if (typeof window !== 'undefined') {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(listHtml, 'text/html');
+            const list = doc.querySelector('ul, ol');
+
+            if (list) {
+                tag = list.tagName.toLowerCase() as 'ol' | 'ul';
+                listStyleType = list.getAttribute('data-list-style-type');
+                styleAttr = list.getAttribute('style');
+
+                Array.from(list.children).forEach((child) => {
+                    if (child.tagName.toLowerCase() === 'li') {
+                        matches.push({
+                            full: child.outerHTML,
+                            inner: child.innerHTML,
+                        });
+                    }
+                });
+            }
+        } catch {
+            // fallback to parser below
+        }
+    }
+
+    if (matches.length === 0) {
+        const listStyleTypeMatch = listHtml.match(
+            /data-list-style-type=["']([^"']+)["']/i,
+        );
+
+        if (!listStyleType && listStyleTypeMatch) {
+            listStyleType = listStyleTypeMatch[1];
+        }
+
+        const styleMatch = listHtml.match(/style=["']([^"']+)["']/i);
+
+        if (!styleAttr && styleMatch) {
+            styleAttr = styleMatch[1];
+        }
+
+        matches.push(...parseTopLevelListItems(listHtml));
     }
 
     matches.forEach((m, idx) => {
@@ -105,9 +213,9 @@ export function paginateList(
         const liFull = m.full;
         const liInner = m.inner;
 
-        // Split by inner paragraphs or line breaks
+        // Split by inner paragraphs, line breaks, or inner list items
         const segments = liInner
-            .split(/<p[^>]*>|<\/p>|<br\s*\/?>|<div[^>]*>|<\/div>/i)
+            .split(/<p[^>]*>|<\/p>|<br\s*\/?>|<div[^>]*>|<\/div>|<li[^>]*>|<\/li>/i)
             .map((s) => decodeHtmlEntities(s.replace(/<[^>]+>/g, '')).trim())
             .filter((s) => s.length > 0);
 
@@ -139,14 +247,6 @@ export function paginateList(
             textLength: totalTextLen,
         });
     });
-
-    const listStyleTypeMatch = listHtml.match(
-        /data-list-style-type=["']([^"']+)["']/i,
-    );
-    const listStyleType = listStyleTypeMatch ? listStyleTypeMatch[1] : null;
-
-    const styleMatch = listHtml.match(/style=["']([^"']+)["']/i);
-    const styleAttr = styleMatch ? styleMatch[1] : null;
 
     return { tag, items, listStyleType, styleAttr, listCharsPerLine };
 }

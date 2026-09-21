@@ -17,22 +17,22 @@
             --bg-color: #ffffff;
             --text-main: #0f172a;
             --text-muted: #64748b;
-            --badge-bg: rgba(16, 185, 129, 0.1);
-            --badge-border: rgba(16, 185, 129, 0.25);
-            --badge-text: #047857;
-            --primary: #10b981;
-            --primary-hover: #059669;
+            --badge-bg: rgba(245, 158, 11, 0.12);
+            --badge-border: rgba(245, 158, 11, 0.3);
+            --badge-text: #b45309;
+            --primary: #d97706;
+            --primary-hover: #b45309;
             --primary-text: #ffffff;
             --card-bg: rgba(255, 255, 255, 0.85);
             --card-border: rgba(226, 232, 240, 0.9);
             --subcard-bg: rgba(248, 250, 252, 0.75);
             --subcard-border: rgba(226, 232, 240, 0.8);
             --border-color: rgba(226, 232, 240, 0.8);
-            --orb-1: rgba(16, 185, 129, 0.18);
-            --orb-2: rgba(37, 99, 235, 0.15);
-            --orb-3: rgba(6, 182, 212, 0.15);
-            --orb-4: rgba(16, 185, 129, 0.12);
-            --orb-5: rgba(59, 130, 246, 0.12);
+            --orb-1: rgba(245, 158, 11, 0.18);
+            --orb-2: rgba(234, 179, 8, 0.15);
+            --orb-3: rgba(251, 191, 36, 0.14);
+            --orb-4: rgba(217, 119, 6, 0.12);
+            --orb-5: rgba(245, 158, 11, 0.12);
         }
 
         * {
@@ -105,7 +105,7 @@
         }
 
         .card-header {
-            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            background: linear-gradient(135deg, #b45309 0%, #d97706 50%, #f59e0b 100%);
             padding: 2rem 1.5rem 1.75rem;
             text-align: center;
             color: #ffffff;
@@ -122,6 +122,7 @@
             align-items: center;
             justify-content: center;
             backdrop-filter: blur(8px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
 
         .card-header h1 {
@@ -129,12 +130,17 @@
             font-weight: 700;
             margin-bottom: 0.25rem;
             letter-spacing: -0.01em;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
         }
 
         .card-header p {
             font-size: 0.875rem;
-            color: rgba(255, 255, 255, 0.9);
+            color: rgba(255, 255, 255, 0.95);
             font-weight: 500;
+            line-height: 1.45;
+            max-width: 380px;
+            margin: 0.35rem auto 0;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
         }
 
         .details-body {
@@ -199,12 +205,12 @@
         }
 
         .btn-primary {
-            background: #10b981;
+            background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
             color: #ffffff;
             border: none;
-            padding: 0.75rem 1.5rem;
+            padding: 0.85rem 1.5rem;
             border-radius: 0.85rem;
-            font-size: 0.9rem;
+            font-size: 0.925rem;
             font-weight: 600;
             cursor: pointer;
             text-decoration: none;
@@ -212,14 +218,14 @@
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
-            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
             transition: all 0.2s ease;
         }
 
         .btn-primary:hover {
-            background: #059669;
+            background: linear-gradient(135deg, #b45309 0%, #d97706 100%);
             transform: translateY(-1px);
-            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 6px 18px rgba(217, 119, 6, 0.45);
         }
 
         footer {
@@ -256,13 +262,13 @@
                     </svg>
                 </div>
                 <h1>Informe Auténtico</h1>
-                <p>Certificado por Laboratorio PatoLab</p>
+                <p>Por favor descargar el reporte para comparar y verificar su autenticidad.</p>
             </div>
 
             <div class="details-body">
                 <div class="detail-row">
                     <span class="detail-label">Código de Informe</span>
-                    <p class="detail-value mono" style="color: #047857;">{{ $reportCode }}</p>
+                    <p class="detail-value mono" style="color: #b45309;">{{ $reportCode }}</p>
                 </div>
 
                 @if(!empty($sequenceCode))

@@ -59,7 +59,7 @@ class DeliveryNotePdfService
         $deliveryNote = $workOrder->deliveryNote;
 
         $contentHtml = $deliveryNote?->content_html ?? '';
-        $contentHtmlWithBase64 = $this->convertImagesToBase64($contentHtml);
+        $contentHtmlWithBase64 = DeliveryNotePaginator::removeHyperlinks($this->convertImagesToBase64($contentHtml));
 
         $pages = DeliveryNotePaginator::paginate($contentHtmlWithBase64);
 

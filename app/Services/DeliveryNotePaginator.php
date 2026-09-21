@@ -25,7 +25,8 @@ class DeliveryNotePaginator
         $lineHeight = self::LINE_HEIGHT;
         $maxCharsPerLine = self::MAX_CHARS_PER_LINE;
 
-        $rawBlocks = self::parseHtmlToBlocks($contentHtml ?? '');
+        $contentHtml = self::removeHyperlinks($contentHtml ?? '');
+        $rawBlocks = self::parseHtmlToBlocks($contentHtml);
         $classifiedBlocks = [];
 
         foreach ($rawBlocks as $bHtml) {
@@ -65,6 +66,39 @@ class DeliveryNotePaginator
     }
 
     /**
+     * Removes all hyperlinks (<a> tags) from the HTML string, unwrapping and preserving their inner content.
+     */
+    public static function removeHyperlinks(string $html): string
+    {
+        if (empty($html) || ! str_contains($html, '<a')) {
+            return $html;
+        }
+
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="utf-8" ?><div>'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $root = $dom->getElementsByTagName('div')->item(0);
+
+        if ($root) {
+            $anchors = iterator_to_array($root->getElementsByTagName('a'));
+            foreach ($anchors as $anchor) {
+                while ($anchor->firstChild) {
+                    $anchor->parentNode->insertBefore($anchor->firstChild, $anchor);
+                }
+                $anchor->parentNode->removeChild($anchor);
+            }
+
+            $output = '';
+            foreach ($root->childNodes as $child) {
+                $output .= $dom->saveHTML($child);
+            }
+
+            return $output;
+        }
+
+        return preg_replace('/<a\b[^>]*>(.*?)<\/a>/is', '$1', $html) ?? $html;
+    }
+
+    /**
      * Parses raw HTML into top-level blocks.
      */
     public static function parseHtmlToBlocks(string $html): array
@@ -72,6 +106,8 @@ class DeliveryNotePaginator
         if (empty(trim($html))) {
             return [];
         }
+
+        $html = self::removeHyperlinks($html);
 
         $dom = new \DOMDocument;
         @$dom->loadHTML('<?xml encoding="utf-8" ?><div>'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
@@ -103,6 +139,8 @@ class DeliveryNotePaginator
             return [];
         }
 
+        $blockHtml = self::removeHyperlinks($blockHtml);
+
         preg_match('/^<([a-zA-Z0-9]+)/i', $blockHtml, $matches);
         $tag = isset($matches[1]) ? strtolower($matches[1]) : 'p';
 
@@ -126,7 +164,26 @@ class DeliveryNotePaginator
             }
 
             preg_match_all('/<img[^>]+>/i', $blockHtml, $imgMatches);
-            $imgTags = array_slice($imgMatches[0] ?? [], 0, 4);
+            $imgTags = $imgMatches[0] ?? [];
+            usort($imgTags, function ($a, $b) {
+                preg_match('/data-order=["\'](\d+)["\']/i', $a, $matchA);
+                preg_match('/data-order=["\'](\d+)["\']/i', $b, $matchB);
+                $orderA = isset($matchA[1]) ? (int) $matchA[1] : null;
+                $orderB = isset($matchB[1]) ? (int) $matchB[1] : null;
+
+                if ($orderA !== null && $orderB !== null) {
+                    return $orderA <=> $orderB;
+                }
+                if ($orderA !== null) {
+                    return -1;
+                }
+                if ($orderB !== null) {
+                    return 1;
+                }
+
+                return 0;
+            });
+            $imgTags = array_slice($imgTags, 0, 4);
             $columns = max(1, count($imgTags));
 
             $usableWidth = $width ? (185.9 * ($width / 704.0)) : 185.9;
@@ -453,7 +510,27 @@ class DeliveryNotePaginator
                 $width = $block['width'] ?? null;
                 $usableWidth = $width ? (185.9 * ($width / 704.0)) : 185.9;
                 $gap = 1.50; // mm
-                $slicedImages = array_slice($images, 0, 4);
+                $sortedImages = $images;
+                usort($sortedImages, function ($a, $b) {
+                    preg_match('/data-order=["\'](\d+)["\']/i', $a, $matchA);
+                    preg_match('/data-order=["\'](\d+)["\']/i', $b, $matchB);
+                    $orderA = isset($matchA[1]) ? (int) $matchA[1] : null;
+                    $orderB = isset($matchB[1]) ? (int) $matchB[1] : null;
+
+                    if ($orderA !== null && $orderB !== null) {
+                        return $orderA <=> $orderB;
+                    }
+                    if ($orderA !== null) {
+                        return -1;
+                    }
+                    if ($orderB !== null) {
+                        return 1;
+                    }
+
+                    return 0;
+                });
+                $slicedImages = array_slice($sortedImages, 0, 4);
+                $columns = max(1, count($slicedImages));
                 $rowsRemaining = [$slicedImages];
 
                 // Pre-calculate height of each row using justified aspect ratios

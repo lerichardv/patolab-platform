@@ -43,6 +43,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { removeHyperlinks } from '@/pages/specimens/report-editor/utils/paste-cleaner';
 
 export interface User {
     id: number;
@@ -329,32 +330,34 @@ export default function TemplateForm({
 
     const isEditMode = !!template;
 
-    const { data, setData, post, put, processing, errors } = useForm({
-        name: template?.name || '',
-        user_id: template?.user_id?.toString() || '',
-        specimen_type_id: isEditMode
-            ? template?.specimen_type_id?.toString() || ''
-            : '',
-        specimen_type_examination_id: isEditMode
-            ? template?.specimen_type_examination_id?.toString() || ''
-            : '',
-        specimen_type_ids: [] as string[],
-        specimen_type_examination_ids: [] as string[],
-        clinical_details_html: template?.clinical_details_html || '',
-        diagnosis_html: template?.diagnosis_html || '',
-        macroscopy_html: template?.macroscopy_html || '',
-        microscopy_html: template?.microscopy_html || '',
-        comments_notes_html: template?.comments_notes_html || '',
-        protocols_html: template?.protocols_html || '',
-        legend_html: template?.legend_html || '',
-        open_text_html: template?.open_text_html || '',
-        open_text_label: template?.open_text_label || 'Texto Libre',
-        addendum_html: template?.addendum_html || '',
-        sections_order: getMergedSectionsOrder(template?.sections_order),
-        headings_toggles: getMergedHeadingsToggles(
-            template?.headings_toggles,
-        ) as Record<string, boolean>,
-    });
+    const { data, setData, post, put, processing, errors, transform } = useForm(
+        {
+            name: template?.name || '',
+            user_id: template?.user_id?.toString() || '',
+            specimen_type_id: isEditMode
+                ? template?.specimen_type_id?.toString() || ''
+                : '',
+            specimen_type_examination_id: isEditMode
+                ? template?.specimen_type_examination_id?.toString() || ''
+                : '',
+            specimen_type_ids: [] as string[],
+            specimen_type_examination_ids: [] as string[],
+            clinical_details_html: template?.clinical_details_html || '',
+            diagnosis_html: template?.diagnosis_html || '',
+            macroscopy_html: template?.macroscopy_html || '',
+            microscopy_html: template?.microscopy_html || '',
+            comments_notes_html: template?.comments_notes_html || '',
+            protocols_html: template?.protocols_html || '',
+            legend_html: template?.legend_html || '',
+            open_text_html: template?.open_text_html || '',
+            open_text_label: template?.open_text_label || 'Texto Libre',
+            addendum_html: template?.addendum_html || '',
+            sections_order: getMergedSectionsOrder(template?.sections_order),
+            headings_toggles: getMergedHeadingsToggles(
+                template?.headings_toggles,
+            ) as Record<string, boolean>,
+        },
+    );
 
     const [sectionsOrder, setSectionsOrder] = useState<SectionsOrderElement[]>(
         () => getMergedSectionsOrder(template?.sections_order),
@@ -415,6 +418,23 @@ export default function TemplateForm({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        transform((formData) => ({
+            ...formData,
+            clinical_details_html: removeHyperlinks(
+                formData.clinical_details_html || '',
+            ),
+            diagnosis_html: removeHyperlinks(formData.diagnosis_html || ''),
+            macroscopy_html: removeHyperlinks(formData.macroscopy_html || ''),
+            microscopy_html: removeHyperlinks(formData.microscopy_html || ''),
+            comments_notes_html: removeHyperlinks(
+                formData.comments_notes_html || '',
+            ),
+            protocols_html: removeHyperlinks(formData.protocols_html || ''),
+            legend_html: removeHyperlinks(formData.legend_html || ''),
+            open_text_html: removeHyperlinks(formData.open_text_html || ''),
+            addendum_html: removeHyperlinks(formData.addendum_html || ''),
+        }));
 
         const options = {
             onSuccess: () => {

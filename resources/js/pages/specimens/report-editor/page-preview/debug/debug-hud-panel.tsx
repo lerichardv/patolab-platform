@@ -46,7 +46,7 @@ export function DebugHudPanel({ pages, totalPages }: DebugHudPanelProps) {
         return null;
     }
 
-    const maxBodyHeight = 212.79;
+    const maxBodyHeight = 208.9;
 
     // Find selected block
     let selectedBlock: MeasuredBlock | null = null;

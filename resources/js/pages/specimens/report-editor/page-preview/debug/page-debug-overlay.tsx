@@ -12,10 +12,10 @@ interface PageDebugOverlayProps {
     marginBottomMm?: number; // default 12.0mm
     marginLeftMm?: number; // default 15.0mm
     marginRightMm?: number; // default 15.0mm
-    maxBodyHeightMm?: number; // default 212.79mm
+    maxBodyHeightMm?: number; // default 208.90mm
     headerHeightMm?: number; // default 27.0mm
     headerMarginBottomMm?: number; // default 2.5mm
-    footerHeightMm?: number; // default 20.11mm
+    footerHeightMm?: number; // default 24.0mm
     footerBottomMm?: number; // default 5.0mm
 }
 
@@ -29,10 +29,10 @@ export function PageDebugOverlay({
     marginBottomMm = 12.0,
     marginLeftMm = 15.0,
     marginRightMm = 15.0,
-    maxBodyHeightMm = 212.79,
+    maxBodyHeightMm = 208.9,
     headerHeightMm = 27.0,
     headerMarginBottomMm = 2.5,
-    footerHeightMm = 20.11,
+    footerHeightMm = 24.0,
     footerBottomMm = 5.0,
 }: PageDebugOverlayProps) {
     const {
@@ -306,7 +306,7 @@ export function PageDebugOverlay({
                 </span>
             </div>
 
-            {/* Body Content Area Max Height Marker (212.79mm) */}
+            {/* Body Content Area Max Height Marker (208.90mm) */}
             <div
                 style={{
                     position: 'absolute',

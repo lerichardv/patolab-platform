@@ -1,5 +1,6 @@
 import { getImageAspectRatio, getImageHeight } from './image-measurer';
 import { decodeHtmlEntities } from './pagination-helpers';
+import { removeHyperlinks } from './paste-cleaner';
 
 export function getBlockLineHeight(
     block: { html?: string },
@@ -61,6 +62,7 @@ export function getBlockLineHeight(
 }
 
 export function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
+    blockHtml = removeHyperlinks(blockHtml);
     const tagMatch = blockHtml.match(/^<([a-zA-Z0-9]+)/);
     const tag = tagMatch ? tagMatch[1].toLowerCase() : 'p';
 
@@ -99,6 +101,25 @@ export function classifyBlock(blockHtml: string, maxCharsPerLine: number): any {
         while ((match = imgRegex.exec(blockHtml)) !== null) {
             imgTags.push(match[0]);
         }
+
+        imgTags.sort((a, b) => {
+            const orderA = a.match(/data-order=["'](\d+)["']/i);
+            const orderB = b.match(/data-order=["'](\d+)["']/i);
+
+            if (orderA && orderB) {
+                return parseInt(orderA[1], 10) - parseInt(orderB[1], 10);
+            }
+
+            if (orderA) {
+                return -1;
+            }
+
+            if (orderB) {
+                return 1;
+            }
+
+            return 0;
+        });
 
         const usableWidth = width ? 185.9 * (width / 704) : 185.9;
         const gap = 1.5; // mm
