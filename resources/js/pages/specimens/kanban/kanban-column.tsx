@@ -78,6 +78,7 @@ export interface KanbanColumnProps {
     handleLoadGroupAndOpenSheet: (groupId: number) => void;
     handleCancelClick: (specimen: Specimen) => void;
     handleDeleteClick: (specimen: Specimen) => void;
+    handleSendReportClick?: (specimen: Specimen) => void;
     handleLoadMore: (priorityId: number) => void;
 }
 
@@ -94,6 +95,7 @@ export function KanbanColumn({
     handleLoadGroupAndOpenSheet,
     handleCancelClick,
     handleDeleteClick,
+    handleSendReportClick,
     handleLoadMore,
 }: KanbanColumnProps) {
     const totalSpecimens = priority.specimens.length;
@@ -156,6 +158,9 @@ export function KanbanColumn({
                                     }
                                     handleCancelClick={handleCancelClick}
                                     handleDeleteClick={handleDeleteClick}
+                                    handleSendReportClick={
+                                        handleSendReportClick
+                                    }
                                 />
                             ))}
                             {isPaginated && visibleLimit < totalSpecimens && (

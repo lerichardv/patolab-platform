@@ -6,6 +6,7 @@ import {
     CalendarClock,
     Edit2,
     FileText,
+    Mail,
     MoreVertical,
     Plus,
     Tag,
@@ -47,6 +48,7 @@ export interface KanbanCardProps {
     handleLoadGroupAndOpenSheet: (groupId: number) => void;
     handleCancelClick: (specimen: Specimen) => void;
     handleDeleteClick: (specimen: Specimen) => void;
+    handleSendReportClick?: (specimen: Specimen) => void;
 }
 
 export function KanbanCard({
@@ -62,6 +64,7 @@ export function KanbanCard({
     handleLoadGroupAndOpenSheet,
     handleCancelClick,
     handleDeleteClick,
+    handleSendReportClick,
 }: KanbanCardProps) {
     return (
         <Draggable
@@ -257,6 +260,70 @@ export function KanbanCard({
                                                     <span>Eliminar</span>
                                                 </DropdownMenuItem>
                                             )}
+                                            {(() => {
+                                                const isSendReportAllowed = [
+                                                    'finalized',
+                                                    'delivered',
+                                                ].includes(specimen.status);
+
+                                                if (isSendReportAllowed) {
+                                                    return (
+                                                        <DropdownMenuItem
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSendReportClick?.(
+                                                                    specimen,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <Mail className="mr-2 h-4 w-4" />
+                                                            <span>
+                                                                Enviar Reporte
+                                                            </span>
+                                                        </DropdownMenuItem>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger
+                                                                asChild
+                                                            >
+                                                                <div className="w-full">
+                                                                    <DropdownMenuItem
+                                                                        disabled
+                                                                        className="cursor-not-allowed opacity-50"
+                                                                        onClick={(
+                                                                            e,
+                                                                        ) =>
+                                                                            e.stopPropagation()
+                                                                        }
+                                                                    >
+                                                                        <Mail className="mr-2 h-4 w-4" />
+                                                                        <span>
+                                                                            Enviar
+                                                                            Reporte
+                                                                        </span>
+                                                                    </DropdownMenuItem>
+                                                                </div>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="left">
+                                                                <span>
+                                                                    El reporte
+                                                                    solo se
+                                                                    puede enviar
+                                                                    una vez que
+                                                                    la muestra
+                                                                    esté
+                                                                    finalizada o
+                                                                    entregada
+                                                                </span>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                );
+                                            })()}
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 )}

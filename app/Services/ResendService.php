@@ -25,13 +25,13 @@ class ResendService
     /**
      * Send an email using Resend API.
      *
-     * @param  string  $to  Recipient email address
+     * @param  string|array  $to  Recipient email address or array of addresses
      * @param  string  $subject  Subject line
      * @param  string  $htmlContent  HTML body content
      * @param  array  $attachments  Array of attachments: [['content' => 'base64...', 'filename' => '...', 'contentId' => '...']]
      * @return bool True if successful, false otherwise
      */
-    public function sendEmail(string $to, string $subject, string $htmlContent, array $attachments = []): bool
+    public function sendEmail(string|array $to, string $subject, string $htmlContent, array $attachments = []): bool
     {
         if (empty($this->apiKey)) {
             Log::error('ResendService: RESEND_API_KEY is not configured in the .env file.');
@@ -39,9 +39,12 @@ class ResendService
             return false;
         }
 
+        $recipients = is_array($to) ? array_values($to) : [$to];
+        $toLog = is_array($to) ? implode(', ', $to) : $to;
+
         $payload = [
             'from' => $this->from,
-            'to' => [$to],
+            'to' => $recipients,
             'subject' => $subject,
             'html' => $htmlContent,
         ];
@@ -51,7 +54,7 @@ class ResendService
         }
 
         try {
-            Log::info("ResendService: Sending email to {$to} with subject '{$subject}'...");
+            Log::info("ResendService: Sending email to {$toLog} with subject '{$subject}'...");
             $response = Http::withToken($this->apiKey)
                 ->post('https://api.resend.com/emails', $payload);
 

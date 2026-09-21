@@ -237,7 +237,9 @@ class SpecimenStatusService
 
             $dateColumn = Specimen::STATUS_DATE_COLUMNS[$targetStatus] ?? null;
             if ($dateColumn) {
-                $specimenUpdate[$dateColumn] = now();
+                if ($dateColumn !== 'received_at' || ($specimen->auto_received_at ?? true)) {
+                    $specimenUpdate[$dateColumn] = now();
+                }
             }
 
             if ($targetStatus === 'cancelled') {

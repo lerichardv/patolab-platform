@@ -94,6 +94,7 @@ import {
 } from '@/services/specimen-delivery-date';
 import InvoiceSheet from '../invoices/invoice-sheet';
 import { KanbanBoard } from './kanban/kanban-board';
+import SendReportSheet from './send-report/send-report-sheet';
 import SpecimenBulkCollaboratorSheet from './specimen-bulk-collaborator-sheet';
 import SpecimenBulkPathologistSheet from './specimen-bulk-pathologist-sheet';
 import SpecimenGroupSheet from './specimen-group-sheet';
@@ -279,6 +280,10 @@ export default function SpecimensIndex({
     const [selectedSpecimenForView, setSelectedSpecimenForView] =
         useState<Specimen | null>(null);
     const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
+
+    const [selectedSpecimenForSendReport, setSelectedSpecimenForSendReport] =
+        useState<Specimen | null>(null);
+    const [isSendReportSheetOpen, setIsSendReportSheetOpen] = useState(false);
 
     const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
     const [paymentInvoiceUrl, setPaymentInvoiceUrl] = useState<string | null>(
@@ -816,6 +821,11 @@ export default function SpecimensIndex({
     const handleAssignClick = (specimen: Specimen) => {
         setSelectedSpecimenForAssign(specimen);
         setIsAssignSheetOpen(true);
+    };
+
+    const handleSendReportClick = (specimen: Specimen) => {
+        setSelectedSpecimenForSendReport(specimen);
+        setIsSendReportSheetOpen(true);
     };
 
     const activeAssignSpecimen = selectedSpecimenForAssign
@@ -1864,6 +1874,7 @@ export default function SpecimensIndex({
                     handleLoadGroupAndOpenSheet={handleLoadGroupAndOpenSheet}
                     handleCancelClick={handleCancelClick}
                     handleDeleteClick={handleDeleteClick}
+                    handleSendReportClick={handleSendReportClick}
                     handleLoadMore={handleLoadMore}
                 />
             </div>
@@ -1954,6 +1965,12 @@ export default function SpecimensIndex({
                 selectedSpecimens={selectedSpecimens}
                 open={isBulkCollaboratorSheetOpen}
                 onOpenChange={setIsBulkCollaboratorSheetOpen}
+            />
+
+            <SendReportSheet
+                specimen={selectedSpecimenForSendReport}
+                open={isSendReportSheetOpen}
+                onOpenChange={setIsSendReportSheetOpen}
             />
 
             <AlertDialog
