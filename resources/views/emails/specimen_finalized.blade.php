@@ -16,6 +16,13 @@
             <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 15px;"><strong>Reporte Adjunto</strong></h3>
             <p style="margin: 0; font-size: 14px; line-height: 1.5;">Hemos adjuntado una copia del reporte oficial en formato PDF a este correo electrónico para su comodidad.</p>
         </div>
+
+        @if(!empty($customMessage))
+            <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 4px; padding: 12px 16px; margin: 20px 0; color: #1e40af; font-size: 14px; line-height: 1.5;">
+                <strong>Nota adicional:</strong><br>
+                <span style="white-space: pre-line;">{{ $customMessage }}</span>
+            </div>
+        @endif
         
         <p>También puede visualizar los resultados del diagnóstico y el historial de progreso de su muestra en tiempo real a través de nuestro portal digital:</p>
         

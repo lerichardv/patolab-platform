@@ -25,6 +25,7 @@ export interface KanbanBoardProps {
     handleLoadGroupAndOpenSheet: (groupId: number) => void;
     handleCancelClick: (specimen: Specimen) => void;
     handleDeleteClick: (specimen: Specimen) => void;
+    handleSendReportClick?: (specimen: Specimen) => void;
     handleLoadMore: (priorityId: number) => void;
 }
 
@@ -45,6 +46,7 @@ export function KanbanBoard({
     handleLoadGroupAndOpenSheet,
     handleCancelClick,
     handleDeleteClick,
+    handleSendReportClick,
     handleLoadMore,
 }: KanbanBoardProps) {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -202,6 +204,7 @@ export function KanbanBoard({
                                 }
                                 handleCancelClick={handleCancelClick}
                                 handleDeleteClick={handleDeleteClick}
+                                handleSendReportClick={handleSendReportClick}
                                 handleLoadMore={handleLoadMore}
                             />
                         ))}

@@ -66,6 +66,8 @@ export interface Specimen {
     sequence_code: string;
     sample_collection_date?: string;
     sample_collection_date_na?: boolean;
+    received_at?: string;
+    auto_received_at?: boolean;
     anatomic_site: string;
     diagnosis: string | null;
     clinical_notes: string | null;

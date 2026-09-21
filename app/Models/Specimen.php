@@ -52,7 +52,9 @@ class Specimen extends Model
             if ($specimen->isDirty('status')) {
                 $column = self::STATUS_DATE_COLUMNS[$specimen->status] ?? null;
                 if ($column && ! $specimen->isDirty($column)) {
-                    $specimen->{$column} = now();
+                    if ($column !== 'received_at' || ($specimen->auto_received_at ?? true)) {
+                        $specimen->{$column} = now();
+                    }
                 }
             }
         });
@@ -67,6 +69,10 @@ class Specimen extends Model
     }
 
     protected $table = 'specimen';
+
+    protected $attributes = [
+        'auto_received_at' => true,
+    ];
 
     public const STATUS_COLORS = [
         'received' => '#3b82f6',           // blue-500
@@ -92,6 +98,7 @@ class Specimen extends Model
         'clinical_notes',
         'status',
         'received_at',
+        'auto_received_at',
         'macroscopic_review_at',
         'processing_at',
         'microscopic_review_at',
@@ -127,6 +134,7 @@ class Specimen extends Model
         'is_manual_delivery_date_enabled' => 'boolean',
         'delivery_date_quantity' => 'integer',
         'received_at' => 'datetime',
+        'auto_received_at' => 'boolean',
         'macroscopic_review_at' => 'datetime',
         'processing_at' => 'datetime',
         'microscopic_review_at' => 'datetime',
@@ -416,5 +424,34 @@ class Specimen extends Model
     public function cuttings(): HasMany
     {
         return $this->hasMany(Cutting::class, 'specimen_id');
+    }
+
+    /**
+     * Get the automatic reception date for the specimen.
+     */
+    public function getAutomaticReceivedAt(): ?Carbon
+    {
+        $auditLog = AuditLog::where('table', $this->getTable())
+            ->where('row_id', $this->getKey())
+            ->where('action', 'create')
+            ->where('column', 'received_at')
+            ->first();
+
+        if ($auditLog && ! empty($auditLog->new_value)) {
+            return Carbon::parse($auditLog->new_value);
+        }
+
+        $statusLog = AuditLog::where('table', $this->getTable())
+            ->where('row_id', $this->getKey())
+            ->where('column', 'status')
+            ->where('new_value', 'received')
+            ->orderBy('created_at', 'asc')
+            ->first();
+
+        if ($statusLog) {
+            return Carbon::parse($statusLog->created_at);
+        }
+
+        return $this->created_at ? Carbon::parse($this->created_at) : now();
     }
 }

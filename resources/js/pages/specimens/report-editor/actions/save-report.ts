@@ -2,6 +2,8 @@ import { postJson } from './client';
 
 export interface ReportEditorSavePayload {
     report_date?: string | null;
+    received_at?: string | null;
+    auto_received_at?: boolean;
     sample_collection_date?: string | null;
     sample_collection_date_na?: boolean;
     finalization_date?: string | null;

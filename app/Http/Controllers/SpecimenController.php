@@ -28,8 +28,10 @@ use App\Services\ImageOptimizerService;
 use App\Services\InvoiceCalculationService;
 use App\Services\InvoicePdfService;
 use App\Services\ReportPdfService;
+use App\Services\ResendService;
 use App\Services\SpecimenStatusService;
 use App\Services\WhatsAppService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -1819,5 +1821,173 @@ class SpecimenController extends Controller
         });
 
         return redirect()->back()->with('success', 'Muestra actualizada correctamente.');
+    }
+
+    public function reportEmailData(Specimen $specimen): JsonResponse
+    {
+        if (! Gate::check('specimens.view') && ! Gate::check('specimens.edit') && ! Gate::check('my_assignments.view') && ! Gate::check('report_editor.view')) {
+            Gate::authorize('specimens.view');
+        }
+
+        $specimen->load(['customerRelation', 'referrerRelation', 'type', 'examination', 'report']);
+
+        $customer = $specimen->customerRelation;
+        $referrer = $specimen->referrerRelation;
+        $report = $specimen->report;
+        $type = $specimen->type;
+
+        $requiresReport = $type ? (bool) $type->requires_report : true;
+        $hasReportFile = $report && ! empty($report->report_file) && Storage::disk('public')->exists($report->report_file);
+
+        $suggestedEmails = [];
+        if (! empty($customer?->email)) {
+            $suggestedEmails[] = [
+                'email' => $customer->email,
+                'label' => "Paciente ({$customer->name})",
+                'type' => 'customer',
+            ];
+        }
+        if (! empty($referrer?->email)) {
+            $suggestedEmails[] = [
+                'email' => $referrer->email,
+                'label' => "Remitente / Médico ({$referrer->name})",
+                'type' => 'referrer',
+            ];
+        }
+
+        return response()->json([
+            'specimen' => [
+                'id' => $specimen->id,
+                'sequence_code' => $specimen->sequence_code,
+                'status' => $specimen->status,
+                'status_color' => $specimen->status_color,
+                'customer_name' => $customer?->name,
+                'customer_email' => $customer?->email,
+                'referrer_name' => $referrer?->name,
+                'referrer_email' => $referrer?->email,
+                'examination_name' => $specimen->examination?->name,
+                'type_name' => $type?->name,
+                'requires_report' => $requiresReport,
+                'has_report_file' => $hasReportFile,
+                'report_file_name' => $hasReportFile ? basename($report->report_file) : null,
+                'report_file_url' => $hasReportFile ? '/storage/'.$report->report_file : null,
+                'report_date' => $report?->report_date,
+            ],
+            'default_subject' => $requiresReport
+                ? "Reporte Listo — {$specimen->sequence_code}"
+                : "Muestra Finalizada — {$specimen->sequence_code}",
+            'suggested_emails' => $suggestedEmails,
+        ]);
+    }
+
+    public function sendReport(Request $request, Specimen $specimen, ResendService $resend): JsonResponse
+    {
+        if (! Gate::check('specimens.view') && ! Gate::check('specimens.edit') && ! Gate::check('my_assignments.view') && ! Gate::check('report_editor.view')) {
+            Gate::authorize('specimens.view');
+        }
+
+        if (! in_array($specimen->status, ['finalized', 'delivered'])) {
+            return response()->json([
+                'message' => 'El reporte solo puede enviarse cuando la muestra esté finalizada o entregada.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'emails' => 'required|array|min:1',
+            'emails.*' => 'required|email|max:255',
+            'subject' => 'nullable|string|max:255',
+            'custom_message' => 'nullable|string|max:2000',
+        ], [
+            'emails.required' => 'Debe ingresar al menos un correo electrónico destinatario.',
+            'emails.min' => 'Debe ingresar al menos un correo electrónico destinatario.',
+            'emails.*.email' => 'Uno o más correos electrónicos no tienen un formato válido.',
+        ]);
+
+        $specimen->load(['customerRelation', 'type', 'examination', 'report']);
+        $requiresReport = $specimen->type ? (bool) $specimen->type->requires_report : true;
+
+        if ($requiresReport) {
+            if (! $specimen->report) {
+                return response()->json([
+                    'message' => 'No hay un reporte asociado a esta muestra.',
+                ], 422);
+            }
+
+            if (! $specimen->report->report_file || ! Storage::disk('public')->exists($specimen->report->report_file)) {
+                try {
+                    $specimen->report->ensureValidationQrCode();
+                    app(ReportPdfService::class)->generateAndStoreReport($specimen);
+                    $specimen->refresh();
+                } catch (\Exception $e) {
+                    Log::error("Error generating report PDF before sending email: {$e->getMessage()}");
+
+                    return response()->json([
+                        'message' => 'No se pudo generar el archivo PDF del reporte: '.$e->getMessage(),
+                    ], 500);
+                }
+            }
+        }
+
+        $attachments = [];
+        if ($requiresReport && $specimen->report && $specimen->report->report_file) {
+            $reportFile = $specimen->report->report_file;
+            if (Storage::disk('public')->exists($reportFile)) {
+                $attachments[] = [
+                    'content' => base64_encode(Storage::disk('public')->get($reportFile)),
+                    'filename' => "Reporte_{$specimen->sequence_code}.pdf",
+                ];
+            }
+        }
+
+        $customer = $specimen->customerRelation;
+        $statusUrl = route('specimens.show-public', [
+            'specimen_code' => $specimen->sequence_code,
+            'token' => $specimen->access_token,
+            'delivery_token' => $specimen->delivery_token,
+        ]);
+
+        $subject = ! empty($validated['subject'])
+            ? $validated['subject']
+            : ($requiresReport ? "Reporte Listo — {$specimen->sequence_code}" : "Muestra Finalizada — {$specimen->sequence_code}");
+
+        $htmlContent = view('emails.specimen_finalized', [
+            'specimen' => $specimen,
+            'customer' => $customer ?? (object) ['name' => 'Estimado(a) Paciente / Cliente'],
+            'statusUrl' => $statusUrl,
+            'requiresReport' => $requiresReport,
+            'customMessage' => $validated['custom_message'] ?? null,
+        ])->render();
+
+        $emails = array_values(array_unique($validated['emails']));
+        $failedEmails = [];
+
+        foreach ($emails as $email) {
+            $sent = $resend->sendEmail($email, $subject, $htmlContent, $attachments);
+            if (! $sent) {
+                $failedEmails[] = $email;
+            }
+        }
+
+        if (! empty($failedEmails) && count($failedEmails) === count($emails)) {
+            return response()->json([
+                'message' => 'No se pudo enviar el correo electrónico. Verifique la configuración del servicio.',
+            ], 500);
+        }
+
+        if (! empty($failedEmails)) {
+            return response()->json([
+                'message' => 'El reporte se envió a algunos destinatarios, pero falló para: '.implode(', ', $failedEmails),
+                'partial_success' => true,
+                'failed_emails' => $failedEmails,
+            ], 207);
+        }
+
+        $count = count($emails);
+
+        return response()->json([
+            'message' => $count === 1
+                ? "Reporte enviado exitosamente a {$emails[0]}."
+                : "Reporte enviado exitosamente a {$count} destinatarios.",
+        ]);
     }
 }

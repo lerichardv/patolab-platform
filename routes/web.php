@@ -150,6 +150,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('specimens/{specimen:sequence_code}/generate-report', [SpecimenController::class, 'generateReport'])->name('specimens.generate-report');
     Route::get('specimens/quick-edit-metadata', [SpecimenController::class, 'quickEditMetadata'])->name('specimens.quick-edit-metadata');
     Route::post('specimens/{specimen}/quick-update', [SpecimenController::class, 'quickUpdate'])->name('specimens.quick-update');
+    Route::get('specimens/{specimen}/report-email-data', [SpecimenController::class, 'reportEmailData'])->name('specimens.report-email-data');
+    Route::post('specimens/{specimen}/send-report', [SpecimenController::class, 'sendReport'])->name('specimens.send-report');
     Route::get('specimens/form-data', SpecimenFormDataController::class)->name('specimens.form-data');
     Route::get('specimens/pathologists/form-data', PathologistFormDataController::class)->name('specimens.pathologists.form-data');
     Route::resource('specimens', SpecimenController::class);

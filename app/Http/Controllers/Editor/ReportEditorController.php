@@ -498,8 +498,12 @@ class ReportEditorController extends Controller
             return $specimen->report;
         }
 
+        $reportDate = $specimen->received_at
+            ? $specimen->received_at->format('Y-m-d')
+            : now()->format('Y-m-d');
+
         $report = SpecimenReport::create([
-            'report_date' => now()->format('Y-m-d'),
+            'report_date' => $reportDate,
             'finalization_date' => now()->format('Y-m-d'),
             'macroscopy_html' => '',
             'microscopy_html' => '',
@@ -701,6 +705,11 @@ class ReportEditorController extends Controller
             'report_date' => $request->report_date,
         ]);
 
+        $specimen->update([
+            'received_at' => $request->report_date.' 00:00:00',
+            'auto_received_at' => false,
+        ]);
+
         return redirect()->back()->with('success', 'Fecha del reporte actualizada.');
     }
 
@@ -878,6 +887,8 @@ class ReportEditorController extends Controller
 
         $request->validate([
             'report_date' => 'nullable|string',
+            'received_at' => 'nullable|string',
+            'auto_received_at' => 'nullable|boolean',
             'sample_collection_date' => 'nullable|string',
             'sample_collection_date_na' => 'nullable|boolean',
             'finalization_date' => 'nullable|string',
@@ -911,10 +922,35 @@ class ReportEditorController extends Controller
         $hasGeneralAccess = $hasMacroAccess || $hasMicroAccess;
         $updateData = [];
 
+        if ($request->has('auto_received_at')) {
+            $autoReceivedAt = $request->boolean('auto_received_at');
+            $specimenUpdateData = ['auto_received_at' => $autoReceivedAt];
+
+            if ($autoReceivedAt) {
+                $autoDate = $specimen->getAutomaticReceivedAt();
+                if ($autoDate) {
+                    $specimenUpdateData['received_at'] = $autoDate;
+                    $updateData['report_date'] = $autoDate->format('Y-m-d');
+                }
+            }
+
+            $specimen->update($specimenUpdateData);
+        }
+
+        if ($request->has('received_at')) {
+            $receivedAt = $request->input('received_at');
+            if (! empty($receivedAt) && preg_match('/^\d{4}-\d{2}-\d{2}/', $receivedAt)) {
+                $dateStr = substr($receivedAt, 0, 10);
+                $specimen->update(['received_at' => $dateStr.' 00:00:00']);
+                $updateData['report_date'] = $dateStr;
+            }
+        }
+
         if ($request->has('report_date')) {
             $reportDate = $request->input('report_date');
             if (! empty($reportDate) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportDate)) {
                 $updateData['report_date'] = $reportDate;
+                $specimen->update(['received_at' => $reportDate.' 00:00:00']);
             }
         }
 
@@ -994,6 +1030,7 @@ class ReportEditorController extends Controller
             'status' => 'success',
             'message' => 'Reporte guardado con éxito.',
             'report' => $report->fresh(),
+            'specimen' => $specimen->fresh(),
         ]);
     }
 
