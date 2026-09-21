@@ -4,14 +4,18 @@ namespace App\Services;
 
 class ReportPaginator
 {
+    public const PAGE_CONTENT_HEIGHT = 208.90; // mm (Letter 279.4 - top padding 12 - header 27 - header mb 2.5 - footer 24 - footer bottom 5)
+
+    public const SIGNATURE_ROW_HEIGHT = 33.33; // mm per row (increased by 33.3% from 25.0mm)
+
     public static function paginate($specimen, $report, $customer, $referrer, $isMicroscopyVisible): array
     {
-        $pageContentHeight = 212.79; // mm
+        $pageContentHeight = self::PAGE_CONTENT_HEIGHT; // mm
         $lineHeight = 3.53; // mm (8pt * 1.25)
         $maxCharsPerLine = 144;
         $pathologistsCount = $specimen->users ? $specimen->users->count() : 0;
         $rowsCount = (int) ceil($pathologistsCount / 2);
-        $signatureHeight = $rowsCount * 25.0; // 25mm per row
+        $signatureHeight = $rowsCount * self::SIGNATURE_ROW_HEIGHT;
 
         // Resolve headings_toggles — defaults all sections to visible (true) when null/absent
         $headingsToggles = [];
@@ -483,11 +487,46 @@ class ReportPaginator
         return $totalLines * 4.80;
     }
 
+    /**
+     * Removes all hyperlinks (<a> tags) from the HTML string, unwrapping and preserving their inner content.
+     */
+    public static function removeHyperlinks(string $html): string
+    {
+        if (empty($html) || ! str_contains($html, '<a')) {
+            return $html;
+        }
+
+        $dom = new \DOMDocument;
+        @$dom->loadHTML('<?xml encoding="utf-8" ?><div>'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $root = $dom->getElementsByTagName('div')->item(0);
+
+        if ($root) {
+            $anchors = iterator_to_array($root->getElementsByTagName('a'));
+            foreach ($anchors as $anchor) {
+                while ($anchor->firstChild) {
+                    $anchor->parentNode->insertBefore($anchor->firstChild, $anchor);
+                }
+                $anchor->parentNode->removeChild($anchor);
+            }
+
+            $output = '';
+            foreach ($root->childNodes as $child) {
+                $output .= $dom->saveHTML($child);
+            }
+
+            return $output;
+        }
+
+        return preg_replace('/<a\b[^>]*>(.*?)<\/a>/is', '$1', $html) ?? $html;
+    }
+
     public static function parseHtmlToBlocks(string $html): array
     {
         if (empty($html)) {
             return [];
         }
+
+        $html = self::removeHyperlinks($html);
 
         $dom = new \DOMDocument;
         @$dom->loadHTML('<?xml encoding="utf-8" ?><div>'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
@@ -512,6 +551,7 @@ class ReportPaginator
 
     public static function classifyBlock(string $blockHtml, int $maxCharsPerLine): array
     {
+        $blockHtml = self::removeHyperlinks($blockHtml);
         preg_match('/^<([a-zA-Z0-9]+)/', $blockHtml, $matches);
         $tag = isset($matches[1]) ? strtolower($matches[1]) : 'p';
 
@@ -539,6 +579,24 @@ class ReportPaginator
             if (empty($imgTags)) {
                 $imgTags = [];
             }
+            usort($imgTags, function ($a, $b) {
+                preg_match('/data-order=["\'](\d+)["\']/i', $a, $matchA);
+                preg_match('/data-order=["\'](\d+)["\']/i', $b, $matchB);
+                $orderA = isset($matchA[1]) ? (int) $matchA[1] : null;
+                $orderB = isset($matchB[1]) ? (int) $matchB[1] : null;
+
+                if ($orderA !== null && $orderB !== null) {
+                    return $orderA <=> $orderB;
+                }
+                if ($orderA !== null) {
+                    return -1;
+                }
+                if ($orderB !== null) {
+                    return 1;
+                }
+
+                return 0;
+            });
             $imgTags = array_slice($imgTags, 0, 4);
             $columns = count($imgTags);
             if ($columns < 1) {
@@ -1030,10 +1088,11 @@ class ReportPaginator
         $styleAttr = $list->getAttribute('style') ?: null;
 
         $items = [];
-        $liElements = $list->getElementsByTagName('li');
         $liList = [];
-        foreach ($liElements as $li) {
-            $liList[] = $li;
+        foreach ($list->childNodes as $child) {
+            if ($child->nodeType === XML_ELEMENT_NODE && strtolower($child->nodeName) === 'li') {
+                $liList[] = $child;
+            }
         }
         $totalItems = count($liList);
 
@@ -1047,7 +1106,7 @@ class ReportPaginator
                 $liInner .= $dom->saveHTML($child);
             }
 
-            $rawSegments = preg_split('/<p[^>]*>|<\/p>|<br\s*\/?>|<div[^>]*>|<\/div>/i', $liInner);
+            $rawSegments = preg_split('/<p[^>]*>|<\/p>|<br\s*\/?>|<div[^>]*>|<\/div>|<li[^>]*>|<\/li>/i', $liInner);
             $segments = [];
             if ($rawSegments) {
                 foreach ($rawSegments as $s) {
@@ -1344,7 +1403,7 @@ class ReportPaginator
         return (float) ($nextBlock['height'] ?? (2.0 * $lineHeight));
     }
 
-    public static function paginateBlocks(array $blocks, float $pageContentHeight, float $lineHeight, int $maxCharsPerLine): array
+    public static function paginateBlocks(array $blocks, float $pageContentHeight = self::PAGE_CONTENT_HEIGHT, float $lineHeight = 3.53, int $maxCharsPerLine = 144): array
     {
         $pages = [];
         $currentPage = [];
@@ -1459,7 +1518,27 @@ class ReportPaginator
                 $width = $block['width'] ?? null;
                 $usableWidth = $width ? (185.9 * ($width / 704.0)) : 185.9;
                 $gap = 1.50; // mm
-                $slicedImages = array_slice($images, 0, 4);
+                $sortedImages = $images;
+                usort($sortedImages, function ($a, $b) {
+                    preg_match('/data-order=["\'](\d+)["\']/i', $a, $matchA);
+                    preg_match('/data-order=["\'](\d+)["\']/i', $b, $matchB);
+                    $orderA = isset($matchA[1]) ? (int) $matchA[1] : null;
+                    $orderB = isset($matchB[1]) ? (int) $matchB[1] : null;
+
+                    if ($orderA !== null && $orderB !== null) {
+                        return $orderA <=> $orderB;
+                    }
+                    if ($orderA !== null) {
+                        return -1;
+                    }
+                    if ($orderB !== null) {
+                        return 1;
+                    }
+
+                    return 0;
+                });
+                $slicedImages = array_slice($sortedImages, 0, 4);
+                $columns = count($slicedImages);
                 $rowsRemaining = [$slicedImages];
 
                 // Pre-calculate height of each row using justified aspect ratios
@@ -1763,9 +1842,9 @@ class ReportPaginator
                             $currentPage[] = [
                                 'type' => 'html',
                                 'html' => "<{$tag} class=\"section-content\"{$startAttr}{$listStyleAttr}{$styleAttr}>".$itemHtml."</{$tag}>",
-                                'height' => $itemHeight + 1.98,
+                                'height' => $itemHeight + ($isLastOfAll ? 1.98 : 0.0),
                             ];
-                            $currentHeight += $itemHeight + 1.98;
+                            $currentHeight += $itemHeight + ($isLastOfAll ? 1.98 : 0.0);
                             $i++;
                             $olStartIndex++;
                         } else {

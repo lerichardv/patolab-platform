@@ -20,6 +20,13 @@
             margin-top: 0 !important;
         }
 
+        a, a:visited, a:hover, a:active {
+            color: inherit !important;
+            text-decoration: none !important;
+            pointer-events: none !important;
+            cursor: text !important;
+        }
+
         @page {
             size: 215.9mm 279.4mm;
             margin: 0;

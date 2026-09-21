@@ -1,3 +1,5 @@
+import type { DropResult } from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react';
 import {
     LayoutGrid,
@@ -8,8 +10,10 @@ import {
     Image as ImageIcon,
     X,
     Crop,
+    GripVertical,
 } from 'lucide-react';
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,27 +52,99 @@ export default function ImageGridComponent({
     )?.options;
     const specimenSequenceCode = extOptions?.specimenSequenceCode || '';
 
+    // Helper to get upload URL across reports, templates, and delivery notes
+    const getUploadUrl = () => {
+        if (extOptions?.uploadUrl) {
+            return extOptions.uploadUrl;
+        }
+
+        if (specimenSequenceCode) {
+            return `/specimens/${specimenSequenceCode}/report-editor/upload-image`;
+        }
+
+        if (typeof window !== 'undefined') {
+            const pathname = window.location.pathname;
+            const workOrderMatch = pathname.match(/\/work-orders\/(\d+)/);
+
+            if (workOrderMatch) {
+                return `/work-orders/${workOrderMatch[1]}/delivery-note/upload-image`;
+            }
+
+            if (pathname.includes('/my-specimen-type-templates')) {
+                return `/my-specimen-type-templates/upload-image`;
+            }
+        }
+
+        return `/specimen-type-templates/upload-image`;
+    };
+
     // Collect current images reactively
     const currentImages: Array<{
         src: string;
         caption: string;
+        order?: number | null;
         offset: number;
         nodeSize: number;
+        childNode: any;
     }> = [];
     node.content.forEach((childNode: any, offset: number) => {
         if (childNode.type.name === 'image') {
             currentImages.push({
                 src: childNode.attrs.src,
                 caption: childNode.attrs.caption || '',
+                order: childNode.attrs.order ?? null,
                 offset,
                 nodeSize: childNode.nodeSize,
+                childNode,
             });
         }
     });
 
     const imagesSrcString = currentImages
-        .map((img) => `${img.src}_${img.caption}`)
+        .map((img, idx) => `${img.src}_${img.caption}_${img.order ?? idx}`)
         .join(',');
+
+    const handleDragEnd = (result: DropResult) => {
+        if (
+            !result.destination ||
+            result.destination.index === result.source.index
+        ) {
+            return;
+        }
+
+        const pos = getPos();
+
+        if (pos === undefined) {
+            return;
+        }
+
+        const items = [...currentImages];
+        const [moved] = items.splice(result.source.index, 1);
+        items.splice(result.destination.index, 0, moved);
+
+        // Recreate child nodes in new order with updated order attributes (1-based)
+        const newNodes = items.map((item, idx) => {
+            return editor.schema.nodes.image.create({
+                ...item.childNode.attrs,
+                order: idx + 1,
+            });
+        });
+
+        const from = pos + 1;
+        const to = pos + node.nodeSize - 1;
+
+        editor
+            .chain()
+            .focus()
+            .command(({ tr }: any) => {
+                tr.replaceWith(from, to, newNodes);
+
+                return true;
+            })
+            .run();
+
+        toast.success('Imágenes reordenadas');
+    };
 
     const handleUpdateImageCaption = (offset: number, caption: string) => {
         const pos = getPos();
@@ -430,14 +506,7 @@ export default function ImageGridComponent({
         const uploadToast = toast.loading('Guardando imagen recortada...');
 
         try {
-            const isMyTemplates = window.location.pathname.includes(
-                '/my-specimen-type-templates',
-            );
-            const uploadUrl = specimenSequenceCode
-                ? `/specimens/${specimenSequenceCode}/report-editor/upload-image`
-                : isMyTemplates
-                  ? `/my-specimen-type-templates/upload-image`
-                  : `/specimen-type-templates/upload-image`;
+            const uploadUrl = getUploadUrl();
 
             const data = await uploadImageToEndpoint(
                 uploadUrl,
@@ -505,14 +574,7 @@ export default function ImageGridComponent({
 
             for (const file of files) {
                 try {
-                    const isMyTemplates = window.location.pathname.includes(
-                        '/my-specimen-type-templates',
-                    );
-                    const uploadUrl = specimenSequenceCode
-                        ? `/specimens/${specimenSequenceCode}/report-editor/upload-image`
-                        : isMyTemplates
-                          ? `/my-specimen-type-templates/upload-image`
-                          : `/specimen-type-templates/upload-image`;
+                    const uploadUrl = getUploadUrl();
 
                     const data = await uploadImageToEndpoint(
                         uploadUrl,
@@ -534,6 +596,10 @@ export default function ImageGridComponent({
                                     attrs: {
                                         src: data.url,
                                         alignment: 'center',
+                                        order:
+                                            currentImages.length +
+                                            successCount +
+                                            1,
                                     },
                                 })
                                 .run();
@@ -703,61 +769,139 @@ export default function ImageGridComponent({
                                             </Button>
                                         </div>
                                     ) : (
-                                        <div className="grid max-h-64 grid-cols-4 gap-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-3 pr-1 dark:border-slate-800 dark:bg-slate-950/10">
-                                            {currentImages.map((img, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    className="group/img relative flex flex-col overflow-hidden rounded-md border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900"
-                                                >
-                                                    <div className="relative aspect-square w-full overflow-hidden rounded">
-                                                        <img
-                                                            src={img.src}
-                                                            alt={`Thumbnail ${idx + 1}`}
-                                                            className="h-full w-full object-cover"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setCroppingImage(
-                                                                    img,
-                                                                )
-                                                            }
-                                                            className="absolute top-1 right-8 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-white text-slate-700 opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                                                            title="Recortar imagen"
-                                                        >
-                                                            <Crop className="h-3.5 w-3.5 text-indigo-500" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                handleDeleteImage(
-                                                                    img.offset,
-                                                                    img.nodeSize,
-                                                                )
-                                                            }
-                                                            className="absolute top-1 right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-500 text-white opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-red-600"
-                                                            title="Eliminar de la galería"
-                                                        >
-                                                            <X className="h-3.5 w-3.5" />
-                                                        </button>
+                                        <DragDropContext
+                                            onDragEnd={handleDragEnd}
+                                        >
+                                            <Droppable
+                                                droppableId="gallery-images-droppable"
+                                                direction="horizontal"
+                                            >
+                                                {(droppableProvided) => (
+                                                    <div
+                                                        ref={
+                                                            droppableProvided.innerRef
+                                                        }
+                                                        {...droppableProvided.droppableProps}
+                                                        className="grid max-h-64 grid-cols-4 gap-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-3 pr-1 dark:border-slate-800 dark:bg-slate-950/10"
+                                                    >
+                                                        {currentImages.map(
+                                                            (img, idx) => (
+                                                                <Draggable
+                                                                    key={`gallery-img-${idx}-${img.src}`}
+                                                                    draggableId={`gallery-img-${idx}-${img.src}`}
+                                                                    index={idx}
+                                                                >
+                                                                    {(
+                                                                        draggableProvided,
+                                                                        snapshot,
+                                                                    ) => {
+                                                                        const child =
+                                                                            (
+                                                                                <div
+                                                                                    ref={
+                                                                                        draggableProvided.innerRef
+                                                                                    }
+                                                                                    {...draggableProvided.draggableProps}
+                                                                                    className={cn(
+                                                                                        'group/img relative flex flex-col overflow-hidden rounded-md border border-slate-200 bg-slate-100 p-1 transition-shadow dark:border-slate-800 dark:bg-slate-900',
+                                                                                        snapshot.isDragging &&
+                                                                                            'z-50 bg-white shadow-xl ring-2 ring-indigo-500 dark:bg-slate-800',
+                                                                                    )}
+                                                                                >
+                                                                                    <div className="relative aspect-square w-full overflow-hidden rounded">
+                                                                                        <img
+                                                                                            src={
+                                                                                                img.src
+                                                                                            }
+                                                                                            alt={`Thumbnail ${idx + 1}`}
+                                                                                            className="h-full w-full object-cover"
+                                                                                        />
+
+                                                                                        {/* Drag Handle & Order Badge */}
+                                                                                        <div
+                                                                                            {...draggableProvided.dragHandleProps}
+                                                                                            className="absolute top-1 left-1 flex h-6 cursor-grab items-center gap-0.5 rounded bg-black/60 px-1.5 text-[11px] font-semibold text-white backdrop-blur-xs transition-colors hover:bg-black/80 active:cursor-grabbing"
+                                                                                            title="Arrastrar para reordenar"
+                                                                                        >
+                                                                                            <GripVertical className="h-3 w-3 text-slate-300" />
+                                                                                            <span>
+                                                                                                #
+                                                                                                {idx +
+                                                                                                    1}
+                                                                                            </span>
+                                                                                        </div>
+
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() =>
+                                                                                                setCroppingImage(
+                                                                                                    img,
+                                                                                                )
+                                                                                            }
+                                                                                            className="absolute top-1 right-8 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-white text-slate-700 opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                                                                            title="Recortar imagen"
+                                                                                        >
+                                                                                            <Crop className="h-3.5 w-3.5 text-indigo-500" />
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() =>
+                                                                                                handleDeleteImage(
+                                                                                                    img.offset,
+                                                                                                    img.nodeSize,
+                                                                                                )
+                                                                                            }
+                                                                                            className="absolute top-1 right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-red-500 text-white opacity-0 shadow-md transition-opacity duration-200 group-hover/img:opacity-100 hover:bg-red-600"
+                                                                                            title="Eliminar de la galería"
+                                                                                        >
+                                                                                            <X className="h-3.5 w-3.5" />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        value={
+                                                                                            img.caption ||
+                                                                                            ''
+                                                                                        }
+                                                                                        placeholder="Pie de foto..."
+                                                                                        onChange={(
+                                                                                            e,
+                                                                                        ) =>
+                                                                                            handleUpdateImageCaption(
+                                                                                                img.offset,
+                                                                                                e
+                                                                                                    .target
+                                                                                                    .value,
+                                                                                            )
+                                                                                        }
+                                                                                        className="mt-1 w-full rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-700 italic focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                                                                                    />
+                                                                                </div>
+                                                                            );
+
+                                                                        if (
+                                                                            snapshot.isDragging &&
+                                                                            typeof window !==
+                                                                                'undefined'
+                                                                        ) {
+                                                                            return createPortal(
+                                                                                child,
+                                                                                document.body,
+                                                                            );
+                                                                        }
+
+                                                                        return child;
+                                                                    }}
+                                                                </Draggable>
+                                                            ),
+                                                        )}
+                                                        {
+                                                            droppableProvided.placeholder
+                                                        }
                                                     </div>
-                                                    <input
-                                                        type="text"
-                                                        value={
-                                                            img.caption || ''
-                                                        }
-                                                        placeholder="Pie de foto..."
-                                                        onChange={(e) =>
-                                                            handleUpdateImageCaption(
-                                                                img.offset,
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className="mt-1 w-full rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-700 italic focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
+                                                )}
+                                            </Droppable>
+                                        </DragDropContext>
                                     )}
                                 </div>
                             </div>
@@ -973,6 +1117,7 @@ export function ImageCropperDialog({
     // Reset crop state on open/src change
     useEffect(() => {
         if (isOpen) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setCrop({ x: 10, y: 10, w: 80, h: 80 });
             setAspectRatio('free');
             setImageRect(null);

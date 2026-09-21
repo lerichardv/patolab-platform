@@ -1,3 +1,5 @@
+import { removeHyperlinks } from './paste-cleaner';
+
 export function isEmptyHtml(html: string | null | undefined): boolean {
     if (!html) {
         return true;
@@ -185,12 +187,14 @@ export function parseHtmlToBlocks(html: string): string[] {
         return [];
     }
 
+    const clean = removeHyperlinks(html);
+
     if (typeof window === 'undefined') {
-        return [html];
+        return [clean];
     }
 
     const div = document.createElement('div');
-    div.innerHTML = html;
+    div.innerHTML = clean;
 
     const blocks: string[] = [];
     let currentText = '';

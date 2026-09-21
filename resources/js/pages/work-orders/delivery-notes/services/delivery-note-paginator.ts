@@ -1,3 +1,4 @@
+import { removeHyperlinks } from '@/pages/specimens/report-editor/utils/paste-cleaner';
 import type { DeliveryNoteMeasuredBlock } from '../types';
 
 export class DeliveryNotePaginator {
@@ -13,6 +14,8 @@ export class DeliveryNotePaginator {
     public static paginate(
         contentHtml: string | null | undefined,
     ): DeliveryNoteMeasuredBlock[][] {
+        contentHtml = removeHyperlinks(contentHtml || '');
+
         if (
             !contentHtml ||
             contentHtml.trim() === '' ||
@@ -86,6 +89,8 @@ export class DeliveryNotePaginator {
             return [];
         }
 
+        html = removeHyperlinks(html);
+
         if (typeof window === 'undefined') {
             return [html];
         }
@@ -116,6 +121,7 @@ export class DeliveryNotePaginator {
         blockHtml: string,
         maxCharsPerLine: number,
     ): DeliveryNoteMeasuredBlock {
+        blockHtml = removeHyperlinks(blockHtml);
         const match = blockHtml.match(/^<([a-zA-Z0-9]+)/i);
         const tag = match ? match[1].toLowerCase() : 'p';
 
@@ -143,6 +149,24 @@ export class DeliveryNotePaginator {
             }
 
             const imgMatches = blockHtml.match(/<img[^>]+>/gi) || [];
+            imgMatches.sort((a, b) => {
+                const orderA = a.match(/data-order=["'](\d+)["']/i);
+                const orderB = b.match(/data-order=["'](\d+)["']/i);
+
+                if (orderA && orderB) {
+                    return parseInt(orderA[1], 10) - parseInt(orderB[1], 10);
+                }
+
+                if (orderA) {
+                    return -1;
+                }
+
+                if (orderB) {
+                    return 1;
+                }
+
+                return 0;
+            });
             const imgTags = imgMatches.slice(0, 4);
             const N = Math.max(1, imgTags.length);
 
@@ -314,10 +338,12 @@ export class DeliveryNotePaginator {
                 const tag = listData.tag;
                 const items = listData.items;
                 let olStartIndex = 1;
+
                 if (tag === 'ol') {
                     const startMatch = (block.html || '').match(
                         /start=["'](\d+)["']/i,
                     );
+
                     if (startMatch) {
                         olStartIndex = parseInt(startMatch[1], 10);
                     }
@@ -350,15 +376,19 @@ export class DeliveryNotePaginator {
                         const slice = pendingItems.slice(0, fitCount);
 
                         let tagOpen = `<${tag}`;
+
                         if (tag === 'ol' && olStartIndex > 1) {
                             tagOpen += ` start="${olStartIndex}"`;
                         }
+
                         if (listData.listStyleType) {
                             tagOpen += ` data-list-style-type="${listData.listStyleType}"`;
                         }
+
                         if (listData.styleAttr) {
                             tagOpen += ` style="${listData.styleAttr}"`;
                         }
+
                         tagOpen += '>';
 
                         const sliceHtml =
@@ -537,7 +567,27 @@ export class DeliveryNotePaginator {
 
                 const usableWidth = width ? 185.9 * (width / 704.0) : 185.9;
                 const gap = 1.5; // mm
-                const slicedImages = images.slice(0, 4);
+                const sortedImages = [...images].sort((a, b) => {
+                    const orderA = a.match(/data-order=["'](\d+)["']/i);
+                    const orderB = b.match(/data-order=["'](\d+)["']/i);
+
+                    if (orderA && orderB) {
+                        return (
+                            parseInt(orderA[1], 10) - parseInt(orderB[1], 10)
+                        );
+                    }
+
+                    if (orderA) {
+                        return -1;
+                    }
+
+                    if (orderB) {
+                        return 1;
+                    }
+
+                    return 0;
+                });
+                const slicedImages = sortedImages.slice(0, 4);
                 let rowsRemaining: string[][] = [slicedImages];
 
                 const rowHeights = rowsRemaining.map((rowImages) => {

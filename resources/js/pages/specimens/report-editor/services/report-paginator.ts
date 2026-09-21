@@ -30,12 +30,13 @@ export interface ReportPaginateOptions {
 }
 
 export class ReportPaginator {
-    public static readonly PAGE_CONTENT_HEIGHT = 212.79; // mm
+    public static readonly PAGE_CONTENT_HEIGHT = 208.9; // mm (Letter 279.4 - top padding 12 - header 27 - header mb 2.5 - footer 24 - footer bottom 5)
     public static readonly LINE_HEIGHT = 3.53; // mm (8pt * 1.25)
     public static readonly LIST_ITEM_SPACING = 0.8; // mm (spacing between li items)
     public static readonly MAX_CHARS_PER_LINE = 144;
     public static readonly SECTION_HEADER_HEIGHT = 7.94; // mm
     public static readonly TABLE_SPLIT_BUFFER = 2.0; // mm
+    public static readonly SIGNATURE_ROW_HEIGHT = 33.33; // mm per row (increased by 33.3% from 25.0mm)
 
     public static readonly DEFAULT_SECTIONS_ORDER: SectionOrderItem[] = [
         { key: 'clinical_details_html', order: 1, active: true },
@@ -337,7 +338,8 @@ export class ReportPaginator {
 
         const pathologistsCount = specimen?.users?.length || 0;
         const rowsCount = Math.ceil(pathologistsCount / 2);
-        const signatureHeight = rowsCount * 25.0; // 25mm per row
+        const signatureHeight =
+            rowsCount * ReportPaginator.SIGNATURE_ROW_HEIGHT;
 
         let headingsToggles: Record<string, boolean> = {};
 
@@ -582,7 +584,7 @@ export class ReportPaginator {
 
         // Pathologist signatures with keep_together: true
         if (signatureHeight > 0) {
-            const sigFormula = `${pathologistsCount} firma(s) de patólogo (${rowsCount} fila(s) × 25.00mm = ${signatureHeight.toFixed(2)}mm)`;
+            const sigFormula = `${pathologistsCount} firma(s) de patólogo (${rowsCount} fila(s) × ${ReportPaginator.SIGNATURE_ROW_HEIGHT.toFixed(2)}mm = ${signatureHeight.toFixed(2)}mm)`;
 
             if (lastPageHeight + signatureHeight > maxHeightForLastPage) {
                 computedPages.push([
@@ -855,7 +857,27 @@ export class ReportPaginator {
                 const width = block.width || null;
                 const usableWidth = width ? 185.9 * (width / 704) : 185.9;
                 const gap = 1.5; // mm
-                const slicedImages = images.slice(0, 4);
+                const sortedImages = [...images].sort((a, b) => {
+                    const orderA = a.match(/data-order=["'](\d+)["']/i);
+                    const orderB = b.match(/data-order=["'](\d+)["']/i);
+
+                    if (orderA && orderB) {
+                        return (
+                            parseInt(orderA[1], 10) - parseInt(orderB[1], 10)
+                        );
+                    }
+
+                    if (orderA) {
+                        return -1;
+                    }
+
+                    if (orderB) {
+                        return 1;
+                    }
+
+                    return 0;
+                });
+                const slicedImages = sortedImages.slice(0, 4);
                 let rowsRemaining: string[][] = [slicedImages];
 
                 const rowHeights = rowsRemaining.map((rowImages) => {
@@ -1259,7 +1281,8 @@ export class ReportPaginator {
                                     id: `${block.id}-item-${i}`,
                                     type: 'html',
                                     html: `<${tag} class="section-content"${startAttr}${listStyleAttr}${styleAttr}>${itemHtml}</${tag}>`,
-                                    height: itemHeight + 1.98,
+                                    height:
+                                        itemHeight + (isLastOfAll ? 1.98 : 0.0),
                                 },
                                 {
                                     blockType: `list (${tag.toUpperCase()})`,
@@ -1271,7 +1294,7 @@ export class ReportPaginator {
                                             textLength: item.textLength,
                                         },
                                     ],
-                                    formula: `Elemento ${i + 1} de lista <${tag}>: ${(itemHeight + 1.98).toFixed(2)}mm`,
+                                    formula: `Elemento ${i + 1} de lista <${tag}>: ${(itemHeight + (isLastOfAll ? 1.98 : 0.0)).toFixed(2)}mm`,
                                 },
                             );
 

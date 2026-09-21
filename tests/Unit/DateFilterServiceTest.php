@@ -172,3 +172,29 @@ test('creates a cookie to queue with fixed end date other than today', function 
         'to' => '2026-07-27', // remains a fixed date range
     ]);
 });
+
+test('normalizes various date formats in resolveFilter', function (string $from, string $to, string $expectedFrom, string $expectedTo) {
+    $result = DateFilterService::resolveFilter(null, $from, $to);
+
+    expect($result['from'])->toBe($expectedFrom);
+    expect($result['to'])->toBe($expectedTo);
+})->with([
+    'US format MM-DD-YYYY' => ['08-01-2026', '08-31-2026', '2026-08-01', '2026-08-31'],
+    'Latin format DD-MM-YYYY' => ['01-08-2026', '31-08-2026', '2026-08-01', '2026-08-31'],
+    'Slashed US format MM/DD/YYYY' => ['08/01/2026', '08/31/2026', '2026-08-01', '2026-08-31'],
+    'Slashed Latin format DD/MM/YYYY' => ['01/08/2026', '31/08/2026', '2026-08-01', '2026-08-31'],
+    'ISO format YYYY-MM-DD' => ['2026-08-01', '2026-08-31', '2026-08-01', '2026-08-31'],
+    'Inverted range swapped automatically' => ['2026-08-31', '2026-08-01', '2026-08-01', '2026-08-31'],
+]);
+
+test('normalizes cookie dates in getCookieToQueue', function () {
+    $cookie = DateFilterService::getCookieToQueue(
+        'billing_cookie',
+        '08-01-2026',
+        '08-31-2026'
+    );
+
+    $value = json_decode($cookie->getValue(), true);
+    expect($value['from'])->toBe('2026-08-01');
+    expect($value['to'])->toBe('2026-08-31');
+});

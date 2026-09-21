@@ -22,6 +22,14 @@ export const editorStyles = `
     line-height: 1.25;
   }
 
+  /* ── Hyperlink Neutralization ── */
+  .tiptap a, .preview-content a, .section-content a, a {
+    color: inherit !important;
+    text-decoration: none !important;
+    cursor: text !important;
+    pointer-events: none !important;
+  }
+
   /* ── Dictation Caret Style ── */
   .tiptap.is-dictating {
     caret-color: #dc2626 !important;

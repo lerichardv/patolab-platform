@@ -8,6 +8,7 @@ use App\Models\SpecimenTypeTemplate;
 use App\Models\User;
 use App\Models\UserTemplatePermission;
 use App\Services\ImageOptimizerService;
+use App\Services\ReportPaginator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -142,6 +143,24 @@ class MySpecimenTypeTemplateController extends Controller
             ['key' => 'open_text_html', 'order' => 8, 'active' => true],
         ]);
 
+        $htmlFields = [
+            'clinical_details_html',
+            'diagnosis_html',
+            'macroscopy_html',
+            'microscopy_html',
+            'comments_notes_html',
+            'protocols_html',
+            'legend_html',
+            'open_text_html',
+            'addendum_html',
+        ];
+
+        foreach ($htmlFields as $field) {
+            if (isset($validated[$field])) {
+                $validated[$field] = ReportPaginator::removeHyperlinks($validated[$field]);
+            }
+        }
+
         $examinations = SpecimenTypeExamination::whereIn('id', $validated['specimen_type_examination_ids'])
             ->whereIn('specimen_type', $validated['specimen_type_ids'])
             ->get();
@@ -216,6 +235,24 @@ class MySpecimenTypeTemplateController extends Controller
             'headings_toggles' => 'nullable|array',
             'headings_toggles.*' => 'boolean',
         ]);
+
+        $htmlFields = [
+            'clinical_details_html',
+            'diagnosis_html',
+            'macroscopy_html',
+            'microscopy_html',
+            'comments_notes_html',
+            'protocols_html',
+            'legend_html',
+            'open_text_html',
+            'addendum_html',
+        ];
+
+        foreach ($htmlFields as $field) {
+            if (isset($validated[$field])) {
+                $validated[$field] = ReportPaginator::removeHyperlinks($validated[$field]);
+            }
+        }
 
         $validated['user_id'] = $userId;
 

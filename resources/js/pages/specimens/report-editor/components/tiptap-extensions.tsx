@@ -240,6 +240,26 @@ export const CustomImage = Image.extend({
     addAttributes() {
         return {
             ...this.parent?.(),
+            order: {
+                default: null,
+                parseHTML: (element) => {
+                    const order = element.getAttribute('data-order');
+
+                    return order ? parseInt(order, 10) : null;
+                },
+                renderHTML: (attributes) => {
+                    if (
+                        attributes.order === null ||
+                        attributes.order === undefined
+                    ) {
+                        return {};
+                    }
+
+                    return {
+                        'data-order': attributes.order,
+                    };
+                },
+            },
             caption: {
                 default: '',
                 parseHTML: (element) =>
@@ -379,6 +399,10 @@ export const CustomImage = Image.extend({
         if (node?.attrs?.caption) {
             mergedAttrs['data-caption'] = node.attrs.caption;
             mergedAttrs['alt'] = node.attrs.caption;
+        }
+
+        if (node?.attrs?.order !== null && node?.attrs?.order !== undefined) {
+            mergedAttrs['data-order'] = node.attrs.order;
         }
 
         return ['img', mergedAttrs];

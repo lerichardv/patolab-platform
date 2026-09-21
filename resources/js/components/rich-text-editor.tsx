@@ -79,11 +79,20 @@ import { isSelectionInTable } from '@/pages/specimens/report-editor/utils';
 import {
     cleanPastedHtml,
     cleanPastedText,
+    removeHyperlinks,
 } from '@/pages/specimens/report-editor/utils/paste-cleaner';
 
 export const editorStyles = `
   /* ── Base ── */
   .tiptap { outline: none; min-height: 160px; }
+
+  /* ── Hyperlink Neutralization ── */
+  .tiptap a, .preview-content a, .section-content a, a {
+    color: inherit !important;
+    text-decoration: none !important;
+    cursor: text !important;
+    pointer-events: none !important;
+  }
 
   /* ── Paragraphs ── */
   .tiptap p, .preview-content p { margin-bottom: 0.5rem; }
@@ -601,6 +610,26 @@ const CustomImage = Image.extend({
     addAttributes() {
         return {
             ...this.parent?.(),
+            order: {
+                default: null,
+                parseHTML: (element) => {
+                    const order = element.getAttribute('data-order');
+
+                    return order ? parseInt(order, 10) : null;
+                },
+                renderHTML: (attributes) => {
+                    if (
+                        attributes.order === null ||
+                        attributes.order === undefined
+                    ) {
+                        return {};
+                    }
+
+                    return {
+                        'data-order': attributes.order,
+                    };
+                },
+            },
             caption: {
                 default: '',
                 parseHTML: (element) =>
@@ -740,6 +769,10 @@ const CustomImage = Image.extend({
         if (node?.attrs?.caption) {
             mergedAttrs['data-caption'] = node.attrs.caption;
             mergedAttrs['alt'] = node.attrs.caption;
+        }
+
+        if (node?.attrs?.order !== null && node?.attrs?.order !== undefined) {
+            mergedAttrs['data-order'] = node.attrs.order;
         }
 
         return ['img', mergedAttrs];
@@ -2372,7 +2405,7 @@ export function RichTextEditorArea({
             Underline,
             ...sharedExtensions,
         ],
-        content,
+        content: content ? removeHyperlinks(content) : content,
         editable,
         editorProps: {
             handleKeyDown: (view, event) => {
@@ -2385,7 +2418,7 @@ export function RichTextEditorArea({
         },
         onUpdate({ editor }) {
             setCharacterCount(editor.storage.characterCount?.characters() ?? 0);
-            onChange(editor.getHTML());
+            onChange(removeHyperlinks(editor.getHTML()));
         },
         onFocus({ editor }) {
             setIsFocused(true);

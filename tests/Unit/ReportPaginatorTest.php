@@ -523,3 +523,228 @@ test('report paginator respects headings_toggles visibility setting', function (
     $diagHeaders = array_filter($pages[0], fn ($b) => ($b['type'] ?? '') === 'section-header' && ($b['title'] ?? '') === 'DIAGNÓSTICO');
     expect($diagHeaders)->not->toBeEmpty();
 });
+
+test('report paginator sorts image grid images by data-order attribute', function () {
+    $gridHtml = '<div data-columns="3" data-align="center" data-type="image-grid" class="align-center" style="display: grid; margin-left: auto; margin-right: auto;">'
+        .'<img src="http://localhost:8000/storage/img3.jpg" data-order="3" data-caption="Foto 3" style="display: block;">'
+        .'<img src="http://localhost:8000/storage/img1.jpg" data-order="1" data-caption="Foto 1" style="display: block;">'
+        .'<img src="http://localhost:8000/storage/img2.jpg" data-order="2" data-caption="Foto 2" style="display: block;">'
+        .'</div>';
+
+    $classified = ReportPaginator::classifyBlock($gridHtml, 144);
+
+    expect($classified['type'])->toBe('image-grid');
+    expect($classified['images'])->toHaveCount(3);
+    expect($classified['images'][0])->toContain('img1.jpg');
+    expect($classified['images'][1])->toContain('img2.jpg');
+    expect($classified['images'][2])->toContain('img3.jpg');
+
+    $pages = ReportPaginator::paginateBlocks([$classified], 210.0, 3.53, 144);
+    expect($pages)->toHaveCount(1);
+
+    $gridBlock = $pages[0][0];
+    expect($gridBlock['type'])->toBe('html');
+    $pos1 = strpos($gridBlock['html'], 'img1.jpg');
+    $pos2 = strpos($gridBlock['html'], 'img2.jpg');
+    $pos3 = strpos($gridBlock['html'], 'img3.jpg');
+
+    expect($pos1)->toBeLessThan($pos2);
+    expect($pos2)->toBeLessThan($pos3);
+});
+
+test('report paginator removes hyperlinks while preserving inner text and markup', function () {
+    $htmlWithLinks = '<p>Visite nuestro <a href="https://patolab.org" target="_blank" style="color: blue;"><strong>portal web</strong></a> para más información o escriba a <a href="mailto:info@patolab.org">soporte</a>.</p>';
+
+    $cleaned = ReportPaginator::removeHyperlinks($htmlWithLinks);
+
+    expect($cleaned)->not->toContain('<a');
+    expect($cleaned)->not->toContain('</a>');
+    expect($cleaned)->not->toContain('href=');
+    expect($cleaned)->toContain('<strong>portal web</strong>');
+    expect($cleaned)->toContain('soporte');
+
+    $blocks = ReportPaginator::parseHtmlToBlocks($htmlWithLinks);
+    expect($blocks)->toHaveCount(1);
+    expect($blocks[0])->not->toContain('<a');
+    expect($blocks[0])->toContain('portal web');
+});
+
+test('report paginator calculates signature block height with increased row height (33.33mm)', function () {
+    expect(ReportPaginator::SIGNATURE_ROW_HEIGHT)->toBe(33.33);
+
+    $specimen = new stdClass;
+    $specimen->sequence_code = 'B-200-26';
+    $specimen->diagnosis = 'Biopsia gástrica';
+    $specimen->anatomic_site = 'Estómago';
+    $specimen->users = collect([
+        (object) [
+            'id' => 1,
+            'name' => 'DRA. ESTEFANY LAGOS',
+            'role' => (object) ['name' => 'PATOLOGÍA ONCOLÓGICA'],
+        ],
+    ]);
+
+    $report = new stdClass;
+    $report->sections_order = [
+        ['key' => 'diagnosis_html', 'order' => 1, 'active' => true],
+    ];
+    $report->diagnosis_html = '<p>Diagnóstico breve.</p>';
+    $report->clinical_details_html = '';
+    $report->macroscopy_html = '';
+    $report->microscopy_html = '';
+    $report->comments_notes_html = '';
+    $report->protocols_html = '';
+    $report->legend_html = '';
+
+    $customer = new stdClass;
+    $customer->name = 'Juan Pérez';
+    $customer->age = 45;
+    $customer->gender = 'M';
+
+    $referrer = new stdClass;
+    $referrer->name = 'Dr. Gómez';
+    $referrer->notes = 'Clínica Central';
+
+    // Test 1 pathologist -> 1 row = 33.33mm
+    $pages1 = ReportPaginator::paginate($specimen, $report, $customer, $referrer, false);
+    $sigBlock1 = collect($pages1)->flatten(1)->firstWhere('type', 'signature');
+    expect($sigBlock1)->not->toBeNull();
+    expect($sigBlock1['height'])->toBe(33.33);
+
+    // Test 3 pathologists -> 2 rows = 66.66mm
+    $specimen->users->push(
+        (object) ['id' => 2, 'name' => 'DR. ROBERTO MEJÍA', 'role' => (object) ['name' => 'PATOLOGÍA QUIRÚRGICA']],
+        (object) ['id' => 3, 'name' => 'DRA. MARÍA LÓPEZ', 'role' => (object) ['name' => 'PATOLOGÍA CLÍNICA']]
+    );
+    $pages3 = ReportPaginator::paginate($specimen, $report, $customer, $referrer, false);
+    $sigBlock3 = collect($pages3)->flatten(1)->firstWhere('type', 'signature');
+    expect($sigBlock3)->not->toBeNull();
+    expect($sigBlock3['height'])->toBe(66.66);
+});
+
+test('report paginator ensures page content height never exceeds 208.90mm to avoid footer overlap', function () {
+    expect(ReportPaginator::PAGE_CONTENT_HEIGHT)->toBe(208.90);
+
+    $specimen = new stdClass;
+    $specimen->sequence_code = 'BIO-0099-08-2026';
+    $specimen->diagnosis = 'Gastritis crónica moderada';
+    $specimen->anatomic_site = 'Antro gástrico';
+    $specimen->users = collect();
+
+    $report = new stdClass;
+    $report->sections_order = [
+        ['key' => 'diagnosis_html', 'order' => 1, 'active' => true],
+    ];
+
+    // Build dense paragraphs replicating the example where content previously reached 212.42mm
+    $para = '<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum in ultricies tellus, sed tempus quam. Nullam vulputate consectetur venenatis. Nulla tristique, nunc ac semper vehicula, ex nibh dictum massa, eget porttitor eros nisi sed ligula. Sed sagittis rhoncus nisl ac rutrum. Nullam vel turpis pharetra, convallis tortor quis, maximus urna. Nulla leo nulla, tincidunt sit amet ipsum a, eleifend ultrices odio. Integer elit elit, volutpat nec accumsan ac, ornare et ipsum. Sed volutpat egestas tincidunt. Cras augue libero, volutpat vitae leo eu, dapibus ultricies lorem. Aliquam id posuere lorem. In facilisis quam eget aliquam cursus.</p>';
+    $denseHtml = str_repeat($para, 15);
+    $report->diagnosis_html = $denseHtml;
+    $report->clinical_details_html = '';
+    $report->macroscopy_html = '';
+    $report->microscopy_html = '';
+    $report->comments_notes_html = '';
+    $report->protocols_html = '';
+    $report->legend_html = '';
+
+    $customer = new stdClass;
+    $customer->name = 'Paciente Prueba';
+    $customer->age = 50;
+    $customer->gender = 'M';
+
+    $referrer = new stdClass;
+    $referrer->name = 'Dr. Referente';
+    $referrer->notes = 'Clínica San Pedro';
+
+    $pages = ReportPaginator::paginate($specimen, $report, $customer, $referrer, false);
+
+    expect(count($pages))->toBeGreaterThanOrEqual(2);
+
+    // Assert every page's total accumulated block height is <= 208.90mm
+    foreach ($pages as $pIdx => $pageBlocks) {
+        $totalHeight = 0.0;
+        foreach ($pageBlocks as $block) {
+            $totalHeight += (float) $block['height'];
+        }
+        expect($totalHeight)->toBeLessThanOrEqual(208.90 + 0.001); // 0.001 delta for floating point precision
+    }
+});
+
+test('report paginator paginateList does not duplicate nested list items with double or triple hierarchy', function () {
+    $nestedListHtml = '<ul>'.
+        '<li>Padre 1'.
+            '<ul>'.
+                '<li>Hijo nivel 2'.
+                    '<ul>'.
+                        '<li>Nieto nivel 3</li>'.
+                    '</ul>'.
+                '</li>'.
+                '<li>Hijo nivel 2 hermano</li>'.
+            '</ul>'.
+        '</li>'.
+        '<li>Padre 2</li>'.
+    '</ul>';
+
+    $result = ReportPaginator::paginateList($nestedListHtml);
+
+    expect($result)->toBeArray();
+    expect($result['tag'])->toBe('ul');
+    // Must only have 2 top-level items, NOT 4 or 5 items with duplicates
+    expect($result['items'])->toHaveCount(2);
+
+    // Item 0 is Padre 1, containing the nested sub-list
+    expect($result['items'][0]['html'])->toContain('Padre 1');
+    expect($result['items'][0]['html'])->toContain('Hijo nivel 2');
+    expect($result['items'][0]['html'])->toContain('Nieto nivel 3');
+
+    // Item 1 is Padre 2
+    expect($result['items'][1]['html'])->toContain('Padre 2');
+    expect($result['items'][1]['html'])->not->toContain('Hijo nivel 2');
+
+    // Height of Item 0 should account for all 4 lines (Padre 1 + Hijo nivel 2 + Nieto nivel 3 + Hijo nivel 2 hermano)
+    expect($result['items'][0]['height'])->toBeGreaterThanOrEqual(4 * 3.53);
+});
+
+test('report paginator end-to-end pagination with nested list does not produce duplicate blocks', function () {
+    $specimen = new stdClass;
+    $specimen->sequence_code = 'BIO-1234-09-2026';
+    $specimen->diagnosis = '';
+    $specimen->anatomic_site = 'Piel';
+    $specimen->users = collect();
+
+    $report = new stdClass;
+    $report->sections_order = [
+        ['key' => 'diagnosis_html', 'order' => 1, 'active' => true],
+    ];
+    $report->diagnosis_html = '<ul>'.
+        '<li>Diagnóstico principal'.
+            '<ul>'.
+                '<li>Subdiagnóstico A'.
+                    '<ul>'.
+                        '<li>Detalle triple</li>'.
+                    '</ul>'.
+                '</li>'.
+            '</ul>'.
+        '</li>'.
+    '</ul>';
+    $report->clinical_details_html = '';
+    $report->macroscopy_html = '';
+    $report->microscopy_html = '';
+    $report->comments_notes_html = '';
+    $report->protocols_html = '';
+    $report->legend_html = '';
+
+    $pages = ReportPaginator::paginate($specimen, $report, null, null, false);
+
+    expect($pages)->toBeArray();
+    expect($pages)->not->toBeEmpty();
+
+    $listBlocks = collect($pages[0])->filter(fn ($b) => ($b['type'] ?? '') === 'html' && str_contains($b['html'] ?? '', 'Diagnóstico principal'));
+    expect($listBlocks)->toHaveCount(1);
+
+    $html = $listBlocks->first()['html'];
+    // "Subdiagnóstico A" must appear exactly once in the rendered HTML, never duplicated
+    expect(substr_count($html, 'Subdiagnóstico A'))->toBe(1);
+    // "Detalle triple" must appear exactly once, never triplicated
+    expect(substr_count($html, 'Detalle triple'))->toBe(1);
+});

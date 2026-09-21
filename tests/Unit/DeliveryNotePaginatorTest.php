@@ -25,7 +25,7 @@ test('it paginates short content within a single page alongside signatures', fun
 });
 
 test('it pushes signatures block to a new page when first page content fills available height', function () {
-    // Generate enough paragraphs to almost fill or fill the page height (212.79mm)
+    // Generate enough paragraphs to almost fill or fill the page height (208.0mm)
     // Each paragraph with ~10 lines takes ~35mm. 6 of these take ~210mm.
     $longParagraph = '<p>'.str_repeat('Esta es una descripción detallada de los bloques de parafina entregados al cliente. ', 15).'</p>';
     $html = str_repeat($longParagraph, 6);
@@ -115,4 +115,40 @@ HTML;
     expect($listBlock['html'])->toContain('TIROIDES - TIROIDECTOMÍA TOTAL:');
     expect($listBlock['html'])->toContain('TIROIDITIS DE HASHIMOTO.');
     expect($listBlock['html'])->toContain('MARGENES DE RESECCION LIBRES DE NEOPLASIA.');
+});
+
+test('it sorts image grid images by data-order attribute', function () {
+    $gridHtml = '<div data-columns="2" data-align="center" data-type="image-grid" class="align-center" style="display: grid; margin-left: auto; margin-right: auto;">'
+        .'<img src="http://localhost:8000/storage/beta.jpg" data-order="2" style="display: block;">'
+        .'<img src="http://localhost:8000/storage/alpha.jpg" data-order="1" style="display: block;">'
+        .'</div>';
+
+    $pages = DeliveryNotePaginator::paginate($gridHtml);
+
+    expect($pages)->toHaveCount(1);
+    $firstPage = $pages[0];
+
+    $gridBlock = collect($firstPage)->firstWhere('type', 'image-grid');
+    expect($gridBlock)->not->toBeNull();
+
+    $posAlpha = strpos($gridBlock['html'], 'alpha.jpg');
+    $posBeta = strpos($gridBlock['html'], 'beta.jpg');
+
+    expect($posAlpha)->toBeLessThan($posBeta);
+});
+
+test('it removes hyperlinks while preserving inner text and markup', function () {
+    $htmlWithLinks = '<div><p>Nota con enlace: <a href="https://example.com" target="_blank"><em>Documento</em></a></p></div>';
+
+    $cleaned = DeliveryNotePaginator::removeHyperlinks($htmlWithLinks);
+
+    expect($cleaned)->not->toContain('<a');
+    expect($cleaned)->not->toContain('</a>');
+    expect($cleaned)->not->toContain('href=');
+    expect($cleaned)->toContain('<em>Documento</em>');
+
+    $pages = DeliveryNotePaginator::paginate($htmlWithLinks);
+    $firstBlock = $pages[0][0];
+    expect($firstBlock['html'])->not->toContain('<a');
+    expect($firstBlock['html'])->toContain('Documento');
 });

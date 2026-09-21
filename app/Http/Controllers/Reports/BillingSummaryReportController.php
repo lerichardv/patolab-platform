@@ -12,6 +12,7 @@ use App\Models\SpecimenTypeExamination;
 use App\Services\DateFilterService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -692,10 +693,10 @@ class BillingSummaryReportController extends Controller
                 $q->where(function ($sub) use ($dateFrom, $dateTo) {
                     $sub->where('is_group', false);
                     if (! empty($dateFrom)) {
-                        $sub->whereDate('invoices.created_at', '>=', $dateFrom);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '>=', $dateFrom);
                     }
                     if (! empty($dateTo)) {
-                        $sub->whereDate('invoices.created_at', '<=', $dateTo);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '<=', $dateTo);
                     }
                 });
 
@@ -703,13 +704,36 @@ class BillingSummaryReportController extends Controller
                 $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
                     $sub->where('is_group', true)
                         ->where('payment_type', 'credit')
-                        ->whereHas('creditInvoiceSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
-                            if (! empty($dateFrom)) {
-                                $subQ->whereDate('created_at', '>=', $dateFrom);
-                            }
-                            if (! empty($dateTo)) {
-                                $subQ->whereDate('created_at', '<=', $dateTo);
-                            }
+                        ->where(function ($creditSub) use ($dateFrom, $dateTo) {
+                            $creditSub->whereHas('creditInvoiceSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            })->orWhereHas('creditInvoiceSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            })->orWhereHas('groupSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            })->orWhereHas('groupSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            });
                         });
                 });
 
@@ -717,13 +741,22 @@ class BillingSummaryReportController extends Controller
                 $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
                     $sub->where('is_group', true)
                         ->where('payment_type', '!=', 'credit')
-                        ->whereHas('groupSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
-                            if (! empty($dateFrom)) {
-                                $subQ->whereDate('created_at', '>=', $dateFrom);
-                            }
-                            if (! empty($dateTo)) {
-                                $subQ->whereDate('created_at', '<=', $dateTo);
-                            }
+                        ->where(function ($groupSub) use ($dateFrom, $dateTo) {
+                            $groupSub->whereHas('groupSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            })->orWhereHas('groupSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            });
                         });
                 });
 
@@ -731,10 +764,10 @@ class BillingSummaryReportController extends Controller
                 $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
                     $sub->whereIn('invoice_type', ['credit payment', 'social security']);
                     if (! empty($dateFrom)) {
-                        $sub->whereDate('invoices.created_at', '>=', $dateFrom);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '>=', $dateFrom);
                     }
                     if (! empty($dateTo)) {
-                        $sub->whereDate('invoices.created_at', '<=', $dateTo);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '<=', $dateTo);
                     }
                 });
             });
@@ -1038,10 +1071,18 @@ class BillingSummaryReportController extends Controller
                 if ($invoice->payment_type === 'credit') {
                     $cisItems = $invoice->creditInvoiceSpecimens;
                     if (! empty($dateFrom)) {
-                        $cisItems = $cisItems->filter(fn ($cis) => $cis->created_at && $cis->created_at->toDateString() >= $dateFrom);
+                        $cisItems = $cisItems->filter(function ($cis) use ($dateFrom) {
+                            $d = ($cis->specimen?->created_at ?? $cis->created_at)?->toDateString();
+
+                            return $d && $d >= $dateFrom;
+                        });
                     }
                     if (! empty($dateTo)) {
-                        $cisItems = $cisItems->filter(fn ($cis) => $cis->created_at && $cis->created_at->toDateString() <= $dateTo);
+                        $cisItems = $cisItems->filter(function ($cis) use ($dateTo) {
+                            $d = ($cis->specimen?->created_at ?? $cis->created_at)?->toDateString();
+
+                            return $d && $d <= $dateTo;
+                        });
                     }
 
                     if ($typeIds !== null) {
@@ -1064,6 +1105,7 @@ class BillingSummaryReportController extends Controller
                         foreach ($cisItems as $cis) {
                             $quantity = $cis->quantity ?? 1;
                             $specimen = $cis->specimen;
+                            $itemDate = $specimen?->created_at ?? $cis->created_at;
                             $specimenType = $specimen?->type?->name;
                             $examItems = $this->getSpecimenExaminations($specimen, $cis, $invoice);
                             $examNames = array_column($examItems, 'name');
@@ -1075,9 +1117,9 @@ class BillingSummaryReportController extends Controller
                                 'id' => 'cis-'.$cis->id,
                                 'invoice_id' => $invoice->id,
                                 'invoice' => $invoice,
-                                'date' => $cis->created_at ? $cis->created_at->toIso8601String() : null,
+                                'date' => $itemDate ? $itemDate->toIso8601String() : null,
                                 'invoice_date' => $invoice->invoice_date ? Carbon::parse($invoice->invoice_date)->toIso8601String() : null,
-                                'created_at' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
+                                'created_at' => $itemDate ? $itemDate->toIso8601String() : ($invoice->created_at ? $invoice->created_at->toIso8601String() : null),
                                 'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
                                 'customer_name' => $invoice->customer?->name ?? 'N/A',
                                 'invoice_number' => $invoice->full_invoice_number,
@@ -1099,10 +1141,18 @@ class BillingSummaryReportController extends Controller
                 } else {
                     $igsItems = $invoice->groupSpecimens;
                     if (! empty($dateFrom)) {
-                        $igsItems = $igsItems->filter(fn ($igs) => $igs->created_at && $igs->created_at->toDateString() >= $dateFrom);
+                        $igsItems = $igsItems->filter(function ($igs) use ($dateFrom) {
+                            $d = ($igs->specimen?->created_at ?? $igs->created_at)?->toDateString();
+
+                            return $d && $d >= $dateFrom;
+                        });
                     }
                     if (! empty($dateTo)) {
-                        $igsItems = $igsItems->filter(fn ($igs) => $igs->created_at && $igs->created_at->toDateString() <= $dateTo);
+                        $igsItems = $igsItems->filter(function ($igs) use ($dateTo) {
+                            $d = ($igs->specimen?->created_at ?? $igs->created_at)?->toDateString();
+
+                            return $d && $d <= $dateTo;
+                        });
                     }
 
                     if ($typeIds !== null) {
@@ -1125,6 +1175,7 @@ class BillingSummaryReportController extends Controller
                         foreach ($igsItems as $igs) {
                             $quantity = $igs->quantity ?? 1;
                             $specimen = $igs->specimen;
+                            $itemDate = $specimen?->created_at ?? $igs->created_at;
                             $specimenType = $specimen?->type?->name;
                             $examItems = $this->getSpecimenExaminations($specimen, $igs, $invoice);
                             $examNames = array_column($examItems, 'name');
@@ -1136,9 +1187,9 @@ class BillingSummaryReportController extends Controller
                                 'id' => 'igs-'.$igs->id,
                                 'invoice_id' => $invoice->id,
                                 'invoice' => $invoice,
-                                'date' => $igs->created_at ? $igs->created_at->toIso8601String() : null,
+                                'date' => $itemDate ? $itemDate->toIso8601String() : null,
                                 'invoice_date' => $invoice->invoice_date ? Carbon::parse($invoice->invoice_date)->toIso8601String() : null,
-                                'created_at' => $invoice->created_at ? $invoice->created_at->toIso8601String() : null,
+                                'created_at' => $itemDate ? $itemDate->toIso8601String() : ($invoice->created_at ? $invoice->created_at->toIso8601String() : null),
                                 'customer_id_number' => $invoice->customer?->id_number ?? 'N/A',
                                 'customer_name' => $invoice->customer?->name ?? 'N/A',
                                 'invoice_number' => $invoice->full_invoice_number,
@@ -1159,6 +1210,14 @@ class BillingSummaryReportController extends Controller
                     }
                 }
             } else {
+                $invDate = $invoice->invoice_date ? substr($invoice->invoice_date, 0, 10) : ($invoice->created_at ? $invoice->created_at->toDateString() : null);
+                if (! empty($dateFrom) && $invDate && $invDate < $dateFrom) {
+                    continue;
+                }
+                if (! empty($dateTo) && $invDate && $invDate > $dateTo) {
+                    continue;
+                }
+
                 if ($typeIds !== null) {
                     $typeId = $invoice->specimen?->specimen_type;
                     if (! $typeId || ! in_array((string) $typeId, $typeIds, true)) {
@@ -1222,8 +1281,8 @@ class BillingSummaryReportController extends Controller
         }
 
         usort($rows, function ($a, $b) use ($sortOrder) {
-            $dateA = $a['date'] ? strtotime($a['date']) : 0;
-            $dateB = $b['date'] ? strtotime($b['date']) : 0;
+            $dateA = $a['invoice_date'] ? strtotime($a['invoice_date']) : ($a['date'] ? strtotime($a['date']) : 0);
+            $dateB = $b['invoice_date'] ? strtotime($b['invoice_date']) : ($b['date'] ? strtotime($b['date']) : 0);
             if ($dateA == $dateB) {
                 return 0;
             }

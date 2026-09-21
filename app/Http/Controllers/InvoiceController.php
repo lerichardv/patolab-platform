@@ -159,10 +159,10 @@ class InvoiceController extends Controller
                 $q->where(function ($sub) use ($dateFrom, $dateTo) {
                     $sub->where('invoices.is_group', false);
                     if (! empty($dateFrom)) {
-                        $sub->whereDate('invoices.created_at', '>=', $dateFrom);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '>=', $dateFrom);
                     }
                     if (! empty($dateTo)) {
-                        $sub->whereDate('invoices.created_at', '<=', $dateTo);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '<=', $dateTo);
                     }
                 });
 
@@ -178,7 +178,21 @@ class InvoiceController extends Controller
                                 if (! empty($dateTo)) {
                                     $subQ->whereDate('created_at', '<=', $dateTo);
                                 }
+                            })->orWhereHas('creditInvoiceSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
                             })->orWhereHas('groupSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            })->orWhereHas('groupSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
                                 if (! empty($dateFrom)) {
                                     $subQ->whereDate('created_at', '>=', $dateFrom);
                                 }
@@ -193,13 +207,22 @@ class InvoiceController extends Controller
                 $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
                     $sub->where('invoices.is_group', true)
                         ->where('payment_type', '!=', 'credit')
-                        ->whereHas('groupSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
-                            if (! empty($dateFrom)) {
-                                $subQ->whereDate('created_at', '>=', $dateFrom);
-                            }
-                            if (! empty($dateTo)) {
-                                $subQ->whereDate('created_at', '<=', $dateTo);
-                            }
+                        ->where(function ($groupSub) use ($dateFrom, $dateTo) {
+                            $groupSub->whereHas('groupSpecimens.specimen', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            })->orWhereHas('groupSpecimens', function ($subQ) use ($dateFrom, $dateTo) {
+                                if (! empty($dateFrom)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFrom);
+                                }
+                                if (! empty($dateTo)) {
+                                    $subQ->whereDate('created_at', '<=', $dateTo);
+                                }
+                            });
                         });
                 });
 
@@ -207,10 +230,10 @@ class InvoiceController extends Controller
                 $q->orWhere(function ($sub) use ($dateFrom, $dateTo) {
                     $sub->whereIn('invoice_type', ['credit payment', 'social security']);
                     if (! empty($dateFrom)) {
-                        $sub->whereDate('invoices.created_at', '>=', $dateFrom);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '>=', $dateFrom);
                     }
                     if (! empty($dateTo)) {
-                        $sub->whereDate('invoices.created_at', '<=', $dateTo);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '<=', $dateTo);
                     }
                 });
             });
@@ -384,10 +407,10 @@ class InvoiceController extends Controller
                 $q->where(function ($sub) use ($dateFromExport, $dateToExport) {
                     $sub->where('invoices.is_group', false);
                     if (! empty($dateFromExport)) {
-                        $sub->whereDate('invoices.created_at', '>=', $dateFromExport);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '>=', $dateFromExport);
                     }
                     if (! empty($dateToExport)) {
-                        $sub->whereDate('invoices.created_at', '<=', $dateToExport);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '<=', $dateToExport);
                     }
                 });
 
@@ -395,13 +418,36 @@ class InvoiceController extends Controller
                 $q->orWhere(function ($sub) use ($dateFromExport, $dateToExport) {
                     $sub->where('invoices.is_group', true)
                         ->where('payment_type', 'credit')
-                        ->whereHas('creditInvoiceSpecimens.specimen', function ($subQ) use ($dateFromExport, $dateToExport) {
-                            if (! empty($dateFromExport)) {
-                                $subQ->whereDate('created_at', '>=', $dateFromExport);
-                            }
-                            if (! empty($dateToExport)) {
-                                $subQ->whereDate('created_at', '<=', $dateToExport);
-                            }
+                        ->where(function ($creditSub) use ($dateFromExport, $dateToExport) {
+                            $creditSub->whereHas('creditInvoiceSpecimens.specimen', function ($subQ) use ($dateFromExport, $dateToExport) {
+                                if (! empty($dateFromExport)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFromExport);
+                                }
+                                if (! empty($dateToExport)) {
+                                    $subQ->whereDate('created_at', '<=', $dateToExport);
+                                }
+                            })->orWhereHas('creditInvoiceSpecimens', function ($subQ) use ($dateFromExport, $dateToExport) {
+                                if (! empty($dateFromExport)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFromExport);
+                                }
+                                if (! empty($dateToExport)) {
+                                    $subQ->whereDate('created_at', '<=', $dateToExport);
+                                }
+                            })->orWhereHas('groupSpecimens.specimen', function ($subQ) use ($dateFromExport, $dateToExport) {
+                                if (! empty($dateFromExport)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFromExport);
+                                }
+                                if (! empty($dateToExport)) {
+                                    $subQ->whereDate('created_at', '<=', $dateToExport);
+                                }
+                            })->orWhereHas('groupSpecimens', function ($subQ) use ($dateFromExport, $dateToExport) {
+                                if (! empty($dateFromExport)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFromExport);
+                                }
+                                if (! empty($dateToExport)) {
+                                    $subQ->whereDate('created_at', '<=', $dateToExport);
+                                }
+                            });
                         });
                 });
 
@@ -409,13 +455,22 @@ class InvoiceController extends Controller
                 $q->orWhere(function ($sub) use ($dateFromExport, $dateToExport) {
                     $sub->where('invoices.is_group', true)
                         ->where('payment_type', '!=', 'credit')
-                        ->whereHas('groupSpecimens.specimen', function ($subQ) use ($dateFromExport, $dateToExport) {
-                            if (! empty($dateFromExport)) {
-                                $subQ->whereDate('created_at', '>=', $dateFromExport);
-                            }
-                            if (! empty($dateToExport)) {
-                                $subQ->whereDate('created_at', '<=', $dateToExport);
-                            }
+                        ->where(function ($groupSub) use ($dateFromExport, $dateToExport) {
+                            $groupSub->whereHas('groupSpecimens.specimen', function ($subQ) use ($dateFromExport, $dateToExport) {
+                                if (! empty($dateFromExport)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFromExport);
+                                }
+                                if (! empty($dateToExport)) {
+                                    $subQ->whereDate('created_at', '<=', $dateToExport);
+                                }
+                            })->orWhereHas('groupSpecimens', function ($subQ) use ($dateFromExport, $dateToExport) {
+                                if (! empty($dateFromExport)) {
+                                    $subQ->whereDate('created_at', '>=', $dateFromExport);
+                                }
+                                if (! empty($dateToExport)) {
+                                    $subQ->whereDate('created_at', '<=', $dateToExport);
+                                }
+                            });
                         });
                 });
 
@@ -423,10 +478,10 @@ class InvoiceController extends Controller
                 $q->orWhere(function ($sub) use ($dateFromExport, $dateToExport) {
                     $sub->whereIn('invoice_type', ['credit payment', 'social security']);
                     if (! empty($dateFromExport)) {
-                        $sub->whereDate('invoices.created_at', '>=', $dateFromExport);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '>=', $dateFromExport);
                     }
                     if (! empty($dateToExport)) {
-                        $sub->whereDate('invoices.created_at', '<=', $dateToExport);
+                        $sub->whereDate(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), '<=', $dateToExport);
                     }
                 });
             });

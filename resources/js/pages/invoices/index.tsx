@@ -2032,21 +2032,62 @@ export default function InvoicesIndex({
                                                                         className="w-64 p-0"
                                                                     >
                                                                         {(() => {
-                                                                            const filteredSpecimens =
+                                                                            const baseSpecimens = (
+                                                                                invoice
+                                                                                    .group
+                                                                                    .specimens ||
+                                                                                []
+                                                                            ).filter(
                                                                                 (
-                                                                                    invoice
-                                                                                        .group
-                                                                                        .specimens ||
-                                                                                    []
-                                                                                ).filter(
-                                                                                    (
-                                                                                        s: any,
-                                                                                    ) =>
-                                                                                        matchesSearch(
-                                                                                            s.sequence_code,
-                                                                                            specimenSearchQuery,
-                                                                                        ),
-                                                                                );
+                                                                                    s: any,
+                                                                                ) =>
+                                                                                    matchesSearch(
+                                                                                        s.sequence_code,
+                                                                                        specimenSearchQuery,
+                                                                                    ),
+                                                                            );
+
+                                                                            const filteredSpecimens =
+                                                                                displayValues.isGroupFiltered &&
+                                                                                displayValues.specimensInRangeMap
+                                                                                    ? [
+                                                                                          ...baseSpecimens,
+                                                                                      ].sort(
+                                                                                          (
+                                                                                              a: any,
+                                                                                              b: any,
+                                                                                          ) => {
+                                                                                              const aIn =
+                                                                                                  displayValues
+                                                                                                      .specimensInRangeMap?.[
+                                                                                                      a
+                                                                                                          .id
+                                                                                                  ] !==
+                                                                                                  false;
+                                                                                              const bIn =
+                                                                                                  displayValues
+                                                                                                      .specimensInRangeMap?.[
+                                                                                                      b
+                                                                                                          .id
+                                                                                                  ] !==
+                                                                                                  false;
+                                                                                              if (
+                                                                                                  aIn &&
+                                                                                                  !bIn
+                                                                                              ) {
+                                                                                                  return -1;
+                                                                                              }
+                                                                                              if (
+                                                                                                  !aIn &&
+                                                                                                  bIn
+                                                                                              ) {
+                                                                                                  return 1;
+                                                                                              }
+
+                                                                                              return 0;
+                                                                                          },
+                                                                                      )
+                                                                                    : baseSpecimens;
 
                                                                             return (
                                                                                 <>

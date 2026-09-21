@@ -824,11 +824,55 @@ function cleanInlineStylesAndElements(doc: Document): void {
 }
 
 /**
+ * Strips/unwraps all hyperlinks (<a> tags) from the document, preserving their text and child nodes.
+ */
+function cleanHyperlinks(doc: Document): void {
+    let link: Element | null;
+
+    while ((link = doc.querySelector('a'))) {
+        unwrapElement(link);
+    }
+}
+
+/**
+ * Removes all hyperlinks (<a> tags) from an HTML string, unwrapping and preserving their inner content.
+ */
+export function removeHyperlinks(html: string): string {
+    if (!html || !html.includes('<a')) {
+        return html;
+    }
+
+    if (typeof window !== 'undefined') {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(
+                `<body>${html}</body>`,
+                'text/html',
+            );
+
+            cleanHyperlinks(doc);
+
+            return doc.body.innerHTML;
+        } catch {
+            // Fallback to regex
+        }
+    }
+
+    return html
+        .replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, '$1')
+        .replace(/<a\b[^>]*\/>/gi, '');
+}
+
+/**
  * Main function to clean, sanitize, and convert pasted HTML.
  */
 export function cleanPastedHtml(html: string): string {
-    if (!html || typeof window === 'undefined') {
+    if (!html) {
         return html;
+    }
+
+    if (typeof window === 'undefined') {
+        return removeHyperlinks(html);
     }
 
     try {
@@ -842,19 +886,25 @@ export function cleanPastedHtml(html: string): string {
             'text/html',
         );
 
-        // Stage 3: Convert Tables
+        // Stage 3: Remove Hyperlinks
+        cleanHyperlinks(doc);
+
+        // Stage 4: Convert Tables
         cleanTables(doc);
 
-        // Stage 4: Convert Lists
+        // Stage 5: Convert Lists
         cleanLists(doc);
 
-        // Stage 5: Clean Inline Styles, Unwrap Spans & Normalize Semantic Elements
+        // Stage 6: Clean Inline Styles, Unwrap Spans & Normalize Semantic Elements
         cleanInlineStylesAndElements(doc);
 
-        // Stage 6: Return clean inner HTML
+        // Stage 7: Final hyperlink sweep
+        cleanHyperlinks(doc);
+
+        // Stage 8: Return clean inner HTML
         return doc.body.innerHTML.trim();
     } catch {
-        return html;
+        return removeHyperlinks(html);
     }
 }
 
