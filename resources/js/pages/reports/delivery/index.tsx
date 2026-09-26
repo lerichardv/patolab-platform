@@ -1231,16 +1231,19 @@ export default function DeliveryReportIndex({
                                                 <TableCell>
                                                     <div className="flex flex-col items-start gap-1">
                                                         <Badge variant="outline">
-                                                            {row.category?.name ??
-                                                                'N/A'}
+                                                            {row.category
+                                                                ?.name ?? 'N/A'}
                                                         </Badge>
                                                         {row.is_manual_delivery_date_enabled && (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="h-4 px-1.5 py-0 text-[10px] font-normal border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300"
+                                                                className="h-4 border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] font-normal text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300"
                                                                 title="Fecha de entrega al cliente personalizada"
                                                             >
-                                                                Cli: {row.delivery_date_quantity}{' '}
+                                                                Cli:{' '}
+                                                                {
+                                                                    row.delivery_date_quantity
+                                                                }{' '}
                                                                 {formatUnitSpanish(
                                                                     row.delivery_date_unit ||
                                                                         'days',
@@ -1251,10 +1254,13 @@ export default function DeliveryReportIndex({
                                                         {row.is_manual_delivery_date_intern_enabled && (
                                                             <Badge
                                                                 variant="outline"
-                                                                className="h-4 px-1.5 py-0 text-[10px] font-normal border-purple-300 bg-purple-50 text-purple-800 dark:border-purple-800/60 dark:bg-purple-950/40 dark:text-purple-300"
+                                                                className="h-4 border-purple-300 bg-purple-50 px-1.5 py-0 text-[10px] font-normal text-purple-800 dark:border-purple-800/60 dark:bg-purple-950/40 dark:text-purple-300"
                                                                 title="Fecha estimada interna personalizada"
                                                             >
-                                                                Int: {row.delivery_date_intern_quantity}{' '}
+                                                                Int:{' '}
+                                                                {
+                                                                    row.delivery_date_intern_quantity
+                                                                }{' '}
                                                                 {formatUnitSpanish(
                                                                     row.delivery_date_intern_unit ||
                                                                         'days',

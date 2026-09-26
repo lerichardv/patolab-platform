@@ -298,7 +298,12 @@ export default function PublicGroupProgress({ group }: Props) {
                                                                 Solicitado(s)
                                                             </span>
                                                             <div className="font-semibold text-foreground">
-                                                                <p>{specimen.type?.name || 'N/A'}</p>
+                                                                <p>
+                                                                    {specimen
+                                                                        .type
+                                                                        ?.name ||
+                                                                        'N/A'}
+                                                                </p>
                                                                 {(() => {
                                                                     const rawExams =
                                                                         specimen.specimen_examinations ||
@@ -306,32 +311,65 @@ export default function PublicGroupProgress({ group }: Props) {
                                                                         specimen.examinations ||
                                                                         [];
 
-                                                                    const examNames: string[] = rawExams
-                                                                        .map((item: any) => item.examination?.name || item.name)
-                                                                        .filter(Boolean);
+                                                                    const examNames: string[] =
+                                                                        rawExams
+                                                                            .map(
+                                                                                (
+                                                                                    item: any,
+                                                                                ) =>
+                                                                                    item
+                                                                                        .examination
+                                                                                        ?.name ||
+                                                                                    item.name,
+                                                                            )
+                                                                            .filter(
+                                                                                Boolean,
+                                                                            );
 
-                                                                    if (examNames.length === 0 && specimen.examination?.name) {
-                                                                        examNames.push(specimen.examination.name);
+                                                                    if (
+                                                                        examNames.length ===
+                                                                            0 &&
+                                                                        specimen
+                                                                            .examination
+                                                                            ?.name
+                                                                    ) {
+                                                                        examNames.push(
+                                                                            specimen
+                                                                                .examination
+                                                                                .name,
+                                                                        );
                                                                     }
 
-                                                                    if (examNames.length === 0) {
+                                                                    if (
+                                                                        examNames.length ===
+                                                                        0
+                                                                    ) {
                                                                         return (
                                                                             <p className="text-[11px] font-normal text-muted-foreground">
-                                                                                Sin exámenes especificados
+                                                                                Sin
+                                                                                exámenes
+                                                                                especificados
                                                                             </p>
                                                                         );
                                                                     }
 
                                                                     return (
                                                                         <div className="mt-1 flex flex-wrap gap-1">
-                                                                            {examNames.map((name, idx) => (
-                                                                                <span
-                                                                                    key={`${name}-${idx}`}
-                                                                                    className="inline-flex items-center rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary"
-                                                                                >
-                                                                                    {name}
-                                                                                </span>
-                                                                            ))}
+                                                                            {examNames.map(
+                                                                                (
+                                                                                    name,
+                                                                                    idx,
+                                                                                ) => (
+                                                                                    <span
+                                                                                        key={`${name}-${idx}`}
+                                                                                        className="inline-flex items-center rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                                                                                    >
+                                                                                        {
+                                                                                            name
+                                                                                        }
+                                                                                    </span>
+                                                                                ),
+                                                                            )}
                                                                         </div>
                                                                     );
                                                                 })()}
@@ -405,20 +443,32 @@ export default function PublicGroupProgress({ group }: Props) {
 
                                                             <div className="relative space-y-5 pl-6 before:absolute before:top-2 before:bottom-2 before:left-[9px] before:w-[1.5px] before:bg-border/60">
                                                                 {(() => {
-                                                                    const activeConfig: Array<{ status: string }> =
-                                                                        specimen.type?.active_states ||
-                                                                        specimen.type?.activeStates ||
+                                                                    const activeConfig: Array<{
+                                                                        status: string;
+                                                                    }> =
+                                                                        specimen
+                                                                            .type
+                                                                            ?.active_states ||
+                                                                        specimen
+                                                                            .type
+                                                                            ?.activeStates ||
                                                                         [];
 
                                                                     const steps =
-                                                                        activeConfig.length > 0
+                                                                        activeConfig.length >
+                                                                        0
                                                                             ? (activeConfig
-                                                                                  .map((st) =>
-                                                                                      STATUS_STEPS.find(
-                                                                                          (s) =>
-                                                                                              s.key ===
-                                                                                              st.status,
-                                                                                      ),
+                                                                                  .map(
+                                                                                      (
+                                                                                          st,
+                                                                                      ) =>
+                                                                                          STATUS_STEPS.find(
+                                                                                              (
+                                                                                                  s,
+                                                                                              ) =>
+                                                                                                  s.key ===
+                                                                                                  st.status,
+                                                                                          ),
                                                                                   )
                                                                                   .filter(
                                                                                       Boolean,
@@ -426,82 +476,92 @@ export default function PublicGroupProgress({ group }: Props) {
                                                                             : STATUS_STEPS;
 
                                                                     const isDelivered =
-                                                                        specimen.status === 'delivered';
+                                                                        specimen.status ===
+                                                                        'delivered';
                                                                     const currentStepIndex =
                                                                         steps.findIndex(
-                                                                            (s) =>
+                                                                            (
+                                                                                s,
+                                                                            ) =>
                                                                                 s.key ===
                                                                                 specimen.status,
                                                                         );
 
-                                                                    return steps.map((step, idx) => {
-                                                                        const isPastStep =
-                                                                            isDelivered
-                                                                                ? true
-                                                                                : idx <
-                                                                                  currentStepIndex;
-                                                                        const isCurrentStep =
-                                                                            isDelivered
-                                                                                ? false
-                                                                                : idx ===
-                                                                                  currentStepIndex;
+                                                                    return steps.map(
+                                                                        (
+                                                                            step,
+                                                                            idx,
+                                                                        ) => {
+                                                                            const isPastStep =
+                                                                                isDelivered
+                                                                                    ? true
+                                                                                    : idx <
+                                                                                      currentStepIndex;
+                                                                            const isCurrentStep =
+                                                                                isDelivered
+                                                                                    ? false
+                                                                                    : idx ===
+                                                                                      currentStepIndex;
 
-                                                                        return (
-                                                                            <div
-                                                                                key={step.key}
-                                                                                className="group relative"
-                                                                            >
-                                                                                {/* Step Node Icon/Indicator */}
+                                                                            return (
                                                                                 <div
-                                                                                    className={`absolute top-0.5 -left-[23px] z-10 flex h-5 w-5 items-center justify-center rounded-full border transition-all duration-300 ${
-                                                                                        isPastStep
-                                                                                            ? 'border-emerald-600 bg-emerald-50 text-white shadow-sm'
-                                                                                            : isCurrentStep
-                                                                                              ? 'scale-110 border-blue-700 bg-blue-600 text-white shadow-md ring-4 ring-blue-500/20'
-                                                                                              : 'border-border bg-background text-muted-foreground'
-                                                                                    }`}
+                                                                                    key={
+                                                                                        step.key
+                                                                                    }
+                                                                                    className="group relative"
                                                                                 >
-                                                                                    {isPastStep ? (
-                                                                                        <CheckCircle2 className="h-3 w-3 stroke-[3] text-emerald-600" />
-                                                                                    ) : isCurrentStep ? (
-                                                                                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                                                                                    ) : (
-                                                                                        <span className="text-[9px] font-semibold">
-                                                                                            {idx +
-                                                                                                1}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-
-                                                                                {/* Step Content */}
-                                                                                <div
-                                                                                    className={`transition-all duration-200 ${
-                                                                                        isCurrentStep
-                                                                                            ? 'translate-x-0.5 opacity-100'
-                                                                                            : isPastStep
-                                                                                              ? 'opacity-80'
-                                                                                              : 'opacity-40'
-                                                                                    }`}
-                                                                                >
-                                                                                    <h5 className="flex items-center gap-1.5 text-xs font-bold">
-                                                                                        {
-                                                                                            step.label
-                                                                                        }
-                                                                                        {isCurrentStep && (
-                                                                                            <span className="py-0.2 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 text-[9px] font-semibold tracking-wider text-blue-600 uppercase dark:text-blue-400">
-                                                                                                Actual
+                                                                                    {/* Step Node Icon/Indicator */}
+                                                                                    <div
+                                                                                        className={`absolute top-0.5 -left-[23px] z-10 flex h-5 w-5 items-center justify-center rounded-full border transition-all duration-300 ${
+                                                                                            isPastStep
+                                                                                                ? 'border-emerald-600 bg-emerald-50 text-white shadow-sm'
+                                                                                                : isCurrentStep
+                                                                                                  ? 'scale-110 border-blue-700 bg-blue-600 text-white shadow-md ring-4 ring-blue-500/20'
+                                                                                                  : 'border-border bg-background text-muted-foreground'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {isPastStep ? (
+                                                                                            <CheckCircle2 className="h-3 w-3 stroke-[3] text-emerald-600" />
+                                                                                        ) : isCurrentStep ? (
+                                                                                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                                                                        ) : (
+                                                                                            <span className="text-[9px] font-semibold">
+                                                                                                {idx +
+                                                                                                    1}
                                                                                             </span>
                                                                                         )}
-                                                                                    </h5>
-                                                                                    <p className="mt-0.5 text-[10px] text-muted-foreground">
-                                                                                        {
-                                                                                            step.desc
-                                                                                        }
-                                                                                    </p>
+                                                                                    </div>
+
+                                                                                    {/* Step Content */}
+                                                                                    <div
+                                                                                        className={`transition-all duration-200 ${
+                                                                                            isCurrentStep
+                                                                                                ? 'translate-x-0.5 opacity-100'
+                                                                                                : isPastStep
+                                                                                                  ? 'opacity-80'
+                                                                                                  : 'opacity-40'
+                                                                                        }`}
+                                                                                    >
+                                                                                        <h5 className="flex items-center gap-1.5 text-xs font-bold">
+                                                                                            {
+                                                                                                step.label
+                                                                                            }
+                                                                                            {isCurrentStep && (
+                                                                                                <span className="py-0.2 rounded border border-blue-500/20 bg-blue-500/10 px-1.5 text-[9px] font-semibold tracking-wider text-blue-600 uppercase dark:text-blue-400">
+                                                                                                    Actual
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </h5>
+                                                                                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                                                                            {
+                                                                                                step.desc
+                                                                                            }
+                                                                                        </p>
+                                                                                    </div>
                                                                                 </div>
-                                                                            </div>
-                                                                        );
-                                                                    });
+                                                                            );
+                                                                        },
+                                                                    );
                                                                 })()}
                                                             </div>
                                                         </div>

@@ -422,24 +422,51 @@ export default function SpecimenGroupViewSheet({
                                                         </span>
                                                         <div className="flex flex-wrap items-center gap-1.5 font-medium text-foreground">
                                                             <span>
-                                                                {specimen.category?.name || 'N/A'}
+                                                                {specimen
+                                                                    .category
+                                                                    ?.name ||
+                                                                    'N/A'}
                                                             </span>
                                                             {(() => {
-                                                                const clientDur = getClientDeliveryDuration(specimen);
-                                                                const internDur = getInternalDeliveryDuration(specimen);
-                                                                const clientTxt = formatDurationText('Cli', clientDur);
-                                                                const internTxt = formatDurationText('Int', internDur);
+                                                                const clientDur =
+                                                                    getClientDeliveryDuration(
+                                                                        specimen,
+                                                                    );
+                                                                const internDur =
+                                                                    getInternalDeliveryDuration(
+                                                                        specimen,
+                                                                    );
+                                                                const clientTxt =
+                                                                    formatDurationText(
+                                                                        'Cli',
+                                                                        clientDur,
+                                                                    );
+                                                                const internTxt =
+                                                                    formatDurationText(
+                                                                        'Int',
+                                                                        internDur,
+                                                                    );
 
                                                                 return (
                                                                     <>
                                                                         {clientTxt && (
-                                                                            <Badge variant="outline" className="h-4 py-0 text-[10px]">
-                                                                                {clientTxt}
+                                                                            <Badge
+                                                                                variant="outline"
+                                                                                className="h-4 py-0 text-[10px]"
+                                                                            >
+                                                                                {
+                                                                                    clientTxt
+                                                                                }
                                                                             </Badge>
                                                                         )}
                                                                         {internTxt && (
-                                                                            <Badge variant="outline" className="h-4 py-0 text-[10px]">
-                                                                                {internTxt}
+                                                                            <Badge
+                                                                                variant="outline"
+                                                                                className="h-4 py-0 text-[10px]"
+                                                                            >
+                                                                                {
+                                                                                    internTxt
+                                                                                }
                                                                             </Badge>
                                                                         )}
                                                                     </>

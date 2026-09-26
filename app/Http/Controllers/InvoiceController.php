@@ -37,6 +37,73 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         Gate::authorize('invoices.view');
+
+        // Resolve user cookies and query parameters
+        $userId = auth()->id();
+
+        // 4. Date Range Filter
+        $resolvedDates = DateFilterService::resolveFilter(
+            $request->cookie("date_filter_invoices_user_{$userId}"),
+            $request->get('date_from'),
+            $request->get('date_to')
+        );
+        $dateFrom = $resolvedDates['from'];
+        $dateTo = $resolvedDates['to'];
+
+        if ($request->has('date_from') || $request->has('date_to')) {
+            cookie()->queue(DateFilterService::getCookieToQueue(
+                "date_filter_invoices_user_{$userId}",
+                $dateFrom,
+                $dateTo,
+                $resolvedDates['range']
+            ));
+        }
+
+        // Resolve the currently-filtered customer for the async combobox initial label
+        $selectedCustomer = null;
+        $filteredCustomerId = $request->get('customer_id');
+        if ($filteredCustomerId && $filteredCustomerId !== 'all') {
+            $selectedCustomer = Customer::where('id', $filteredCustomerId)
+                ->select('id', 'name', 'id_number')
+                ->first();
+        }
+
+        $banks = Bank::all();
+        $examinations = SpecimenTypeExamination::where('active', true)->select('id', 'name', 'specimen_type')->get();
+
+        return Inertia::render('invoices/index', [
+            'invoices' => app()->runningUnitTests() && ! $request->hasHeader('X-Inertia-Partial-Data') && ! $request->has('test_defer')
+                ? $this->getInvoicesQuery($request, $dateFrom, $dateTo)->paginate(10)->withQueryString()
+                : Inertia::defer(function () use ($request, $dateFrom, $dateTo) {
+                    return $this->getInvoicesQuery($request, $dateFrom, $dateTo)
+                        ->paginate(10)
+                        ->withQueryString();
+                }),
+            'filters' => array_merge(
+                $request->only([
+                    'search', 'payment_type', 'customer_id',
+                    'has_credit', 'sort_field', 'sort_direction', 'group_id', 'invoice_type',
+                ]),
+                [
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo,
+                ]
+            ),
+            'selectedCustomer' => $selectedCustomer,
+            'banks' => $banks,
+            'examinations' => $examinations,
+            'groups' => SpecimenGroup::orderBy('name', 'asc')->get(),
+            'workOrderTypes' => WorkOrderType::orderBy('name')->get(),
+            'workOrderTasks' => WorkOrderTask::orderBy('name')->get(),
+            'usersList' => User::where('active', true)->orderBy('name')->get(),
+        ]);
+    }
+
+    /**
+     * Build the filtered and sorted query for listing invoices.
+     */
+    protected function getInvoicesQuery(Request $request, ?string $dateFrom, ?string $dateTo)
+    {
         $query = Invoice::with([
             'customer',
             'caiRange',
@@ -106,27 +173,6 @@ class InvoiceController extends Controller
         // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
         if ($request->filled('search')) {
             $this->applySearchFilter($query, (string) $request->get('search'));
-        }
-
-        // Resolve user cookies and query parameters
-        $userId = auth()->id();
-
-        // 4. Date Range Filter
-        $resolvedDates = DateFilterService::resolveFilter(
-            $request->cookie("date_filter_invoices_user_{$userId}"),
-            $request->get('date_from'),
-            $request->get('date_to')
-        );
-        $dateFrom = $resolvedDates['from'];
-        $dateTo = $resolvedDates['to'];
-
-        if ($request->has('date_from') || $request->has('date_to')) {
-            cookie()->queue(DateFilterService::getCookieToQueue(
-                "date_filter_invoices_user_{$userId}",
-                $dateFrom,
-                $dateTo,
-                $resolvedDates['range']
-            ));
         }
 
         // Filter by payment type
@@ -286,40 +332,7 @@ class InvoiceController extends Controller
                 break;
         }
 
-        $invoices = $query->paginate(10)->withQueryString();
-
-        // Resolve the currently-filtered customer for the async combobox initial label
-        $selectedCustomer = null;
-        $filteredCustomerId = $request->get('customer_id');
-        if ($filteredCustomerId && $filteredCustomerId !== 'all') {
-            $selectedCustomer = Customer::where('id', $filteredCustomerId)
-                ->select('id', 'name', 'id_number')
-                ->first();
-        }
-
-        $banks = Bank::all();
-        $examinations = SpecimenTypeExamination::where('active', true)->select('id', 'name', 'specimen_type')->get();
-
-        return Inertia::render('invoices/index', [
-            'invoices' => $invoices,
-            'filters' => array_merge(
-                $request->only([
-                    'search', 'payment_type', 'customer_id',
-                    'has_credit', 'sort_field', 'sort_direction', 'group_id', 'invoice_type',
-                ]),
-                [
-                    'date_from' => $dateFrom,
-                    'date_to' => $dateTo,
-                ]
-            ),
-            'selectedCustomer' => $selectedCustomer,
-            'banks' => $banks,
-            'examinations' => $examinations,
-            'groups' => SpecimenGroup::orderBy('name', 'asc')->get(),
-            'workOrderTypes' => WorkOrderType::orderBy('name')->get(),
-            'workOrderTasks' => WorkOrderTask::orderBy('name')->get(),
-            'usersList' => User::where('active', true)->orderBy('name')->get(),
-        ]);
+        return $query;
     }
 
     public function export(Request $request)

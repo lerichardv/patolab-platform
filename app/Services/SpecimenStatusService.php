@@ -22,6 +22,18 @@ class SpecimenStatusService
     protected array $statesCache = [];
 
     /**
+     * Clear the in-memory states cache.
+     */
+    public function clearCache(?int $typeId = null): void
+    {
+        if ($typeId !== null) {
+            unset($this->statesCache[$typeId]);
+        } else {
+            $this->statesCache = [];
+        }
+    }
+
+    /**
      * Get all configured states for a given specimen type, ordered by step_order.
      *
      * @param  SpecimenType|int|null  $specimenType

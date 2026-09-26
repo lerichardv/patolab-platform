@@ -169,7 +169,7 @@ test('user without specimens.finalize permission cannot transition specimen to f
         ['status' => 'finalized']
     );
 
-    $response->assertSessionHasErrors(['error' => 'No tienes permiso para finalizar el reporte de esta muestra.']);
+    $response->assertSessionHasErrors(['error' => 'No tienes permiso para finalizar esta muestra.']);
 
     $this->specimen->refresh();
     expect($this->specimen->status)->toBe('microscopic_review');

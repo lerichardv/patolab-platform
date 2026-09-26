@@ -53,9 +53,14 @@ function EditorLayoutContent({
             {/* Sliding Drawer Sidebar Container */}
             <div
                 className={cn(
-                    'fixed inset-y-0 left-0 z-50 w-[280px] border-r border-sidebar-border bg-sidebar shadow-2xl transition-transform duration-300 ease-in-out',
+                    'fixed inset-y-0 left-0 z-[55] w-[280px] border-r border-sidebar-border bg-sidebar shadow-2xl transition-transform duration-300 ease-in-out',
                     open ? 'translate-x-0' : '-translate-x-full',
                 )}
+                onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('a')) {
+                        setOpen(false);
+                    }
+                }}
             >
                 {/* Close button inside sidebar */}
                 <div className="absolute top-4 right-4 z-50">

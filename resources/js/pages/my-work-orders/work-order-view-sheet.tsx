@@ -86,7 +86,9 @@ export default function WorkOrderViewSheet({
     onOpenChange,
 }: Props) {
     const targetId = initialWorkOrderId || initialWorkOrder?.id;
-    const [fetchedWorkOrder, setFetchedWorkOrder] = useState<WorkOrder | null>(null);
+    const [fetchedWorkOrder, setFetchedWorkOrder] = useState<WorkOrder | null>(
+        null,
+    );
     const [loading, setLoading] = useState<boolean>(false);
 
     useEffect(() => {
@@ -101,7 +103,9 @@ export default function WorkOrderViewSheet({
                 })
                     .then((res) => {
                         if (!res.ok) {
-                            throw new Error('Error al cargar la orden de trabajo');
+                            throw new Error(
+                                'Error al cargar la orden de trabajo',
+                            );
                         }
                         return res.json();
                     })
@@ -109,7 +113,10 @@ export default function WorkOrderViewSheet({
                         setFetchedWorkOrder(data);
                     })
                     .catch((err) => {
-                        console.error('Error fetching work order details:', err);
+                        console.error(
+                            'Error fetching work order details:',
+                            err,
+                        );
                     })
                     .finally(() => {
                         setLoading(false);

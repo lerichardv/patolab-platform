@@ -242,6 +242,15 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Reporte: Cuadre de Facturación',
+        description:
+            'Permite consultar y exportar el cuadre de facturación y liquidación diaria.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            view: 'reports.billing_reconciliation.view',
+        },
+    },
+    {
         label: 'Otros Cobros',
         description: 'Gestión de cobros de equipos, espacios o servicios.',
         module: 'Otros Cobros',

@@ -215,7 +215,9 @@ export function paginateList(
 
         // Split by inner paragraphs, line breaks, or inner list items
         const segments = liInner
-            .split(/<p[^>]*>|<\/p>|<br\s*\/?>|<div[^>]*>|<\/div>|<li[^>]*>|<\/li>/i)
+            .split(
+                /<p[^>]*>|<\/p>|<br\s*\/?>|<div[^>]*>|<\/div>|<li[^>]*>|<\/li>/i,
+            )
             .map((s) => decodeHtmlEntities(s.replace(/<[^>]+>/g, '')).trim())
             .filter((s) => s.length > 0);
 

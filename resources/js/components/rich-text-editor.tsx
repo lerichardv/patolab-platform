@@ -87,7 +87,7 @@ export const editorStyles = `
   .tiptap { outline: none; min-height: 160px; }
 
   /* ── Hyperlink Neutralization ── */
-  .tiptap a, .preview-content a, .section-content a, a {
+  .tiptap a, .preview-content a, .section-content a {
     color: inherit !important;
     text-decoration: none !important;
     cursor: text !important;
