@@ -640,7 +640,7 @@ class ReportEditorController extends Controller
             $firstTemplate = $orderedTemplates->first();
 
             $report = SpecimenReport::create([
-                'report_date' => now()->format('Y-m-d'),
+                'report_date' => $specimen->received_at ? $specimen->received_at->format('Y-m-d') : now()->format('Y-m-d'),
                 'finalization_date' => now()->format('Y-m-d'),
                 'macroscopy_html' => $concatHtml($orderedTemplates, 'macroscopy_html'),
                 'microscopy_html' => $concatHtml($orderedTemplates, 'microscopy_html'),

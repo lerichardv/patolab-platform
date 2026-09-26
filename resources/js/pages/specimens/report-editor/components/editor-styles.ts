@@ -23,7 +23,7 @@ export const editorStyles = `
   }
 
   /* ── Hyperlink Neutralization ── */
-  .tiptap a, .preview-content a, .section-content a, a {
+  .tiptap a, .preview-content a, .section-content a {
     color: inherit !important;
     text-decoration: none !important;
     cursor: text !important;

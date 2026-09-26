@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage, Deferred } from '@inertiajs/react';
 import axios from 'axios';
 import {
     formatDistanceToNow,
@@ -94,6 +94,7 @@ import {
 } from '@/services/specimen-delivery-date';
 import InvoiceSheet from '../invoices/invoice-sheet';
 import { KanbanBoard } from './kanban/kanban-board';
+import KanbanBoardSkeleton from './kanban/kanban-board-skeleton';
 import SendReportSheet from './send-report/send-report-sheet';
 import SpecimenBulkCollaboratorSheet from './specimen-bulk-collaborator-sheet';
 import SpecimenBulkPathologistSheet from './specimen-bulk-pathologist-sheet';
@@ -144,7 +145,7 @@ export interface Priority {
 }
 
 interface Props {
-    priorities: Priority[];
+    priorities?: Priority[];
     specimenTypes: any[];
     examinations: any[];
     pathologists?: any[];
@@ -231,7 +232,7 @@ export default function SpecimensIndex({
     const isMobile = useIsMobile();
 
     const [priorities, setPriorities] = useState<Priority[]>(() =>
-        deduplicateSpecimens(initialPriorities),
+        deduplicateSpecimens(initialPriorities || []),
     );
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
@@ -250,7 +251,7 @@ export default function SpecimensIndex({
         null,
     );
 
-    const specimensInGroupToCancel = useMemo(() => {
+    const getSpecimensInGroupToCancel = () => {
         if (!specimenToCancel || !specimenToCancel.group_id) {
             return [];
         }
@@ -259,7 +260,7 @@ export default function SpecimensIndex({
         const seenIds = new Set<number>();
 
         priorities.forEach((priority) => {
-            priority.specimens.forEach((specimen) => {
+            priority.specimens?.forEach((specimen) => {
                 if (
                     specimen.group_id === specimenToCancel.group_id &&
                     !seenIds.has(specimen.id)
@@ -271,7 +272,9 @@ export default function SpecimensIndex({
         });
 
         return list;
-    }, [specimenToCancel, priorities]);
+    };
+
+    const specimensInGroupToCancel = getSpecimensInGroupToCancel();
 
     const [isAssignSheetOpen, setIsAssignSheetOpen] = useState(false);
     const [selectedSpecimenForAssign, setSelectedSpecimenForAssign] =
@@ -379,17 +382,14 @@ export default function SpecimensIndex({
         return typeId ? typeId.toString() : null;
     };
 
-    const filteredExaminationsForDropdown = useMemo(() => {
-        if (selectedSpecimenTypeIds.length === specimenTypes.length) {
-            return examinations;
-        }
+    const filteredExaminationsForDropdown =
+        selectedSpecimenTypeIds.length === specimenTypes.length
+            ? examinations
+            : examinations.filter((exam) => {
+                  const typeId = getSpecimenTypeId(exam);
 
-        return examinations.filter((exam) => {
-            const typeId = getSpecimenTypeId(exam);
-
-            return typeId && selectedSpecimenTypeIds.includes(typeId);
-        });
-    }, [examinations, selectedSpecimenTypeIds, specimenTypes.length]);
+                  return typeId && selectedSpecimenTypeIds.includes(typeId);
+              });
 
     const handleSpecimenTypeSelectionChange = (nextTypeIds: string[]) => {
         setSelectedSpecimenTypeIds(nextTypeIds);
@@ -499,7 +499,7 @@ export default function SpecimensIndex({
     const availableGroups = useMemo(() => {
         const groupsMap = new Map<string, { id: string; name: string }>();
         priorities.forEach((priority) => {
-            priority.specimens.forEach((specimen) => {
+            priority.specimens?.forEach((specimen) => {
                 const matchesStatus = selectedStatuses.includes(
                     specimen.status,
                 );
@@ -534,89 +534,95 @@ export default function SpecimensIndex({
 
     const filteredPriorities = useMemo(() => {
         return priorities.map((priority) => {
-            const filteredSpecimens = priority.specimens.filter((specimen) => {
-                const matchesStatus = selectedStatuses.includes(
-                    specimen.status,
-                );
-
-                const specDateStr = format(
-                    new Date(specimen.created_at),
-                    'yyyy-MM-dd',
-                );
-                const matchesDate =
-                    (!dateRange.from || specDateStr >= dateRange.from) &&
-                    (!dateRange.to || specDateStr <= dateRange.to);
-
-                const matchesGroup =
-                    selectedGroupId === 'all' ||
-                    specimen.group_id?.toString() === selectedGroupId;
-
-                const invoice = specimen.group?.invoice
-                    ? specimen.group.invoice
-                    : specimen.invoice_relation;
-
-                const matchesSearch = matchesAnySearch(
-                    [
-                        specimen.sequence_code,
-                        specimen.id,
-                        specimen.customer_relation?.name,
-                        specimen.customer_relation?.id_number,
-                        invoice?.full_invoice_number,
-                        invoice?.invoice_number,
-                    ],
-                    searchQuery,
-                );
-
-                const specimenTypeId =
-                    specimen.specimen_type || specimen.type?.id;
-                const matchesSpecimenType =
-                    selectedSpecimenTypeIds.length === specimenTypes.length ||
-                    (specimenTypeId &&
-                        selectedSpecimenTypeIds.includes(
-                            specimenTypeId.toString(),
-                        ));
-
-                const examId =
-                    specimen.specimen_type_examination ||
-                    specimen.examination?.id;
-                const matchesExamination =
-                    selectedExaminationIds.length === examinations.length ||
-                    (examId &&
-                        selectedExaminationIds.includes(examId.toString()));
-
-                const dueInfo = getDueDateInfo(specimen);
-                const isExpired = !!(
-                    dueInfo &&
-                    dueInfo.isExpired &&
-                    !['finalized', 'delivered', 'cancelled'].includes(
+            const filteredSpecimens = (priority.specimens || []).filter(
+                (specimen) => {
+                    const matchesStatus = selectedStatuses.includes(
                         specimen.status,
-                    )
-                );
-                const matchesExpired = !showExpiredOnly || isExpired;
+                    );
 
-                return (
-                    matchesStatus &&
-                    matchesDate &&
-                    matchesGroup &&
-                    matchesSearch &&
-                    matchesSpecimenType &&
-                    matchesExamination &&
-                    matchesExpired
-                );
-            });
+                    const specDateStr = format(
+                        new Date(specimen.created_at),
+                        'yyyy-MM-dd',
+                    );
+                    const matchesDate =
+                        (!dateRange.from || specDateStr >= dateRange.from) &&
+                        (!dateRange.to || specDateStr <= dateRange.to);
 
-            const sortedSpecimens = [...filteredSpecimens].sort((a, b) => {
-                const dateA = getDueDate(a).getTime();
-                const dateB = getDueDate(b).getTime();
+                    const matchesGroup =
+                        selectedGroupId === 'all' ||
+                        specimen.group_id?.toString() === selectedGroupId;
 
+                    const invoice = specimen.group?.invoice
+                        ? specimen.group.invoice
+                        : specimen.invoice_relation;
+
+                    const matchesSearch = matchesAnySearch(
+                        [
+                            specimen.sequence_code,
+                            specimen.id,
+                            specimen.customer_relation?.name,
+                            specimen.customer_relation?.id_number,
+                            invoice?.full_invoice_number,
+                            invoice?.invoice_number,
+                        ],
+                        searchQuery,
+                    );
+
+                    const specimenTypeId =
+                        specimen.specimen_type || specimen.type?.id;
+                    const matchesSpecimenType =
+                        selectedSpecimenTypeIds.length ===
+                            specimenTypes.length ||
+                        (specimenTypeId &&
+                            selectedSpecimenTypeIds.includes(
+                                specimenTypeId.toString(),
+                            ));
+
+                    const examId =
+                        specimen.specimen_type_examination ||
+                        specimen.examination?.id;
+                    const matchesExamination =
+                        selectedExaminationIds.length === examinations.length ||
+                        (examId &&
+                            selectedExaminationIds.includes(examId.toString()));
+
+                    const dueInfo = getDueDateInfo(specimen);
+                    const isExpired = !!(
+                        dueInfo &&
+                        dueInfo.isExpired &&
+                        !['finalized', 'delivered', 'cancelled'].includes(
+                            specimen.status,
+                        )
+                    );
+                    const matchesExpired = !showExpiredOnly || isExpired;
+
+                    return (
+                        matchesStatus &&
+                        matchesDate &&
+                        matchesGroup &&
+                        matchesSearch &&
+                        matchesSpecimenType &&
+                        matchesExamination &&
+                        matchesExpired
+                    );
+                },
+            );
+
+            // Pre-calculate due dates once for sorting instead of inside comparator
+            const specimensWithDates = filteredSpecimens.map((s) => ({
+                specimen: s,
+                dueTime: getDueDate(s).getTime(),
+            }));
+
+            specimensWithDates.sort((a, b) => {
                 return dueDateSortOrder === 'asc'
-                    ? dateA - dateB
-                    : dateB - dateA;
+                    ? a.dueTime - b.dueTime
+                    : b.dueTime - a.dueTime;
             });
 
             return {
                 ...priority,
-                specimens: sortedSpecimens,
+                specimens: specimensWithDates.map((item) => item.specimen),
             };
         });
     }, [
@@ -627,10 +633,10 @@ export default function SpecimensIndex({
         searchQuery,
         selectedSpecimenTypeIds,
         selectedExaminationIds,
-        specimenTypes.length,
-        examinations.length,
         showExpiredOnly,
         dueDateSortOrder,
+        specimenTypes,
+        examinations,
     ]);
 
     useEffect(() => {
@@ -646,17 +652,17 @@ export default function SpecimensIndex({
         showExpiredOnly,
     ]);
 
-    const visibleSpecimenIds = useMemo(() => {
-        return filteredPriorities.flatMap((p) => p.specimens.map((s) => s.id));
-    }, [filteredPriorities]);
+    const visibleSpecimenIds = useMemo(
+        () =>
+            filteredPriorities.flatMap((p) =>
+                (p.specimens || []).map((s) => s.id),
+            ),
+        [filteredPriorities],
+    );
 
-    const isAllVisibleSelected = useMemo(() => {
-        if (visibleSpecimenIds.length === 0) {
-            return false;
-        }
-
-        return visibleSpecimenIds.every((id) => selectedIds.includes(id));
-    }, [visibleSpecimenIds, selectedIds]);
+    const isAllVisibleSelected =
+        visibleSpecimenIds.length > 0 &&
+        visibleSpecimenIds.every((id) => selectedIds.includes(id));
 
     const handleSelectAllVisible = () => {
         if (isAllVisibleSelected) {
@@ -671,16 +677,10 @@ export default function SpecimensIndex({
     };
 
     useEffect(() => {
-        setPriorities(deduplicateSpecimens(initialPriorities));
-    }, [initialPriorities]);
-
-    useEffect(() => {
-        if (isSheetOpen || isGroupSheetOpen || isViewSheetOpen) {
-            router.reload({
-                only: ['priorities'],
-            });
+        if (initialPriorities) {
+            setPriorities(deduplicateSpecimens(initialPriorities));
         }
-    }, [isSheetOpen, isGroupSheetOpen, isViewSheetOpen]);
+    }, [initialPriorities]);
 
     useEffect(() => {
         if (filters.status) {
@@ -725,11 +725,11 @@ export default function SpecimensIndex({
         );
     };
 
-    const selectedSpecimens = useMemo(() => {
+    const getSelectedSpecimens = () => {
         const list: Specimen[] = [];
 
         for (const p of priorities) {
-            for (const s of p.specimens) {
+            for (const s of p.specimens || []) {
                 if (selectedIds.includes(s.id)) {
                     list.push(s);
                 }
@@ -737,7 +737,9 @@ export default function SpecimensIndex({
         }
 
         return list;
-    }, [priorities, selectedIds]);
+    };
+
+    const selectedSpecimens = getSelectedSpecimens();
 
     const handleBulkChangeStatus = (status: string) => {
         router.post(
@@ -1857,26 +1859,30 @@ export default function SpecimensIndex({
                         </div>
                     </div>
                 )}
-                <KanbanBoard
-                    priorities={priorities}
-                    setPriorities={setPriorities}
-                    filteredPriorities={filteredPriorities}
-                    initialPriorities={initialPriorities}
-                    deduplicateSpecimens={deduplicateSpecimens}
-                    visibleCounts={visibleCounts}
-                    auth={auth}
-                    isSelectionMode={isSelectionMode}
-                    selectedIds={selectedIds}
-                    toggleSelectSpecimen={toggleSelectSpecimen}
-                    handleView={handleView}
-                    handleAssignClick={handleAssignClick}
-                    handleEdit={handleEdit}
-                    handleLoadGroupAndOpenSheet={handleLoadGroupAndOpenSheet}
-                    handleCancelClick={handleCancelClick}
-                    handleDeleteClick={handleDeleteClick}
-                    handleSendReportClick={handleSendReportClick}
-                    handleLoadMore={handleLoadMore}
-                />
+                <Deferred data="priorities" fallback={<KanbanBoardSkeleton />}>
+                    <KanbanBoard
+                        priorities={priorities}
+                        setPriorities={setPriorities}
+                        filteredPriorities={filteredPriorities}
+                        initialPriorities={initialPriorities || []}
+                        deduplicateSpecimens={deduplicateSpecimens}
+                        visibleCounts={visibleCounts}
+                        auth={auth}
+                        isSelectionMode={isSelectionMode}
+                        selectedIds={selectedIds}
+                        toggleSelectSpecimen={toggleSelectSpecimen}
+                        handleView={handleView}
+                        handleAssignClick={handleAssignClick}
+                        handleEdit={handleEdit}
+                        handleLoadGroupAndOpenSheet={
+                            handleLoadGroupAndOpenSheet
+                        }
+                        handleCancelClick={handleCancelClick}
+                        handleDeleteClick={handleDeleteClick}
+                        handleSendReportClick={handleSendReportClick}
+                        handleLoadMore={handleLoadMore}
+                    />
+                </Deferred>
             </div>
 
             <SpecimenSheet

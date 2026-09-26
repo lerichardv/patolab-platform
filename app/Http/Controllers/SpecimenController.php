@@ -31,6 +31,7 @@ use App\Services\ReportPdfService;
 use App\Services\ResendService;
 use App\Services\SpecimenStatusService;
 use App\Services\WhatsAppService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -107,6 +108,29 @@ class SpecimenController extends Controller
             ));
         }
 
+        return Inertia::render('specimens/index', [
+            'priorities' => app()->runningUnitTests() && ! $request->hasHeader('X-Inertia-Partial-Data') && ! $request->has('test_defer')
+                ? $this->getPrioritiesWithSpecimens($statuses, $specimenTypeIds, $examinationIds, $dateFrom, $dateTo)
+                : Inertia::defer(fn () => $this->getPrioritiesWithSpecimens($statuses, $specimenTypeIds, $examinationIds, $dateFrom, $dateTo)),
+            'specimenTypes' => SpecimenType::with('activeStates')->where('active', true)->get(),
+            'examinations' => SpecimenTypeExamination::where('active', true)->with('prices')->get(),
+            'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
+            'usersList' => User::where('active', true)->orderBy('name')->get(),
+            'filters' => [
+                'status' => $statuses,
+                'specimen_type_id' => $specimenTypeIds === null ? 'all' : (empty($specimenTypeIds) ? 'none' : $specimenTypeIds),
+                'examination_id' => $examinationIds === null ? 'all' : (empty($examinationIds) ? 'none' : $examinationIds),
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ],
+        ]);
+    }
+
+    /**
+     * Get priorities with eagerly loaded filtered specimens for the Kanban board.
+     */
+    protected function getPrioritiesWithSpecimens(array $statuses, ?array $specimenTypeIds, ?array $examinationIds, ?string $dateFrom, ?string $dateTo)
+    {
         $priorities = Priority::orderBy('order', 'desc')->get();
 
         $priorities->load(['specimens' => function ($q) use ($statuses, $specimenTypeIds, $examinationIds, $dateFrom, $dateTo) {
@@ -144,19 +168,16 @@ class SpecimenController extends Controller
             }
 
             $q->with([
-                'customerRelation',
-                'type',
-                'examination',
-                'examinations',
-                'category',
-                'referrerRelation',
-                'invoiceRelation.creditRelation',
-                'invoiceRelation.transferBank',
-                'users',
-                'collaborators',
-                'group.invoice',
-                'report',
-                'cancelledBy',
+                'customerRelation:id,name,id_number',
+                'type:id,name,requires_report',
+                'examination:id,name',
+                'examinations:id,name',
+                'category:id,name,unit,quantity,intern_unit,intern_quantity',
+                'group:id,name',
+                'group.invoice:id,specimen_group_id,full_invoice_number,invoice_number',
+                'invoiceRelation:id,specimen_id,full_invoice_number,invoice_number',
+                'users:users.id,name',
+                'collaborators:users.id,name',
             ])
                 ->leftJoin(\DB::raw('(SELECT specimen_id, priority_id, MIN(`order`) as board_order FROM priorities_specimens_order GROUP BY specimen_id, priority_id) as pso'), function ($join) {
                     $join->on('specimen.id', '=', 'pso.specimen_id')
@@ -167,20 +188,16 @@ class SpecimenController extends Controller
                 ->orderBy('specimen.created_at', 'desc');
         }]);
 
-        return Inertia::render('specimens/index', [
-            'priorities' => $priorities,
-            'specimenTypes' => SpecimenType::with('activeStates')->where('active', true)->get(),
-            'examinations' => SpecimenTypeExamination::where('active', true)->with('prices')->get(),
-            'settings' => Setting::all()->pluck('setting_value', 'setting_key'),
-            'usersList' => User::where('active', true)->orderBy('name')->get(),
-            'filters' => [
-                'status' => $statuses,
-                'specimen_type_id' => $specimenTypeIds === null ? 'all' : (empty($specimenTypeIds) ? 'none' : $specimenTypeIds),
-                'examination_id' => $examinationIds === null ? 'all' : (empty($examinationIds) ? 'none' : $examinationIds),
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-            ],
-        ]);
+        $priorities->each(function ($priority) {
+            $priority->specimens->makeHidden([
+                'expected_finalization_date',
+                'expected_internal_finalization_date',
+                'next_status',
+                'next_status_label',
+            ]);
+        });
+
+        return $priorities;
     }
 
     public function store(Request $request)
@@ -199,6 +216,8 @@ class SpecimenController extends Controller
             'status' => 'required|string',
             'priority_id' => 'required|exists:priorities,id',
             'sample_collection_date' => 'nullable|date',
+            'auto_received_at' => 'nullable|boolean',
+            'received_at' => 'nullable|date',
             'is_manual_delivery_date_intern_enabled' => 'nullable|boolean',
             'delivery_date_intern_unit' => 'nullable|in:minutes,hours,days,weeks',
             'delivery_date_intern_quantity' => 'nullable|integer|min:0',
@@ -325,6 +344,17 @@ class SpecimenController extends Controller
             }
 
             $specimenData = $validated;
+            $autoReceivedAt = $request->has('auto_received_at')
+                ? $request->boolean('auto_received_at')
+                : true;
+            $specimenData['auto_received_at'] = $autoReceivedAt;
+            if ($autoReceivedAt) {
+                $specimenData['received_at'] = now();
+            } else {
+                $specimenData['received_at'] = ! empty($validated['received_at'])
+                    ? Carbon::parse($validated['received_at'])->format('Y-m-d 00:00:00')
+                    : now();
+            }
             unset(
                 $specimenData['reserved_code'],
                 $specimenData['quantity'],
@@ -676,6 +706,8 @@ class SpecimenController extends Controller
             'status' => 'required|string',
             'priority_id' => 'required|exists:priorities,id',
             'sample_collection_date' => 'nullable|date',
+            'auto_received_at' => 'nullable|boolean',
+            'received_at' => 'nullable|date',
             'is_manual_delivery_date_intern_enabled' => 'nullable|boolean',
             'delivery_date_intern_unit' => 'nullable|in:minutes,hours,days,weeks',
             'delivery_date_intern_quantity' => 'nullable|integer|min:0',
@@ -891,6 +923,34 @@ class SpecimenController extends Controller
                         'yjs_open_text_state' => null,
                         'yjs_addendum_state' => null,
                     ]);
+                }
+            }
+
+            if ($request->has('auto_received_at')) {
+                $autoReceivedAt = $request->boolean('auto_received_at');
+                $validated['auto_received_at'] = $autoReceivedAt;
+                if ($autoReceivedAt) {
+                    $autoDate = $specimen->getAutomaticReceivedAt() ?? now();
+                    $validated['received_at'] = $autoDate;
+                    if ($specimen->report_id) {
+                        SpecimenReport::where('id', $specimen->report_id)->update(['report_date' => $autoDate->format('Y-m-d')]);
+                    }
+                } else {
+                    if (! empty($validated['received_at'])) {
+                        $dateStr = substr($validated['received_at'], 0, 10);
+                        $validated['received_at'] = $dateStr.' 00:00:00';
+                        if ($specimen->report_id) {
+                            SpecimenReport::where('id', $specimen->report_id)->update(['report_date' => $dateStr]);
+                        }
+                    }
+                }
+            } elseif ($request->has('received_at')) {
+                if (! empty($validated['received_at'])) {
+                    $dateStr = substr($validated['received_at'], 0, 10);
+                    $validated['received_at'] = $dateStr.' 00:00:00';
+                    if ($specimen->report_id) {
+                        SpecimenReport::where('id', $specimen->report_id)->update(['report_date' => $dateStr]);
+                    }
                 }
             }
 
@@ -1765,6 +1825,8 @@ class SpecimenController extends Controller
             'specimen_category' => 'required|exists:specimen_category,id',
             'priority_id' => 'required|exists:priorities,id',
             'sample_collection_date' => 'nullable|date',
+            'auto_received_at' => 'nullable|boolean',
+            'received_at' => 'nullable|date',
             'status' => 'required|string|in:received,macroscopic_review,processing,microscopic_review,finalized,delivered,cancelled',
             'diagnosis' => 'nullable|string',
             'anatomic_site' => 'nullable|string|max:255',
@@ -1804,7 +1866,35 @@ class SpecimenController extends Controller
 
         $oldPriorityId = $specimen->priority_id;
 
-        DB::transaction(function () use ($specimen, $validated, $oldPriorityId) {
+        DB::transaction(function () use ($specimen, $validated, $oldPriorityId, $request) {
+            if ($request->has('auto_received_at')) {
+                $autoReceivedAt = $request->boolean('auto_received_at');
+                $validated['auto_received_at'] = $autoReceivedAt;
+                if ($autoReceivedAt) {
+                    $autoDate = $specimen->getAutomaticReceivedAt() ?? now();
+                    $validated['received_at'] = $autoDate;
+                    if ($specimen->report_id) {
+                        SpecimenReport::where('id', $specimen->report_id)->update(['report_date' => $autoDate->format('Y-m-d')]);
+                    }
+                } else {
+                    if (! empty($validated['received_at'])) {
+                        $dateStr = substr($validated['received_at'], 0, 10);
+                        $validated['received_at'] = $dateStr.' 00:00:00';
+                        if ($specimen->report_id) {
+                            SpecimenReport::where('id', $specimen->report_id)->update(['report_date' => $dateStr]);
+                        }
+                    }
+                }
+            } elseif ($request->has('received_at')) {
+                if (! empty($validated['received_at'])) {
+                    $dateStr = substr($validated['received_at'], 0, 10);
+                    $validated['received_at'] = $dateStr.' 00:00:00';
+                    if ($specimen->report_id) {
+                        SpecimenReport::where('id', $specimen->report_id)->update(['report_date' => $dateStr]);
+                    }
+                }
+            }
+
             $specimen->update($validated);
 
             if ($oldPriorityId != $validated['priority_id']) {

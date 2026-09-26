@@ -1,19 +1,14 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
-    Beaker,
     Briefcase,
-    BookOpen,
     Contact,
-    FolderGit2,
     LayoutGrid,
     Users,
     ShieldCheck,
-    FlaskConical,
     Microscope,
     UserRound,
     Tag,
     MapPin,
-    Hash,
     Warehouse,
     PackageSearch,
     Package,
@@ -45,6 +40,7 @@ import { index as productsIndex } from '@/actions/App/Http/Controllers/ProductCo
 import { index as referrersIndex } from '@/actions/App/Http/Controllers/ReferrerController';
 import { index as referrerTypesIndex } from '@/actions/App/Http/Controllers/ReferrerTypeController';
 import { index as rentalsIndex } from '@/actions/App/Http/Controllers/RentalController';
+import { index as billingReconciliationReportIndex } from '@/actions/App/Http/Controllers/Reports/BillingReconciliationReportController';
 import { index as billingSummaryReportIndex } from '@/actions/App/Http/Controllers/Reports/BillingSummaryReportController';
 import { index as creditGroupReportIndex } from '@/actions/App/Http/Controllers/Reports/CreditGroupReportController';
 import { index as cuttingsReportIndex } from '@/actions/App/Http/Controllers/Reports/CuttingsReportController';
@@ -344,6 +340,12 @@ const adminNavItems: NavItem[] = [
                 href: billingSummaryReportIndex(),
                 icon: FileSpreadsheet,
                 permission: 'reports.billing_summary.view',
+            },
+            {
+                title: 'Cuadre de Facturación',
+                href: billingReconciliationReportIndex(),
+                icon: FileSpreadsheet,
+                permission: 'reports.billing_reconciliation.view',
             },
             {
                 title: 'Reporte de Entrega',

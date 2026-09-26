@@ -40,7 +40,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { findInaccessibleFile } from '@/lib/file-utils';
 import { cn } from '@/lib/utils';
 import type { QuickEditMetadata } from './hooks/use-specimen-quick-edit-metadata';
@@ -183,6 +190,10 @@ export default function SpecimenQuickEditForm({
             : '',
         sample_collection_date: specimen?.sample_collection_date
             ? specimen.sample_collection_date.split('T')[0]
+            : new Date().toISOString().split('T')[0],
+        auto_received_at: specimen?.auto_received_at ?? true,
+        received_at: specimen?.received_at
+            ? specimen.received_at.split('T')[0]
             : new Date().toISOString().split('T')[0],
         status: specimen?.status || 'received',
         medical_order_file: null as File | null,
@@ -488,8 +499,8 @@ export default function SpecimenQuickEditForm({
                     </div>
                 </div>
 
-                {/* Fecha de la toma & Estado */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* Fecha de la toma, Fecha de Recepción & Estado */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div className="grid gap-2">
                         <Label htmlFor="sample_collection_date">
                             Fecha de la toma
@@ -504,6 +515,76 @@ export default function SpecimenQuickEditForm({
                         {errors.sample_collection_date && (
                             <p className="text-xs text-destructive">
                                 {errors.sample_collection_date}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="grid gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <Label
+                                htmlFor="received_at"
+                                className="flex items-center gap-1.5"
+                            >
+                                <Calendar className="h-3 w-3 text-muted-foreground" />{' '}
+                                Fecha de Recepción
+                            </Label>
+                            <TooltipProvider delayDuration={200}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="flex items-center gap-1.5">
+                                            <Switch
+                                                id="quick-auto-received-at"
+                                                checked={data.auto_received_at}
+                                                onCheckedChange={(checked) => {
+                                                    setData((prev: any) => ({
+                                                        ...prev,
+                                                        auto_received_at: checked,
+                                                        received_at: checked
+                                                            ? specimen?.received_at
+                                                                ? specimen.received_at.split(
+                                                                        'T',
+                                                                    )[0]
+                                                                : new Date()
+                                                                        .toISOString()
+                                                                        .split(
+                                                                            'T',
+                                                                        )[0]
+                                                            : prev.received_at,
+                                                    }));
+                                                }}
+                                            />
+                                            <Label
+                                                htmlFor="quick-auto-received-at"
+                                                className="cursor-pointer text-[10px] font-medium tracking-tighter text-muted-foreground select-none"
+                                            >
+                                                AUTO
+                                            </Label>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                        side="top"
+                                        className="max-w-xs text-xs"
+                                    >
+                                        <p>
+                                            {data.auto_received_at
+                                                ? 'Activo: La fecha de recepción se obtendrá automáticamente de la fecha en que se recibió la muestra.'
+                                                : 'Inactivo: Puedes seleccionar una fecha de recepción manual que permanecerá estática.'}
+                                        </p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                        <DatePicker
+                            value={data.received_at}
+                            disabled={data.auto_received_at}
+                            className="w-full"
+                            onChange={(dateString) =>
+                                setData('received_at', dateString)
+                            }
+                        />
+                        {errors.received_at && (
+                            <p className="text-xs text-destructive">
+                                {errors.received_at}
                             </p>
                         )}
                     </div>

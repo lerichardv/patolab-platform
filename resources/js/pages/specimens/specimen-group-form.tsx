@@ -23,6 +23,7 @@ import {
 	ChevronUp,
 	Layers,
 	Search,
+	Calendar,
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
@@ -79,6 +80,12 @@ import {
 	TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { invalidateSpecimenCatalogsCache } from '@/hooks/use-specimen-form-data';
 import { findInaccessibleFile } from '@/lib/file-utils';
 import { cn } from '@/lib/utils';
@@ -168,6 +175,11 @@ export default function SpecimenGroupForm({
 	const [nestedCustomer, setNestedCustomer] = useState('');
 	const [nestedSampleCollectionDate, setNestedSampleCollectionDate] =
 		useState(new Date().toISOString().split('T')[0]);
+	const [nestedAutoReceivedAt, setNestedAutoReceivedAt] =
+		useState<boolean>(true);
+	const [nestedReceivedAt, setNestedReceivedAt] = useState<string>(
+		new Date().toISOString().split('T')[0],
+	);
 	const [nestedSpecimenType, setNestedSpecimenType] = useState('');
 	const [nestedExamination, setNestedExamination] = useState('');
 	const [nestedCategory, setNestedCategory] = useState('');
@@ -552,6 +564,13 @@ export default function SpecimenGroupForm({
 							clinical_notes: s.clinical_notes || '',
 							status: s.status,
 							priority_id: s.priority_id,
+							sample_collection_date: s.sample_collection_date
+								? s.sample_collection_date.split('T')[0]
+								: null,
+							auto_received_at: s.auto_received_at ?? true,
+							received_at: s.received_at
+								? s.received_at.split('T')[0]
+								: new Date().toISOString().split('T')[0],
 							medical_order_file: s.medical_order_file,
 							is_manual_delivery_date_enabled: Boolean(
 								s.is_manual_delivery_date_enabled,
@@ -793,6 +812,8 @@ export default function SpecimenGroupForm({
 		setNestedClinicalNotes('');
 		setNestedStatus('received');
 		setNestedSampleCollectionDate(new Date().toISOString().split('T')[0]);
+		setNestedAutoReceivedAt(true);
+		setNestedReceivedAt(new Date().toISOString().split('T')[0]);
 		setNestedPriority(
 			priorities && priorities.length > 0
 				? priorities[0].id.toString()
@@ -849,6 +870,12 @@ export default function SpecimenGroupForm({
 		setNestedSampleCollectionDate(
 			spec.sample_collection_date
 				? spec.sample_collection_date.split('T')[0]
+				: new Date().toISOString().split('T')[0],
+		);
+		setNestedAutoReceivedAt(spec.auto_received_at ?? true);
+		setNestedReceivedAt(
+			spec.received_at
+				? spec.received_at.split('T')[0]
 				: new Date().toISOString().split('T')[0],
 		);
 		setNestedPriority(spec.priority_id ? spec.priority_id.toString() : '');
@@ -1174,6 +1201,8 @@ export default function SpecimenGroupForm({
 			status: nestedStatus,
 			priority_id: parseInt(nestedPriority),
 			sample_collection_date: nestedSampleCollectionDate,
+			auto_received_at: nestedAutoReceivedAt,
+			received_at: nestedReceivedAt,
 			medical_order_file: nestedMedicalOrderFile,
 			is_manual_delivery_date_enabled:
 				nestedIsManualDeliveryDateEnabled,
@@ -1813,6 +1842,8 @@ export default function SpecimenGroupForm({
 			status: s.status,
 			priority_id: s.priority_id,
 			sample_collection_date: s.sample_collection_date,
+			auto_received_at: s.auto_received_at ?? true,
+			received_at: s.received_at,
 			is_manual_delivery_date_enabled: Boolean(
 				s.is_manual_delivery_date_enabled,
 			),
@@ -2161,6 +2192,7 @@ export default function SpecimenGroupForm({
 											</TableHead>
 											<TableHead>Paciente</TableHead>
 											<TableHead>Examen</TableHead>
+											<TableHead>Recepción</TableHead>
 											<TableHead>Remitente</TableHead>
 											<TableHead>Insumos</TableHead>
 											<TableHead className="w-24 text-right">
@@ -2240,6 +2272,25 @@ export default function SpecimenGroupForm({
 														{
 															spec.specimen_type_name
 														}
+													</div>
+												</TableCell>
+												<TableCell>
+													<div className="flex items-center gap-1.5 text-xs">
+														<span className="font-mono text-muted-foreground">
+															{spec.received_at
+																? spec.received_at.split('T')[0]
+																: new Date()
+																		.toISOString()
+																		.split('T')[0]}
+														</span>
+														{spec.auto_received_at !== false && (
+															<Badge
+																variant="outline"
+																className="px-1 py-0 text-[9px] font-semibold text-muted-foreground uppercase"
+															>
+																Auto
+															</Badge>
+														)}
 													</div>
 												</TableCell>
 												<TableCell>
@@ -4321,7 +4372,7 @@ export default function SpecimenGroupForm({
 							)}
 						</div>
 
-						<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+						<div className="grid grid-cols-1 gap-4 md:grid-cols-3">
 							<div className="grid gap-2">
 								<Label htmlFor="nested_sample_collection_date">
 									Fecha de la toma
@@ -4339,6 +4390,94 @@ export default function SpecimenGroupForm({
 								{nestedErrors.sample_collection_date && (
 									<p className="text-xs text-destructive">
 										{nestedErrors.sample_collection_date}
+									</p>
+								)}
+							</div>
+
+							<div className="grid gap-2">
+								<div className="flex items-center justify-between gap-2">
+									<Label
+										htmlFor="nested_received_at"
+										className="flex items-center gap-1.5"
+									>
+										<Calendar className="h-3 w-3 text-muted-foreground" />{' '}
+										Fecha de Recepción
+									</Label>
+									<TooltipProvider delayDuration={200}>
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<div className="flex items-center gap-1.5">
+													<Switch
+														id="nested_auto_received_at"
+														checked={
+															nestedAutoReceivedAt
+														}
+														onCheckedChange={(
+															checked,
+														) => {
+															setNestedAutoReceivedAt(
+																checked,
+															);
+															if (checked) {
+																const existingSpec =
+																	nestedSpecimenToEditId
+																		? specimens.find(
+																				(
+																					s,
+																				) =>
+																					s.client_id ===
+																					nestedSpecimenToEditId,
+																			)
+																		: null;
+																setNestedReceivedAt(
+																	existingSpec?.received_at
+																		? existingSpec.received_at.split(
+																				'T',
+																			)[0]
+																		: new Date()
+																				.toISOString()
+																				.split(
+																					'T',
+																				)[0],
+																);
+															}
+														}}
+													/>
+													<Label
+														htmlFor="nested_auto_received_at"
+														className="cursor-pointer text-[10px] font-medium tracking-tighter text-muted-foreground select-none"
+													>
+														AUTO
+													</Label>
+												</div>
+											</TooltipTrigger>
+											<TooltipContent
+												side="top"
+												className="max-w-xs text-xs"
+											>
+												<p>
+													{nestedAutoReceivedAt
+														? 'Activo: La fecha de recepción se obtendrá automáticamente de la fecha en que se recibió la muestra.'
+														: 'Inactivo: Puedes seleccionar una fecha de recepción manual que permanecerá estática.'}
+												</p>
+											</TooltipContent>
+										</Tooltip>
+									</TooltipProvider>
+								</div>
+								<DatePicker
+									value={nestedReceivedAt}
+									disabled={nestedAutoReceivedAt}
+									onChange={(v) => {
+										setNestedReceivedAt(v);
+										setNestedErrors((prev) => ({
+											...prev,
+											received_at: '',
+										}));
+									}}
+								/>
+								{nestedErrors.received_at && (
+									<p className="text-xs text-destructive">
+										{nestedErrors.received_at}
 									</p>
 								)}
 							</div>

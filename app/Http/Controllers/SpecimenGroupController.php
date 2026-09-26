@@ -23,6 +23,7 @@ use App\Models\SpecimenTypeExamination;
 use App\Services\InvoiceCalculationService;
 use App\Services\InvoicePdfService;
 use App\Services\WhatsAppService;
+use Carbon\Carbon;
 use Illuminate\Http\File;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -90,6 +91,8 @@ class SpecimenGroupController extends Controller
             'specimens.*.status' => 'required|string',
             'specimens.*.priority_id' => 'required|exists:priorities,id',
             'specimens.*.sample_collection_date' => 'nullable|date',
+            'specimens.*.auto_received_at' => 'nullable|boolean',
+            'specimens.*.received_at' => 'nullable|date',
             'specimens.*.is_manual_delivery_date_intern_enabled' => 'nullable|boolean',
             'specimens.*.delivery_date_intern_unit' => 'nullable|in:minutes,hours,days,weeks',
             'specimens.*.delivery_date_intern_quantity' => 'nullable|integer|min:0',
@@ -432,7 +435,15 @@ class SpecimenGroupController extends Controller
                     'is_group' => true,
                     'group_id' => $group->id,
                     'location_id' => $locationId,
-                    'sample_collection_date' => $specData['sample_collection_date'] ?? null,
+                    'sample_collection_date' => ! empty($specData['sample_collection_date'])
+                        ? $specData['sample_collection_date']
+                        : now()->toDateString(),
+                    'auto_received_at' => array_key_exists('auto_received_at', $specData)
+                        ? filter_var($specData['auto_received_at'], FILTER_VALIDATE_BOOLEAN)
+                        : true,
+                    'received_at' => (array_key_exists('auto_received_at', $specData) && ! filter_var($specData['auto_received_at'], FILTER_VALIDATE_BOOLEAN))
+                        ? (! empty($specData['received_at']) ? Carbon::parse($specData['received_at'])->format('Y-m-d 00:00:00') : now())
+                        : now(),
                     'is_manual_delivery_date_intern_enabled' => ! empty($specData['is_manual_delivery_date_intern_enabled']),
                     'delivery_date_intern_unit' => $specData['delivery_date_intern_unit'] ?? 'minutes',
                     'delivery_date_intern_quantity' => (int) ($specData['delivery_date_intern_quantity'] ?? 0),
@@ -714,6 +725,8 @@ class SpecimenGroupController extends Controller
             'specimens.*.status' => 'required|string',
             'specimens.*.priority_id' => 'required|exists:priorities,id',
             'specimens.*.sample_collection_date' => 'nullable|date',
+            'specimens.*.auto_received_at' => 'nullable|boolean',
+            'specimens.*.received_at' => 'nullable|date',
             'specimens.*.is_manual_delivery_date_intern_enabled' => 'nullable|boolean',
             'specimens.*.delivery_date_intern_unit' => 'nullable|in:minutes,hours,days,weeks',
             'specimens.*.delivery_date_intern_quantity' => 'nullable|integer|min:0',
@@ -962,6 +975,34 @@ class SpecimenGroupController extends Controller
                     if (isset($specData['priority_id'])) {
                         $updateFields['priority_id'] = $specData['priority_id'];
                     }
+                    if (array_key_exists('sample_collection_date', $specData)) {
+                        $updateFields['sample_collection_date'] = $specData['sample_collection_date'];
+                    }
+                    if (array_key_exists('auto_received_at', $specData)) {
+                        $autoReceivedAt = filter_var($specData['auto_received_at'], FILTER_VALIDATE_BOOLEAN);
+                        $updateFields['auto_received_at'] = $autoReceivedAt;
+                        if ($autoReceivedAt) {
+                            $autoDate = $specimen->getAutomaticReceivedAt() ?? now();
+                            $updateFields['received_at'] = $autoDate;
+                            if ($specimen->report_id) {
+                                SpecimenReport::where('id', $specimen->report_id)->update(['report_date' => $autoDate->format('Y-m-d')]);
+                            }
+                        } else {
+                            if (! empty($specData['received_at'])) {
+                                $dateStr = substr($specData['received_at'], 0, 10);
+                                $updateFields['received_at'] = $dateStr.' 00:00:00';
+                                if ($specimen->report_id) {
+                                    SpecimenReport::where('id', $specimen->report_id)->update(['report_date' => $dateStr]);
+                                }
+                            }
+                        }
+                    } elseif (! empty($specData['received_at'])) {
+                        $dateStr = substr($specData['received_at'], 0, 10);
+                        $updateFields['received_at'] = $dateStr.' 00:00:00';
+                        if ($specimen->report_id) {
+                            SpecimenReport::where('id', $specimen->report_id)->update(['report_date' => $dateStr]);
+                        }
+                    }
                     if (array_key_exists('is_manual_delivery_date_intern_enabled', $specData)) {
                         $updateFields['is_manual_delivery_date_intern_enabled'] = ! empty($specData['is_manual_delivery_date_intern_enabled']);
                     }
@@ -1115,7 +1156,15 @@ class SpecimenGroupController extends Controller
                         'delivery_token' => Str::random(32),
                         'is_group' => true,
                         'group_id' => $group->id,
-                        'sample_collection_date' => $specData['sample_collection_date'] ?? null,
+                        'sample_collection_date' => ! empty($specData['sample_collection_date'])
+                            ? $specData['sample_collection_date']
+                            : now()->toDateString(),
+                        'auto_received_at' => array_key_exists('auto_received_at', $specData)
+                            ? filter_var($specData['auto_received_at'], FILTER_VALIDATE_BOOLEAN)
+                            : true,
+                        'received_at' => (array_key_exists('auto_received_at', $specData) && ! filter_var($specData['auto_received_at'], FILTER_VALIDATE_BOOLEAN))
+                            ? (! empty($specData['received_at']) ? Carbon::parse($specData['received_at'])->format('Y-m-d 00:00:00') : now())
+                            : now(),
                         'is_manual_delivery_date_intern_enabled' => ! empty($specData['is_manual_delivery_date_intern_enabled']),
                         'delivery_date_intern_unit' => $specData['delivery_date_intern_unit'] ?? 'minutes',
                         'delivery_date_intern_quantity' => (int) ($specData['delivery_date_intern_quantity'] ?? 0),

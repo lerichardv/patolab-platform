@@ -79,6 +79,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Ver Agrupación de Créditos', 'slug' => 'reports.credit_group.view'],
             ['name' => 'Ver Relación de Biopsias (Cortes)', 'slug' => 'reports.cuttings.view'],
             ['name' => 'Ver Reporte de Entrega', 'slug' => 'reports.delivery.view'],
+            ['name' => 'Ver Cuadre de Facturación', 'slug' => 'reports.billing_reconciliation.view'],
 
             /*
             |--------------------------------------------------------------------------

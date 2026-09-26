@@ -1686,10 +1686,14 @@ export default function ReportWorkspace({
                 return;
             }
 
+            const visitUrl =
+                typeof visit?.url === 'string'
+                    ? visit.url
+                    : (visit?.url?.href ?? String(visit?.url ?? ''));
+
             // Skip mutations targeting the report editor itself (creating report, saving, etc.)
             const isReportEditorAction =
-                typeof visit?.url === 'string' &&
-                visit.url.includes(
+                visitUrl.includes(
                     `/specimens/${specimen.sequence_code}/report-editor`,
                 ) &&
                 visit?.method &&
@@ -1703,7 +1707,7 @@ export default function ReportWorkspace({
             event.preventDefault();
 
             pendingNavigationRef.current = () => {
-                router.visit(visit?.url ?? window.location.href, {
+                router.visit(visitUrl || window.location.href, {
                     method: visit?.method ?? 'get',
                     data: visit?.data,
                     preserveState: false,
@@ -3752,6 +3756,7 @@ export default function ReportWorkspace({
                                 );
                             } finally {
                                 setIsSavingForNav(false);
+                                isDirtyRef.current = false;
                                 setShowNavGuard(false);
                                 pendingNavigationRef.current?.();
                                 pendingNavigationRef.current = null;

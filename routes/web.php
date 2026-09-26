@@ -29,6 +29,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReferrerController;
 use App\Http\Controllers\ReferrerTypeController;
 use App\Http\Controllers\RentalController;
+use App\Http\Controllers\Reports\BillingReconciliationReportController;
 use App\Http\Controllers\Reports\BillingSummaryReportController;
 use App\Http\Controllers\Reports\CreditGroupReportController;
 use App\Http\Controllers\Reports\CuttingsReportController;
@@ -169,6 +170,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('reports/cuttings', [CuttingsReportController::class, 'index'])->name('reports.cuttings.index');
     Route::get('reports/billing-summary/export', [BillingSummaryReportController::class, 'export'])->name('reports.billing-summary.export');
     Route::get('reports/billing-summary', [BillingSummaryReportController::class, 'index'])->name('reports.billing-summary.index');
+    Route::get('reports/billing-reconciliation/export', [BillingReconciliationReportController::class, 'export'])->name('reports.billing-reconciliation.export');
+    Route::get('reports/billing-reconciliation', [BillingReconciliationReportController::class, 'index'])->name('reports.billing-reconciliation.index');
     Route::get('reports/delivery/export', [DeliveryReportController::class, 'export'])->name('reports.delivery.export');
     Route::get('reports/delivery', [DeliveryReportController::class, 'index'])->name('reports.delivery.index');
     Route::get('credits/export', [CreditController::class, 'export'])->name('credits.export');

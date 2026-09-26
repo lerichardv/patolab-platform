@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeState;
+use App\Services\SpecimenStatusService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -199,6 +200,8 @@ class SpecimenTypeController extends Controller
                 );
             }
         });
+
+        app(SpecimenStatusService::class)->clearCache($specimenType->id);
 
         return redirect()->back()->with('success', 'Flujo de estados actualizado con éxito.');
     }
