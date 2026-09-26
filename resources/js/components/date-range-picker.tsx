@@ -1,5 +1,12 @@
 import { usePage } from '@inertiajs/react';
-import { format, add, startOfWeek, endOfWeek } from 'date-fns';
+import {
+    format,
+    add,
+    startOfWeek,
+    endOfWeek,
+    startOfMonth,
+    endOfMonth,
+} from 'date-fns';
 import { CalendarClock, ChevronDown } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
@@ -69,6 +76,9 @@ export function determineRange(from: string, to: string): string {
         'yyyy-MM-dd',
     );
 
+    const startOfMonthVal = format(startOfMonth(today), 'yyyy-MM-dd');
+    const endOfMonthVal = format(endOfMonth(today), 'yyyy-MM-dd');
+
     const sevenDaysAgo = format(add(today, { days: -7 }), 'yyyy-MM-dd');
     const fourteenDaysAgo = format(add(today, { days: -14 }), 'yyyy-MM-dd');
     const thirtyDaysAgo = format(add(today, { days: -30 }), 'yyyy-MM-dd');
@@ -79,6 +89,13 @@ export function determineRange(from: string, to: string): string {
 
     if (resolvedFrom === startOfWeekVal && resolvedTo === endOfWeekVal) {
         return 'this_week';
+    }
+
+    if (
+        resolvedFrom === startOfMonthVal &&
+        (resolvedTo === todayStr || resolvedTo === endOfMonthVal)
+    ) {
+        return 'this_month';
     }
 
     if (resolvedFrom === sevenDaysAgo && resolvedTo === todayStr) {
@@ -94,6 +111,14 @@ export function determineRange(from: string, to: string): string {
     }
 
     return 'custom';
+}
+
+export function getThisMonthRange(): DateRange {
+    const today = new Date();
+    const from = format(startOfMonth(today), 'yyyy-MM-dd');
+    const to = format(today, 'yyyy-MM-dd');
+
+    return { from, to };
 }
 
 export function getLast2WeeksRange(): DateRange {
@@ -280,6 +305,18 @@ export function DateRangePicker({
                             size="sm"
                             className="h-7 text-xs font-normal"
                             onClick={() => {
+                                const range = getThisMonthRange();
+                                handleRangeChange(range, 'this_month');
+                            }}
+                        >
+                            Este mes
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs font-normal"
+                            onClick={() => {
                                 const today = new Date();
                                 const from = format(
                                     add(today, { days: -7 }),
@@ -307,7 +344,7 @@ export function DateRangePicker({
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="col-span-2 h-7 text-xs font-normal"
+                            className="h-7 text-xs font-normal"
                             onClick={() => {
                                 const today = new Date();
                                 const from = format(

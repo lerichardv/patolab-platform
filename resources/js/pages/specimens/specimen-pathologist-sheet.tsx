@@ -88,8 +88,8 @@ export default function SpecimenPathologistSheet({
         const base = formData?.specimen || initialSpecimen;
 
         if (!base) {
-return null;
-}
+            return null;
+        }
 
         return {
             ...base,

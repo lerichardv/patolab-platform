@@ -40,7 +40,9 @@ export function addDeliveryDuration(
  * Returns the resolved internal delivery duration for a specimen,
  * preferring manual override over specimen category.
  */
-export function getInternalDeliveryDuration(specimen: any): DeliveryDuration | null {
+export function getInternalDeliveryDuration(
+    specimen: any,
+): DeliveryDuration | null {
     if (!specimen) {
         return null;
     }
@@ -69,7 +71,9 @@ export function getInternalDeliveryDuration(specimen: any): DeliveryDuration | n
  * Returns the resolved client delivery duration for a specimen,
  * preferring manual override over specimen category.
  */
-export function getClientDeliveryDuration(specimen: any): DeliveryDuration | null {
+export function getClientDeliveryDuration(
+    specimen: any,
+): DeliveryDuration | null {
     if (!specimen) {
         return null;
     }
@@ -188,13 +192,21 @@ export function getSpecimenDueDate(specimen: any): Date {
     const internalDuration = getInternalDeliveryDuration(specimen);
 
     if (internalDuration) {
-        return addDeliveryDuration(createdAt, internalDuration.quantity, internalDuration.unit);
+        return addDeliveryDuration(
+            createdAt,
+            internalDuration.quantity,
+            internalDuration.unit,
+        );
     }
 
     const clientDuration = getClientDeliveryDuration(specimen);
 
     if (clientDuration) {
-        return addDeliveryDuration(createdAt, clientDuration.quantity, clientDuration.unit);
+        return addDeliveryDuration(
+            createdAt,
+            clientDuration.quantity,
+            clientDuration.unit,
+        );
     }
 
     return createdAt;

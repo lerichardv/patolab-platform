@@ -28,8 +28,7 @@ export function ReadOnlyEditor({ content }: ReadOnlyEditorProps) {
         [content],
     );
 
-    const characterCount =
-        editor?.storage.characterCount?.characters() ?? 0;
+    const characterCount = editor?.storage.characterCount?.characters() ?? 0;
 
     return (
         <div className="space-y-1">

@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Location;
 use App\Models\Permission;
 use App\Models\Priority;
+use App\Models\Rental;
 use App\Models\Role;
 use App\Models\SpecimenCategory;
 use App\Models\SpecimenType;
@@ -341,6 +342,27 @@ test('excel export returns binary xlsx file with status 200 and formatted paymen
         'invoice_type' => 'standard',
     ]);
 
+    $rental = Rental::create(['name' => 'Alquiler Test', 'description' => 'Test']);
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00004002',
+        'invoice_number' => '00004002',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 200.0,
+        'discount' => 0.0,
+        'total' => 200.0,
+        'total_paid' => 200.0,
+        'invoice_file' => 'invoices/test2.pdf',
+        'invoice_date' => '2026-08-01 10:00:00',
+        'invoice_type' => 'rental',
+        'rental_id' => $rental->id,
+        'pay_isv' => true,
+        'taxable_amount_15' => 200.0,
+        'isv_15' => 30.0,
+    ]);
+
     $response = $this->actingAs($this->user)
         ->get(route('reports.billing-reconciliation.export', [
             'date_from' => '2026-08-01',
@@ -356,9 +378,31 @@ test('excel export returns binary xlsx file with status 200 and formatted paymen
 
     $reader = new Xlsx;
     $spreadsheet = $reader->load($tempFile);
-    $sheet = $spreadsheet->getSheetByName('Ventas');
 
-    expect($sheet->getCell('F4')->getValue())->toBe('Efectivo (1)');
+    expect($spreadsheet->getSheetCount())->toBe(3);
+
+    // Sheet 0: Ventas (Daily liquidation tables)
+    $sheetVentas = $spreadsheet->getSheet(0);
+    expect($sheetVentas->getTitle())->toBe('Ventas 0826')
+        ->and($sheetVentas->getCell('F4')->getValue())->toBe('Efectivo (1)');
+
+    // Sheet 1: Liquidación (Continuous invoices list)
+    $sheetLiquidacion = $spreadsheet->getSheet(1);
+    expect($sheetLiquidacion->getTitle())->toBe('Liquidación')
+        ->and($sheetLiquidacion->getCell('B3')->getValue())->toBe('ITEM')
+        ->and($sheetLiquidacion->getCell('D3')->getValue())->toBe('No. de Factura')
+        ->and($sheetLiquidacion->getCell('D4')->getValue())->toBe('000-001-01-00004001')
+        ->and($sheetLiquidacion->getCell('J4')->getValue())->toBe('=+F4+G4+I4-H4');
+
+    // Sheet 2: Resumen (Period summary per day)
+    $sheetResumen = $spreadsheet->getSheet(2);
+    expect($sheetResumen->getTitle())->toBe('Resumen')
+        ->and($sheetResumen->getCell('A4')->getValue())->toBe('Fecha')
+        ->and($sheetResumen->getCell('B4')->getValue())->toBe('No. de Fact')
+        ->and($sheetResumen->getCell('B5')->getValue())->toBe('000-001-01-00004001')
+        ->and($sheetResumen->getCell('C5')->getValue())->toBe('000-001-01-00004002')
+        ->and($sheetResumen->getCell('H5')->getValue())->toBe('=+E5*0.15');
+
     unlink($tempFile);
 });
 
@@ -506,4 +550,102 @@ test('only invoices with assigned invoice number and paid status appear on the r
         ->and($invoiceNumbers)->toContain('000-001-01-00003006')
         ->and($invoiceNumbers)->not->toContain('000-001-01-00003004')
         ->and($invoiceNumbers)->not->toContain('000-001-01-00003005');
+
+    // Also assert generalInvoices contains the continuous invoice list with tax fields
+    expect($data)->toHaveKey('generalInvoices')
+        ->and(count($data['generalInvoices']))->toBe(2)
+        ->and($data['generalInvoices'][0]['taxable_15'])->toBe(0.0)
+        ->and($data['generalInvoices'][0]['exempt'])->toBe(100.0)
+        ->and($data['generalInvoices'][0]['isv_15'])->toBe(0.0);
+});
+
+test('resumenRows includes all month working days without sundays with first and last invoice correlatives and total per day', function () {
+    // 2026-08-06 is Thursday, 2026-08-07 is Friday, 2026-08-08 is Saturday, 2026-08-09 is Sunday, 2026-08-10 is Monday
+    $date = '2026-08-06 10:00:00';
+
+    // 1. First invoice on Thursday
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00005001',
+        'invoice_number' => '00005001',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 150.0,
+        'discount' => 0.0,
+        'total' => 150.0,
+        'total_paid' => 150.0,
+        'invoice_file' => 'invoices/test5001.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+    ]);
+
+    // 2. Second invoice on Thursday
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00005002',
+        'invoice_number' => '00005002',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'transfer',
+        'quantity' => 1,
+        'subtotal' => 450.0,
+        'discount' => 50.0,
+        'total' => 467.5,
+        'total_paid' => 467.5,
+        'invoice_file' => 'invoices/test5002.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'rental',
+        'pay_isv' => true,
+        'taxable_amount_15' => 450.0,
+        'isv_15' => 67.5,
+    ]);
+
+    $controller = app(BillingReconciliationReportController::class);
+    // Range from Thursday 2026-08-06 to Monday 2026-08-10 (includes Sunday 2026-08-09)
+    $data = $controller->calculateReportData('2026-08-06', '2026-08-10');
+
+    // Should have 4 working days: Thursday (06), Friday (07), Saturday (08), Monday (10). Sunday (09) excluded!
+    expect($data)->toHaveKey('resumenRows')
+        ->and(count($data['resumenRows']))->toBe(4);
+
+    $dates = array_column($data['resumenRows'], 'date');
+    expect($dates)->toContain('2026-08-06')
+        ->and($dates)->toContain('2026-08-07')
+        ->and($dates)->toContain('2026-08-08')
+        ->and($dates)->toContain('2026-08-10')
+        ->and($dates)->not->toContain('2026-08-09'); // Sunday strictly excluded
+
+    // Thursday has 2 invoices with first and last correlatives
+    $thursdayRow = $data['resumenRows'][0];
+    expect($thursdayRow['date'])->toBe('2026-08-06')
+        ->and($thursdayRow['start_invoice'])->toBe('000-001-01-00005001')
+        ->and($thursdayRow['end_invoice'])->toBe('000-001-01-00005002')
+        ->and($thursdayRow['taxable_15'])->toBe(450.0)
+        ->and($thursdayRow['exempt'])->toBe(150.0)
+        ->and($thursdayRow['discount'])->toBe(50.0)
+        ->and($thursdayRow['isv_15'])->toBe(67.5)
+        ->and($thursdayRow['total'])->toBe(617.5)
+        ->and($thursdayRow['has_invoices'])->toBeTrue();
+
+    // Friday has no invoices
+    $fridayRow = $data['resumenRows'][1];
+    expect($fridayRow['date'])->toBe('2026-08-07')
+        ->and($fridayRow['start_invoice'])->toBe('-')
+        ->and($fridayRow['end_invoice'])->toBe('-')
+        ->and($fridayRow['total'])->toBe(0.0)
+        ->and($fridayRow['has_invoices'])->toBeFalse();
+});
+
+test('report defaults to current month date range when visited without date parameters', function () {
+    $expectedFrom = Carbon\Carbon::today()->startOfMonth()->toDateString();
+    $expectedTo = Carbon\Carbon::today()->toDateString();
+
+    $this->actingAs($this->user)
+        ->get(route('reports.billing-reconciliation.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('reports/billing-reconciliation/index')
+            ->where('filters.date_from', $expectedFrom)
+            ->where('filters.date_to', $expectedTo)
+        );
 });

@@ -68,7 +68,9 @@ export default function PublicProgress({ specimen }: Props) {
 
         if (activeStatesConfig && activeStatesConfig.length > 0) {
             const mapped = activeStatesConfig
-                .map((state) => STATUS_STEPS.find((s) => s.key === state.status))
+                .map((state) =>
+                    STATUS_STEPS.find((s) => s.key === state.status),
+                )
                 .filter(Boolean) as typeof STATUS_STEPS;
 
             if (mapped.length > 0) {
@@ -245,10 +247,13 @@ export default function PublicProgress({ specimen }: Props) {
                             </div>
                             <div className="space-y-1">
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Tag className="h-3.5 w-3.5" /> Examen(es) Solicitado(s)
+                                    <Tag className="h-3.5 w-3.5" /> Examen(es)
+                                    Solicitado(s)
                                 </span>
                                 <div className="text-sm font-semibold">
-                                    <p className="text-foreground">{specimen.type?.name || 'N/A'}</p>
+                                    <p className="text-foreground">
+                                        {specimen.type?.name || 'N/A'}
+                                    </p>
                                     {(() => {
                                         const rawExams =
                                             specimen.specimen_examinations ||
@@ -257,11 +262,20 @@ export default function PublicProgress({ specimen }: Props) {
                                             [];
 
                                         const examNames: string[] = rawExams
-                                            .map((item: any) => item.examination?.name || item.name)
+                                            .map(
+                                                (item: any) =>
+                                                    item.examination?.name ||
+                                                    item.name,
+                                            )
                                             .filter(Boolean);
 
-                                        if (examNames.length === 0 && specimen.examination?.name) {
-                                            examNames.push(specimen.examination.name);
+                                        if (
+                                            examNames.length === 0 &&
+                                            specimen.examination?.name
+                                        ) {
+                                            examNames.push(
+                                                specimen.examination.name,
+                                            );
                                         }
 
                                         if (examNames.length === 0) {

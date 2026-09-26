@@ -14,7 +14,7 @@ import AsyncCustomerCombobox from '@/components/async-customer-combobox';
 import {
     DateRangePicker,
     setCookie,
-    getLast2WeeksRange,
+    getThisMonthRange,
 } from '@/components/date-range-picker';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -30,13 +30,21 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import InvoiceViewSheet from '../../invoices/invoice-view-sheet';
 import DailySettlementTable from './daily-settlement-table';
 import type { DailyTableData } from './daily-settlement-table';
+import GeneralSettlementTable from './general-settlement-table';
+import type { GeneralInvoiceItem } from './general-settlement-table';
 import PeriodSummaryTable from './period-summary-table';
-import type { ResumenRowData, PeriodTotalsData } from './period-summary-table';
+import type {
+    ResumenRowData,
+    PeriodTotalsData,
+    ResumenTotalsData,
+} from './period-summary-table';
 import ShadowTableSkeleton from './shadow-table-skeleton';
 
 interface ReportData {
     dailyTables: DailyTableData[];
+    generalInvoices: GeneralInvoiceItem[];
     resumenRows: ResumenRowData[];
+    resumenTotals?: ResumenTotalsData;
     periodTotals: PeriodTotalsData;
     dateRange: {
         from: string;
@@ -84,7 +92,9 @@ export default function BillingReconciliationReport({
     const [dateFrom, setDateFrom] = useState(filters.date_from);
     const [dateTo, setDateTo] = useState(filters.date_to);
     const [isExporting, setIsExporting] = useState(false);
-    const [activeTab, setActiveTab] = useState<'daily' | 'resumen'>('daily');
+    const [activeTab, setActiveTab] = useState<'daily' | 'general' | 'resumen'>(
+        'daily',
+    );
 
     // State for viewing invoice details sheet
     const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
@@ -168,7 +178,7 @@ export default function BillingReconciliationReport({
     const handleClearFilters = () => {
         setSearch('');
         setCustomerId('all');
-        const defaultRange = getLast2WeeksRange();
+        const defaultRange = getThisMonthRange();
         setDateFrom(defaultRange.from);
         setDateTo(defaultRange.to);
 
@@ -176,9 +186,9 @@ export default function BillingReconciliationReport({
             setCookie(
                 `date_filter_report_billing_reconciliation_user_${userId}`,
                 JSON.stringify({
-                    range: '14_days',
+                    range: 'this_month',
                     from: defaultRange.from,
-                    to: defaultRange.to,
+                    to: 'today',
                 }),
             );
         }
@@ -460,7 +470,12 @@ export default function BillingReconciliationReport({
                                 <Tabs
                                     value={activeTab}
                                     onValueChange={(v) =>
-                                        setActiveTab(v as 'daily' | 'resumen')
+                                        setActiveTab(
+                                            v as
+                                                | 'daily'
+                                                | 'general'
+                                                | 'resumen',
+                                        )
                                     }
                                     className="w-auto"
                                 >
@@ -475,6 +490,13 @@ export default function BillingReconciliationReport({
                                                 {reportData.dailyTables.length}{' '}
                                                 días)
                                             </span>
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="general"
+                                            className="gap-1.5 px-3 text-xs"
+                                        >
+                                            <FileSpreadsheet className="h-3.5 w-3.5" />
+                                            <span>Liquidación General</span>
                                         </TabsTrigger>
                                         <TabsTrigger
                                             value="resumen"
@@ -524,7 +546,7 @@ export default function BillingReconciliationReport({
                                     )}
                             </div>
 
-                            {/* View Content: Daily Tables or Resumen */}
+                            {/* View Content: Daily Tables, General Continuous Settlement (Hoja14), or Resumen */}
                             {activeTab === 'daily' ? (
                                 <div className="space-y-8">
                                     {reportData.dailyTables.length === 0 ? (
@@ -548,10 +570,17 @@ export default function BillingReconciliationReport({
                                         )
                                     )}
                                 </div>
+                            ) : activeTab === 'general' ? (
+                                <GeneralSettlementTable
+                                    invoices={reportData.generalInvoices || []}
+                                    periodTotals={reportData.periodTotals}
+                                    dateRange={reportData.dateRange}
+                                    onSelectInvoice={handleSelectInvoice}
+                                />
                             ) : (
                                 <PeriodSummaryTable
                                     resumenRows={reportData.resumenRows}
-                                    periodTotals={reportData.periodTotals}
+                                    resumenTotals={reportData.resumenTotals}
                                     dateRange={reportData.dateRange}
                                 />
                             )}

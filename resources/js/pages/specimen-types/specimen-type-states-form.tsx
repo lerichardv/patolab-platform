@@ -54,7 +54,10 @@ function StatesSkeleton() {
     );
 }
 
-export default function SpecimenTypeStatesForm({ specimenTypeId, onSuccess }: Props) {
+export default function SpecimenTypeStatesForm({
+    specimenTypeId,
+    onSuccess,
+}: Props) {
     const [states, setStates] = useState<StateItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -83,16 +86,24 @@ export default function SpecimenTypeStatesForm({ specimenTypeId, onSuccess }: Pr
 
     const handleToggleActive = (status: string, checked: boolean) => {
         if (!checked) {
-            const activeCount = states.filter((s) => s.status !== status && s.active).length;
+            const activeCount = states.filter(
+                (s) => s.status !== status && s.active,
+            ).length;
 
             if (activeCount === 0) {
-                toast.error('Debe haber al menos un estado activo en el flujo.');
+                toast.error(
+                    'Debe haber al menos un estado activo en el flujo.',
+                );
 
                 return;
             }
         }
 
-        setStates(states.map((s) => (s.status === status ? { ...s, active: checked } : s)));
+        setStates(
+            states.map((s) =>
+                s.status === status ? { ...s, active: checked } : s,
+            ),
+        );
     };
 
     const handleDragEnd = (result: DropResult) => {
@@ -147,7 +158,9 @@ export default function SpecimenTypeStatesForm({ specimenTypeId, onSuccess }: Pr
                         typeof errors === 'object' && errors
                             ? Object.values(errors)[0]
                             : 'Error al guardar el flujo de estados';
-                    toast.error(typeof msg === 'string' ? msg : 'Error al guardar');
+                    toast.error(
+                        typeof msg === 'string' ? msg : 'Error al guardar',
+                    );
                 },
             },
         );
@@ -171,9 +184,10 @@ export default function SpecimenTypeStatesForm({ specimenTypeId, onSuccess }: Pr
                 <div className="flex items-start gap-2">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <span>
-                        Arrastra los estados para definir la secuencia del flujo. Usa el
-                        interruptor para habilitar o deshabilitar estados según los requerimientos
-                        de este tipo de muestra.
+                        Arrastra los estados para definir la secuencia del
+                        flujo. Usa el interruptor para habilitar o deshabilitar
+                        estados según los requerimientos de este tipo de
+                        muestra.
                     </span>
                 </div>
             </div>
@@ -221,11 +235,14 @@ export default function SpecimenTypeStatesForm({ specimenTypeId, onSuccess }: Pr
                                                             <span
                                                                 className="h-2.5 w-2.5 rounded-full"
                                                                 style={{
-                                                                    backgroundColor: stateItem.color,
+                                                                    backgroundColor:
+                                                                        stateItem.color,
                                                                 }}
                                                             />
                                                             <span className="text-sm font-semibold tracking-tight text-foreground">
-                                                                {stateItem.label}
+                                                                {
+                                                                    stateItem.label
+                                                                }
                                                             </span>
                                                             {!stateItem.active && (
                                                                 <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
@@ -235,7 +252,9 @@ export default function SpecimenTypeStatesForm({ specimenTypeId, onSuccess }: Pr
                                                         </div>
                                                         {stateItem.description && (
                                                             <p className="mt-0.5 text-xs text-muted-foreground">
-                                                                {stateItem.description}
+                                                                {
+                                                                    stateItem.description
+                                                                }
                                                             </p>
                                                         )}
                                                     </div>
@@ -243,8 +262,12 @@ export default function SpecimenTypeStatesForm({ specimenTypeId, onSuccess }: Pr
 
                                                 <div className="flex items-center gap-3">
                                                     <Switch
-                                                        checked={stateItem.active}
-                                                        onCheckedChange={(checked) =>
+                                                        checked={
+                                                            stateItem.active
+                                                        }
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
                                                             handleToggleActive(
                                                                 stateItem.status,
                                                                 checked,
@@ -272,7 +295,11 @@ export default function SpecimenTypeStatesForm({ specimenTypeId, onSuccess }: Pr
             </DragDropContext>
 
             <div className="flex items-center justify-end gap-3 border-t pt-4">
-                <Button type="submit" disabled={isSaving} className="w-full md:w-auto">
+                <Button
+                    type="submit"
+                    disabled={isSaving}
+                    className="w-full md:w-auto"
+                >
                     {isSaving ? (
                         <Spinner className="mr-2" />
                     ) : (

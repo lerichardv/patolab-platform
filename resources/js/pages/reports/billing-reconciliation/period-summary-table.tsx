@@ -28,6 +28,14 @@ export interface ResumenRowData {
     has_invoices: boolean;
 }
 
+export interface ResumenTotalsData {
+    taxable_15: number;
+    exempt: number;
+    discount: number;
+    isv_15: number;
+    total: number;
+}
+
 export interface PeriodTotalsData {
     gross: number;
     discount: number;
@@ -48,7 +56,7 @@ export interface PeriodTotalsData {
 
 interface Props {
     resumenRows: ResumenRowData[];
-    periodTotals: PeriodTotalsData;
+    resumenTotals?: ResumenTotalsData;
     dateRange: {
         from: string;
         to: string;
@@ -69,9 +77,20 @@ const formatCurrency = (val: number): string => {
 
 export default function PeriodSummaryTable({
     resumenRows,
-    periodTotals,
+    resumenTotals,
     dateRange,
 }: Props) {
+    const totals: ResumenTotalsData = resumenTotals ?? {
+        taxable_15: resumenRows.reduce(
+            (acc, r) => acc + (r.taxable_15 || 0),
+            0,
+        ),
+        exempt: resumenRows.reduce((acc, r) => acc + (r.exempt || 0), 0),
+        discount: resumenRows.reduce((acc, r) => acc + (r.discount || 0), 0),
+        isv_15: resumenRows.reduce((acc, r) => acc + (r.isv_15 || 0), 0),
+        total: resumenRows.reduce((acc, r) => acc + (r.total || 0), 0),
+    };
+
     return (
         <Card className="overflow-hidden border border-border shadow-sm">
             <CardHeader className="border-b border-border bg-muted/40 px-6 py-4">
@@ -82,7 +101,7 @@ export default function PeriodSummaryTable({
                         </CardTitle>
                         <CardDescription className="text-xs">
                             Consolidado diario de ventas gravadas, exentas,
-                            descuentos y recaudación neta (del{' '}
+                            descuentos y facturación neta (del{' '}
                             {dateRange.from_formatted} al{' '}
                             {dateRange.to_formatted}).
                         </CardDescription>
@@ -196,23 +215,19 @@ export default function PeriodSummaryTable({
                                         Ventas del período
                                     </TableCell>
                                     <TableCell className="text-right font-mono">
-                                        {formatCurrency(
-                                            periodTotals.taxable_15,
-                                        )}
+                                        {formatCurrency(totals.taxable_15)}
                                     </TableCell>
                                     <TableCell className="text-right font-mono">
-                                        {formatCurrency(periodTotals.exempt)}
+                                        {formatCurrency(totals.exempt)}
                                     </TableCell>
                                     <TableCell className="text-right font-mono">
-                                        {formatCurrency(periodTotals.discount)}
+                                        {formatCurrency(totals.discount)}
                                     </TableCell>
                                     <TableCell className="text-right font-mono">
-                                        {formatCurrency(periodTotals.isv_15)}
+                                        {formatCurrency(totals.isv_15)}
                                     </TableCell>
                                     <TableCell className="border-b-2 border-b-primary text-right font-mono text-sm font-bold text-primary">
-                                        {formatCurrency(
-                                            periodTotals.total_sales,
-                                        )}
+                                        {formatCurrency(totals.total)}
                                     </TableCell>
                                 </TableRow>
                             </tfoot>

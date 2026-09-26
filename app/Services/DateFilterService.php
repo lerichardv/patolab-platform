@@ -12,9 +12,10 @@ class DateFilterService
      * @param  string|null  $cookieValue  The raw cookie string.
      * @param  string|null  $reqFrom  The date_from query parameter.
      * @param  string|null  $reqTo  The date_to query parameter.
+     * @param  string  $defaultRange  Default range if not specified (default: 14_days).
      * @return array{from: string, to: string, range: string}
      */
-    public static function resolveFilter(?string $cookieValue, ?string $reqFrom, ?string $reqTo): array
+    public static function resolveFilter(?string $cookieValue, ?string $reqFrom, ?string $reqTo, string $defaultRange = '14_days'): array
     {
         $today = Carbon::today();
 
@@ -65,6 +66,12 @@ class DateFilterService
                             'to' => $today->copy()->endOfWeek(Carbon::SUNDAY)->toDateString(),
                             'range' => 'this_week',
                         ];
+                    case 'this_month':
+                        return [
+                            'from' => $today->copy()->startOfMonth()->toDateString(),
+                            'to' => $today->toDateString(),
+                            'range' => 'this_month',
+                        ];
                     case '7_days':
                         return [
                             'from' => $today->copy()->subDays(7)->toDateString(),
@@ -100,7 +107,15 @@ class DateFilterService
             }
         }
 
-        // 3. Absolute default: last 14 days
+        // 3. Absolute default
+        if ($defaultRange === 'this_month') {
+            return [
+                'from' => $today->copy()->startOfMonth()->toDateString(),
+                'to' => $today->toDateString(),
+                'range' => 'this_month',
+            ];
+        }
+
         return [
             'from' => $today->copy()->subDays(14)->toDateString(),
             'to' => $today->toDateString(),
@@ -221,11 +236,17 @@ class DateFilterService
         $startOfWeekStr = $today->copy()->startOfWeek(Carbon::MONDAY)->toDateString();
         $endOfWeekStr = $today->copy()->endOfWeek(Carbon::SUNDAY)->toDateString();
 
+        $startOfMonthStr = $today->copy()->startOfMonth()->toDateString();
+        $endOfMonthStr = $today->copy()->endOfMonth()->toDateString();
+
         if ($from === $todayStr && $to === $todayStr) {
             return 'today';
         }
         if ($from === $startOfWeekStr && $to === $endOfWeekStr) {
             return 'this_week';
+        }
+        if ($from === $startOfMonthStr && ($to === $todayStr || $to === $endOfMonthStr)) {
+            return 'this_month';
         }
         if ($from === $today->copy()->subDays(7)->toDateString() && $to === $todayStr) {
             return '7_days';

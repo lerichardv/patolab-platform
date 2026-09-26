@@ -15,7 +15,11 @@ interface Props {
     onOpenChange: (open: boolean) => void;
 }
 
-export default function SpecimenTypeStatesSheet({ specimenType, open, onOpenChange }: Props) {
+export default function SpecimenTypeStatesSheet({
+    specimenType,
+    open,
+    onOpenChange,
+}: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="overflow-y-auto sm:max-w-[620px]">

@@ -49,21 +49,31 @@ class BillingReconciliationReportController extends Controller
         Gate::authorize('reports.billing_reconciliation.view');
 
         $userId = auth()->id();
+        $cookieValue = $request->cookie("date_filter_report_billing_reconciliation_user_{$userId}");
         $resolvedDates = DateFilterService::resolveFilter(
-            $request->cookie("date_filter_report_billing_reconciliation_user_{$userId}"),
+            $cookieValue,
             $request->get('date_from'),
-            $request->get('date_to')
+            $request->get('date_to'),
+            'this_month'
         );
 
-        $dateFrom = $resolvedDates['from'] ?: Carbon::today()->startOfMonth()->toDateString();
-        $dateTo = $resolvedDates['to'] ?: Carbon::today()->toDateString();
+        // If no explicit dates passed and the cookie had legacy 14_days or this_week, default to full current month
+        if (! $request->has('date_from') && in_array($resolvedDates['range'], ['14_days', 'this_week'])) {
+            $dateFrom = Carbon::today()->startOfMonth()->toDateString();
+            $dateTo = Carbon::today()->toDateString();
+            $range = 'this_month';
+        } else {
+            $dateFrom = $resolvedDates['from'] ?: Carbon::today()->startOfMonth()->toDateString();
+            $dateTo = $resolvedDates['to'] ?: Carbon::today()->toDateString();
+            $range = $resolvedDates['range'];
+        }
 
         if ($request->has('date_from') || $request->has('date_to')) {
             cookie()->queue(DateFilterService::getCookieToQueue(
                 "date_filter_report_billing_reconciliation_user_{$userId}",
                 $dateFrom,
                 $dateTo,
-                $resolvedDates['range']
+                $range
             ));
         }
 
@@ -252,6 +262,9 @@ class BillingReconciliationReportController extends Controller
                         'gross_amount' => 0.0,
                         'discount' => 0.0,
                         'net_amount' => 0.0,
+                        'taxable_15' => 0.0,
+                        'exempt' => 0.0,
+                        'isv_15' => 0.0,
                         'comment' => 'Factura Anulada',
                         'invoice_number' => $invoiceNum,
                         'is_cancelled' => true,
@@ -270,6 +283,11 @@ class BillingReconciliationReportController extends Controller
 
                     $quantity = (int) ($inv->quantity ?: 1);
 
+                    // Taxes for Resumen & Liquidación sheet
+                    $t15 = (float) ($inv->taxable_amount_15 > 0 ? $inv->taxable_amount_15 : ($inv->pay_isv ? $inv->subtotal : 0.0));
+                    $ex = (float) ($inv->exempt_amount > 0 ? $inv->exempt_amount : ($inv->pay_isv ? 0.0 : $inv->subtotal));
+                    $isv = (float) ($inv->isv_15 > 0 ? $inv->isv_15 : ($inv->pay_isv ? round($t15 * 0.15, 2) : 0.0));
+
                     $dayRows[] = [
                         'item' => $itemIndex++,
                         'date' => $day->format('d/m/Y'),
@@ -280,6 +298,9 @@ class BillingReconciliationReportController extends Controller
                         'gross_amount' => $gross,
                         'discount' => $discount,
                         'net_amount' => $net,
+                        'taxable_15' => $t15,
+                        'exempt' => $ex,
+                        'isv_15' => $isv,
                         'comment' => $inv->description ?: '',
                         'invoice_number' => $invoiceNum,
                         'is_cancelled' => false,
@@ -309,11 +330,6 @@ class BillingReconciliationReportController extends Controller
                             $settlement['credit'] += $net;
                             break;
                     }
-
-                    // Taxes for Resumen sheet
-                    $t15 = (float) ($inv->taxable_amount_15 ?? ($inv->pay_isv ? $inv->subtotal : 0.0));
-                    $ex = (float) ($inv->exempt_amount ?? ($inv->pay_isv ? 0.0 : $inv->subtotal));
-                    $isv = (float) ($inv->isv_15 ?? ($inv->pay_isv ? round($t15 * 0.15, 2) : 0.0));
 
                     $dayTaxable15 += $t15;
                     $dayExempt += $ex;
@@ -356,7 +372,7 @@ class BillingReconciliationReportController extends Controller
                 'invoice_count' => count($dayRows),
             ];
 
-            // Resumen row for this day
+            // Resumen row for this day (all month days without sundays and with first and last invoice correlatives)
             $resumenRows[] = [
                 'date' => $dateKey,
                 'formatted_date' => $day->format('d/m/Y'),
@@ -372,9 +388,33 @@ class BillingReconciliationReportController extends Controller
             ];
         }
 
+        $generalInvoices = [];
+        foreach ($dailyTables as $dayTable) {
+            foreach ($dayTable['items'] as $item) {
+                $generalInvoices[] = $item;
+            }
+        }
+
+        $resumenTotals = [
+            'taxable_15' => 0.0,
+            'exempt' => 0.0,
+            'discount' => 0.0,
+            'isv_15' => 0.0,
+            'total' => 0.0,
+        ];
+        foreach ($resumenRows as $rRow) {
+            $resumenTotals['taxable_15'] += $rRow['taxable_15'];
+            $resumenTotals['exempt'] += $rRow['exempt'];
+            $resumenTotals['discount'] += $rRow['discount'];
+            $resumenTotals['isv_15'] += $rRow['isv_15'];
+            $resumenTotals['total'] += $rRow['total'];
+        }
+
         return [
             'dailyTables' => $dailyTables,
+            'generalInvoices' => $generalInvoices,
             'resumenRows' => $resumenRows,
+            'resumenTotals' => $resumenTotals,
             'periodTotals' => $periodTotals,
             'dateRange' => [
                 'from' => $dateFrom,
@@ -393,14 +433,21 @@ class BillingReconciliationReportController extends Controller
         Gate::authorize('reports.billing_reconciliation.view');
 
         $userId = auth()->id();
+        $cookieValue = $request->cookie("date_filter_report_billing_reconciliation_user_{$userId}");
         $resolvedDates = DateFilterService::resolveFilter(
-            $request->cookie("date_filter_report_billing_reconciliation_user_{$userId}"),
+            $cookieValue,
             $request->get('date_from'),
-            $request->get('date_to')
+            $request->get('date_to'),
+            'this_month'
         );
 
-        $dateFrom = $resolvedDates['from'] ?: Carbon::today()->startOfMonth()->toDateString();
-        $dateTo = $resolvedDates['to'] ?: Carbon::today()->toDateString();
+        if (! $request->has('date_from') && in_array($resolvedDates['range'], ['14_days', 'this_week'])) {
+            $dateFrom = Carbon::today()->startOfMonth()->toDateString();
+            $dateTo = Carbon::today()->toDateString();
+        } else {
+            $dateFrom = $resolvedDates['from'] ?: Carbon::today()->startOfMonth()->toDateString();
+            $dateTo = $resolvedDates['to'] ?: Carbon::today()->toDateString();
+        }
         $customerId = $request->get('customer_id');
         $search = $request->get('search');
 
@@ -408,11 +455,20 @@ class BillingReconciliationReportController extends Controller
 
         $spreadsheet = new Spreadsheet;
 
+        $fromCarbon = Carbon::parse($dateFrom);
+        $toCarbon = Carbon::parse($dateTo);
+        $monthYear = $fromCarbon->format('my');
+        $isSingleMonth = ($fromCarbon->format('Y-m') === $toCarbon->format('Y-m'));
+
+        $sheetVentasTitle = $isSingleMonth ? "Ventas {$monthYear}" : 'Ventas';
+        $sheetLiquidacionTitle = 'Liquidación';
+        $sheetResumenTitle = 'Resumen';
+
         // ---------------------------------------------------------
         // SHEET 1: Ventas (Detalle Diario con Tablas y Arqueo)
         // ---------------------------------------------------------
         $sheetVentas = $spreadsheet->getActiveSheet();
-        $sheetVentas->setTitle('Ventas');
+        $sheetVentas->setTitle($sheetVentasTitle);
 
         // Column widths matching reference Excel
         $columnWidths = [
@@ -642,21 +698,194 @@ class BillingReconciliationReportController extends Controller
         $sheetVentas->getStyle("E{$currentRow}:I{$currentRow}")->getNumberFormat()->setFormatCode('"L. " #,##0.00');
 
         // ---------------------------------------------------------
-        // SHEET 2: Resumen (Resumen de Ventas del Período por Día)
+        // SHEET 2: Hoja14 (Liquidación General Continua de Facturas)
+        // ---------------------------------------------------------
+        $sheetHoja14 = $spreadsheet->createSheet();
+        $sheetHoja14->setTitle($sheetLiquidacionTitle);
+
+        $h14ColWidths = [
+            'A' => 4,
+            'B' => 7,   // ITEM
+            'C' => 12,  // FECHA
+            'D' => 24,  // No. de Factura
+            'E' => 38,  // NOMBRE PACIENTE
+            'F' => 15,  // Gravadas
+            'G' => 15,  // Exentas
+            'H' => 15,  // DESCUENTO
+            'I' => 15,  // IVA
+            'J' => 16,  // PAGO RECIBIDO
+            'K' => 26,  // COMENTARIO
+        ];
+        foreach ($h14ColWidths as $col => $w) {
+            $sheetHoja14->getColumnDimension($col)->setWidth($w);
+        }
+
+        $sheetHoja14->getStyle('A1:L2000')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF');
+
+        // Banner in Row 2
+        $monthNameSpanish = strtoupper($this->getSpanishMonthName($fromCarbon->month));
+        $h14Banner = $isSingleMonth
+            ? "LIQUIDACIÓN DEL MES DE {$monthNameSpanish} {$fromCarbon->year}"
+            : "LIQUIDACIÓN DE VENTAS DEL {$fromCarbon->format('d/m/Y')} AL {$toCarbon->format('d/m/Y')}";
+
+        $sheetHoja14->mergeCells('B2:K2');
+        $sheetHoja14->setCellValue('B2', $h14Banner);
+        $sheetHoja14->getStyle('B2')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 16, 'name' => 'Calibri'],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+        ]);
+        $sheetHoja14->getRowDimension(2)->setRowHeight(28);
+
+        // Header in Row 3
+        $h14Headers = [
+            'B' => 'ITEM',
+            'C' => 'FECHA',
+            'D' => 'No. de Factura',
+            'E' => 'NOMBRE PACIENTE',
+            'F' => 'Gravadas',
+            'G' => 'Exentas',
+            'H' => 'DESCUENTO',
+            'I' => 'IVA',
+            'J' => 'PAGO RECIBIDO',
+            'K' => 'COMENTARIO',
+        ];
+        foreach ($h14Headers as $col => $text) {
+            $sheetHoja14->setCellValue($col.'3', $text);
+        }
+
+        $sheetHoja14->getStyle('B3:K3')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 9, 'name' => 'Calibri'],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => [
+                'top' => ['borderStyle' => Border::BORDER_MEDIUM],
+                'bottom' => ['borderStyle' => Border::BORDER_MEDIUM],
+            ],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'F2F2F2']],
+        ]);
+        $sheetHoja14->getRowDimension(3)->setRowHeight(24);
+
+        // Rows 4+: Continuous invoices
+        $h14CurrentRow = 4;
+        $h14StartRow = 4;
+
+        foreach ($reportData['dailyTables'] as $dayTable) {
+            $dayItemIdx = 1;
+
+            foreach ($dayTable['items'] as $item) {
+                if ($dayItemIdx === 1) {
+                    $sheetHoja14->setCellValue('B'.$h14CurrentRow, 1);
+                } else {
+                    $prevRow = $h14CurrentRow - 1;
+                    $sheetHoja14->setCellValue('B'.$h14CurrentRow, "=+B{$prevRow}+1");
+                }
+
+                $sheetHoja14->setCellValue('C'.$h14CurrentRow, $item['date']);
+                $sheetHoja14->setCellValue('D'.$h14CurrentRow, $item['invoice_number']);
+                $sheetHoja14->setCellValue('E'.$h14CurrentRow, $item['customer_name']);
+                $sheetHoja14->setCellValue('F'.$h14CurrentRow, $item['taxable_15']);
+                $sheetHoja14->setCellValue('G'.$h14CurrentRow, $item['exempt']);
+                $sheetHoja14->setCellValue('H'.$h14CurrentRow, $item['discount']);
+                $sheetHoja14->setCellValue('I'.$h14CurrentRow, $item['isv_15']);
+                $sheetHoja14->setCellValue('J'.$h14CurrentRow, "=+F{$h14CurrentRow}+G{$h14CurrentRow}+I{$h14CurrentRow}-H{$h14CurrentRow}");
+                $sheetHoja14->setCellValue('K'.$h14CurrentRow, $item['comment']);
+
+                // Alignment
+                $sheetHoja14->getStyle('B'.$h14CurrentRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheetHoja14->getStyle('C'.$h14CurrentRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheetHoja14->getStyle('D'.$h14CurrentRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+                // Number formatting
+                $sheetHoja14->getStyle("F{$h14CurrentRow}:J{$h14CurrentRow}")->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+
+                // Styling
+                $sheetHoja14->getStyle("B{$h14CurrentRow}:K{$h14CurrentRow}")->applyFromArray([
+                    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'E8E8E8']]],
+                    'font' => ['name' => 'Calibri', 'size' => 9],
+                    'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+                ]);
+
+                $sheetHoja14->getRowDimension($h14CurrentRow)->setRowHeight(19);
+
+                $dayItemIdx++;
+                $h14CurrentRow++;
+            }
+        }
+
+        $h14EndRow = $h14CurrentRow - 1;
+
+        if ($h14EndRow >= $h14StartRow) {
+            // Totals Row
+            $sheetHoja14->setCellValue('F'.$h14CurrentRow, "=SUM(F{$h14StartRow}:F{$h14EndRow})");
+            $sheetHoja14->setCellValue('G'.$h14CurrentRow, "=SUM(G{$h14StartRow}:G{$h14EndRow})");
+            $sheetHoja14->setCellValue('H'.$h14CurrentRow, "=SUM(H{$h14StartRow}:H{$h14EndRow})");
+            $sheetHoja14->setCellValue('I'.$h14CurrentRow, "=SUM(I{$h14StartRow}:I{$h14EndRow})");
+            $sheetHoja14->setCellValue('J'.$h14CurrentRow, "=+F{$h14CurrentRow}+G{$h14CurrentRow}+I{$h14CurrentRow}-H{$h14CurrentRow}");
+
+            $sheetHoja14->getStyle("F{$h14CurrentRow}:J{$h14CurrentRow}")->applyFromArray([
+                'font' => ['bold' => true, 'size' => 11, 'name' => 'Calibri'],
+                'borders' => [
+                    'top' => ['borderStyle' => Border::BORDER_THIN],
+                    'bottom' => ['borderStyle' => Border::BORDER_DOUBLE],
+                ],
+            ]);
+            $sheetHoja14->getStyle("F{$h14CurrentRow}:J{$h14CurrentRow}")->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+            $sheetHoja14->getRowDimension($h14CurrentRow)->setRowHeight(22);
+
+            $h14TotalRow = $h14CurrentRow;
+            $h14CurrentRow += 2; // Spacing
+
+            // Summary Header Row
+            $sheetHoja14->setCellValue('E'.$h14CurrentRow, 'Detalle');
+            $sheetHoja14->setCellValue('F'.$h14CurrentRow, 'Gravadas');
+            $sheetHoja14->setCellValue('G'.$h14CurrentRow, 'exentas');
+            $sheetHoja14->setCellValue('H'.$h14CurrentRow, 'Descuentos');
+            $sheetHoja14->setCellValue('I'.$h14CurrentRow, 'IVA');
+            $sheetHoja14->setCellValue('J'.$h14CurrentRow, 'Total');
+
+            $sheetHoja14->getStyle("E{$h14CurrentRow}:J{$h14CurrentRow}")->applyFromArray([
+                'font' => ['bold' => true, 'size' => 10, 'name' => 'Calibri'],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                'borders' => [
+                    'top' => ['borderStyle' => Border::BORDER_MEDIUM],
+                    'bottom' => ['borderStyle' => Border::BORDER_MEDIUM],
+                ],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'F2F2F2']],
+            ]);
+            $sheetHoja14->getRowDimension($h14CurrentRow)->setRowHeight(20);
+            $h14CurrentRow++;
+
+            // Summary Data Row
+            $sheetHoja14->setCellValue('E'.$h14CurrentRow, 'Ventas');
+            $sheetHoja14->setCellValue('F'.$h14CurrentRow, "=+F{$h14TotalRow}");
+            $sheetHoja14->setCellValue('G'.$h14CurrentRow, "=+G{$h14TotalRow}");
+            $sheetHoja14->setCellValue('H'.$h14CurrentRow, "=+H{$h14TotalRow}");
+            $sheetHoja14->setCellValue('I'.$h14CurrentRow, "=+I{$h14TotalRow}");
+            $sheetHoja14->setCellValue('J'.$h14CurrentRow, "=+F{$h14CurrentRow}+G{$h14CurrentRow}-H{$h14CurrentRow}+I{$h14CurrentRow}");
+
+            $sheetHoja14->getStyle("E{$h14CurrentRow}:J{$h14CurrentRow}")->applyFromArray([
+                'font' => ['bold' => true, 'size' => 11, 'name' => 'Calibri'],
+                'borders' => ['bottom' => ['borderStyle' => Border::BORDER_DOUBLE]],
+            ]);
+            $sheetHoja14->getStyle("F{$h14CurrentRow}:J{$h14CurrentRow}")->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+            $sheetHoja14->getRowDimension($h14CurrentRow)->setRowHeight(22);
+        }
+
+        // ---------------------------------------------------------
+        // SHEET 3: Resumen (Resumen de Ventas del Período por Día)
         // ---------------------------------------------------------
         $sheetResumen = $spreadsheet->createSheet();
-        $sheetResumen->setTitle('Resumen');
+        $sheetResumen->setTitle($sheetResumenTitle);
 
         $resumenColWidths = [
             'A' => 14,
-            'B' => 26,
-            'C' => 26,
+            'B' => 24,
+            'C' => 24,
             'D' => 22,
-            'E' => 18,
-            'F' => 18,
-            'G' => 18,
-            'H' => 18,
-            'I' => 18,
+            'E' => 16,
+            'F' => 16,
+            'G' => 16,
+            'H' => 16,
+            'I' => 16,
         ];
         foreach ($resumenColWidths as $col => $w) {
             $sheetResumen->getColumnDimension($col)->setWidth($w);
@@ -664,18 +893,35 @@ class BillingReconciliationReportController extends Controller
 
         $sheetResumen->getStyle('A1:I500')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF');
 
-        // Title Header
+        // Merged Header Row 2: PATOLAB S. DE R.L.
+        $sheetResumen->mergeCells('A2:I2');
         $sheetResumen->setCellValue('A2', 'PATOLAB S. DE R.L.');
-        $sheetResumen->getStyle('A2')->getFont()->setBold(true)->setSize(16)->setName('Calibri');
+        $sheetResumen->getStyle('A2')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 14, 'name' => 'Calibri'],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+        ]);
+        $sheetResumen->getRowDimension(2)->setRowHeight(24);
 
-        $subtitleText = 'RESUMEN DE VENTAS DEL '.Carbon::parse($dateFrom)->format('d/m/Y').' AL '.Carbon::parse($dateTo)->format('d/m/Y');
-        $sheetResumen->setCellValue('A3', $subtitleText);
-        $sheetResumen->getStyle('A3')->getFont()->setBold(true)->setSize(12)->setName('Calibri');
+        $isFullMonth = $isSingleMonth && ($fromCarbon->day === 1 && ($toCarbon->isLastOfMonth() || $toCarbon->isToday()));
 
+        // Merged Header Row 3: Subtitle
+        $resumenSubtitle = $isFullMonth
+            ? "RESUMEN DE VENTAS DEL MES DE {$monthNameSpanish} DEL {$fromCarbon->year}"
+            : "RESUMEN DE VENTAS DEL {$fromCarbon->format('d/m/Y')} AL {$toCarbon->format('d/m/Y')}";
+
+        $sheetResumen->mergeCells('A3:I3');
+        $sheetResumen->setCellValue('A3', $resumenSubtitle);
+        $sheetResumen->getStyle('A3')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 11, 'name' => 'Calibri'],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+        ]);
+        $sheetResumen->getRowDimension(3)->setRowHeight(22);
+
+        // Row 4: Column Headers
         $headersResumen = [
             'A' => 'Fecha',
-            'B' => 'No. de Fact (Inicial)',
-            'C' => 'No. de Fact (Final)',
+            'B' => 'No. de Fact',
+            'C' => 'No. de Fact',
             'D' => 'Cliente',
             'E' => 'Gravadas',
             'F' => 'Exentas',
@@ -689,7 +935,7 @@ class BillingReconciliationReportController extends Controller
 
         $sheetResumen->getStyle('A4:I4')->applyFromArray([
             'font' => ['bold' => true, 'size' => 10, 'name' => 'Calibri'],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
             'borders' => ['top' => ['borderStyle' => Border::BORDER_MEDIUM], 'bottom' => ['borderStyle' => Border::BORDER_MEDIUM]],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'F2F2F2']],
         ]);
@@ -715,7 +961,9 @@ class BillingReconciliationReportController extends Controller
 
             $sheetResumen->getStyle("E{$resumenRowIndex}:I{$resumenRowIndex}")->getNumberFormat()->setFormatCode('"L. " #,##0.00');
             $sheetResumen->getStyle("A{$resumenRowIndex}:I{$resumenRowIndex}")->applyFromArray([
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'E0E0E0']]],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'E8E8E8']]],
+                'font' => ['name' => 'Calibri', 'size' => 9],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
             ]);
             $sheetResumen->getRowDimension($resumenRowIndex)->setRowHeight(19);
 
@@ -723,8 +971,39 @@ class BillingReconciliationReportController extends Controller
         }
         $resumenEndRow = $resumenRowIndex - 1;
 
-        // Grand Total row on Resumen
-        $sheetResumen->setCellValue('A'.$resumenRowIndex, 'Ventas del período');
+        if ($resumenEndRow < $resumenStartRow) {
+            $sheetResumen->setCellValue('A5', '-');
+            $sheetResumen->setCellValue('B5', '-');
+            $sheetResumen->setCellValue('C5', '-');
+            $sheetResumen->setCellValue('D5', 'Sin facturación registrada');
+            $sheetResumen->setCellValue('E5', 0.0);
+            $sheetResumen->setCellValue('F5', 0.0);
+            $sheetResumen->setCellValue('G5', 0.0);
+            $sheetResumen->setCellValue('H5', 0.0);
+            $sheetResumen->setCellValue('I5', 0.0);
+            $sheetResumen->getStyle('E5:I5')->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+            $sheetResumen->getStyle('A5:I5')->applyFromArray([
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'E8E8E8']]],
+                'font' => ['name' => 'Calibri', 'size' => 9],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+            ]);
+            $sheetResumen->getRowDimension(5)->setRowHeight(19);
+            $resumenEndRow = 5;
+            $resumenRowIndex = 6;
+        }
+
+        // Grand Total row on Resumen with merged A..D
+        $totalMonthLabel = $isFullMonth
+            ? 'Ventas del mes de '.ucfirst(strtolower($monthNameSpanish))." del {$fromCarbon->year}"
+            : 'Ventas del período';
+
+        $sheetResumen->mergeCells("A{$resumenRowIndex}:D{$resumenRowIndex}");
+        $sheetResumen->setCellValue('A'.$resumenRowIndex, $totalMonthLabel);
+        $sheetResumen->getStyle('A'.$resumenRowIndex)->applyFromArray([
+            'font' => ['bold' => true, 'size' => 11, 'name' => 'Calibri'],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+        ]);
+
         $sheetResumen->setCellValue('E'.$resumenRowIndex, "=SUM(E{$resumenStartRow}:E{$resumenEndRow})");
         $sheetResumen->setCellValue('F'.$resumenRowIndex, "=SUM(F{$resumenStartRow}:F{$resumenEndRow})");
         $sheetResumen->setCellValue('G'.$resumenRowIndex, "=SUM(G{$resumenStartRow}:G{$resumenEndRow})");

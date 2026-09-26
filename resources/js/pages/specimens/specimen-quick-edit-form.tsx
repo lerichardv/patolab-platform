@@ -538,17 +538,18 @@ export default function SpecimenQuickEditForm({
                                                 onCheckedChange={(checked) => {
                                                     setData((prev: any) => ({
                                                         ...prev,
-                                                        auto_received_at: checked,
+                                                        auto_received_at:
+                                                            checked,
                                                         received_at: checked
                                                             ? specimen?.received_at
                                                                 ? specimen.received_at.split(
-                                                                        'T',
-                                                                    )[0]
+                                                                      'T',
+                                                                  )[0]
                                                                 : new Date()
-                                                                        .toISOString()
-                                                                        .split(
-                                                                            'T',
-                                                                        )[0]
+                                                                      .toISOString()
+                                                                      .split(
+                                                                          'T',
+                                                                      )[0]
                                                             : prev.received_at,
                                                     }));
                                                 }}
@@ -601,34 +602,87 @@ export default function SpecimenQuickEditForm({
                             <SelectContent>
                                 {(() => {
                                     const defaultOptions = [
-                                        { value: 'received', label: 'Recibido', step_order: 1 },
-                                        { value: 'macroscopic_review', label: 'Revisión Macroscópica', step_order: 2 },
-                                        { value: 'processing', label: 'Procesamiento', step_order: 3 },
-                                        { value: 'microscopic_review', label: 'Revisión Microscópica', step_order: 4 },
-                                        { value: 'finalized', label: 'Finalizado', step_order: 5 },
-                                        { value: 'delivered', label: 'Entregado', step_order: 6 },
-                                        { value: 'cancelled', label: 'Cancelado', step_order: 7 },
+                                        {
+                                            value: 'received',
+                                            label: 'Recibido',
+                                            step_order: 1,
+                                        },
+                                        {
+                                            value: 'macroscopic_review',
+                                            label: 'Revisión Macroscópica',
+                                            step_order: 2,
+                                        },
+                                        {
+                                            value: 'processing',
+                                            label: 'Procesamiento',
+                                            step_order: 3,
+                                        },
+                                        {
+                                            value: 'microscopic_review',
+                                            label: 'Revisión Microscópica',
+                                            step_order: 4,
+                                        },
+                                        {
+                                            value: 'finalized',
+                                            label: 'Finalizado',
+                                            step_order: 5,
+                                        },
+                                        {
+                                            value: 'delivered',
+                                            label: 'Entregado',
+                                            step_order: 6,
+                                        },
+                                        {
+                                            value: 'cancelled',
+                                            label: 'Cancelado',
+                                            step_order: 7,
+                                        },
                                     ];
 
-                                    const typeStates = specimen?.type?.active_states || specimen?.type?.activeStates;
+                                    const typeStates =
+                                        specimen?.type?.active_states ||
+                                        specimen?.type?.activeStates;
 
                                     let options = defaultOptions;
 
-                                    if (Array.isArray(typeStates) && typeStates.length > 0) {
-                                        const activeMap = new Map<string, number>();
-                                        typeStates.forEach((ts: any) => activeMap.set(ts.status, ts.step_order));
+                                    if (
+                                        Array.isArray(typeStates) &&
+                                        typeStates.length > 0
+                                    ) {
+                                        const activeMap = new Map<
+                                            string,
+                                            number
+                                        >();
+                                        typeStates.forEach((ts: any) =>
+                                            activeMap.set(
+                                                ts.status,
+                                                ts.step_order,
+                                            ),
+                                        );
 
                                         options = defaultOptions
-                                            .filter((opt) => activeMap.has(opt.value) || opt.value === data.status)
+                                            .filter(
+                                                (opt) =>
+                                                    activeMap.has(opt.value) ||
+                                                    opt.value === data.status,
+                                            )
                                             .map((opt) => ({
                                                 ...opt,
-                                                step_order: activeMap.get(opt.value) ?? opt.step_order,
+                                                step_order:
+                                                    activeMap.get(opt.value) ??
+                                                    opt.step_order,
                                             }))
-                                            .sort((a, b) => a.step_order - b.step_order);
+                                            .sort(
+                                                (a, b) =>
+                                                    a.step_order - b.step_order,
+                                            );
                                     }
 
                                     return options.map((opt) => (
-                                        <SelectItem key={opt.value} value={opt.value}>
+                                        <SelectItem
+                                            key={opt.value}
+                                            value={opt.value}
+                                        >
                                             {opt.label}
                                         </SelectItem>
                                     ));
