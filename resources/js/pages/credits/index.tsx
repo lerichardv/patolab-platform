@@ -25,6 +25,7 @@ import {
     Upload,
     X,
     UserCheck,
+    GitMerge,
 } from 'lucide-react';
 import * as React from 'react';
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -84,6 +85,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import SpecimenGroupCustomerSheet from '../specimens/specimen-group-customer-sheet';
+import SpecimenGroupMergeSheet from '../specimens/specimen-group-merge-sheet';
 import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 import CreditEditSheet from './credit-edit-sheet';
@@ -321,6 +323,14 @@ export default function CreditsIndex({
         selectedGroupIdForCustomerChange,
         setSelectedGroupIdForCustomerChange,
     ] = useState<number | null>(null);
+    const [isGroupMergeSheetOpen, setIsGroupMergeSheetOpen] = useState(false);
+    const [selectedGroupIdForMerge, setSelectedGroupIdForMerge] = useState<number | null>(null);
+
+    const handleMergeGroupClick = (groupId: number) => {
+        setSelectedGroupIdForMerge(groupId);
+        setIsGroupMergeSheetOpen(true);
+    };
+
     const [search, setSearch] = useState(filters.search || '');
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
@@ -1620,6 +1630,40 @@ export default function CreditsIndex({
                                                                             </span>
                                                                         </DropdownMenuItem>
                                                                     )}
+                                                                {canManage &&
+                                                                    Boolean(
+                                                                        credit.is_group ||
+                                                                        credit.group_id ||
+                                                                        credit
+                                                                            .group
+                                                                            ?.id,
+                                                                    ) && (
+                                                                        <DropdownMenuItem
+                                                                            onClick={() => {
+                                                                                const grpId =
+                                                                                    credit.group_id ||
+                                                                                    credit
+                                                                                        .group
+                                                                                        ?.id;
+
+                                                                                if (
+                                                                                    grpId
+                                                                                ) {
+                                                                                    handleMergeGroupClick(
+                                                                                        Number(
+                                                                                            grpId,
+                                                                                        ),
+                                                                                    );
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <GitMerge className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                            <span>
+                                                                                Fusionar
+                                                                                grupo
+                                                                            </span>
+                                                                        </DropdownMenuItem>
+                                                                    )}
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </div>
@@ -1687,6 +1731,21 @@ export default function CreditsIndex({
                     if (!open) {
                         setSelectedGroupIdForCustomerChange(null);
                     }
+                }}
+            />
+
+            <SpecimenGroupMergeSheet
+                groupId={selectedGroupIdForMerge}
+                open={isGroupMergeSheetOpen}
+                onOpenChange={(open) => {
+                    setIsGroupMergeSheetOpen(open);
+
+                    if (!open) {
+                        setSelectedGroupIdForMerge(null);
+                    }
+                }}
+                onSuccess={() => {
+                    router.reload({ only: ['credits'] });
                 }}
             />
 

@@ -4,12 +4,10 @@ namespace App\Http\Controllers\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\Invoice;
+use App\Services\BillingReconciliationService;
 use App\Services\DateFilterService;
 use Carbon\Carbon;
-use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -20,6 +18,10 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class BillingReconciliationReportController extends Controller
 {
+    public function __construct(
+        public BillingReconciliationService $reconciliationService
+    ) {}
+
     /**
      * Payment method mapping to numerical codes used in accounting cuadre.
      */
@@ -111,318 +113,12 @@ class BillingReconciliationReportController extends Controller
      */
     public function calculateReportData(string $dateFrom, string $dateTo, ?string $customerId = null, ?string $search = null): array
     {
-        $startDate = Carbon::parse($dateFrom)->startOfDay();
-        $endDate = Carbon::parse($dateTo)->endOfDay();
-
-        // 1. Fetch all invoices in the date range with necessary relations
-        $query = Invoice::with(['customer', 'specimen.type', 'createdBy', 'creditRelation'])
-            ->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), [
-                    $startDate->toDateTimeString(),
-                    $endDate->toDateTimeString(),
-                ]);
-            });
-
-        // Invoices must have an invoice number assigned
-        $query->whereNotNull('invoices.invoice_number')
-            ->where('invoices.invoice_number', '!=', '');
-
-        // Only include invoices that are already paid:
-        // - Cancelled invoices are retained for sequential audit trail
-        // - Invoices with a credit assigned must have their credit in 'paid' status
-        // - Invoices without a credit assigned must not have payment_type = 'credit'
-        $query->where(function ($q) {
-            $q->where('invoices.invoice_type', 'cancelled')
-                ->orWhere(function ($sub) {
-                    $sub->whereNotNull('invoices.credit_payment_id')
-                        ->whereHas('creditRelation', function ($cq) {
-                            $cq->where('status', 'paid');
-                        });
-                })
-                ->orWhere(function ($sub) {
-                    $sub->whereNull('invoices.credit_payment_id')
-                        ->where('invoices.payment_type', '!=', 'credit');
-                });
-        });
-
-        if ($customerId && $customerId !== 'all') {
-            $query->where('customer_id', $customerId);
-        }
-
-        if (! empty($search)) {
-            $query->where(function ($q) use ($search) {
-                $q->where('full_invoice_number', 'like', "%{$search}%")
-                    ->orWhere('invoice_number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', function ($cq) use ($search) {
-                        $cq->where('name', 'like', "%{$search}%")
-                            ->orWhere('id_number', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('specimen', function ($sq) use ($search) {
-                        $sq->where('sequence_code', 'like', "%{$search}%");
-                    });
-            });
-        }
-
-        $invoices = $query->orderBy(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), 'asc')
-            ->orderBy('id', 'asc')
-            ->get();
-
-        // 2. Group invoices by date string Y-m-d
-        $invoicesByDate = [];
-        foreach ($invoices as $invoice) {
-            $date = $invoice->invoice_date
-                ? Carbon::parse($invoice->invoice_date)->toDateString()
-                : ($invoice->created_at ? $invoice->created_at->toDateString() : null);
-
-            if ($date) {
-                $invoicesByDate[$date][] = $invoice;
-            }
-        }
-
-        // 3. Generate list of working days (MONDAY through SATURDAY, STRICTLY EXCLUDING SUNDAY)
-        $dailyTables = [];
-        $resumenRows = [];
-
-        $period = CarbonPeriod::create($startDate->toDateString(), $endDate->toDateString());
-
-        $periodTotals = [
-            'gross' => 0.0,
-            'discount' => 0.0,
-            'net' => 0.0,
-            'cash' => 0.0,
-            'check' => 0.0,
-            'card' => 0.0,
-            'transfer' => 0.0,
-            'credit' => 0.0,
-            'taxable_15' => 0.0,
-            'exempt' => 0.0,
-            'isv_15' => 0.0,
-            'total_sales' => 0.0,
-            'invoice_count' => 0,
-            'active_count' => 0,
-            'cancelled_count' => 0,
-        ];
-
-        foreach ($period as $day) {
-            // STRICTLY IGNORE SUNDAYS
-            if ($day->isSunday()) {
-                continue;
-            }
-
-            $dateKey = $day->toDateString();
-            $dayInvoices = $invoicesByDate[$dateKey] ?? [];
-
-            $dayRows = [];
-            $itemIndex = 1;
-
-            $dayTotals = [
-                'gross' => 0.0,
-                'discount' => 0.0,
-                'net' => 0.0,
-            ];
-
-            $settlement = [
-                'cash' => 0.0,
-                'check' => 0.0,
-                'card' => 0.0,
-                'transfer' => 0.0,
-                'credit' => 0.0,
-                'total' => 0.0,
-                'difference' => 0.0,
-                'is_balanced' => true,
-            ];
-
-            $dayTaxable15 = 0.0;
-            $dayExempt = 0.0;
-            $dayDiscount = 0.0;
-            $dayIsv15 = 0.0;
-            $dayTotalSales = 0.0;
-
-            $firstInvoiceNum = null;
-            $lastInvoiceNum = null;
-
-            foreach ($dayInvoices as $inv) {
-                $isCancelled = ($inv->invoice_type === 'cancelled');
-                $invoiceNum = $inv->full_invoice_number ?: (string) $inv->invoice_number;
-
-                if (! $firstInvoiceNum) {
-                    $firstInvoiceNum = $invoiceNum;
-                }
-                $lastInvoiceNum = $invoiceNum;
-
-                if ($isCancelled) {
-                    $periodTotals['cancelled_count']++;
-                    $dayRows[] = [
-                        'item' => $itemIndex++,
-                        'date' => $day->format('d/m/Y'),
-                        'customer_name' => 'Anulada',
-                        'quantity' => 0,
-                        'payment_type_code' => 0,
-                        'payment_type_label' => '-',
-                        'gross_amount' => 0.0,
-                        'discount' => 0.0,
-                        'net_amount' => 0.0,
-                        'taxable_15' => 0.0,
-                        'exempt' => 0.0,
-                        'isv_15' => 0.0,
-                        'comment' => 'Factura Anulada',
-                        'invoice_number' => $invoiceNum,
-                        'is_cancelled' => true,
-                        'invoice_id' => $inv->id,
-                    ];
-                } else {
-                    $periodTotals['active_count']++;
-
-                    $pmKey = strtolower(trim((string) $inv->payment_type));
-                    $pmCode = self::PAYMENT_CODES[$pmKey] ?? 1;
-                    $pmLabel = self::PAYMENT_LABELS[$pmCode] ?? 'Efectivo';
-
-                    $discount = (float) $inv->discount;
-                    $net = (float) ($inv->total > 0 ? $inv->total : ($inv->total_paid > 0 ? $inv->total_paid : $inv->subtotal));
-                    $gross = $net + $discount;
-
-                    $quantity = (int) ($inv->quantity ?: 1);
-
-                    // Taxes for Resumen & Liquidación sheet
-                    $t15 = (float) ($inv->taxable_amount_15 > 0 ? $inv->taxable_amount_15 : ($inv->pay_isv ? $inv->subtotal : 0.0));
-                    $ex = (float) ($inv->exempt_amount > 0 ? $inv->exempt_amount : ($inv->pay_isv ? 0.0 : $inv->subtotal));
-                    $isv = (float) ($inv->isv_15 > 0 ? $inv->isv_15 : ($inv->pay_isv ? round($t15 * 0.15, 2) : 0.0));
-
-                    $dayRows[] = [
-                        'item' => $itemIndex++,
-                        'date' => $day->format('d/m/Y'),
-                        'customer_name' => $inv->customer?->name ?: 'Consumidor Final',
-                        'quantity' => $quantity,
-                        'payment_type_code' => $pmCode,
-                        'payment_type_label' => $pmLabel,
-                        'gross_amount' => $gross,
-                        'discount' => $discount,
-                        'net_amount' => $net,
-                        'taxable_15' => $t15,
-                        'exempt' => $ex,
-                        'isv_15' => $isv,
-                        'comment' => $inv->description ?: '',
-                        'invoice_number' => $invoiceNum,
-                        'is_cancelled' => false,
-                        'invoice_id' => $inv->id,
-                        'invoice' => $inv,
-                    ];
-
-                    $dayTotals['gross'] += $gross;
-                    $dayTotals['discount'] += $discount;
-                    $dayTotals['net'] += $net;
-
-                    // Breakdown by payment code into settlement block
-                    switch ($pmCode) {
-                        case 1:
-                            $settlement['cash'] += $net;
-                            break;
-                        case 2:
-                            $settlement['check'] += $net;
-                            break;
-                        case 3:
-                            $settlement['card'] += $net;
-                            break;
-                        case 4:
-                            $settlement['transfer'] += $net;
-                            break;
-                        case 5:
-                            $settlement['credit'] += $net;
-                            break;
-                    }
-
-                    $dayTaxable15 += $t15;
-                    $dayExempt += $ex;
-                    $dayDiscount += $discount;
-                    $dayIsv15 += $isv;
-                    $dayTotalSales += ($t15 + $ex - $discount + $isv);
-                }
-
-                $periodTotals['invoice_count']++;
-            }
-
-            $settlement['total'] = $settlement['cash'] + $settlement['check'] + $settlement['card'] + $settlement['transfer'] + $settlement['credit'];
-            $settlement['difference'] = round($dayTotals['net'] - $settlement['total'], 2);
-            $settlement['is_balanced'] = (abs($settlement['difference']) < 0.01);
-
-            // Accumulate into period totals
-            $periodTotals['gross'] += $dayTotals['gross'];
-            $periodTotals['discount'] += $dayTotals['discount'];
-            $periodTotals['net'] += $dayTotals['net'];
-            $periodTotals['cash'] += $settlement['cash'];
-            $periodTotals['check'] += $settlement['check'];
-            $periodTotals['card'] += $settlement['card'];
-            $periodTotals['transfer'] += $settlement['transfer'];
-            $periodTotals['credit'] += $settlement['credit'];
-            $periodTotals['taxable_15'] += $dayTaxable15;
-            $periodTotals['exempt'] += $dayExempt;
-            $periodTotals['isv_15'] += $dayIsv15;
-            $periodTotals['total_sales'] += $dayTotalSales;
-
-            $spanishTitle = $this->formatDayTitleSpanish($day);
-
-            $dailyTables[] = [
-                'date' => $dateKey,
-                'day_name' => strtoupper($this->getSpanishDayName($day->dayOfWeek)),
-                'formatted_date' => $day->format('d/m/Y'),
-                'title' => $spanishTitle,
-                'items' => $dayRows,
-                'totals' => $dayTotals,
-                'settlement' => $settlement,
-                'invoice_count' => count($dayRows),
-            ];
-
-            // Resumen row for this day (all month days without sundays and with first and last invoice correlatives)
-            $resumenRows[] = [
-                'date' => $dateKey,
-                'formatted_date' => $day->format('d/m/Y'),
-                'start_invoice' => $firstInvoiceNum ?: '-',
-                'end_invoice' => $lastInvoiceNum ?: '-',
-                'customer' => 'Consumidor Final',
-                'taxable_15' => $dayTaxable15,
-                'exempt' => $dayExempt,
-                'discount' => $dayDiscount,
-                'isv_15' => $dayIsv15,
-                'total' => $dayTotalSales,
-                'has_invoices' => count($dayInvoices) > 0,
-            ];
-        }
-
-        $generalInvoices = [];
-        foreach ($dailyTables as $dayTable) {
-            foreach ($dayTable['items'] as $item) {
-                $generalInvoices[] = $item;
-            }
-        }
-
-        $resumenTotals = [
-            'taxable_15' => 0.0,
-            'exempt' => 0.0,
-            'discount' => 0.0,
-            'isv_15' => 0.0,
-            'total' => 0.0,
-        ];
-        foreach ($resumenRows as $rRow) {
-            $resumenTotals['taxable_15'] += $rRow['taxable_15'];
-            $resumenTotals['exempt'] += $rRow['exempt'];
-            $resumenTotals['discount'] += $rRow['discount'];
-            $resumenTotals['isv_15'] += $rRow['isv_15'];
-            $resumenTotals['total'] += $rRow['total'];
-        }
-
-        return [
-            'dailyTables' => $dailyTables,
-            'generalInvoices' => $generalInvoices,
-            'resumenRows' => $resumenRows,
-            'resumenTotals' => $resumenTotals,
-            'periodTotals' => $periodTotals,
-            'dateRange' => [
-                'from' => $dateFrom,
-                'to' => $dateTo,
-                'from_formatted' => Carbon::parse($dateFrom)->format('d/m/Y'),
-                'to_formatted' => Carbon::parse($dateTo)->format('d/m/Y'),
-            ],
-        ];
+        return $this->reconciliationService->calculatePeriodReport(
+            $dateFrom,
+            $dateTo,
+            $customerId,
+            $search
+        );
     }
 
     /**

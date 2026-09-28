@@ -1787,4 +1787,406 @@ class SpecimenGroupController extends Controller
 
         return redirect()->back()->with('success', 'Cliente principal del grupo de muestras actualizado con éxito.');
     }
+
+    public function mergeData(SpecimenGroup $group)
+    {
+        $group->load([
+            'customer',
+            'invoice.creditRelation',
+            'invoice.caiRange',
+            'credit',
+            'specimens.type',
+            'specimens.customerRelation',
+            'specimens.examination',
+            'specimens.specimenExaminations.examination',
+            'specimens.invoiceSpecimens',
+        ]);
+
+        $invoice = $group->invoice;
+        $credit = $invoice?->creditRelation ?? $group->credit ?? Credit::where('group_id', $group->id)->first();
+
+        $invoiceSpecimens = $invoice
+            ? $invoice->invoiceSpecimens()->with('examination')->get()
+            : InvoiceSpecimen::where('group_id', $group->id)->with('examination')->get();
+
+        $hasInvoiceNumber = ! empty($invoice?->full_invoice_number) || ! empty($invoice?->invoice_number);
+
+        return response()->json([
+            'id' => $group->id,
+            'name' => $group->name,
+            'customer_id' => $group->customer_id,
+            'customer' => $group->customer ? [
+                'id' => $group->customer->id,
+                'name' => $group->customer->name,
+                'id_number' => $group->customer->id_number,
+                'type' => $group->customer->type,
+            ] : null,
+            'specimens_count' => $group->specimens->count(),
+            'specimens' => $group->specimens->map(function ($s) {
+                return [
+                    'id' => $s->id,
+                    'sequence_code' => $s->sequence_code,
+                    'status' => $s->status,
+                    'status_color' => $s->status_color,
+                    'customer_name' => $s->customerRelation?->name,
+                    'type_name' => $s->type?->name,
+                    'examination_name' => $s->examination?->name ?? $s->specimenExaminations->first()?->examination?->name ?? 'Examen',
+                ];
+            }),
+            'invoice' => $invoice ? [
+                'id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'full_invoice_number' => $invoice->full_invoice_number,
+                'has_invoice_number' => $hasInvoiceNumber,
+                'payment_type' => $invoice->payment_type,
+                'amount' => (float) $invoice->amount,
+                'discount' => (float) $invoice->discount,
+                'subtotal' => (float) $invoice->subtotal,
+                'total' => (float) $invoice->total,
+                'total_paid' => (float) $invoice->total_paid,
+                'invoice_file' => $invoice->invoice_file,
+                'invoice_file_url' => $invoice->invoice_file ? asset('storage/'.$invoice->invoice_file) : null,
+            ] : null,
+            'credit' => $credit ? [
+                'id' => $credit->id,
+                'credit_amount' => (float) $credit->credit_amount,
+                'amount_paid' => (float) $credit->amount_paid,
+                'amount_remaining' => (float) $credit->amount_remaining,
+                'status' => $credit->status,
+                'created_at' => $credit->created_at?->format('d/m/Y H:i'),
+            ] : null,
+            'invoice_specimens_count' => $invoiceSpecimens->count(),
+        ]);
+    }
+
+    public function searchMergeCandidates(Request $request)
+    {
+        $excludeId = $request->integer('exclude_id');
+        $term = $request->input('q');
+
+        $targetGroup = $excludeId ? SpecimenGroup::with(['invoice.creditRelation', 'credit'])->find($excludeId) : null;
+        $targetHasCredit = $targetGroup ? (
+            ($targetGroup->invoice?->payment_type === 'credit')
+            || ($targetGroup->invoice?->credit_payment_id !== null)
+            || ($targetGroup->credit !== null)
+            || Credit::where('group_id', $targetGroup->id)->exists()
+        ) : false;
+
+        $query = SpecimenGroup::with([
+            'invoice.creditRelation',
+            'credit',
+            'customer',
+            'specimens:id,group_id,sequence_code,customer',
+        ])
+            ->when($excludeId, function ($q, $excludeId) {
+                $q->where('id', '!=', $excludeId);
+            });
+
+        if ($term) {
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'like', "%{$term}%")
+                    ->orWhereHas('invoice', function ($q2) use ($term) {
+                        $q2->where('full_invoice_number', 'like', "%{$term}%")
+                            ->orWhere('invoice_number', 'like', "%{$term}%");
+                    })
+                    ->orWhereHas('specimens', function ($q3) use ($term) {
+                        $q3->where('sequence_code', 'like', "%{$term}%");
+                    })
+                    ->orWhereHas('customer', function ($q4) use ($term) {
+                        $q4->where('name', 'like', "%{$term}%");
+                    });
+            });
+        }
+
+        $candidatesPaginated = $query->latest()->paginate(8);
+
+        $formattedData = collect($candidatesPaginated->items())->map(function ($group) use ($targetGroup, $targetHasCredit) {
+            $invoice = $group->invoice;
+            $hasInvoiceNumber = ! empty($invoice?->full_invoice_number) || ! empty($invoice?->invoice_number);
+            $hasCredit = ($invoice?->payment_type === 'credit')
+                || ($invoice?->credit_payment_id !== null)
+                || ($group->credit !== null)
+                || Credit::where('group_id', $group->id)->exists();
+
+            return [
+                'id' => $group->id,
+                'name' => $group->name,
+                'customer_name' => $group->customer?->name ?? 'Sin cliente',
+                'full_invoice_number' => $invoice?->full_invoice_number ?: ($invoice?->invoice_number ?: null),
+                'has_invoice_number' => $hasInvoiceNumber,
+                'payment_type' => $invoice?->payment_type ?? 'Sin pago',
+                'has_credit' => $hasCredit,
+                'is_compatible' => $targetGroup ? ($targetHasCredit === $hasCredit) : true,
+                'total' => (float) ($invoice?->total ?? 0),
+                'specimens_count' => $group->specimens->count(),
+                'specimen_codes' => $group->specimens->map(fn ($s) => $s->sequence_code)->filter()->values()->toArray(),
+            ];
+        });
+
+        return response()->json([
+            'data' => $formattedData,
+            'current_page' => $candidatesPaginated->currentPage(),
+            'last_page' => $candidatesPaginated->lastPage(),
+            'total' => $candidatesPaginated->total(),
+            'target_has_credit' => $targetHasCredit,
+        ]);
+    }
+
+    public function merge(Request $request, SpecimenGroup $group)
+    {
+        $validated = $request->validate([
+            'origin_group_id' => [
+                'required',
+                'integer',
+                'exists:specimen_groups,id',
+                function ($attribute, $value, $fail) use ($group) {
+                    if ((int) $value === (int) $group->id) {
+                        $fail('El grupo origen no puede ser igual al grupo destino.');
+                    }
+                },
+            ],
+            'target_invoice_id' => 'nullable|integer',
+            'target_credit_id' => 'nullable|integer',
+        ]);
+
+        $targetGroup = $group;
+        $originGroup = SpecimenGroup::with(['invoice.creditRelation', 'credit', 'specimens', 'customer'])->findOrFail($validated['origin_group_id']);
+
+        if ($originGroup->specimens->isEmpty()) {
+            throw ValidationException::withMessages([
+                'origin_group_id' => ['El grupo origen no contiene muestras para transferir.'],
+            ]);
+        }
+
+        $targetInvoice = $targetGroup->invoice;
+        $originInvoice = $originGroup->invoice;
+
+        $targetCredit = $targetInvoice?->creditRelation ?? $targetGroup->credit ?? Credit::where('group_id', $targetGroup->id)->first();
+        $originCredit = $originInvoice?->creditRelation ?? $originGroup->credit ?? Credit::where('group_id', $originGroup->id)->first();
+
+        $targetHasCredit = ($targetInvoice?->payment_type === 'credit')
+            || ($targetInvoice?->credit_payment_id !== null)
+            || ($targetCredit !== null);
+
+        $originHasCredit = ($originInvoice?->payment_type === 'credit')
+            || ($originInvoice?->credit_payment_id !== null)
+            || ($originCredit !== null);
+
+        if ($targetHasCredit || $originHasCredit) {
+            if (! $targetHasCredit || ! $originHasCredit) {
+                throw ValidationException::withMessages([
+                    'origin_group_id' => ['Si alguno de los grupos tiene un crédito asociado, ambos grupos deben ser a crédito para poder fusionarse.'],
+                ]);
+            }
+        }
+
+        $targetHasInvoiceNumber = ! empty($targetInvoice?->full_invoice_number) || ! empty($targetInvoice?->invoice_number);
+        $originHasInvoiceNumber = ! empty($originInvoice?->full_invoice_number) || ! empty($originInvoice?->invoice_number);
+
+        $requestedInvoiceId = $request->input('target_invoice_id');
+        $survivingInvoice = null;
+        $emptyInvoice = null;
+
+        if ($targetHasInvoiceNumber && $originHasInvoiceNumber) {
+            // Both have invoice numbers - respect user selection
+            if ($requestedInvoiceId && (int) $requestedInvoiceId === (int) $originInvoice?->id) {
+                $survivingInvoice = $originInvoice;
+                $emptyInvoice = $targetInvoice;
+            } else {
+                $survivingInvoice = $targetInvoice;
+                $emptyInvoice = $originInvoice;
+            }
+        } elseif ($originHasInvoiceNumber && ! $targetHasInvoiceNumber) {
+            // Only origin has invoice number - keep origin invoice
+            $survivingInvoice = $originInvoice;
+            $emptyInvoice = $targetInvoice;
+        } else {
+            // Only target has invoice number, or neither has invoice number - keep target invoice
+            $survivingInvoice = $targetInvoice ?? $originInvoice;
+            $emptyInvoice = ($survivingInvoice?->id === $targetInvoice?->id) ? $originInvoice : $targetInvoice;
+        }
+
+        // Credit resolution: respect user selection when both groups have credits
+        $requestedCreditId = $request->input('target_credit_id');
+        $survivingCredit = null;
+        $dissolvedCredit = null;
+
+        if ($targetCredit && $originCredit) {
+            if ($requestedCreditId && (int) $requestedCreditId === (int) $originCredit->id) {
+                $survivingCredit = $originCredit;
+                $dissolvedCredit = $targetCredit;
+            } else {
+                $survivingCredit = $targetCredit;
+                $dissolvedCredit = $originCredit;
+            }
+        } elseif ($originCredit && ! $targetCredit) {
+            $survivingCredit = $originCredit;
+            $dissolvedCredit = null;
+        } else {
+            $survivingCredit = $targetCredit;
+            $dissolvedCredit = null;
+        }
+
+        DB::transaction(function () use (
+            $targetGroup,
+            $originGroup,
+            $targetInvoice,
+            $originInvoice,
+            &$survivingInvoice,
+            $emptyInvoice,
+            &$survivingCredit,
+            $dissolvedCredit,
+            $targetCredit,
+            $originCredit
+        ) {
+            // 1. Move specimens from origin group to target group
+            $originSpecimenIds = $originGroup->specimens->pluck('id')->toArray();
+            Specimen::whereIn('id', $originSpecimenIds)->update([
+                'group_id' => $targetGroup->id,
+                'is_group' => true,
+            ]);
+
+            // 2. Pivot customers sync
+            $originCustomerIds = SpecimenGroupCustomer::where('specimen_group_id', $originGroup->id)
+                ->pluck('customer_id')
+                ->toArray();
+            if ($originGroup->customer_id) {
+                $originCustomerIds[] = $originGroup->customer_id;
+            }
+            foreach (array_unique(array_filter($originCustomerIds)) as $cId) {
+                SpecimenGroupCustomer::firstOrCreate([
+                    'specimen_group_id' => $targetGroup->id,
+                    'customer_id' => $cId,
+                ]);
+            }
+            SpecimenGroupCustomer::where('specimen_group_id', $originGroup->id)->delete();
+
+            // 3. Re-assign Surviving Invoice and Credit to Target Group
+            if ($survivingInvoice && $targetGroup->invoice_id !== $survivingInvoice->id) {
+                $targetGroup->update(['invoice_id' => $survivingInvoice->id]);
+                $survivingInvoice->update(['group_id' => $targetGroup->id]);
+            }
+
+            if ($survivingCredit && $survivingCredit->group_id !== $targetGroup->id) {
+                $survivingCredit->update(['group_id' => $targetGroup->id]);
+            }
+
+            // 4. Update InvoiceSpecimens
+            if ($survivingInvoice) {
+                InvoiceSpecimen::where('group_id', $originGroup->id)
+                    ->orWhere(function ($q) use ($emptyInvoice) {
+                        if ($emptyInvoice) {
+                            $q->where('invoice_id', $emptyInvoice->id);
+                        }
+                    })
+                    ->update([
+                        'group_id' => $targetGroup->id,
+                        'invoice_id' => $survivingInvoice->id,
+                        'credit_id' => $survivingCredit?->id,
+                        'is_group' => true,
+                        'updated_at' => now(),
+                    ]);
+
+                // Ensure all target items also have the surviving invoice and credit
+                InvoiceSpecimen::where('group_id', $targetGroup->id)->update([
+                    'invoice_id' => $survivingInvoice->id,
+                    'credit_id' => $survivingCredit?->id,
+                    'is_group' => true,
+                    'updated_at' => now(),
+                ]);
+
+                // 5. Recalculate Surviving Invoice Totals
+                $allIgs = InvoiceSpecimen::where('invoice_id', $survivingInvoice->id)->get();
+
+                $newAmount = (float) $allIgs->sum('amount');
+                $newDiscount = (float) $allIgs->sum('discount');
+                $newSubtotal = (float) $allIgs->sum('subtotal');
+                $newExempt = (float) $allIgs->sum('exempt_amount');
+                $newTax15 = (float) $allIgs->sum('taxable_amount_15');
+                $newTax18 = (float) $allIgs->sum('taxable_amount_18');
+                $newIsv15 = (float) $allIgs->sum('isv_15');
+                $newIsv18 = (float) $allIgs->sum('isv_18');
+                $newTotal = (float) $allIgs->sum('total');
+                $newQty = (int) $allIgs->sum('quantity');
+
+                $combinedPaid = (float) ($targetInvoice?->total_paid ?? 0) + (float) ($originInvoice?->total_paid ?? 0);
+
+                $survivingInvoice->update([
+                    'amount' => $newAmount,
+                    'discount' => $newDiscount,
+                    'subtotal' => $newSubtotal,
+                    'exempt_amount' => $newExempt,
+                    'tax_exempt_amount' => $newSubtotal,
+                    'taxable_amount_15' => $newTax15,
+                    'taxable_amount_18' => $newTax18,
+                    'isv_15' => $newIsv15,
+                    'isv_18' => $newIsv18,
+                    'total' => $newTotal,
+                    'quantity' => $newQty ?: $allIgs->unique('specimen_id')->count(),
+                    'total_paid' => $combinedPaid,
+                    'group_id' => $targetGroup->id,
+                    'credit_payment_id' => $survivingCredit?->id,
+                ]);
+            }
+
+            // 6. Recalculate Credit if applicable
+            if ($survivingCredit && $survivingInvoice) {
+                $combinedCreditPaid = (float) ($targetCredit?->amount_paid ?? 0) + (float) ($originCredit?->amount_paid ?? 0);
+                $newRemaining = max(0, (float) $survivingInvoice->total - $combinedCreditPaid);
+
+                if ($dissolvedCredit && $dissolvedCredit->id !== $survivingCredit->id) {
+                    Invoice::where('credit_payment_id', $dissolvedCredit->id)
+                        ->where('id', '!=', $emptyInvoice?->id)
+                        ->update(['credit_payment_id' => $survivingCredit->id]);
+                }
+
+                $survivingCredit->update([
+                    'credit_amount' => (float) $survivingInvoice->total,
+                    'amount_paid' => $combinedCreditPaid,
+                    'amount_remaining' => $newRemaining,
+                    'status' => $newRemaining <= 0 ? 'paid' : 'pending',
+                    'group_id' => $targetGroup->id,
+                    'customer_id' => $targetGroup->customer_id ?? $survivingCredit->customer_id,
+                ]);
+            }
+
+            // 7. Delete Dissolved Credit
+            if ($dissolvedCredit && $dissolvedCredit->id !== $survivingCredit?->id) {
+                $dissolvedCredit->delete();
+            }
+
+            // 8. Delete Empty Invoice
+            if ($emptyInvoice && $emptyInvoice->id !== $survivingInvoice?->id) {
+                if ($emptyInvoice->invoice_file && Storage::disk('public')->exists($emptyInvoice->invoice_file)) {
+                    Storage::disk('public')->delete($emptyInvoice->invoice_file);
+                }
+                $emptyInvoice->delete();
+            }
+
+            // 9. Update Target Group Name & Count
+            $totalCount = Specimen::where('group_id', $targetGroup->id)->count();
+            $targetCustomer = $targetGroup->customer;
+            $targetGroup->update([
+                'name' => ($targetCustomer ? $targetCustomer->name : 'Grupo').' - '.$totalCount.' '.($totalCount === 1 ? 'Muestra' : 'Muestras'),
+            ]);
+
+            // 10. Delete Origin Group
+            $originGroup->delete();
+        });
+
+        // 11. Regenerate Surviving Invoice PDF
+        if ($survivingInvoice) {
+            try {
+                app(InvoicePdfService::class)->generateAndStoreInvoice($survivingInvoice->fresh());
+            } catch (\Throwable $e) {
+                Log::warning('Error regenerating invoice PDF during group merge: '.$e->getMessage());
+            }
+        }
+
+        return redirect()->back()->with([
+            'success' => 'Grupos de muestras fusionados con éxito.',
+            'target_group_id' => $targetGroup->id,
+            'invoice_id' => $survivingInvoice?->id,
+        ]);
+    }
 }

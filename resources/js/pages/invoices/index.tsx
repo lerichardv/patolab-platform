@@ -34,6 +34,7 @@ import {
     FolderMinus,
     UserCheck,
     History,
+    GitMerge,
 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import * as React from 'react';
@@ -113,6 +114,7 @@ import CreditFinalPaymentSheet from '../credits/credit-final-payment-sheet';
 import WorkOrderSheet from '../my-work-orders/work-order-sheet';
 import RentalPaymentSheet from '../rentals/rental-payment-sheet';
 import SpecimenGroupCustomerSheet from '../specimens/specimen-group-customer-sheet';
+import SpecimenGroupMergeSheet from '../specimens/specimen-group-merge-sheet';
 import SpecimenGroupSheet from '../specimens/specimen-group-sheet';
 import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
 import SpecimenSheet from '../specimens/specimen-sheet';
@@ -739,6 +741,14 @@ export default function InvoicesIndex({
     const [specimenSearchQuery, setSpecimenSearchQuery] = useState('');
     const [isSelectGroupDialogOpen, setIsSelectGroupDialogOpen] =
         useState(false);
+
+    const [isGroupMergeSheetOpen, setIsGroupMergeSheetOpen] = useState(false);
+    const [selectedGroupIdForMerge, setSelectedGroupIdForMerge] = useState<number | null>(null);
+
+    const handleMergeGroupClick = (groupId: number) => {
+        setSelectedGroupIdForMerge(groupId);
+        setIsGroupMergeSheetOpen(true);
+    };
 
     const [isWorkOrderSheetOpen, setIsWorkOrderSheetOpen] = useState(false);
     const [selectedSpecimenForWorkOrder, setSelectedSpecimenForWorkOrder] =
@@ -2094,12 +2104,14 @@ export default function InvoicesIndex({
                                                                                                                       .id
                                                                                                               ] !==
                                                                                                               false;
+
                                                                                                           if (
                                                                                                               aIn &&
                                                                                                               !bIn
                                                                                                           ) {
                                                                                                               return -1;
                                                                                                           }
+
                                                                                                           if (
                                                                                                               !aIn &&
                                                                                                               bIn
@@ -2695,6 +2707,29 @@ export default function InvoicesIndex({
                                                                                             );
                                                                                         })()}
                                                                                     </>
+                                                                                )}
+                                                                            {canManageInvoices &&
+                                                                                (invoice.is_group ||
+                                                                                    invoice.group_id ||
+                                                                                    invoice.group?.id) && (
+                                                                                    <DropdownMenuItem
+                                                                                        onClick={() => {
+                                                                                            const grpId =
+                                                                                                invoice.group_id ||
+                                                                                                invoice.group?.id;
+
+                                                                                            if (grpId) {
+                                                                                                handleMergeGroupClick(
+                                                                                                    Number(grpId),
+                                                                                                );
+                                                                                            }
+                                                                                        }}
+                                                                                    >
+                                                                                        <GitMerge className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                                        <span>
+                                                                                            Fusionar grupo
+                                                                                        </span>
+                                                                                    </DropdownMenuItem>
                                                                                 )}
                                                                             {canEditSpecimen &&
                                                                                 invoice.invoice_type !==
@@ -3302,6 +3337,21 @@ export default function InvoicesIndex({
                     if (!open) {
                         setSelectedGroupIdForCustomerChange(null);
                     }
+                }}
+            />
+
+            <SpecimenGroupMergeSheet
+                groupId={selectedGroupIdForMerge}
+                open={isGroupMergeSheetOpen}
+                onOpenChange={(open) => {
+                    setIsGroupMergeSheetOpen(open);
+
+                    if (!open) {
+                        setSelectedGroupIdForMerge(null);
+                    }
+                }}
+                onSuccess={() => {
+                    router.reload({ only: ['invoices'] });
                 }}
             />
 

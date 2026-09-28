@@ -122,6 +122,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('specimen-groups/{group}/details', [SpecimenGroupController::class, 'details'])->name('specimen-groups.details');
     Route::get('specimen-groups/{group}/customer-info', [SpecimenGroupController::class, 'customerInfo'])->name('specimen-groups.customer-info');
     Route::put('specimen-groups/{group}/customer', [SpecimenGroupController::class, 'updateCustomer'])->name('specimen-groups.update-customer');
+    Route::get('specimen-groups/{group}/merge-data', [SpecimenGroupController::class, 'mergeData'])->name('specimen-groups.merge-data');
+    Route::get('specimen-groups/search-merge-candidates', [SpecimenGroupController::class, 'searchMergeCandidates'])->name('specimen-groups.search-merge-candidates');
+    Route::post('specimen-groups/{group}/merge', [SpecimenGroupController::class, 'merge'])->name('specimen-groups.merge');
 
     // Specimen Report Editor routes
     Route::get('specimens/can-finalize', [ReportEditorController::class, 'canFinalize'])->name('specimens.can-finalize');
