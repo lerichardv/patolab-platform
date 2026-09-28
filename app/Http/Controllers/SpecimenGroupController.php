@@ -18,6 +18,7 @@ use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenGroup;
 use App\Models\SpecimenGroupCustomer;
+use App\Models\SpecimenReport;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Services\InvoiceCalculationService;
