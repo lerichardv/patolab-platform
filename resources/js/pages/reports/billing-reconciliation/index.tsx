@@ -363,7 +363,7 @@ export default function BillingReconciliationReport({
                             className={`space-y-6 transition-opacity duration-200 ${isPending ? 'pointer-events-none opacity-60' : ''}`}
                         >
                             {/* Period Top Stats Overview */}
-                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                                 <Card className="border border-border/80 bg-card p-3.5 shadow-xs">
                                     <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                                         Total Facturado
@@ -444,23 +444,6 @@ export default function BillingReconciliationReport({
                                     </p>
                                     <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
                                         Bancos en línea
-                                    </p>
-                                </Card>
-
-                                <Card className="border border-border/80 bg-card p-3.5 shadow-xs">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                            5. Crédito
-                                        </p>
-                                        <div className="h-2 w-2 rounded-full bg-indigo-500" />
-                                    </div>
-                                    <p className="mt-1 font-mono text-lg font-bold text-foreground">
-                                        {formatCurrency(
-                                            reportData.periodTotals.credit,
-                                        )}
-                                    </p>
-                                    <p className="mt-0.5 text-[11px] text-indigo-600 dark:text-indigo-400">
-                                        Cuentas por cobrar
                                     </p>
                                 </Card>
                             </div>
