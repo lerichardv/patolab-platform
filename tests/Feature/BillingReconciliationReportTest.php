@@ -649,3 +649,203 @@ test('report defaults to current month date range when visited without date para
             ->where('filters.date_to', $expectedTo)
         );
 });
+
+test('invoices with discounts correctly calculate gross exempt and do not double-subtract discount from total sales', function () {
+    // Replicating the scenario from user screenshot:
+    // Invoice 1: Gross 2900, Discount 870, Net 2030 (exempt)
+    // Invoice 2: Gross 1700, Discount 510, Net 1190 (exempt)
+    // Total Gross = 4600, Total Discount = 1380, Total Net = 3220
+    $date = '2026-09-26 10:00:00';
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00029923',
+        'invoice_number' => '00029923',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'card',
+        'quantity' => 1,
+        'amount' => 2900.0,
+        'discount' => 870.0,
+        'subtotal' => 2030.0,
+        'exempt_amount' => 2030.0,
+        'total' => 2030.0,
+        'total_paid' => 2030.0,
+        'invoice_file' => 'invoices/test_disc_1.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+        'pay_isv' => false,
+    ]);
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00029924',
+        'invoice_number' => '00029924',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'card',
+        'quantity' => 1,
+        'amount' => 1700.0,
+        'discount' => 510.0,
+        'subtotal' => 1190.0,
+        'exempt_amount' => 1190.0,
+        'total' => 1190.0,
+        'total_paid' => 1190.0,
+        'invoice_file' => 'invoices/test_disc_2.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+        'pay_isv' => false,
+    ]);
+
+    $controller = app(BillingReconciliationReportController::class);
+    $data = $controller->calculateReportData('2026-09-26', '2026-09-26');
+
+    $dayTable = $data['dailyTables'][0];
+
+    // Check individual items
+    expect($dayTable['items'][0]['gross_amount'])->toEqual(2900.0)
+        ->and($dayTable['items'][0]['discount'])->toEqual(870.0)
+        ->and($dayTable['items'][0]['net_amount'])->toEqual(2030.0)
+        ->and($dayTable['items'][0]['exempt'])->toEqual(2900.0)
+        ->and($dayTable['items'][0]['taxable_15'])->toEqual(0.0);
+
+    expect($dayTable['items'][1]['gross_amount'])->toEqual(1700.0)
+        ->and($dayTable['items'][1]['discount'])->toEqual(510.0)
+        ->and($dayTable['items'][1]['net_amount'])->toEqual(1190.0)
+        ->and($dayTable['items'][1]['exempt'])->toEqual(1700.0)
+        ->and($dayTable['items'][1]['taxable_15'])->toEqual(0.0);
+
+    // Check day totals: Gross = 4600, Discount = 1380, Net = 3220
+    expect($dayTable['totals']['gross'])->toEqual(4600.0)
+        ->and($dayTable['totals']['discount'])->toEqual(1380.0)
+        ->and($dayTable['totals']['net'])->toEqual(3220.0);
+
+    // Crucial: Total sales must NOT be 3220 - 1380 = 1840! It must be 3220.00!
+    expect($data['periodTotals']['exempt'])->toEqual(4600.0)
+        ->and($data['periodTotals']['discount'])->toEqual(1380.0)
+        ->and($data['periodTotals']['total_sales'])->toEqual(3220.0)
+        ->and($data['periodTotals']['net'])->toEqual(3220.0)
+        ->and($data['periodTotals']['card'])->toEqual(3220.0);
+
+    // Resumen row total must equal net sales
+    expect($data['resumenRows'][0]['exempt'])->toEqual(4600.0)
+        ->and($data['resumenRows'][0]['discount'])->toEqual(1380.0)
+        ->and($data['resumenRows'][0]['total'])->toEqual(3220.0);
+});
+
+test('taxable invoice with 15 percent ISV and discount correctly calculates gross taxable and total sales', function () {
+    // Base 1000, Discount 200, Subtotal 800, ISV 120, Total 920
+    $date = '2026-09-26 11:00:00';
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00039901',
+        'invoice_number' => '00039901',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'transfer',
+        'quantity' => 1,
+        'amount' => 1000.0,
+        'discount' => 200.0,
+        'subtotal' => 800.0,
+        'taxable_amount_15' => 800.0,
+        'isv_15' => 120.0,
+        'total' => 920.0,
+        'total_paid' => 920.0,
+        'invoice_file' => 'invoices/test_taxable.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'rental',
+        'pay_isv' => true,
+    ]);
+
+    $controller = app(BillingReconciliationReportController::class);
+    $data = $controller->calculateReportData('2026-09-26', '2026-09-26');
+
+    $item = $data['dailyTables'][0]['items'][0];
+    expect($item['gross_amount'])->toEqual(1120.0) // 920 net + 200 discount
+        ->and($item['discount'])->toEqual(200.0)
+        ->and($item['net_amount'])->toEqual(920.0)
+        ->and($item['taxable_15'])->toEqual(1000.0) // Pre-tax gross: 800 net pre-tax + 200 discount
+        ->and($item['exempt'])->toEqual(0.0)
+        ->and($item['isv_15'])->toEqual(120.0);
+
+    // Total sales = Gravadas (1000) + Exentas (0) - Descuento (200) + IVA (120) = 920.0
+    expect($data['periodTotals']['total_sales'])->toEqual(920.0)
+        ->and($data['periodTotals']['transfer'])->toEqual(920.0);
+});
+
+test('excel export formulas evaluate to correct net amounts for discounted invoices', function () {
+    $date = '2026-09-26 10:00:00';
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00049901',
+        'invoice_number' => '00049901',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'amount' => 2900.0,
+        'discount' => 870.0,
+        'subtotal' => 2030.0,
+        'exempt_amount' => 2030.0,
+        'total' => 2030.0,
+        'total_paid' => 2030.0,
+        'invoice_file' => 'invoices/test_excel_disc.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+        'pay_isv' => false,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->get(route('reports.billing-reconciliation.export', [
+            'date_from' => '2026-09-26',
+            'date_to' => '2026-09-26',
+        ]));
+
+    $response->assertOk();
+
+    $content = $response->streamedContent();
+    $tempFile = tempnam(sys_get_temp_dir(), 'excel_disc_test');
+    file_put_contents($tempFile, $content);
+
+    $reader = new Xlsx;
+    $spreadsheet = $reader->load($tempFile);
+
+    // Sheet 1: Ventas
+    $sheetVentas = $spreadsheet->getSheet(0);
+    // Row 4: G4 = Gross (2900), H4 = Discount (870), I4 formula =+G4-H4 -> evaluates to 2030
+    expect($sheetVentas->getCell('G4')->getValue())->toEqual(2900.0)
+        ->and($sheetVentas->getCell('H4')->getValue())->toEqual(870.0)
+        ->and($sheetVentas->getCell('I4')->getCalculatedValue())->toEqual(2030.0);
+
+    // Bottom summary in Sheet 1: E = Gravadas (0), F = Exentas (2900), G = Descuentos (870), I = Total formula
+    // Row 16: E16=0, F16=2900, G16=870, I16 =+E16+F16+H16-G16 -> evaluates to 2030!
+    // Find the row with 'Ventas' in column D
+    $highestRow = $sheetVentas->getHighestRow();
+    $summaryRow = null;
+    for ($r = 1; $r <= $highestRow; $r++) {
+        if ($sheetVentas->getCell('D'.$r)->getValue() === 'Ventas') {
+            $summaryRow = $r;
+            break;
+        }
+    }
+    expect($summaryRow)->not->toBeNull()
+        ->and($sheetVentas->getCell('F'.$summaryRow)->getValue())->toEqual(2900.0)
+        ->and($sheetVentas->getCell('G'.$summaryRow)->getValue())->toEqual(870.0)
+        ->and($sheetVentas->getCell('I'.$summaryRow)->getCalculatedValue())->toEqual(2030.0);
+
+    // Sheet 2: Liquidación
+    $sheetLiquidacion = $spreadsheet->getSheet(1);
+    // Row 4: F4=Gravadas (0), G4=Exentas (2900), H4=Descuento (870), I4=IVA (0)
+    // J4 formula: =+F4+G4+I4-H4 -> evaluates to 2030!
+    expect($sheetLiquidacion->getCell('G4')->getValue())->toEqual(2900.0)
+        ->and($sheetLiquidacion->getCell('H4')->getValue())->toEqual(870.0)
+        ->and($sheetLiquidacion->getCell('J4')->getCalculatedValue())->toEqual(2030.0);
+
+    // Sheet 3: Resumen
+    $sheetResumen = $spreadsheet->getSheet(2);
+    // Row 5: E5=Gravadas (0), F5=Exentas (2900), G5=Descuentos (870)
+    // I5 formula: =+E5+F5+H5-G5 -> evaluates to 2030!
+    expect($sheetResumen->getCell('F5')->getValue())->toEqual(2900.0)
+        ->and($sheetResumen->getCell('G5')->getValue())->toEqual(870.0)
+        ->and($sheetResumen->getCell('I5')->getCalculatedValue())->toEqual(2030.0);
+
+    unlink($tempFile);
+});
