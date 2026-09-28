@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class SpecimenGroup extends Model
@@ -35,6 +36,11 @@ class SpecimenGroup extends Model
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class, 'invoice_id');
+    }
+
+    public function credit(): HasOne
+    {
+        return $this->hasOne(Credit::class, 'group_id');
     }
 
     public function customer(): BelongsTo
