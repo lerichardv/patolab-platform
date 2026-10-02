@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
@@ -18,10 +19,12 @@ use App\Models\Sequence;
 use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenCategory;
+use App\Models\SpecimenCollaborator;
 use App\Models\SpecimenReport;
 use App\Models\SpecimenType;
 use App\Models\SpecimenTypeExamination;
 use App\Models\SpecimenTypeTemplate;
+use App\Models\SpecimenUser;
 use App\Models\User;
 use App\Services\DateFilterService;
 use App\Services\ImageOptimizerService;
@@ -537,8 +540,8 @@ class SpecimenController extends Controller
                 'amount' => $unitPrice,
                 'discount' => $discount,
                 'subtotal' => $subtotal,
-                'exempt_amount' => 0.00,
-                'tax_exempt_amount' => $subtotal,
+                'exempt_amount' => max(0.00, $subtotal - $customAmountVal),
+                'tax_exempt_amount' => $customAmountVal,
                 'taxable_amount_15' => 0.00,
                 'taxable_amount_18' => 0.00,
                 'isv_15' => 0.00,
@@ -1055,7 +1058,8 @@ class SpecimenController extends Controller
                     'amount' => $amount,
                     'discount' => $discount,
                     'subtotal' => $subtotal,
-                    'tax_exempt_amount' => $subtotal,
+                    'exempt_amount' => $subtotal,
+                    'tax_exempt_amount' => 0.00,
                     'total' => $subtotal,
                     'total_paid' => $invoice->payment_type !== 'credit' ? $subtotal : $invoice->total_paid,
                 ]);
@@ -1131,7 +1135,8 @@ class SpecimenController extends Controller
                         'transfer_bank_id' => $request->input('initial_payment_type') === 'bank transfer' ? $request->input('transfer_bank_id') : null,
                         'transfer_value' => $request->input('initial_payment_type') === 'bank transfer' ? $initialPaymentAmount : null,
                         'transfer_authorization_code' => $request->input('initial_payment_type') === 'bank transfer' ? $request->input('transfer_authorization_code') : null,
-                        'tax_exempt_amount' => $invoice->subtotal,
+                        'exempt_amount' => $invoice->subtotal,
+                        'tax_exempt_amount' => 0.00,
                         'taxable_amount_15' => 0.00,
                         'taxable_amount_18' => 0.00,
                         'isv_15' => 0.00,
@@ -1154,7 +1159,8 @@ class SpecimenController extends Controller
                         'transfer_bank_id' => $newPaymentType === 'bank transfer' ? $request->input('transfer_bank_id') : null,
                         'transfer_value' => $newPaymentType === 'bank transfer' ? $invoice->total : null,
                         'transfer_authorization_code' => $newPaymentType === 'bank transfer' ? $request->input('transfer_authorization_code') : null,
-                        'tax_exempt_amount' => $invoice->subtotal,
+                        'exempt_amount' => $invoice->subtotal,
+                        'tax_exempt_amount' => 0.00,
                         'taxable_amount_15' => 0.00,
                         'taxable_amount_18' => 0.00,
                         'isv_15' => 0.00,
@@ -1343,17 +1349,41 @@ class SpecimenController extends Controller
         $macroscopy = $request->boolean('macroscopy_access', false);
         $microscopy = $request->boolean('microscopy_access', false);
 
-        if ($specimen->users()->where('user_id', $validated['user_id'])->exists()) {
-            $specimen->users()->updateExistingPivot($validated['user_id'], [
-                'macroscopy_access' => $macroscopy,
-                'microscopy_access' => $microscopy,
-            ]);
+        AuditLog::$currentOrigin = 'pathologist-assignment';
+        $specimenUser = SpecimenUser::where('specimen_id', $specimen->id)
+            ->where('user_id', $validated['user_id'])
+            ->first();
+
+        if ($specimenUser) {
+            $specimenUser->macroscopy_access = $macroscopy;
+            $specimenUser->microscopy_access = $microscopy;
+            $specimenUser->assigned_by = Auth::id();
+            $isDirty = $specimenUser->isDirty();
+            $specimenUser->save();
+
+            if (! $isDirty) {
+                AuditLog::create([
+                    'audit_session_code' => substr(str_replace('-', '', (string) Str::uuid()), 0, 24),
+                    'action' => 'update',
+                    'table' => 'specimen_user',
+                    'row_id' => $specimenUser->id,
+                    'column' => 'assigned_by',
+                    'old_value' => (string) $specimenUser->assigned_by,
+                    'new_value' => (string) Auth::id(),
+                    'user' => Auth::id(),
+                    'origin' => AuditLog::$currentOrigin,
+                ]);
+            }
         } else {
-            $specimen->users()->attach($validated['user_id'], [
+            SpecimenUser::create([
+                'specimen_id' => $specimen->id,
+                'user_id' => $validated['user_id'],
                 'macroscopy_access' => $macroscopy,
                 'microscopy_access' => $microscopy,
+                'assigned_by' => Auth::id(),
             ]);
         }
+        AuditLog::$currentOrigin = 'system';
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -1374,7 +1404,15 @@ class SpecimenController extends Controller
             'user_id' => 'required|exists:users,id',
         ]);
 
-        $specimen->users()->detach($validated['user_id']);
+        AuditLog::$currentOrigin = 'pathologist-unassignment';
+        $specimenUser = SpecimenUser::where('specimen_id', $specimen->id)
+            ->where('user_id', $validated['user_id'])
+            ->first();
+
+        if ($specimenUser) {
+            $specimenUser->delete();
+        }
+        AuditLog::$currentOrigin = 'system';
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -1404,17 +1442,41 @@ class SpecimenController extends Controller
         $macroscopy = $request->boolean('macroscopy_access', false);
         $microscopy = $request->boolean('microscopy_access', false);
 
-        if ($specimen->collaborators()->where('user_id', $validated['user_id'])->exists()) {
-            $specimen->collaborators()->updateExistingPivot($validated['user_id'], [
-                'macroscopy_access' => $macroscopy,
-                'microscopy_access' => $microscopy,
-            ]);
+        AuditLog::$currentOrigin = 'collaborator-assignment';
+        $specimenCollaborator = SpecimenCollaborator::where('specimen_id', $specimen->id)
+            ->where('user_id', $validated['user_id'])
+            ->first();
+
+        if ($specimenCollaborator) {
+            $specimenCollaborator->macroscopy_access = $macroscopy;
+            $specimenCollaborator->microscopy_access = $microscopy;
+            $specimenCollaborator->assigned_by = Auth::id();
+            $isDirty = $specimenCollaborator->isDirty();
+            $specimenCollaborator->save();
+
+            if (! $isDirty) {
+                AuditLog::create([
+                    'audit_session_code' => substr(str_replace('-', '', (string) Str::uuid()), 0, 24),
+                    'action' => 'update',
+                    'table' => 'specimen_collaborators',
+                    'row_id' => $specimenCollaborator->id,
+                    'column' => 'assigned_by',
+                    'old_value' => (string) $specimenCollaborator->assigned_by,
+                    'new_value' => (string) Auth::id(),
+                    'user' => Auth::id(),
+                    'origin' => AuditLog::$currentOrigin,
+                ]);
+            }
         } else {
-            $specimen->collaborators()->attach($validated['user_id'], [
+            SpecimenCollaborator::create([
+                'specimen_id' => $specimen->id,
+                'user_id' => $validated['user_id'],
                 'macroscopy_access' => $macroscopy,
                 'microscopy_access' => $microscopy,
+                'assigned_by' => Auth::id(),
             ]);
         }
+        AuditLog::$currentOrigin = 'system';
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -1439,7 +1501,15 @@ class SpecimenController extends Controller
             'user_id' => 'required|exists:users,id',
         ]);
 
-        $specimen->collaborators()->detach($validated['user_id']);
+        AuditLog::$currentOrigin = 'collaborator-unassignment';
+        $specimenCollaborator = SpecimenCollaborator::where('specimen_id', $specimen->id)
+            ->where('user_id', $validated['user_id'])
+            ->first();
+
+        if ($specimenCollaborator) {
+            $specimenCollaborator->delete();
+        }
+        AuditLog::$currentOrigin = 'system';
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -1634,55 +1704,107 @@ class SpecimenController extends Controller
             } elseif ($action === 'assign_pathologist') {
                 $macroscopy = request()->boolean('macroscopy_access', true);
                 $microscopy = request()->boolean('microscopy_access', true);
+                AuditLog::$currentOrigin = 'bulk-pathologist-assignment';
                 foreach ($ids as $id) {
-                    $specimen = Specimen::find($id);
-                    if ($specimen) {
-                        if ($specimen->users()->where('user_id', $value)->exists()) {
-                            $specimen->users()->updateExistingPivot($value, [
-                                'macroscopy_access' => $macroscopy,
-                                'microscopy_access' => $microscopy,
-                            ]);
-                        } else {
-                            $specimen->users()->attach($value, [
-                                'macroscopy_access' => $macroscopy,
-                                'microscopy_access' => $microscopy,
+                    $specimenUser = SpecimenUser::where('specimen_id', $id)
+                        ->where('user_id', $value)
+                        ->first();
+
+                    if ($specimenUser) {
+                        $specimenUser->macroscopy_access = $macroscopy;
+                        $specimenUser->microscopy_access = $microscopy;
+                        $specimenUser->assigned_by = Auth::id();
+                        $isDirty = $specimenUser->isDirty();
+                        $specimenUser->save();
+
+                        if (! $isDirty) {
+                            AuditLog::create([
+                                'audit_session_code' => substr(str_replace('-', '', (string) Str::uuid()), 0, 24),
+                                'action' => 'update',
+                                'table' => 'specimen_user',
+                                'row_id' => $specimenUser->id,
+                                'column' => 'assigned_by',
+                                'old_value' => (string) $specimenUser->assigned_by,
+                                'new_value' => (string) Auth::id(),
+                                'user' => Auth::id(),
+                                'origin' => AuditLog::$currentOrigin,
                             ]);
                         }
+                    } else {
+                        SpecimenUser::create([
+                            'specimen_id' => $id,
+                            'user_id' => $value,
+                            'macroscopy_access' => $macroscopy,
+                            'microscopy_access' => $microscopy,
+                            'assigned_by' => Auth::id(),
+                        ]);
                     }
                 }
+                AuditLog::$currentOrigin = 'system';
             } elseif ($action === 'unassign_pathologist') {
+                AuditLog::$currentOrigin = 'bulk-pathologist-unassignment';
                 foreach ($ids as $id) {
-                    $specimen = Specimen::find($id);
-                    if ($specimen) {
-                        $specimen->users()->detach($value);
+                    $specimenUser = SpecimenUser::where('specimen_id', $id)
+                        ->where('user_id', $value)
+                        ->first();
+
+                    if ($specimenUser) {
+                        $specimenUser->delete();
                     }
                 }
+                AuditLog::$currentOrigin = 'system';
             } elseif ($action === 'assign_collaborator') {
                 $macroscopy = request()->boolean('macroscopy_access', false);
                 $microscopy = request()->boolean('microscopy_access', false);
+                AuditLog::$currentOrigin = 'bulk-collaborator-assignment';
                 foreach ($ids as $id) {
-                    $specimen = Specimen::find($id);
-                    if ($specimen) {
-                        if ($specimen->collaborators()->where('user_id', $value)->exists()) {
-                            $specimen->collaborators()->updateExistingPivot($value, [
-                                'macroscopy_access' => $macroscopy,
-                                'microscopy_access' => $microscopy,
-                            ]);
-                        } else {
-                            $specimen->collaborators()->attach($value, [
-                                'macroscopy_access' => $macroscopy,
-                                'microscopy_access' => $microscopy,
+                    $specimenCollaborator = SpecimenCollaborator::where('specimen_id', $id)
+                        ->where('user_id', $value)
+                        ->first();
+
+                    if ($specimenCollaborator) {
+                        $specimenCollaborator->macroscopy_access = $macroscopy;
+                        $specimenCollaborator->microscopy_access = $microscopy;
+                        $specimenCollaborator->assigned_by = Auth::id();
+                        $isDirty = $specimenCollaborator->isDirty();
+                        $specimenCollaborator->save();
+
+                        if (! $isDirty) {
+                            AuditLog::create([
+                                'audit_session_code' => substr(str_replace('-', '', (string) Str::uuid()), 0, 24),
+                                'action' => 'update',
+                                'table' => 'specimen_collaborators',
+                                'row_id' => $specimenCollaborator->id,
+                                'column' => 'assigned_by',
+                                'old_value' => (string) $specimenCollaborator->assigned_by,
+                                'new_value' => (string) Auth::id(),
+                                'user' => Auth::id(),
+                                'origin' => AuditLog::$currentOrigin,
                             ]);
                         }
+                    } else {
+                        SpecimenCollaborator::create([
+                            'specimen_id' => $id,
+                            'user_id' => $value,
+                            'macroscopy_access' => $macroscopy,
+                            'microscopy_access' => $microscopy,
+                            'assigned_by' => Auth::id(),
+                        ]);
                     }
                 }
+                AuditLog::$currentOrigin = 'system';
             } elseif ($action === 'unassign_collaborator') {
+                AuditLog::$currentOrigin = 'bulk-collaborator-unassignment';
                 foreach ($ids as $id) {
-                    $specimen = Specimen::find($id);
-                    if ($specimen) {
-                        $specimen->collaborators()->detach($value);
+                    $specimenCollaborator = SpecimenCollaborator::where('specimen_id', $id)
+                        ->where('user_id', $value)
+                        ->first();
+
+                    if ($specimenCollaborator) {
+                        $specimenCollaborator->delete();
                     }
                 }
+                AuditLog::$currentOrigin = 'system';
             } elseif ($action === 'delete') {
                 Specimen::whereIn('id', $ids)->update(['active' => false]);
             }

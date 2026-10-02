@@ -8,6 +8,7 @@ export interface PreviewUser {
     };
     user_signature?: string | null;
     signature_url?: string | null;
+    signature_subtext?: string | null;
 }
 
 export interface PreviewSpecimen {

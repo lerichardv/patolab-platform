@@ -430,8 +430,10 @@
                                 ->where('specimen_id', $spec->id)
                                 ->first();
                             $paidQty = isset($paidSpecimensData[$spec->id]) ? (int)$paidSpecimensData[$spec->id] : ($detail ? $detail->quantity : 1);
+                            $detailQty = $detail && (int)$detail->quantity > 0 ? (int)$detail->quantity : 1;
                             $unitPrice = $detail ? (float)$detail->amount : 0.00;
-                            $unitDiscount = $detail ? (float)$detail->discount : 0.00;
+                            $unitDiscount = $detail ? ((float)$detail->discount / $detailQty) : 0.00;
+                            $paidDiscount = $unitDiscount * $paidQty;
                             $specTotal = ($unitPrice - $unitDiscount) * $paidQty;
                         @endphp
                         <tr>
@@ -460,7 +462,7 @@
                             </td>
                             <td>{{ $paidQty }}</td>
                             <td class="text-right">L. {{ number_format($unitPrice, 2) }}</td>
-                            <td class="text-right">L. {{ number_format($unitDiscount, 2) }}</td>
+                            <td class="text-right">L. {{ number_format($paidDiscount, 2) }}</td>
                             <td class="text-right">L. {{ number_format($specTotal, 2) }}</td>
                         </tr>
                     @endforeach

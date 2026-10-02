@@ -748,3 +748,96 @@ test('report paginator end-to-end pagination with nested list does not produce d
     // "Detalle triple" must appear exactly once, never triplicated
     expect(substr_count($html, 'Detalle triple'))->toBe(1);
 });
+
+test('report paginator calculates dynamic signature height for multi-line signature subtext', function () {
+    $specimen = new stdClass;
+    $specimen->sequence_code = 'B-300-26';
+    $specimen->diagnosis = 'Biopsia';
+    $specimen->anatomic_site = 'Piel';
+    $specimen->users = collect([
+        (object) [
+            'id' => 1,
+            'name' => 'DRA. ANA RAQUEL URBINA',
+            'signature_subtext' => "ANATOMÍA PATOLÓGICA\nMSC. PATOLOGÍA ONCOLÓGICA",
+            'role' => (object) ['name' => 'PATÓLOGO'],
+        ],
+    ]);
+
+    $report = new stdClass;
+    $report->sections_order = [
+        ['key' => 'diagnosis_html', 'order' => 1, 'active' => true],
+    ];
+    $report->diagnosis_html = '<p>Diagnóstico.</p>';
+    $report->clinical_details_html = '';
+    $report->macroscopy_html = '';
+    $report->microscopy_html = '';
+    $report->comments_notes_html = '';
+    $report->protocols_html = '';
+    $report->legend_html = '';
+
+    $customer = new stdClass;
+    $customer->name = 'María';
+    $customer->age = 30;
+    $customer->gender = 'F';
+
+    // 1 pathologist with 2 lines -> 1 extra line -> 33.33 + 3.0 = 36.33mm
+    $pages = ReportPaginator::paginate($specimen, $report, $customer, null, false);
+    $sigBlock = collect($pages)->flatten(1)->firstWhere('type', 'signature');
+    expect($sigBlock)->not->toBeNull();
+    expect($sigBlock['height'])->toBe(36.33);
+
+    // 2 pathologists in 1 row: one has 2 lines (1 extra), one has 3 lines (2 extra) -> maxExtraLines = 2 -> 33.33 + (2 * 3.0) = 39.33mm
+    $specimen->users->push(
+        (object) [
+            'id' => 2,
+            'name' => 'DRA. ESTEFANY LAGOS',
+            'signature_subtext' => "ANATOMÍA PATOLÓGICA\nMSC. PATOLOGÍA ONCOLÓGICA\nESPECIALISTA",
+            'role' => (object) ['name' => 'PATÓLOGO'],
+        ]
+    );
+    $pages2 = ReportPaginator::paginate($specimen, $report, $customer, null, false);
+    $sigBlock2 = collect($pages2)->flatten(1)->firstWhere('type', 'signature');
+    expect($sigBlock2)->not->toBeNull();
+    expect($sigBlock2['height'])->toBe(39.33);
+});
+
+test('report paginator does not fallback to specimen diagnosis when diagnosis_html is empty', function () {
+    $specimen = new stdClass;
+    $specimen->sequence_code = 'B-103-26';
+    $specimen->diagnosis = 'Duodenopatía Exudativa';
+    $specimen->anatomic_site = 'Duodeno';
+    $specimen->users = collect([]);
+
+    $report = new stdClass;
+    $report->sections_order = [
+        ['key' => 'diagnosis_html', 'order' => 1, 'active' => true],
+        ['key' => 'macroscopy_html', 'order' => 2, 'active' => true],
+    ];
+    $report->diagnosis_html = '';
+    $report->macroscopy_html = '<p>Descripción macroscópica válida.</p>';
+    $report->clinical_details_html = '';
+    $report->microscopy_html = '';
+    $report->comments_notes_html = '';
+    $report->protocols_html = '';
+    $report->legend_html = '';
+
+    $customer = new stdClass;
+    $customer->name = 'Yeni Patricia';
+    $customer->age = 34;
+    $customer->gender = 'F';
+
+    $pages = ReportPaginator::paginate($specimen, $report, $customer, null, false);
+    $allBlocks = collect($pages)->flatten(1);
+
+    // Section header for DIAGNÓSTICO must NOT be present
+    $diagHeaders = $allBlocks->filter(fn ($b) => ($b['type'] ?? '') === 'section-header' && ($b['title'] ?? '') === 'DIAGNÓSTICO');
+    expect($diagHeaders)->toBeEmpty();
+
+    // Body content with specimen diagnosis must NOT be present in body blocks
+    $diagBodyBlocks = $allBlocks->filter(fn ($b) => ($b['type'] ?? '') === 'paragraph' && str_contains($b['html'] ?? '', 'Duodenopatía Exudativa'));
+    expect($diagBodyBlocks)->toBeEmpty();
+
+    // Macroscopy header and content must still be present
+    $macroHeaders = $allBlocks->filter(fn ($b) => ($b['type'] ?? '') === 'section-header' && ($b['title'] ?? '') === 'DESCRIPCIÓN MACROSCÓPICA');
+    expect($macroHeaders)->not->toBeEmpty();
+});

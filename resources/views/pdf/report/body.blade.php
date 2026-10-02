@@ -688,7 +688,13 @@
                                                 @endif
                                                 <div class="signature-line" style="width: 100%; border-top: 0.40mm solid #4b5563; margin-bottom: 1.32mm;"></div>
                                                 <div class="pathologist-name" style="font-size: 2.65mm; font-weight: 700; color: #1f2937; text-transform: uppercase;">{{ $pathologist->name }}</div>
-                                                <div class="pathologist-title" style="font-size: 2.25mm; color: #4b5563; font-weight: 500; text-transform: uppercase;">{{ $pathologist->role ? $pathologist->role->name : 'PATOLOGÍA ONCOLÓGICA' }}</div>
+                                                @if(!empty($pathologist->signature_subtext))
+                                                    @foreach(array_filter(array_map('trim', explode("\n", $pathologist->signature_subtext))) as $subtextLine)
+                                                        <div class="pathologist-title" style="font-size: 2.25mm; color: #4b5563; font-weight: 500; text-transform: uppercase; line-height: 3.0mm;">{{ $subtextLine }}</div>
+                                                    @endforeach
+                                                @else
+                                                    <div class="pathologist-title" style="font-size: 2.25mm; color: #4b5563; font-weight: 500; text-transform: uppercase;">{{ $pathologist->role ? $pathologist->role->name : 'PATOLOGÍA ONCOLÓGICA' }}</div>
+                                                @endif
                                                 <div class="date-signature" style="font-size: 2.38mm; font-weight: 600; color: #374151; margin-top: 1.32mm;">FECHA: {{ $report->finalization_date ? \Carbon\Carbon::parse($report->finalization_date)->format('d/m/y') : 'N/A' }}</div>
                                             </div>
                                         @endforeach

@@ -579,3 +579,123 @@ test('handles failure when resend service fails to send email', function () {
     $response->assertRedirect();
     $response->assertSessionHasErrors(['email']);
 });
+
+test('can create a price quote with custom specimen price', function () {
+    $payload = [
+        'customer_id' => $this->customer->id,
+        'specimens' => [
+            [
+                'specimen_type' => $this->specimenType->id,
+                'specimen_category' => $this->specimenCategory->id,
+                'examination_id' => $this->examination->id,
+                'quantity' => 1,
+                'amount' => 7100.00,
+                'discount' => 2130.00,
+                'subtotal' => 4970.00,
+                'exempt_amount' => 4970.00,
+                'taxable_amount_15' => 0.00,
+                'taxable_amount_18' => 0.00,
+                'isv_15' => 0.00,
+                'isv_18' => 0.00,
+                'total' => 4970.00,
+                'selected_price' => 'custom',
+                'custom_specimen_price' => 7100.00,
+                'additional_discount_enabled' => false,
+                'additional_discount' => 0.00,
+                'age_discout_type' => 'third',
+                'age_discout_amount' => 2130.00,
+            ],
+        ],
+    ];
+
+    $response = $this->actingAs($this->user)
+        ->from(route('price-quotes.index'))
+        ->post(route('price-quotes.store'), $payload);
+
+    $response->assertRedirect(route('price-quotes.index'))
+        ->assertSessionHas('new_price_quote_url');
+
+    $quote = PriceQuote::latest('id')->first();
+    expect($quote)->not->toBeNull()
+        ->and($quote->priceQuoteSpecimens)->toHaveCount(1);
+
+    $specimen = $quote->priceQuoteSpecimens->first();
+    expect($specimen->selected_price)->toBe('custom')
+        ->and((float) $specimen->custom_specimen_price)->toBe(7100.00)
+        ->and((float) $specimen->total)->toBe(4970.00);
+});
+
+test('can update a price quote to use custom specimen price', function () {
+    $quote = PriceQuote::create([
+        'price_quote_id' => 'aabbccddeeff',
+        'customer_id' => $this->customer->id,
+        'active' => true,
+    ]);
+
+    PriceQuoteSpecimen::create([
+        'price_quote_id' => $quote->id,
+        'specimen' => 'aabbccddeeff',
+        'specimen_type' => $this->specimenType->id,
+        'specimen_category' => $this->specimenCategory->id,
+        'examination_id' => $this->examination->id,
+        'quantity' => 1,
+        'amount' => 1000.00,
+        'discount' => 0.00,
+        'subtotal' => 1000.00,
+        'exempt_amount' => 0.00,
+        'taxable_amount_15' => 1000.00,
+        'taxable_amount_18' => 0.00,
+        'isv_15' => 150.00,
+        'isv_18' => 0.00,
+        'total' => 1150.00,
+        'selected_price' => '1000.00',
+        'custom_specimen_price' => 0.00,
+        'additional_discount_enabled' => false,
+        'additional_discount' => 0.00,
+        'age_discout_type' => 'percentage',
+        'age_discout_amount' => 0.00,
+    ]);
+
+    $payload = [
+        'customer_id' => $this->customer->id,
+        'specimens' => [
+            [
+                'specimen' => 'aabbccddeeff',
+                'specimen_type' => $this->specimenType->id,
+                'specimen_category' => $this->specimenCategory->id,
+                'examination_id' => $this->examination->id,
+                'quantity' => 1,
+                'amount' => 5000.00,
+                'discount' => 500.00,
+                'subtotal' => 4500.00,
+                'exempt_amount' => 4500.00,
+                'taxable_amount_15' => 0.00,
+                'taxable_amount_18' => 0.00,
+                'isv_15' => 0.00,
+                'isv_18' => 0.00,
+                'total' => 4500.00,
+                'selected_price' => 'custom',
+                'custom_specimen_price' => 5000.00,
+                'additional_discount_enabled' => false,
+                'additional_discount' => 0.00,
+                'age_discout_type' => null,
+                'age_discout_amount' => 0.00,
+            ],
+        ],
+    ];
+
+    $response = $this->actingAs($this->user)
+        ->from(route('price-quotes.index'))
+        ->put(route('price-quotes.update', $quote->id), $payload);
+
+    $response->assertRedirect(route('price-quotes.index'))
+        ->assertSessionHas('new_price_quote_url');
+
+    $quote->refresh();
+    expect($quote->priceQuoteSpecimens)->toHaveCount(1);
+
+    $specimen = $quote->priceQuoteSpecimens->first();
+    expect($specimen->selected_price)->toBe('custom')
+        ->and((float) $specimen->custom_specimen_price)->toBe(5000.00)
+        ->and((float) $specimen->total)->toBe(4500.00);
+});

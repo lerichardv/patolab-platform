@@ -277,9 +277,17 @@ export default function PriceQuoteViewSheet({
                                                 item.patient?.name ||
                                                 item.customer?.name;
                                             const qty = item.quantity || 1;
-                                            const unitPrice = parseFloat(
-                                                item.selected_price || '0',
-                                            );
+                                            const unitPrice =
+                                                item.selected_price === 'custom'
+                                                    ? parseFloat(
+                                                          item.custom_specimen_price ||
+                                                              '0',
+                                                      )
+                                                    : parseFloat(
+                                                          item.selected_price ||
+                                                              item.amount ||
+                                                              '0',
+                                                      );
                                             const discount = parseFloat(
                                                 item.discount || '0',
                                             );

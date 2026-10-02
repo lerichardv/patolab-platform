@@ -2625,6 +2625,12 @@ export default function MyAssignmentsIndex({
                         });
                     }
                 }}
+                onAssignCollaboratorClick={() => {
+                    if (selectedSpecimen) {
+                        setSelectedSpecimenForCollaborator(selectedSpecimen);
+                        setIsCollaboratorSheetOpen(true);
+                    }
+                }}
             />
 
             <WorkOrderSheet
@@ -2662,6 +2668,10 @@ export default function MyAssignmentsIndex({
                 selectedSpecimens={selectedSpecimens}
                 open={isBulkCollaboratorSheetOpen}
                 onOpenChange={setIsBulkCollaboratorSheetOpen}
+                onSuccess={() => {
+                    setSelectedIds([]);
+                    setIsSelectionMode(false);
+                }}
             />
 
             <SpecimenWorkOrdersSheet

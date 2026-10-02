@@ -336,10 +336,35 @@ export class ReportPaginator {
         const effectiveCustomer = customer || specimen?.customer_relation;
         const effectiveReferrer = referrer || specimen?.referrer_relation;
 
-        const pathologistsCount = specimen?.users?.length || 0;
+        const pathologists = specimen?.users || [];
+        const pathologistsCount = pathologists.length;
         const rowsCount = Math.ceil(pathologistsCount / 2);
-        const signatureHeight =
-            rowsCount * ReportPaginator.SIGNATURE_ROW_HEIGHT;
+        let signatureHeight = 0;
+
+        if (pathologistsCount > 0) {
+            for (let i = 0; i < pathologistsCount; i += 2) {
+                const row = pathologists.slice(i, i + 2);
+                let maxExtraLines = 0;
+
+                for (const u of row) {
+                    const subtext = u?.signature_subtext;
+
+                    if (subtext) {
+                        const lines = subtext
+                            .split('\n')
+                            .map((l: string) => l.trim())
+                            .filter(Boolean);
+                        maxExtraLines = Math.max(
+                            maxExtraLines,
+                            Math.max(0, lines.length - 1),
+                        );
+                    }
+                }
+
+                signatureHeight +=
+                    ReportPaginator.SIGNATURE_ROW_HEIGHT + maxExtraLines * 3.0;
+            }
+        }
 
         let headingsToggles: Record<string, boolean> = {};
 
@@ -409,8 +434,7 @@ export class ReportPaginator {
                     });
                 }
             } else if (section.key === 'diagnosis_html') {
-                const diagHtml =
-                    report?.diagnosis_html || specimen?.diagnosis || '';
+                const diagHtml = report?.diagnosis_html || '';
 
                 if (!isEmptyHtml(diagHtml)) {
                     if (showHeading) {
@@ -584,7 +608,7 @@ export class ReportPaginator {
 
         // Pathologist signatures with keep_together: true
         if (signatureHeight > 0) {
-            const sigFormula = `${pathologistsCount} firma(s) de patólogo (${rowsCount} fila(s) × ${ReportPaginator.SIGNATURE_ROW_HEIGHT.toFixed(2)}mm = ${signatureHeight.toFixed(2)}mm)`;
+            const sigFormula = `${pathologistsCount} firma(s) de patólogo (${rowsCount} fila(s) = ${signatureHeight.toFixed(2)}mm)`;
 
             if (lastPageHeight + signatureHeight > maxHeightForLastPage) {
                 computedPages.push([

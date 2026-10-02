@@ -59,6 +59,7 @@ export interface ConsolidatedTotals {
     discount: number;
     subtotal: number;
     exempt_amount: number;
+    tax_exempt_amount?: number;
     taxable_amount_15: number;
     taxable_amount_18: number;
     isv_15: number;
@@ -146,7 +147,7 @@ export function calculateInvoiceItem(
     return {
         examination_id: exam?.id ?? itemData.examination_id ?? null,
         quantity: qty,
-        amount: basePrice,
+        amount: maxPrice,
         discount: totalDiscountVal,
         subtotal: subtotalVal,
         exempt_amount: totalVal,
@@ -193,15 +194,17 @@ export function calculateConsolidatedTotals(
         totalSubtotal += item.subtotal;
     });
 
-    const grandSubtotal = totalSubtotal + insumosTotal + customAmount;
+    const taxableBase = totalSubtotal + insumosTotal;
+    const grandSubtotal = taxableBase + customAmount;
     const grandTotal = grandSubtotal;
 
     return {
         quantity: totalQty,
-        amount: totalAmount + customAmount,
+        amount: totalAmount + insumosTotal + customAmount,
         discount: totalDiscount,
         subtotal: grandSubtotal,
-        exempt_amount: grandTotal,
+        exempt_amount: taxableBase,
+        tax_exempt_amount: customAmount,
         taxable_amount_15: 0,
         taxable_amount_18: 0,
         isv_15: 0,

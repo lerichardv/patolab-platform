@@ -20,11 +20,16 @@ class InvoicePdfService
     {
         $invoice->load([
             'specimen.products',
+            'specimen.type',
             'specimen.examination.prices',
             'creditRelation',
             'customer',
             'caiRange',
             'rental',
+            'invoiceSpecimens.examination.prices',
+            'invoiceSpecimens.specimen.customerRelation',
+            'invoiceSpecimens.specimen.type',
+            'invoiceSpecimens.specimen.products',
             'groupSpecimens.specimen.examination',
             'groupSpecimens.specimen.customerRelation',
             'groupSpecimens.specimen.examination.prices',

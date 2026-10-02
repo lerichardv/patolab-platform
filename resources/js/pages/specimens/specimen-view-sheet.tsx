@@ -56,6 +56,7 @@ interface Props {
     preventCloseOnOutsideClick?: boolean;
     onEditInvoiceClick?: (invoice: any) => void;
     onAssignPathologistClick?: () => void;
+    onAssignCollaboratorClick?: () => void;
 }
 
 export default function SpecimenViewSheet({
@@ -67,6 +68,7 @@ export default function SpecimenViewSheet({
     preventCloseOnOutsideClick,
     onEditInvoiceClick,
     onAssignPathologistClick,
+    onAssignCollaboratorClick,
 }: Props) {
     const pageProps = usePage<any>().props;
     const { auth } = pageProps;
@@ -1083,6 +1085,9 @@ export default function SpecimenViewSheet({
                                                     <th className="p-3">
                                                         Accesos
                                                     </th>
+                                                    <th className="p-3">
+                                                        Asignado Por
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-border/60">
@@ -1136,6 +1141,36 @@ export default function SpecimenViewSheet({
                                                                     )}
                                                                 </div>
                                                             </td>
+                                                            <td className="p-3 text-xs text-muted-foreground">
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-medium text-foreground">
+                                                                        {user
+                                                                            .pivot
+                                                                            ?.assigned_by_user_name ||
+                                                                            (user
+                                                                                .pivot
+                                                                                ?.assigned_by
+                                                                                ? `Usuario #${user.pivot.assigned_by}`
+                                                                                : 'Sistema')}
+                                                                    </span>
+                                                                    {user.pivot
+                                                                        ?.created_at && (
+                                                                        <span className="text-[11px] text-muted-foreground">
+                                                                            {format(
+                                                                                new Date(
+                                                                                    user
+                                                                                        .pivot
+                                                                                        .created_at,
+                                                                                ),
+                                                                                'dd/MM/yyyy HH:mm',
+                                                                                {
+                                                                                    locale: es,
+                                                                                },
+                                                                            )}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
                                                         </tr>
                                                     ),
                                                 )}
@@ -1177,7 +1212,7 @@ export default function SpecimenViewSheet({
                                         <UserPlus className="h-5 w-5" />{' '}
                                         Colaboradores Asignados
                                     </h3>
-                                    {onAssignPathologistClick &&
+                                    {onAssignCollaboratorClick &&
                                         (auth.permissions?.includes(
                                             'specimens.manage',
                                         ) ||
@@ -1190,7 +1225,7 @@ export default function SpecimenViewSheet({
                                                 size="sm"
                                                 onClick={() => {
                                                     onOpenChange(false);
-                                                    onAssignPathologistClick();
+                                                    onAssignCollaboratorClick();
                                                 }}
                                                 className="h-8 gap-1.5 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
                                             >
@@ -1219,6 +1254,9 @@ export default function SpecimenViewSheet({
                                                     </th>
                                                     <th className="p-3">
                                                         Accesos
+                                                    </th>
+                                                    <th className="p-3">
+                                                        Asignado Por
                                                     </th>
                                                 </tr>
                                             </thead>
@@ -1273,6 +1311,36 @@ export default function SpecimenViewSheet({
                                                                     )}
                                                                 </div>
                                                             </td>
+                                                            <td className="p-3 text-xs text-muted-foreground">
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-medium text-foreground">
+                                                                        {user
+                                                                            .pivot
+                                                                            ?.assigned_by_user_name ||
+                                                                            (user
+                                                                                .pivot
+                                                                                ?.assigned_by
+                                                                                ? `Usuario #${user.pivot.assigned_by}`
+                                                                                : 'Sistema')}
+                                                                    </span>
+                                                                    {user.pivot
+                                                                        ?.created_at && (
+                                                                        <span className="text-[11px] text-muted-foreground">
+                                                                            {format(
+                                                                                new Date(
+                                                                                    user
+                                                                                        .pivot
+                                                                                        .created_at,
+                                                                                ),
+                                                                                'dd/MM/yyyy HH:mm',
+                                                                                {
+                                                                                    locale: es,
+                                                                                },
+                                                                            )}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
                                                         </tr>
                                                     ),
                                                 )}
@@ -1285,7 +1353,7 @@ export default function SpecimenViewSheet({
                                             No hay colaboradores asignados a
                                             esta muestra.
                                         </p>
-                                        {onAssignPathologistClick &&
+                                        {onAssignCollaboratorClick &&
                                             (auth.permissions?.includes(
                                                 'specimens.manage',
                                             ) ||
@@ -1299,7 +1367,7 @@ export default function SpecimenViewSheet({
                                                     size="sm"
                                                     onClick={() => {
                                                         onOpenChange(false);
-                                                        onAssignPathologistClick();
+                                                        onAssignCollaboratorClick();
                                                     }}
                                                     className="mx-auto flex h-8 items-center gap-1.5 border-primary/20 text-xs font-semibold text-primary hover:bg-primary/10 hover:text-primary"
                                                 >

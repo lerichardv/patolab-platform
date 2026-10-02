@@ -45,6 +45,7 @@ export interface SpecimenUserRelation {
     };
     user_signature?: string | null;
     signature_url?: string | null;
+    signature_subtext?: string | null;
     pivot?: {
         macroscopy_access: boolean;
         microscopy_access: boolean;

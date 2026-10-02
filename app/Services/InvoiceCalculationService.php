@@ -69,7 +69,7 @@ class InvoiceCalculationService
         return [
             'examination_id' => $examination?->id ?? ($itemData['examination_id'] ?? null),
             'quantity' => $qty,
-            'amount' => $basePrice,
+            'amount' => $maxPrice,
             'discount' => $totalDiscountVal,
             'subtotal' => $subtotalVal,
             'exempt_amount' => $payIsv ? 0.0 : $subtotalVal,
@@ -115,7 +115,7 @@ class InvoiceCalculationService
 
         return [
             'quantity' => $totalQty,
-            'amount' => $totalAmount + $customAmount,
+            'amount' => $totalAmount + $insumosTotal + $customAmount,
             'discount' => $totalDiscount,
             'subtotal' => $grandSubtotal,
             'exempt_amount' => $payIsv ? 0.0 : $taxableBase,

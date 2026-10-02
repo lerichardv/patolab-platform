@@ -86,7 +86,6 @@ class PriceQuoteSpecimen extends Model
         'isv_15' => 'decimal:2',
         'isv_18' => 'decimal:2',
         'total' => 'decimal:2',
-        'selected_price' => 'decimal:2',
         'custom_specimen_price' => 'decimal:2',
         'additional_discount_enabled' => 'boolean',
         'additional_discount' => 'decimal:2',
