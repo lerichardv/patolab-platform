@@ -699,3 +699,46 @@ test('can update a price quote to use custom specimen price', function () {
         ->and((float) $specimen->custom_specimen_price)->toBe(5000.00)
         ->and((float) $specimen->total)->toBe(4500.00);
 });
+
+test('pdf.price_quote blade view renders successfully', function () {
+    $quote = PriceQuote::create([
+        'price_quote_id' => '123456789012',
+        'customer_id' => $this->customer->id,
+        'active' => true,
+    ]);
+
+    $quote->priceQuoteSpecimens()->create([
+        'specimen' => 'aabbccddeeff',
+        'specimen_type' => $this->specimenType->id,
+        'specimen_category' => $this->specimenCategory->id,
+        'examination_id' => $this->examination->id,
+        'quantity' => 1,
+        'amount' => 1000.00,
+        'discount' => 0.00,
+        'subtotal' => 1000.00,
+        'exempt_amount' => 0.00,
+        'taxable_amount_15' => 1000.00,
+        'taxable_amount_18' => 0.00,
+        'isv_15' => 150.00,
+        'isv_18' => 0.00,
+        'total' => 1150.00,
+        'selected_price' => '1000.00',
+        'custom_specimen_price' => 0.00,
+        'additional_discount_enabled' => false,
+        'additional_discount' => 0.00,
+        'age_discout_type' => 'none',
+        'age_discout_amount' => 0.00,
+    ]);
+
+    $quote->load(['customer', 'priceQuoteSpecimens.examination', 'priceQuoteSpecimens.specimenType', 'priceQuoteSpecimens.specimenCategory']);
+
+    $rendered = view('pdf.price_quote', [
+        'priceQuote' => $quote,
+        'customer' => $quote->customer,
+        'totalWords' => 'UN MIL CIENTO CINCUENTA LEMPIRAS EXACTOS',
+        'setting' => Setting::first(),
+    ])->render();
+
+    expect($rendered)->toBeString()
+        ->and(strlen($rendered))->toBeGreaterThan(0);
+});
