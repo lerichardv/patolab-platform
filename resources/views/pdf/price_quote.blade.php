@@ -433,6 +433,7 @@
                                 default => $qty === 1 ? $unit : $unit . 's',
                             };
                             $deliveryDuration = "{$qty} {$unitLabel}";
+                        }
                     @endphp
                     @foreach($items as $item)
                         @php
