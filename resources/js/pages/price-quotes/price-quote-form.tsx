@@ -414,6 +414,20 @@ export default function PriceQuoteForm({
             return;
         }
 
+        const invalidCustomPriceItem = quoteItems.find(
+            (item) =>
+                item.selected_price === 'custom' &&
+                (!item.custom_specimen_price ||
+                    item.custom_specimen_price <= 0),
+        );
+        if (invalidCustomPriceItem) {
+            toast.error(
+                `Debe ingresar un monto válido mayor a 0 para el precio personalizado en "${invalidCustomPriceItem.examination_name || 'el examen'}".`,
+            );
+
+            return;
+        }
+
         setShowSummaryConfirm(true);
     };
 
@@ -1553,14 +1567,8 @@ export default function PriceQuoteForm({
                 autoDiscountTotal={calculatedItems.reduce(
                     (sum, ci) =>
                         sum +
-                        (Number(ci.calculated.age_discount_amount || 0) || 0) +
-                        Math.max(
-                            0,
-                            (ci.calculated.maxPrice || 0) -
-                                (Number(ci.calculated.selected_price || 0) ||
-                                    0),
-                        ) *
-                            (ci.quantity || 1),
+                        (Number(ci.calculated.ageDiscountAmount || 0) || 0) +
+                        (Number(ci.calculated.priceDiscount || 0) || 0),
                     0,
                 )}
                 additionalDiscountTotal={calculatedItems.reduce(

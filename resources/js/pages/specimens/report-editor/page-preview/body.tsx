@@ -239,17 +239,38 @@ export function SignatureBlock({
                             >
                                 {pathologist.name}
                             </div>
-                            <div
-                                style={{
-                                    fontSize: '2.25mm',
-                                    color: '#4b5563',
-                                    fontWeight: 500,
-                                    textTransform: 'uppercase',
-                                }}
-                            >
-                                {pathologist.role?.name ||
-                                    'PATOLOGÍA ONCOLÓGICA'}
-                            </div>
+                            {pathologist.signature_subtext ? (
+                                pathologist.signature_subtext
+                                    .split('\n')
+                                    .map((l: string) => l.trim())
+                                    .filter(Boolean)
+                                    .map((line: string, lineIdx: number) => (
+                                        <div
+                                            key={lineIdx}
+                                            style={{
+                                                fontSize: '2.25mm',
+                                                color: '#4b5563',
+                                                fontWeight: 500,
+                                                textTransform: 'uppercase',
+                                                lineHeight: '3.0mm',
+                                            }}
+                                        >
+                                            {line}
+                                        </div>
+                                    ))
+                            ) : (
+                                <div
+                                    style={{
+                                        fontSize: '2.25mm',
+                                        color: '#4b5563',
+                                        fontWeight: 500,
+                                        textTransform: 'uppercase',
+                                    }}
+                                >
+                                    {pathologist.role?.name ||
+                                        'PATOLOGÍA ONCOLÓGICA'}
+                                </div>
+                            )}
                             <div
                                 style={{
                                     fontSize: '2.38mm',

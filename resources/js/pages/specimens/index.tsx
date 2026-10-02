@@ -98,6 +98,7 @@ import KanbanBoardSkeleton from './kanban/kanban-board-skeleton';
 import SendReportSheet from './send-report/send-report-sheet';
 import SpecimenBulkCollaboratorSheet from './specimen-bulk-collaborator-sheet';
 import SpecimenBulkPathologistSheet from './specimen-bulk-pathologist-sheet';
+import SpecimenCollaboratorSheet from './specimen-collaborator-sheet';
 import SpecimenGroupSheet from './specimen-group-sheet';
 import SpecimenPathologistSheet from './specimen-pathologist-sheet';
 import SpecimenSheet from './specimen-sheet';
@@ -279,6 +280,13 @@ export default function SpecimensIndex({
     const [isAssignSheetOpen, setIsAssignSheetOpen] = useState(false);
     const [selectedSpecimenForAssign, setSelectedSpecimenForAssign] =
         useState<Specimen | null>(null);
+
+    const [isCollaboratorSheetOpen, setIsCollaboratorSheetOpen] =
+        useState(false);
+    const [
+        selectedSpecimenForCollaborator,
+        setSelectedSpecimenForCollaborator,
+    ] = useState<Specimen | null>(null);
 
     const [selectedSpecimenForView, setSelectedSpecimenForView] =
         useState<Specimen | null>(null);
@@ -825,6 +833,11 @@ export default function SpecimensIndex({
         setIsAssignSheetOpen(true);
     };
 
+    const handleCollaboratorClick = (specimen: Specimen) => {
+        setSelectedSpecimenForCollaborator(specimen);
+        setIsCollaboratorSheetOpen(true);
+    };
+
     const handleSendReportClick = (specimen: Specimen) => {
         setSelectedSpecimenForSendReport(specimen);
         setIsSendReportSheetOpen(true);
@@ -832,6 +845,10 @@ export default function SpecimensIndex({
 
     const activeAssignSpecimen = selectedSpecimenForAssign
         ? findSpecimenById(selectedSpecimenForAssign.id)
+        : null;
+
+    const activeCollaboratorSpecimen = selectedSpecimenForCollaborator
+        ? findSpecimenById(selectedSpecimenForCollaborator.id)
         : null;
 
     useEffect(() => {
@@ -1947,6 +1964,11 @@ export default function SpecimensIndex({
                         handleAssignClick(selectedSpecimenForView);
                     }
                 }}
+                onAssignCollaboratorClick={() => {
+                    if (selectedSpecimenForView) {
+                        handleCollaboratorClick(selectedSpecimenForView);
+                    }
+                }}
             />
 
             <InvoiceSheet
@@ -1961,16 +1983,30 @@ export default function SpecimensIndex({
                 onOpenChange={setIsAssignSheetOpen}
             />
 
+            <SpecimenCollaboratorSheet
+                specimen={activeCollaboratorSpecimen}
+                open={isCollaboratorSheetOpen}
+                onOpenChange={setIsCollaboratorSheetOpen}
+            />
+
             <SpecimenBulkPathologistSheet
                 selectedSpecimens={selectedSpecimens}
                 open={isBulkAssignSheetOpen}
                 onOpenChange={setIsBulkAssignSheetOpen}
+                onSuccess={() => {
+                    setSelectedIds([]);
+                    setIsSelectionMode(false);
+                }}
             />
 
             <SpecimenBulkCollaboratorSheet
                 selectedSpecimens={selectedSpecimens}
                 open={isBulkCollaboratorSheetOpen}
                 onOpenChange={setIsBulkCollaboratorSheetOpen}
+                onSuccess={() => {
+                    setSelectedIds([]);
+                    setIsSelectionMode(false);
+                }}
             />
 
             <SendReportSheet

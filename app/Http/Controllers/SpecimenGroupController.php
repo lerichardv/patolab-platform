@@ -197,7 +197,7 @@ class SpecimenGroupController extends Controller
                     $totalAmount += $basePrice * $qty;
                     $totalDiscount += $disc;
                     $totalQuantity += $qty;
-                    $totalAgeDiscount += $ageDiscount * $qty;
+                    $totalAgeDiscount += $ageDiscount;
 
                     if (! empty($item['age_discount_type']) && ! $firstAgeDiscountType) {
                         $firstAgeDiscountType = $item['age_discount_type'];
@@ -296,8 +296,8 @@ class SpecimenGroupController extends Controller
                 'amount' => $totalAmount,
                 'discount' => $totalDiscount,
                 'subtotal' => $subtotal,
-                'exempt_amount' => 0.00,
-                'tax_exempt_amount' => $subtotal,
+                'exempt_amount' => max(0.00, $subtotal - $customAmountVal),
+                'tax_exempt_amount' => $customAmountVal,
                 'taxable_amount_15' => 0.00,
                 'taxable_amount_18' => 0.00,
                 'isv_15' => 0.00,
@@ -910,7 +910,8 @@ class SpecimenGroupController extends Controller
                 'amount' => $totalAmount,
                 'discount' => $totalDiscount,
                 'subtotal' => $subtotal,
-                'tax_exempt_amount' => $subtotal,
+                'exempt_amount' => max(0.00, $subtotal - $customAmountVal),
+                'tax_exempt_amount' => $customAmountVal,
                 'total' => $subtotal,
                 'total_paid' => $totalPaid,
                 'proof_of_payment' => $proofOfPaymentPath,
@@ -2116,7 +2117,7 @@ class SpecimenGroupController extends Controller
                     'discount' => $newDiscount,
                     'subtotal' => $newSubtotal,
                     'exempt_amount' => $newExempt,
-                    'tax_exempt_amount' => $newSubtotal,
+                    'tax_exempt_amount' => 0.00,
                     'taxable_amount_15' => $newTax15,
                     'taxable_amount_18' => $newTax18,
                     'isv_15' => $newIsv15,

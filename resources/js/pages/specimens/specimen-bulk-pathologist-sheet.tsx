@@ -4,6 +4,16 @@ import { User, Trash2, Microscope, UserPlus } from 'lucide-react';
 import { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import HeadingSheet from '@/components/heading-sheet';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
     Popover,
@@ -61,6 +71,8 @@ export default function SpecimenBulkPathologistSheet({
         useState<string>('');
     const [macroscopyAccess, setMacroscopyAccess] = useState<boolean>(false);
     const [microscopyAccess, setMicroscopyAccess] = useState<boolean>(true);
+    const [isConfirmDialogOpen, setIsConfirmDialogOpen] =
+        useState<boolean>(false);
 
     const specimenIds = useMemo(() => {
         return currentSpecimens.map((s) => s.id);
@@ -96,6 +108,26 @@ export default function SpecimenBulkPathologistSheet({
             return assignedCount < currentSpecimens.length;
         });
     }, [resolvedPathologists, currentSpecimens]);
+
+    const selectedPathologistName = useMemo(() => {
+        return (
+            resolvedPathologists.find(
+                (p: any) => p.id.toString() === selectedPathologistId,
+            )?.name || 'el patólogo seleccionado'
+        );
+    }, [resolvedPathologists, selectedPathologistId]);
+
+    const handleAssignClick = () => {
+        if (!selectedPathologistId || specimenIds.length === 0 || isAssigning) {
+            return;
+        }
+
+        if (specimenIds.length > 1) {
+            setIsConfirmDialogOpen(true);
+        } else {
+            handleAssign(selectedPathologistId);
+        }
+    };
 
     const handleAssign = async (userId: string) => {
         if (!userId || specimenIds.length === 0 || isAssigning) {
@@ -508,11 +540,7 @@ export default function SpecimenBulkPathologistSheet({
 
                                         <Button
                                             type="button"
-                                            onClick={() =>
-                                                handleAssign(
-                                                    selectedPathologistId,
-                                                )
-                                            }
+                                            onClick={handleAssignClick}
                                             disabled={
                                                 !selectedPathologistId ||
                                                 isAssigning
@@ -856,6 +884,41 @@ export default function SpecimenBulkPathologistSheet({
                     </div>
                 )}
             </SheetContent>
+
+            <AlertDialog
+                open={isConfirmDialogOpen}
+                onOpenChange={setIsConfirmDialogOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            ¿Confirmar asignación en lote?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            ¿Está seguro de que desea asignar al patólogo{' '}
+                            <span className="font-semibold text-foreground">
+                                {selectedPathologistName}
+                            </span>{' '}
+                            a las{' '}
+                            <span className="font-semibold text-foreground">
+                                {specimenIds.length}
+                            </span>{' '}
+                            muestras seleccionadas?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setIsConfirmDialogOpen(false);
+                                handleAssign(selectedPathologistId);
+                            }}
+                        >
+                            Confirmar y Asignar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Sheet>
     );
 }

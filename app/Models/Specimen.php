@@ -349,7 +349,7 @@ class Specimen extends Model
     {
         return $this->belongsToMany(User::class, 'specimen_user', 'specimen_id', 'user_id')
             ->using(SpecimenUser::class)
-            ->withPivot(['macroscopy_access', 'microscopy_access'])
+            ->withPivot(['macroscopy_access', 'microscopy_access', 'assigned_by'])
             ->withTimestamps();
     }
 
@@ -359,7 +359,8 @@ class Specimen extends Model
     public function collaborators(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'specimen_collaborators', 'specimen_id', 'user_id')
-            ->withPivot(['macroscopy_access', 'microscopy_access'])
+            ->using(SpecimenCollaborator::class)
+            ->withPivot(['macroscopy_access', 'microscopy_access', 'assigned_by'])
             ->withTimestamps();
     }
 

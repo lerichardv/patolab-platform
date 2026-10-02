@@ -13,9 +13,24 @@ class ReportPaginator
         $pageContentHeight = self::PAGE_CONTENT_HEIGHT; // mm
         $lineHeight = 3.53; // mm (8pt * 1.25)
         $maxCharsPerLine = 144;
-        $pathologistsCount = $specimen->users ? $specimen->users->count() : 0;
-        $rowsCount = (int) ceil($pathologistsCount / 2);
-        $signatureHeight = $rowsCount * self::SIGNATURE_ROW_HEIGHT;
+        $pathologists = $specimen->users ?? collect();
+        if (is_array($pathologists)) {
+            $pathologists = collect($pathologists);
+        }
+        $signatureHeight = 0.0;
+        if ($pathologists->count() > 0) {
+            foreach ($pathologists->chunk(2) as $rowUsers) {
+                $maxExtraLines = 0;
+                foreach ($rowUsers as $u) {
+                    $subtext = is_array($u) ? ($u['signature_subtext'] ?? null) : ($u->signature_subtext ?? null);
+                    if (! empty($subtext)) {
+                        $lines = array_filter(array_map('trim', explode("\n", $subtext)));
+                        $maxExtraLines = max($maxExtraLines, max(0, count($lines) - 1));
+                    }
+                }
+                $signatureHeight += self::SIGNATURE_ROW_HEIGHT + ($maxExtraLines * 3.0);
+            }
+        }
 
         // Resolve headings_toggles — defaults all sections to visible (true) when null/absent
         $headingsToggles = [];
@@ -219,7 +234,7 @@ class ReportPaginator
                     }
                 }
             } elseif ($key === 'diagnosis_html') {
-                $diagHtml = ! empty($report->diagnosis_html) ? $report->diagnosis_html : ($specimen->diagnosis ?? '');
+                $diagHtml = ! empty($report->diagnosis_html) ? $report->diagnosis_html : '';
                 if (! self::isEmptyHtml($diagHtml)) {
                     if ($showHeading) {
                         $blocks[] = [

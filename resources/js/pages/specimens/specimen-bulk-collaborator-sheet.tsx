@@ -4,6 +4,16 @@ import { User, Trash2, Microscope, UserPlus } from 'lucide-react';
 import { useState, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import HeadingSheet from '@/components/heading-sheet';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
     Popover,
@@ -79,6 +89,8 @@ export default function SpecimenBulkCollaboratorSheet({
         useState<boolean>(true);
     const [collabMicroscopyAccess, setCollabMicroscopyAccess] =
         useState<boolean>(true);
+    const [isConfirmDialogOpen, setIsConfirmDialogOpen] =
+        useState<boolean>(false);
 
     const specimenIds = useMemo(() => {
         return currentSpecimens.map((s) => s.id);
@@ -114,6 +126,30 @@ export default function SpecimenBulkCollaboratorSheet({
             return assignedCount < currentSpecimens.length;
         });
     }, [resolvedUsers, currentSpecimens]);
+
+    const selectedCollaboratorName = useMemo(() => {
+        return (
+            resolvedUsers.find(
+                (p: any) => p.id.toString() === selectedCollaboratorId,
+            )?.name || 'el colaborador seleccionado'
+        );
+    }, [resolvedUsers, selectedCollaboratorId]);
+
+    const handleAssignClick = () => {
+        if (
+            !selectedCollaboratorId ||
+            specimenIds.length === 0 ||
+            isAssigning
+        ) {
+            return;
+        }
+
+        if (specimenIds.length > 1) {
+            setIsConfirmDialogOpen(true);
+        } else {
+            handleAssignCollaborator(selectedCollaboratorId);
+        }
+    };
 
     const handleAssignCollaborator = async (userId: string) => {
         if (!userId || specimenIds.length === 0 || isAssigning) {
@@ -545,11 +581,7 @@ export default function SpecimenBulkCollaboratorSheet({
 
                                         <Button
                                             type="button"
-                                            onClick={() =>
-                                                handleAssignCollaborator(
-                                                    selectedCollaboratorId,
-                                                )
-                                            }
+                                            onClick={handleAssignClick}
                                             disabled={
                                                 !selectedCollaboratorId ||
                                                 isAssigning
@@ -893,6 +925,43 @@ export default function SpecimenBulkCollaboratorSheet({
                     </div>
                 )}
             </SheetContent>
+
+            <AlertDialog
+                open={isConfirmDialogOpen}
+                onOpenChange={setIsConfirmDialogOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            ¿Confirmar asignación en lote?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            ¿Está seguro de que desea asignar al colaborador{' '}
+                            <span className="font-semibold text-foreground">
+                                {selectedCollaboratorName}
+                            </span>{' '}
+                            a las{' '}
+                            <span className="font-semibold text-foreground">
+                                {specimenIds.length}
+                            </span>{' '}
+                            muestras seleccionadas?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setIsConfirmDialogOpen(false);
+                                handleAssignCollaborator(
+                                    selectedCollaboratorId,
+                                );
+                            }}
+                        >
+                            Confirmar y Asignar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Sheet>
     );
 }

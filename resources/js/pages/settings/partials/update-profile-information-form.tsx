@@ -9,7 +9,7 @@ import {
     PenTool,
     Upload,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEventHandler } from 'react';
 import { toast } from 'sonner';
 import InputError from '@/components/input-error';
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Sheet,
     SheetContent,
@@ -123,6 +124,37 @@ export default function UpdateProfileInformationForm({
             name: user.name,
             email: user.email,
         });
+
+    const subtextForm = useForm({
+        name: user.name,
+        email: user.email,
+        signature_subtext: (user.signature_subtext as string) || '',
+    });
+
+    useEffect(() => {
+        subtextForm.setData(
+            'signature_subtext',
+            (user.signature_subtext as string) || '',
+        );
+    }, [user.signature_subtext]);
+
+    const submitSubtext: FormEventHandler = (e) => {
+        e.preventDefault();
+
+        subtextForm.patch(update().url, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Texto de firma actualizado correctamente');
+            },
+        });
+    };
+
+    const subtextLines = useMemo(() => {
+        return (subtextForm.data.signature_subtext || '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
+    }, [subtextForm.data.signature_subtext]);
 
     const [sheetOpen, setSheetOpen] = useState(false);
     const [signatureMode, setSignatureMode] = useState<'draw' | 'upload'>(
@@ -436,6 +468,113 @@ export default function UpdateProfileInformationForm({
                         </Button>
                     </div>
                 </div>
+            </section>
+
+            <Separator className="my-6" />
+
+            <section className="space-y-6">
+                <header>
+                    <h2 className="text-lg font-medium text-foreground">
+                        Texto bajo la firma
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Personalice el texto o títulos profesionales que
+                        aparecen debajo de su nombre en la firma de los informes
+                        (ej. especialidades, maestrías o colegiaciones). Soporta
+                        múltiples líneas.
+                    </p>
+                </header>
+
+                <form onSubmit={submitSubtext} className="space-y-6">
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="signature_subtext">
+                                Líneas después del nombre
+                            </Label>
+                            <Textarea
+                                id="signature_subtext"
+                                className="min-h-[140px] font-mono text-sm uppercase"
+                                value={subtextForm.data.signature_subtext}
+                                onChange={(e) =>
+                                    subtextForm.setData(
+                                        'signature_subtext',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder={
+                                    'ANATOMÍA PATOLÓGICA\nMSC. PATOLOGÍA ONCOLÓGICA'
+                                }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Escriba cada título o grado en una línea
+                                diferente presionando Enter.
+                            </p>
+                            <InputError
+                                message={subtextForm.errors.signature_subtext}
+                            />
+                        </div>
+
+                        {/* Live preview */}
+                        <div className="flex flex-col gap-2">
+                            <span className="text-sm font-medium text-foreground">
+                                Vista previa en el informe
+                            </span>
+                            <div className="flex min-h-[140px] flex-col items-center justify-center rounded-lg border bg-white p-5 text-center shadow-xs">
+                                {user.signature_url ? (
+                                    <img
+                                        src={user.signature_url as string}
+                                        alt="Firma"
+                                        className="mb-2 max-h-[48px] max-w-[160px] object-contain"
+                                    />
+                                ) : (
+                                    <div className="mb-2 text-xs italic text-muted-foreground">
+                                        (Firma digital)
+                                    </div>
+                                )}
+                                <div className="mb-1.5 w-48 border-t border-gray-600" />
+                                <div className="text-xs font-bold text-gray-800 uppercase">
+                                    {user.name}
+                                </div>
+                                {subtextLines.length > 0 ? (
+                                    subtextLines.map((line, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="text-[11px] font-medium text-gray-600 uppercase"
+                                        >
+                                            {line}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-[11px] font-medium text-gray-600 uppercase">
+                                        {(user.role as any)?.name ||
+                                            'PATOLOGÍA ONCOLÓGICA'}
+                                    </div>
+                                )}
+                                <div className="mt-1 text-[10px] font-semibold text-gray-700">
+                                    FECHA: 24/06/26
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <Button disabled={subtextForm.processing}>
+                            Guardar texto de firma
+                        </Button>
+
+                        <Transition
+                            show={subtextForm.recentlySuccessful}
+                            enter="transition ease-in-out"
+                            enterFrom="opacity-0"
+                            leave="transition ease-in-out"
+                            leaveTo="opacity-0"
+                        >
+                            <p className="text-sm text-muted-foreground">
+                                Guardado.
+                            </p>
+                        </Transition>
+                    </div>
+                </form>
             </section>
 
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

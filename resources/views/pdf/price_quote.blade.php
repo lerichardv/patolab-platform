@@ -433,82 +433,64 @@
                                 default => $qty === 1 ? $unit : $unit . 's',
                             };
                             $deliveryDuration = "{$qty} {$unitLabel}";
-                        }
-                        $specQty = 0;
-                        $specPrice = 0.0;
-                        $specDisc = 0.0;
-                        $specTotal = 0.0;
+                    @endphp
+                    @foreach($items as $item)
+                        @php
+                            $itQty = max(1, (int) ($item->quantity ?? 1));
+                            $itAmt = (float) ($item->amount ?? 0);
+                            $itDisc = (float) ($item->discount ?? 0);
+                            $itSub = (float) ($item->subtotal ?? 0);
+                            $itTot = (float) ($item->total ?? 0);
 
-                        foreach($items as $it) {
-                            $itQty = max(1, (int) ($it->quantity ?? 1));
-                            $itAmt = (float) ($it->amount ?? 0);
-                            $itDisc = (float) ($it->discount ?? 0);
-                            $itSub = (float) ($it->subtotal ?? 0);
-                            $itTot = (float) ($it->total ?? 0);
-
-                            $specQty += $itQty;
-                            $specPrice += $itAmt;
-                            $specDisc += $itDisc;
-                            $specTotal += $itTot;
-
-                            $calcAmount += $itAmt;
+                            $calcAmount += $itAmt * $itQty;
                             $calcDiscount += $itDisc;
                             $calcSubtotal += $itSub;
-                            $calcExempt += (float) ($it->exempt_amount ?? 0);
-                            $calcTaxable15 += (float) ($it->taxable_amount_15 ?? 0);
-                            $calcIsv15 += (float) ($it->isv_15 ?? 0);
+                            $calcExempt += (float) ($item->exempt_amount ?? 0);
+                            $calcTaxable15 += (float) ($item->taxable_amount_15 ?? 0);
+                            $calcIsv15 += (float) ($item->isv_15 ?? 0);
                             $calcTotal += $itTot;
-                        }
-                    @endphp
-                    <tr>
-                        <td style="vertical-align: middle; padding: 6px 4px;">{{ $rowNum++ }}</td>
-                        <td style="vertical-align: middle; padding: 6px 4px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; margin-bottom: 4px;">
-                                <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
-                                    @if(!empty($typeName))
-                                        <span style="font-size: 8px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; letter-spacing: 0.3px; line-height: 1;">
-                                            {{ $typeName }}
-                                        </span>
-                                    @endif
 
-                                    @if($deliveryDuration)
-                                        <span style="font-size: 8px; font-weight: 600; color: #047857; background-color: #ecfdf5; border: 1px solid #a7f3d0; padding: 1px 5px; border-radius: 3px; white-space: nowrap;">
-                                            Entrega estimada: {{ $deliveryDuration }}
-                                        </span>
-                                    @endif
-
-                                </div>
-                            </div>
-
-                            <div style="display: flex; flex-direction: column; gap: 3px;">
-                                @foreach($items as $item)
-                                    @php
-                                        $examName = $item->examination->name ?? 'Análisis';
-                                        $itemQuantity = max(1, (int) ($item->quantity ?? 1));
-                                    @endphp
-                                    <div>
-                                        <div style="font-weight: 500; font-size: 10px; color: #4b5563; line-height: 1.2;">
-                                            {{ $examName }} <span style="font-size: 9px; font-weight: 600; color: #1e3a8a;"> x{{ $itemQuantity }}</span>
-                                        </div>
-                                        @if(!empty($item->age_discout_type) && (float)($item->age_discout_amount ?? 0) > 0)
-                                            <div style="font-size: 7.5px; color: #059669; margin-top: 1px; font-weight: 500;">
-                                                * Descuento {{ $item->age_discout_type === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }}: - L. {{ number_format((float)$item->age_discout_amount, 2) }}
-                                            </div>
+                            $examName = $item->examination->name ?? 'Análisis';
+                        @endphp
+                        <tr>
+                            <td style="vertical-align: middle; padding: 6px 4px;">{{ $rowNum++ }}</td>
+                            <td style="vertical-align: middle; padding: 6px 4px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; margin-bottom: 2px;">
+                                    <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+                                        @if(!empty($typeName))
+                                            <span style="font-size: 8px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; letter-spacing: 0.3px; line-height: 1;">
+                                                {{ $typeName }}
+                                            </span>
                                         @endif
-                                        @if(!empty($item->additional_discount_enabled) && (float)($item->additional_discount ?? 0) > 0)
-                                            <div style="font-size: 7.5px; color: #059669; margin-top: 1px; font-weight: 500;">
-                                                * Descuento Adicional: - L. {{ number_format((float)$item->additional_discount, 2) }}
-                                            </div>
+
+                                        @if($deliveryDuration)
+                                            <span style="font-size: 8px; font-weight: 600; color: #047857; background-color: #ecfdf5; border: 1px solid #a7f3d0; padding: 1px 5px; border-radius: 3px; white-space: nowrap;">
+                                                Entrega estimada: {{ $deliveryDuration }}
+                                            </span>
                                         @endif
                                     </div>
-                                @endforeach
-                            </div>
-                        </td>
-                        <td style="vertical-align: middle; padding: 6px 4px;">{{ $specQty }}</td>
-                        <td class="text-right" style="vertical-align: middle; padding: 6px 4px;">L. {{ number_format($specPrice, 2) }}</td>
-                        <td class="text-right" style="vertical-align: middle; padding: 6px 4px;">L. {{ number_format($specDisc, 2) }}</td>
-                        <td class="text-right" style="vertical-align: middle; padding: 6px 4px;">L. {{ number_format($specTotal, 2) }}</td>
-                    </tr>
+                                </div>
+
+                                <div style="font-weight: 500; font-size: 10px; color: #1f2937; line-height: 1.2;">
+                                    {{ $examName }}
+                                </div>
+                                @if(!empty($item->age_discout_type) && (float)($item->age_discout_amount ?? 0) > 0)
+                                    <div style="font-size: 7.5px; color: #059669; margin-top: 1px; font-weight: 500;">
+                                        * Descuento {{ $item->age_discout_type === 'third' ? 'Tercera Edad' : 'Cuarta Edad' }}: - L. {{ number_format((float)$item->age_discout_amount, 2) }}
+                                    </div>
+                                @endif
+                                @if(!empty($item->additional_discount_enabled) && (float)($item->additional_discount ?? 0) > 0)
+                                    <div style="font-size: 7.5px; color: #059669; margin-top: 1px; font-weight: 500;">
+                                        * Descuento Adicional: - L. {{ number_format((float)$item->additional_discount, 2) }}
+                                    </div>
+                                @endif
+                            </td>
+                            <td style="vertical-align: middle; padding: 6px 4px;">{{ $itQty }}</td>
+                            <td class="text-right" style="vertical-align: middle; padding: 6px 4px;">L. {{ number_format($itAmt, 2) }}</td>
+                            <td class="text-right" style="vertical-align: middle; padding: 6px 4px;">L. {{ number_format($itDisc, 2) }}</td>
+                            <td class="text-right" style="vertical-align: middle; padding: 6px 4px;">L. {{ number_format($itTot, 2) }}</td>
+                        </tr>
+                    @endforeach
                 @endforeach
             </tbody>
         </table>

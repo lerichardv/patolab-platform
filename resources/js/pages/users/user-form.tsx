@@ -17,6 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 interface User {
     id?: number;
@@ -25,6 +26,7 @@ interface User {
     role_id?: number;
     password?: string;
     password_confirmation?: string;
+    signature_subtext?: string | null;
 }
 
 interface UserFormProps {
@@ -38,6 +40,7 @@ export default function UserForm({ user, roles, onSuccess }: UserFormProps) {
         name: user?.name || '',
         email: user?.email || '',
         role_id: user?.role_id?.toString() || '',
+        signature_subtext: user?.signature_subtext || '',
         password: '',
         password_confirmation: '',
     });
@@ -48,6 +51,7 @@ export default function UserForm({ user, roles, onSuccess }: UserFormProps) {
                 name: user.name,
                 email: user.email,
                 role_id: user.role_id?.toString() || '',
+                signature_subtext: user.signature_subtext || '',
                 password: '',
                 password_confirmation: '',
             });
@@ -124,6 +128,25 @@ export default function UserForm({ user, roles, onSuccess }: UserFormProps) {
                     </SelectContent>
                 </Select>
                 <InputError message={errors.role_id} />
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="signature_subtext">
+                    Líneas de la Firma (Opcional)
+                </Label>
+                <Textarea
+                    id="signature_subtext"
+                    value={data.signature_subtext}
+                    onChange={(e) =>
+                        setData('signature_subtext', e.target.value)
+                    }
+                    placeholder={`ANATOMÍA PATOLÓGICA\nMSC. PATOLOGÍA ONCOLÓGICA`}
+                    rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                    Texto que aparece debajo del nombre en los reportes (soporta múltiples líneas).
+                </p>
+                <InputError message={errors.signature_subtext} />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

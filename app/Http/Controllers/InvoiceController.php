@@ -731,7 +731,10 @@ class InvoiceController extends Controller
             $validated['isv_18'] = 0.00;
             $validated['total'] = $calc['total'];
         } else {
-            $validated['tax_exempt_amount'] = (float) $validated['subtotal'];
+            $customAmt = ! empty($validated['custom_amount_enabled']) ? (float) ($validated['custom_amount'] ?? 0.00) : 0.00;
+            $sub = (float) $validated['subtotal'];
+            $validated['tax_exempt_amount'] = $customAmt;
+            $validated['exempt_amount'] = max(0.00, $sub - $customAmt);
             $validated['taxable_amount_15'] = 0.00;
             $validated['taxable_amount_18'] = 0.00;
             $validated['isv_15'] = 0.00;

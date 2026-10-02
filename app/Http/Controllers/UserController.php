@@ -42,6 +42,7 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'role_id' => 'nullable|exists:roles,id',
+            'signature_subtext' => 'nullable|string|max:1000',
         ]);
 
         User::create([
@@ -49,6 +50,7 @@ class UserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role_id' => $validated['role_id'] ?? null,
+            'signature_subtext' => $validated['signature_subtext'] ?? null,
             'active' => true,
         ]);
 
@@ -68,12 +70,14 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
             'password' => 'nullable|string|min:8|confirmed',
             'role_id' => 'nullable|exists:roles,id',
+            'signature_subtext' => 'nullable|string|max:1000',
         ]);
 
         $data = [
             'name' => $validated['name'],
             'email' => $validated['email'],
             'role_id' => $validated['role_id'] ?? null,
+            'signature_subtext' => $validated['signature_subtext'] ?? null,
         ];
 
         if (! empty($validated['password'])) {
