@@ -644,7 +644,29 @@ export default function RentalPaymentForm({
                                         </span>
                                         <span className="font-medium text-foreground">
                                             {selectedCustomer.age
-                                                ? `${selectedCustomer.age} años`
+                                                ? `${selectedCustomer.age} ${
+                                                      (selectedCustomer as any)
+                                                          .age_unit === 'days'
+                                                          ? Number(
+                                                                selectedCustomer.age,
+                                                            ) === 1
+                                                              ? 'día'
+                                                              : 'días'
+                                                          : (
+                                                                  selectedCustomer as any
+                                                              ).age_unit ===
+                                                              'months'
+                                                            ? Number(
+                                                                  selectedCustomer.age,
+                                                              ) === 1
+                                                                ? 'mes'
+                                                                : 'meses'
+                                                            : Number(
+                                                                    selectedCustomer.age,
+                                                                ) === 1
+                                                              ? 'año'
+                                                              : 'años'
+                                                  }`
                                                 : 'N/A'}
                                         </span>
                                     </div>

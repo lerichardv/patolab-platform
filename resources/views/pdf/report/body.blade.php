@@ -640,7 +640,16 @@
                             <tr>
                                 <td style="width: 50%;">
                                     <strong>Nombre:</strong> {{ $customer->name ?? 'N/C' }}<br>
-                                    <strong>Edad:</strong> {{ $customer->age ?? 'N/C' }} {{ $customer->age && $customer->age > 0 ? 'años' : '' }} &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ in_array(strtolower($customer->gender ?? ''), ['m', 'masculino', 'hombre']) ? 'M' : (in_array(strtolower($customer->gender ?? ''), ['f', 'femenino', 'mujer']) ? 'F' : (in_array(strtolower($customer->gender ?? ''), ['o', 'otro']) ? 'O' : 'N/C')) }}<br>
+                                    @php
+                                        $custAge = $customer->age ?? null;
+                                        $custAgeUnit = $customer->age_unit ?? 'years';
+                                        $ageUnitLabel = match($custAgeUnit) {
+                                            'days' => ((int)$custAge === 1 ? 'día' : 'días'),
+                                            'months' => ((int)$custAge === 1 ? 'mes' : 'meses'),
+                                            default => ((int)$custAge === 1 ? 'año' : 'años'),
+                                        };
+                                    @endphp
+                                    <strong>Edad:</strong> {{ $custAge ?? 'N/C' }} {{ $custAge && $custAge > 0 ? $ageUnitLabel : '' }} &nbsp;&nbsp;&nbsp; <strong>Sexo:</strong> {{ in_array(strtolower($customer->gender ?? ''), ['m', 'masculino', 'hombre']) ? 'M' : (in_array(strtolower($customer->gender ?? ''), ['f', 'femenino', 'mujer']) ? 'F' : (in_array(strtolower($customer->gender ?? ''), ['o', 'otro']) ? 'O' : 'N/C')) }}<br>
                                     <strong>Remitente:</strong> {{ $referrer->name ?? 'N/C' }}<br>
                                     <strong>Hospital/Clínica:</strong> {{ $referrer->notes ?? '' }}
                                 </td>

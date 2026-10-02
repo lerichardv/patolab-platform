@@ -17,6 +17,7 @@ class Customer extends Model
         'name',
         'id_number',
         'age',
+        'age_unit',
         'phone',
         'gender',
         'state',
@@ -27,6 +28,22 @@ class Customer extends Model
         'email',
         'active',
     ];
+
+    public function getFormattedAgeAttribute(): ?string
+    {
+        if ($this->age === null || $this->age === '') {
+            return null;
+        }
+
+        $age = (int) $this->age;
+        $unit = $this->age_unit ?? 'years';
+
+        return match ($unit) {
+            'days' => $age === 1 ? '1 día' : "{$age} días",
+            'months' => $age === 1 ? '1 mes' : "{$age} meses",
+            default => $age === 1 ? '1 año' : "{$age} años",
+        };
+    }
 
     public function department()
     {

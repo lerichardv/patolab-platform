@@ -37,6 +37,7 @@ interface Customer {
     id_number: string;
     type: 'cliente' | 'empresa';
     age: number | string;
+    age_unit?: 'years' | 'months' | 'days' | string;
     phone: string;
     secondary_phone: string;
     gender: string;
@@ -58,6 +59,7 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
             id_number: customer?.id_number || '',
             type: customer?.type || 'cliente',
             age: customer?.age || '',
+            age_unit: customer?.age_unit || 'years',
             phone: customer?.phone || '',
             secondary_phone: customer?.secondary_phone || '',
             gender: customer?.gender || '',
@@ -213,14 +215,34 @@ export default function CustomerForm({ customer, onSuccess }: Props) {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="age">Edad (Opcional)</Label>
-                    <Input
-                        id="age"
-                        type="number"
-                        value={data.age}
-                        onChange={(e) => setData('age', e.target.value)}
-                        placeholder="Ej. 25"
-                    />
+                    <div className="flex gap-2">
+                        <Input
+                            id="age"
+                            type="number"
+                            min="0"
+                            value={data.age}
+                            onChange={(e) => setData('age', e.target.value)}
+                            placeholder="Ej. 25"
+                            className="w-3/5"
+                        />
+                        <Select
+                            value={data.age_unit}
+                            onValueChange={(value) =>
+                                setData('age_unit', value)
+                            }
+                        >
+                            <SelectTrigger className="w-2/5">
+                                <SelectValue placeholder="Unidad" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="years">Años</SelectItem>
+                                <SelectItem value="months">Meses</SelectItem>
+                                <SelectItem value="days">Días</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <InputError message={errors.age} />
+                    <InputError message={errors.age_unit} />
                 </div>
             </div>
 

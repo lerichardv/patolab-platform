@@ -197,6 +197,7 @@ export default function SpecimenForm({
                       gender: specimen.customerRelation.gender,
                       type: specimen.customerRelation.type,
                       age: specimen.customerRelation.age,
+                      age_unit: specimen.customerRelation.age_unit,
                   }
                 : null,
         );
@@ -1992,7 +1993,27 @@ export default function SpecimenForm({
                                             </span>
                                             <span className="font-medium text-foreground">
                                                 {selectedCustomer.age
-                                                    ? `${selectedCustomer.age} años`
+                                                    ? `${selectedCustomer.age} ${
+                                                          selectedCustomer.age_unit ===
+                                                          'days'
+                                                              ? Number(
+                                                                    selectedCustomer.age,
+                                                                ) === 1
+                                                                  ? 'día'
+                                                                  : 'días'
+                                                              : selectedCustomer.age_unit ===
+                                                                  'months'
+                                                                ? Number(
+                                                                      selectedCustomer.age,
+                                                                  ) === 1
+                                                                    ? 'mes'
+                                                                    : 'meses'
+                                                                : Number(
+                                                                        selectedCustomer.age,
+                                                                    ) === 1
+                                                                  ? 'año'
+                                                                  : 'años'
+                                                      }`
                                                     : 'N/A'}
                                             </span>
                                         </div>

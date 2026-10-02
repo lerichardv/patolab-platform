@@ -2740,8 +2740,40 @@ export default function ReportWorkspace({
                                                 </span>{' '}
                                                 <strong className="text-card-foreground">
                                                     {specimen.customer_relation
-                                                        .age ?? 'N/A'}{' '}
-                                                    años (
+                                                        .age != null
+                                                        ? `${specimen.customer_relation.age} ${
+                                                              specimen
+                                                                  .customer_relation
+                                                                  .age_unit ===
+                                                              'days'
+                                                                  ? Number(
+                                                                        specimen
+                                                                            .customer_relation
+                                                                            .age,
+                                                                    ) === 1
+                                                                      ? 'día'
+                                                                      : 'días'
+                                                                  : specimen
+                                                                          .customer_relation
+                                                                          .age_unit ===
+                                                                      'months'
+                                                                    ? Number(
+                                                                          specimen
+                                                                              .customer_relation
+                                                                              .age,
+                                                                      ) === 1
+                                                                        ? 'mes'
+                                                                        : 'meses'
+                                                                    : Number(
+                                                                            specimen
+                                                                                .customer_relation
+                                                                                .age,
+                                                                        ) === 1
+                                                                      ? 'año'
+                                                                      : 'años'
+                                                          }`
+                                                        : 'N/A'}{' '}
+                                                    (
                                                     {
                                                         specimen
                                                             .customer_relation

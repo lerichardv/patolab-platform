@@ -26,6 +26,7 @@ export interface PreviewSpecimen {
         phone?: string;
         gender?: string;
         age: number | null;
+        age_unit?: string | null;
         type?: 'cliente' | 'empresa';
     };
     referrer_relation: {

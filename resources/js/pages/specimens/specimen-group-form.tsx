@@ -386,6 +386,7 @@ export default function SpecimenGroupForm({
                         gender: group.customer.gender || null,
                         type: group.customer.type || null,
                         age: group.customer.age || null,
+                        age_unit: group.customer.age_unit || 'years',
                     });
                 } else {
                     setSelectedGlobalCustomerData(null);
@@ -548,6 +549,9 @@ export default function SpecimenGroupForm({
                                       type:
                                           s.customer_relation.type || 'cliente',
                                       age: s.customer_relation.age || '',
+                                      age_unit:
+                                          s.customer_relation.age_unit ||
+                                          'years',
                                       state: s.customer_relation.state || '',
                                       city: s.customer_relation.city || '',
                                       address:

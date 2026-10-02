@@ -75,6 +75,7 @@ class CustomerController extends Controller
             'id_number' => 'required|string',
             'type' => 'required|in:cliente,empresa',
             'age' => 'nullable|integer',
+            'age_unit' => 'nullable|string|in:years,months,days',
             'phone' => 'required|string',
             'gender' => 'nullable|string',
             'state' => 'nullable|exists:departments,id',
@@ -94,6 +95,7 @@ class CustomerController extends Controller
             'gender' => $customer->gender,
             'type' => $customer->type,
             'age' => $customer->age,
+            'age_unit' => $customer->age_unit ?? 'years',
         ]);
     }
 
@@ -105,6 +107,7 @@ class CustomerController extends Controller
             'id_number' => 'required|string',
             'type' => 'required|in:cliente,empresa',
             'age' => 'nullable|integer',
+            'age_unit' => 'nullable|string|in:years,months,days',
             'phone' => 'required|string',
             'gender' => 'nullable|string',
             'state' => 'nullable|exists:departments,id',
@@ -192,7 +195,7 @@ class CustomerController extends Controller
                     $customer->name,
                     $customer->id_number,
                     ucfirst($customer->type),
-                    $customer->age,
+                    $customer->formatted_age ?? $customer->age,
                     $customer->gender,
                     $customer->phone,
                     $customer->department?->name ?? $customer->state,
@@ -322,6 +325,7 @@ class CustomerController extends Controller
                 'id_number' => 'required|string',
                 'type' => 'required|in:cliente,empresa',
                 'age' => 'nullable|integer',
+                'age_unit' => 'nullable|string|in:years,months,days',
                 'phone' => 'required|string',
                 'gender' => 'nullable|string',
                 'state' => 'nullable|exists:departments,id',
