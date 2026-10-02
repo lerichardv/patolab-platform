@@ -49,7 +49,18 @@ export function PatientMetadataCard({
                         {specimen.customer_relation.age ?? 'N/C'}{' '}
                         {specimen.customer_relation.age &&
                         specimen.customer_relation.age > 0
-                            ? 'años'
+                            ? specimen.customer_relation.age_unit === 'days'
+                                ? Number(specimen.customer_relation.age) === 1
+                                    ? 'día'
+                                    : 'días'
+                                : specimen.customer_relation.age_unit ===
+                                    'months'
+                                  ? Number(specimen.customer_relation.age) === 1
+                                      ? 'mes'
+                                      : 'meses'
+                                  : Number(specimen.customer_relation.age) === 1
+                                    ? 'año'
+                                    : 'años'
                             : ''}
                         &nbsp;&nbsp;&nbsp;{' '}
                         <strong style={{ color: '#1e3a8a', fontWeight: 600 }}>

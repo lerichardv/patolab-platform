@@ -53,6 +53,7 @@ interface Customer {
     id_number: string;
     type: 'cliente' | 'empresa';
     age: number | string;
+    age_unit?: 'years' | 'months' | 'days' | string;
     phone: string;
     secondary_phone: string;
     gender: string;

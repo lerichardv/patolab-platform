@@ -19,6 +19,7 @@ export interface CustomerOption {
     gender?: string | null;
     type?: string | null;
     age?: number | null;
+    age_unit?: string | null;
     secondary_phone?: string | null;
     state?: string | number | null;
     city?: string | number | null;

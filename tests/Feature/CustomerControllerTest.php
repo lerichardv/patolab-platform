@@ -68,3 +68,92 @@ test('customer can be updated to share rtn/id_number of another customer', funct
     $customer2->refresh();
     expect($customer2->id_number)->toBe('0801-1990-11111');
 });
+
+test('customer can be created with age and age_unit', function () {
+    $response = $this->actingAs($this->user)
+        ->post(route('customers.store'), [
+            'name' => 'Pediatric Patient',
+            'id_number' => '0801-2024-00001',
+            'type' => 'cliente',
+            'age' => 5,
+            'age_unit' => 'months',
+            'phone' => '8888-8888',
+            'email' => 'baby@example.com',
+        ]);
+
+    $response->assertRedirect();
+    $customer = Customer::where('id_number', '0801-2024-00001')->first();
+    expect($customer)->not->toBeNull()
+        ->and($customer->age)->toBe(5)
+        ->and($customer->age_unit)->toBe('months')
+        ->and($customer->formatted_age)->toBe('5 meses');
+
+    $response->assertSessionHas('created_customer', function ($payload) {
+        return $payload['age'] === 5 && $payload['age_unit'] === 'months';
+    });
+});
+
+test('customer age_unit defaults to years when not specified', function () {
+    $response = $this->actingAs($this->user)
+        ->post(route('customers.store'), [
+            'name' => 'Adult Patient',
+            'id_number' => '0801-1995-00002',
+            'type' => 'cliente',
+            'age' => 30,
+            'phone' => '8888-8889',
+            'email' => 'adult@example.com',
+        ]);
+
+    $response->assertRedirect();
+    $customer = Customer::where('id_number', '0801-1995-00002')->first();
+    expect($customer)->not->toBeNull()
+        ->and($customer->age)->toBe(30)
+        ->and($customer->age_unit)->toBe('years')
+        ->and($customer->formatted_age)->toBe('30 años');
+});
+
+test('customer can be updated with different age_unit', function () {
+    $customer = Customer::create([
+        'name' => 'Infant Patient',
+        'id_number' => '0801-2025-00003',
+        'type' => 'cliente',
+        'age' => 15,
+        'age_unit' => 'days',
+        'phone' => '8888-8880',
+        'email' => 'infant@example.com',
+    ]);
+
+    expect($customer->formatted_age)->toBe('15 días');
+
+    $response = $this->actingAs($this->user)
+        ->put(route('customers.update', $customer->id), [
+            'name' => 'Infant Patient Updated',
+            'id_number' => '0801-2025-00003',
+            'type' => 'cliente',
+            'age' => 1,
+            'age_unit' => 'months',
+            'phone' => '8888-8880',
+            'email' => 'infant@example.com',
+        ]);
+
+    $response->assertRedirect();
+    $customer->refresh();
+    expect($customer->age)->toBe(1)
+        ->and($customer->age_unit)->toBe('months')
+        ->and($customer->formatted_age)->toBe('1 mes');
+});
+
+test('customer validation fails if age_unit is invalid', function () {
+    $response = $this->actingAs($this->user)
+        ->post(route('customers.store'), [
+            'name' => 'Invalid Patient',
+            'id_number' => '0801-1990-00004',
+            'type' => 'cliente',
+            'age' => 10,
+            'age_unit' => 'centuries',
+            'phone' => '8888-8881',
+            'email' => 'invalid@example.com',
+        ]);
+
+    $response->assertSessionHasErrors(['age_unit']);
+});
