@@ -183,6 +183,7 @@ interface Props {
         total: number;
         from: number;
         to: number;
+        per_page?: number;
     };
     filters: {
         search?: string;
@@ -198,6 +199,8 @@ interface Props {
         sort_direction?: 'asc' | 'desc';
         group_id?: string;
         invoice_type?: string;
+        per_page?: number | string;
+        page?: number | string;
     };
     selectedCustomer?: {
         id: number;
@@ -697,6 +700,7 @@ export default function InvoicesIndex({
         setSelectedCreditForExtractSpecimen,
     ] = useState<any | null>(null);
     const [search, setSearch] = useState(filters.search || '');
+    const [isTableLoading, setIsTableLoading] = useState(false);
 
     const handlePayFinalClick = (credit: any) => {
         setSelectedCreditForFinalPayment(credit);
@@ -743,7 +747,9 @@ export default function InvoicesIndex({
         useState(false);
 
     const [isGroupMergeSheetOpen, setIsGroupMergeSheetOpen] = useState(false);
-    const [selectedGroupIdForMerge, setSelectedGroupIdForMerge] = useState<number | null>(null);
+    const [selectedGroupIdForMerge, setSelectedGroupIdForMerge] = useState<
+        number | null
+    >(null);
 
     const handleMergeGroupClick = (groupId: number) => {
         setSelectedGroupIdForMerge(groupId);
@@ -1006,10 +1012,15 @@ export default function InvoicesIndex({
     }, [invoices?.data]);
 
     const handleFilterChange = (key: string, value: string) => {
-        const newFilters = { ...filters, [key]: value };
+        const newFilters: Record<string, any> = { ...filters, [key]: value };
 
         if (value === 'all' || value === '') {
-            delete newFilters[key as keyof typeof filters];
+            delete newFilters[key];
+        }
+
+        // Reset to page 1 whenever any filter (including search and per_page) changes
+        if (key !== 'page') {
+            delete newFilters.page;
         }
 
         const userId = auth?.user?.id;
@@ -1050,10 +1061,18 @@ export default function InvoicesIndex({
             }
         }
 
+        setIsTableLoading(true);
         router.get(invoicesIndex().url, newFilters, {
             preserveState: true,
+            preserveScroll: true,
             replace: true,
+            only: ['invoices', 'filters'],
+            onFinish: () => setIsTableLoading(false),
         });
+    };
+
+    const handlePerPageChange = (perPage: number) => {
+        handleFilterChange('per_page', String(perPage));
     };
 
     const handleExport = (format: 'csv' | 'xlsx') => {
@@ -1074,15 +1093,21 @@ export default function InvoicesIndex({
         const direction =
             isCurrentField && filters.sort_direction === 'asc' ? 'desc' : 'asc';
 
-        const newFilters = {
+        const newFilters: Record<string, any> = {
             ...filters,
             sort_field: field,
             sort_direction: direction,
         };
 
+        delete newFilters.page;
+
+        setIsTableLoading(true);
         router.get(invoicesIndex().url, newFilters, {
             preserveState: true,
+            preserveScroll: true,
             replace: true,
+            only: ['invoices', 'filters'],
+            onFinish: () => setIsTableLoading(false),
         });
     };
 
@@ -1109,18 +1134,26 @@ export default function InvoicesIndex({
         );
     };
 
-    const debouncedSearch = useCallback(
+    const handleFilterChangeRef = useRef(handleFilterChange);
+    useEffect(() => {
+        handleFilterChangeRef.current = handleFilterChange;
+    });
+
+    const debouncedSearch = useRef(
         debounce((value: string) => {
-            handleFilterChange('search', value);
-        }, 300),
-        [filters],
-    );
+            handleFilterChangeRef.current('search', value);
+        }, 600),
+    ).current;
 
     useEffect(() => {
         if (search !== filters.search) {
             debouncedSearch(search);
         }
-    }, [search]);
+
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [search, filters.search, debouncedSearch]);
 
     const handleViewDetails = (invoice: Invoice) => {
         setSelectedInvoice(invoice);
@@ -1433,7 +1466,9 @@ export default function InvoicesIndex({
                                     to: filters.date_to || '',
                                 }}
                                 onChange={(range) => {
-                                    const newFilters = { ...filters };
+                                    const newFilters: Record<string, any> = {
+                                        ...filters,
+                                    };
 
                                     if (range.from) {
                                         newFilters.date_from = range.from;
@@ -1447,12 +1482,19 @@ export default function InvoicesIndex({
                                         delete newFilters.date_to;
                                     }
 
+                                    delete newFilters.page;
+
+                                    setIsTableLoading(true);
                                     router.get(
                                         invoicesIndex().url,
                                         newFilters,
                                         {
                                             preserveState: true,
+                                            preserveScroll: true,
                                             replace: true,
+                                            only: ['invoices', 'filters'],
+                                            onFinish: () =>
+                                                setIsTableLoading(false),
                                         },
                                     );
                                 }}
@@ -1686,8 +1728,17 @@ export default function InvoicesIndex({
                             {/* Table - Consistent with customer layout */}
                             <div
                                 ref={containerRef}
-                                className="rounded-md border bg-card"
+                                className={cn(
+                                    'relative rounded-md border bg-card transition-opacity duration-200',
+                                    isTableLoading &&
+                                        'pointer-events-none opacity-60',
+                                )}
                             >
+                                {isTableLoading && (
+                                    <div className="absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden bg-primary/20">
+                                        <div className="h-full w-full animate-pulse bg-primary" />
+                                    </div>
+                                )}
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -2711,23 +2762,32 @@ export default function InvoicesIndex({
                                                                             {canManageInvoices &&
                                                                                 (invoice.is_group ||
                                                                                     invoice.group_id ||
-                                                                                    invoice.group?.id) && (
+                                                                                    invoice
+                                                                                        .group
+                                                                                        ?.id) && (
                                                                                     <DropdownMenuItem
                                                                                         onClick={() => {
                                                                                             const grpId =
                                                                                                 invoice.group_id ||
-                                                                                                invoice.group?.id;
+                                                                                                invoice
+                                                                                                    .group
+                                                                                                    ?.id;
 
-                                                                                            if (grpId) {
+                                                                                            if (
+                                                                                                grpId
+                                                                                            ) {
                                                                                                 handleMergeGroupClick(
-                                                                                                    Number(grpId),
+                                                                                                    Number(
+                                                                                                        grpId,
+                                                                                                    ),
                                                                                                 );
                                                                                             }
                                                                                         }}
                                                                                     >
                                                                                         <GitMerge className="mr-2 h-4 w-4 text-muted-foreground" />
                                                                                         <span>
-                                                                                            Fusionar grupo
+                                                                                            Fusionar
+                                                                                            grupo
                                                                                         </span>
                                                                                     </DropdownMenuItem>
                                                                                 )}
@@ -3203,6 +3263,29 @@ export default function InvoicesIndex({
                                     from: invoices.from,
                                     to: invoices.to,
                                     total: invoices.total,
+                                }}
+                                perPageOptions={[10, 25, 50]}
+                                currentPerPage={
+                                    filters.per_page
+                                        ? Number(filters.per_page)
+                                        : invoices.per_page || 10
+                                }
+                                onPerPageChange={handlePerPageChange}
+                                only={['invoices', 'filters']}
+                                onPageChange={(url) => {
+                                    setIsTableLoading(true);
+                                    router.get(
+                                        url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                            replace: true,
+                                            only: ['invoices', 'filters'],
+                                            onFinish: () =>
+                                                setIsTableLoading(false),
+                                        },
+                                    );
                                 }}
                             />
                         </>
