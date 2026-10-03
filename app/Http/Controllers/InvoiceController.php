@@ -71,12 +71,17 @@ class InvoiceController extends Controller
         $banks = Bank::all();
         $examinations = SpecimenTypeExamination::where('active', true)->select('id', 'name', 'specimen_type')->get();
 
+        $perPage = $request->integer('per_page', 10);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 10;
+        }
+
         return Inertia::render('invoices/index', [
             'invoices' => app()->runningUnitTests() && ! $request->hasHeader('X-Inertia-Partial-Data') && ! $request->has('test_defer')
-                ? $this->getInvoicesQuery($request, $dateFrom, $dateTo)->paginate(10)->withQueryString()
-                : Inertia::defer(function () use ($request, $dateFrom, $dateTo) {
+                ? $this->getInvoicesQuery($request, $dateFrom, $dateTo)->paginate($perPage)->withQueryString()
+                : Inertia::defer(function () use ($request, $dateFrom, $dateTo, $perPage) {
                     return $this->getInvoicesQuery($request, $dateFrom, $dateTo)
-                        ->paginate(10)
+                        ->paginate($perPage)
                         ->withQueryString();
                 }),
             'filters' => array_merge(
@@ -87,12 +92,13 @@ class InvoiceController extends Controller
                 [
                     'date_from' => $dateFrom,
                     'date_to' => $dateTo,
+                    'per_page' => $perPage,
                 ]
             ),
             'selectedCustomer' => $selectedCustomer,
             'banks' => $banks,
             'examinations' => $examinations,
-            'groups' => SpecimenGroup::orderBy('name', 'asc')->get(),
+            'groups' => SpecimenGroup::select('id', 'name')->orderBy('name', 'asc')->get(),
             'workOrderTypes' => WorkOrderType::orderBy('name')->get(),
             'workOrderTasks' => WorkOrderTask::orderBy('name')->get(),
             'usersList' => User::where('active', true)->orderBy('name')->get(),
@@ -105,69 +111,24 @@ class InvoiceController extends Controller
     protected function getInvoicesQuery(Request $request, ?string $dateFrom, ?string $dateTo)
     {
         $query = Invoice::with([
-            'customer',
-            'caiRange',
-            'specimen.type',
-            'specimen.examination.prices',
-            'specimen.examinations',
-            'specimen.specimenExaminations.examination',
-            'specimen.customerRelation',
-            'specimen.category',
-            'specimen.referrerRelation',
-            'specimen.priority',
-            'invoiceSpecimens.specimen.customerRelation',
-            'invoiceSpecimens.specimen.type',
-            'invoiceSpecimens.examination.prices',
-            'invoiceSpecimens.specimen.examination.prices',
-            'invoiceSpecimens.specimen.products',
-            'invoiceSpecimens.specimen.examinations',
-            'invoiceSpecimens.specimen.specimenExaminations.examination',
-            'invoiceSpecimens.specimen.category',
-            'invoiceSpecimens.specimen.referrerRelation',
-            'invoiceSpecimens.specimen.priority',
-            'invoiceSpecimens.specimen.cancelledBy',
-            'creditRelation.customer',
-            'creditRelation.creditInvoiceSpecimens.examination',
-            'creditRelation.creditInvoiceSpecimens.specimen.customerRelation',
-            'creditRelation.creditInvoiceSpecimens.specimen.type',
-            'creditRelation.creditInvoiceSpecimens.specimen.examination',
-            'creditRelation.creditInvoiceSpecimens.specimen.examinations',
-            'creditRelation.creditInvoiceSpecimens.specimen.specimenExaminations.examination',
-            'creditRelation.specimen.customerRelation',
-            'creditRelation.specimen.type',
-            'creditRelation.specimen.examination',
-            'creditRelation.specimen.examinations',
-            'creditRelation.specimen.specimenExaminations.examination',
-            'creditRelation.group.specimens.customerRelation',
-            'creditRelation.group.specimens.type',
-            'creditRelation.group.specimens.examination',
-            'creditRelation.group.specimens.examinations',
-            'creditRelation.group.specimens.specimenExaminations.examination',
-            'rental',
-            'group.specimens.type',
-            'group.specimens.customerRelation',
-            'group.specimens.examination.prices',
-            'group.specimens.examinations',
-            'group.specimens.specimenExaminations.examination',
-            'group.specimens.category',
-            'group.specimens.referrerRelation',
-            'group.specimens.priority',
-            'group.specimens.cancelledBy',
-            'group.specimens.invoiceGroupSpecimen',
-            'group.specimens.products',
-            'groupSpecimens.specimen.type',
-            'groupSpecimens.examination.prices',
-            'groupSpecimens.specimen.examination.prices',
-            'groupSpecimens.specimen.examinations',
-            'groupSpecimens.specimen.specimenExaminations.examination',
-            'groupSpecimens.specimen.customerRelation',
-            'groupSpecimens.specimen.products',
-            'groupSpecimens.specimen.cancelledBy',
-            'creditInvoiceSpecimens.specimen.type',
-            'creditInvoiceSpecimens.specimen.examination.prices',
-            'creditInvoiceSpecimens.specimen.examinations',
-            'creditInvoiceSpecimens.specimen.specimenExaminations.examination',
-            'creditInvoiceSpecimens.specimen.customerRelation',
+            'customer:id,name,id_number',
+            'caiRange:id,cai,full_prefix',
+            'rental:id,name,description',
+            'group:id,name',
+            'group.specimens.customerRelation:id,name',
+            'specimen.type:id,name',
+            'specimen.examination:id,name',
+            'specimen.customerRelation:id,name',
+            'invoiceSpecimens.specimen.type:id,name',
+            'invoiceSpecimens.examination:id,name',
+            'creditInvoiceSpecimens.specimen.type:id,name',
+            'creditInvoiceSpecimens.examination:id,name',
+            'groupSpecimens.specimen.type:id,name',
+            'groupSpecimens.examination:id,name',
+            'creditRelation:id,customer_id,credit_amount,amount_paid,amount_remaining,status',
+            'creditRelation.customer:id,name,id_number',
+            'creditRelation.specimen',
+            'creditRelation.group.specimens',
         ]);
 
         // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
