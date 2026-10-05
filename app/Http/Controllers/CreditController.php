@@ -478,8 +478,16 @@ class CreditController extends Controller
 
             // Get original invoice to fetch the specimen_id
             $originalInvoice = Invoice::where('credit_payment_id', $credit->id)
-                ->where('payment_type', 'credit')
+                ->where('invoice_type', '!=', 'credit payment')
                 ->first();
+
+            if (! $originalInvoice) {
+                $originalInvoice = Invoice::where('credit_payment_id', $credit->id)->first();
+            }
+
+            if (! $originalInvoice && $credit->group_id) {
+                $originalInvoice = Invoice::where('group_id', $credit->group_id)->first();
+            }
 
             if (! $originalInvoice) {
                 throw new \Exception('No se pudo encontrar la factura original del crédito.');
@@ -641,22 +649,14 @@ class CreditController extends Controller
         Gate::authorize('credits.manage');
 
         $validated = $request->validate([
-            'amount_paid' => [
-                'required',
-                'numeric',
-                function ($attribute, $value, $fail) use ($credit) {
-                    if (abs($value - $credit->amount_remaining) > 0.01) {
-                        $fail('El pago final debe liquidar el saldo restante por completo (L. '.number_format($credit->amount_remaining, 2).').');
-                    }
-                },
-            ],
+            'amount_paid' => 'nullable|numeric|min:0',
             'specimens' => $credit->is_group ? 'required|array|min:1' : 'nullable|array',
             'specimens.*.id' => 'required|exists:specimen,id',
             'specimens.*.quantity' => 'required|integer|min:1',
         ]);
 
         $originalInvoice = Invoice::where('credit_payment_id', $credit->id)
-            ->where('payment_type', 'credit')
+            ->where('invoice_type', '!=', 'credit payment')
             ->first();
 
         if (! $originalInvoice) {
@@ -671,10 +671,9 @@ class CreditController extends Controller
             throw new \Exception('No se pudo encontrar la factura original del crédito.');
         }
 
-        DB::transaction(function () use ($validated, $credit, $originalInvoice) {
+        DB::transaction(function () use ($credit, $originalInvoice) {
             $invoiceUpdateData = [
                 'invoice_date' => now(),
-                'total_paid' => $originalInvoice->total,
             ];
 
             // If the invoice does not already have an invoice number, full invoice number, and cai range id, assign them from the active CAI range
@@ -700,46 +699,14 @@ class CreditController extends Controller
                 $invoiceUpdateData['full_invoice_number'] = $fullInvoiceNumber;
             }
 
-            // Update specimen payments in invoice_specimens table
-            if ($credit->is_group && ! empty($validated['specimens'])) {
-                foreach ($validated['specimens'] as $item) {
-                    $dbRow = DB::table('invoice_specimens')
-                        ->where('credit_id', $credit->id)
-                        ->where('specimen_id', $item['id'])
-                        ->first();
-
-                    if ($dbRow) {
-                        DB::table('invoice_specimens')
-                            ->where('credit_id', $credit->id)
-                            ->where('specimen_id', $item['id'])
-                            ->update([
-                                'quantity_paid' => $dbRow->quantity,
-                                'is_paid' => 1,
-                                'updated_at' => now(),
-                            ]);
-                    }
-                }
-            } else {
-                DB::table('invoice_specimens')
-                    ->where(function ($q) use ($credit, $originalInvoice) {
-                        $q->where('credit_id', $credit->id)
-                            ->orWhere('invoice_id', $originalInvoice->id);
-                    })
-                    ->update([
-                        'quantity_paid' => DB::raw('quantity'),
-                        'is_paid' => 1,
-                        'updated_at' => now(),
-                    ]);
-            }
-
             // Update original invoice details
             $originalInvoice->update($invoiceUpdateData);
 
-            // Update credit
+            // Update credit status to invoice generated, keeping remaining balance pending until marked as paid
+            $amountRemaining = max(0, (float) ($credit->credit_amount ?: $originalInvoice->total) - (float) $credit->amount_paid);
             $credit->update([
-                'amount_paid' => $credit->credit_amount,
-                'amount_remaining' => 0.00,
-                'last_payment_date' => now(),
+                'credit_amount' => $originalInvoice->total ?: $credit->credit_amount,
+                'amount_remaining' => $amountRemaining,
                 'status' => 'invoice generated',
             ]);
 
@@ -937,7 +904,8 @@ class CreditController extends Controller
         }
 
         $group = SpecimenGroup::with(['specimens', 'invoice', 'invoiceGroupSpecimens'])->findOrFail($credit->group_id);
-        $originalInvoice = Invoice::where('credit_payment_id', $credit->id)->where('payment_type', 'credit')->first()
+        $originalInvoice = Invoice::where('credit_payment_id', $credit->id)->where('invoice_type', '!=', 'credit payment')->first()
+            ?? Invoice::where('credit_payment_id', $credit->id)->first()
             ?? $group->invoice;
 
         if (! $originalInvoice) {
@@ -1204,7 +1172,7 @@ class CreditController extends Controller
         ]);
 
         $originalInvoice = Invoice::where('credit_payment_id', $credit->id)
-            ->where('payment_type', 'credit')
+            ->where('invoice_type', '!=', 'credit payment')
             ->first();
 
         if (! $originalInvoice) {
@@ -1259,6 +1227,8 @@ class CreditController extends Controller
 
             $credit->update([
                 'status' => 'paid',
+                'amount_paid' => $credit->credit_amount ?: ($originalInvoice ? $originalInvoice->total : $credit->amount_paid),
+                'amount_remaining' => 0.00,
                 'last_payment_date' => now(),
             ]);
         });

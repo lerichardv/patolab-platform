@@ -285,8 +285,12 @@ function cleanLists(doc: Document): void {
     } | null = null;
 
     for (const p of paragraphs) {
-        // Check if inside a table or already inside a list
-        if (p.closest('table, ul, ol')) {
+        // Check if inside a table, already inside a list, or if it is an image grid
+        if (
+            p.closest('table, ul, ol') ||
+            p.getAttribute('data-type') === 'image-grid' ||
+            p.closest('div[data-type="image-grid"]')
+        ) {
             currentList = null;
             continue;
         }
@@ -420,6 +424,14 @@ function cleanInlineStylesAndElements(doc: Document): void {
     );
 
     for (const container of disallowedContainers) {
+        // Do not unwrap or convert TipTap image-grid containers
+        if (
+            container.getAttribute('data-type') === 'image-grid' ||
+            container.closest('div[data-type="image-grid"]')
+        ) {
+            continue;
+        }
+
         if (container.closest('table, ul, ol')) {
             unwrapElement(container);
             continue;
@@ -635,6 +647,14 @@ function cleanInlineStylesAndElements(doc: Document): void {
         table: ['class', 'style'],
         colgroup: ['style'],
         col: ['style'],
+        div: [
+            'data-type',
+            'data-columns',
+            'data-align',
+            'width',
+            'class',
+            'style',
+        ],
         ul: ['data-list-style-type', 'style'],
         ol: ['start'],
         img: [
@@ -644,6 +664,7 @@ function cleanInlineStylesAndElements(doc: Document): void {
             'height',
             'data-align',
             'data-caption',
+            'data-order',
             'class',
             'style',
         ],
@@ -745,6 +766,11 @@ function cleanInlineStylesAndElements(doc: Document): void {
                 } else {
                     el.removeAttribute('style');
                 }
+            } else if (
+                tagName === 'div' &&
+                el.getAttribute('data-type') === 'image-grid'
+            ) {
+                // Preserve grid styles (display: grid, margins, width)
             } else if (!['img', 'colgroup', 'col'].includes(tagName)) {
                 el.removeAttribute('style');
             }

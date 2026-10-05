@@ -204,23 +204,83 @@ export function KanbanCard({
                                                     </TooltipProvider>
                                                 ))}
                                             {specimen.is_group &&
-                                                specimen.group && (
-                                                    <DropdownMenuItem
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleLoadGroupAndOpenSheet(
-                                                                specimen.group
-                                                                    .id,
-                                                            );
-                                                        }}
-                                                    >
-                                                        <Plus className="mr-2 h-4 w-4" />
-                                                        <span>
-                                                            Agregar más muestras
-                                                            al grupo
-                                                        </span>
-                                                    </DropdownMenuItem>
-                                                )}
+                                                specimen.group &&
+                                                (() => {
+                                                    const groupInvoice =
+                                                        specimen.group.invoice;
+                                                    const hasInvoiceNum =
+                                                        Boolean(
+                                                            groupInvoice?.invoice_number ||
+                                                            (groupInvoice?.full_invoice_number &&
+                                                                groupInvoice.full_invoice_number !==
+                                                                    'Sin factura'),
+                                                        );
+
+                                                    if (hasInvoiceNum) {
+                                                        return (
+                                                            <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger
+                                                                        asChild
+                                                                    >
+                                                                        <div className="w-full">
+                                                                            <DropdownMenuItem
+                                                                                disabled
+                                                                                className="cursor-not-allowed opacity-50"
+                                                                            >
+                                                                                <Plus className="mr-2 h-4 w-4" />
+                                                                                <span>
+                                                                                    Agregar
+                                                                                    más
+                                                                                    muestras
+                                                                                    al
+                                                                                    grupo
+                                                                                </span>
+                                                                            </DropdownMenuItem>
+                                                                        </div>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <span>
+                                                                            No
+                                                                            es
+                                                                            posible
+                                                                            agregar
+                                                                            más
+                                                                            muestras:
+                                                                            este
+                                                                            crédito
+                                                                            ya
+                                                                            cuenta
+                                                                            con
+                                                                            #factura
+                                                                            emitida.
+                                                                        </span>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        );
+                                                    }
+
+                                                    return (
+                                                        <DropdownMenuItem
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleLoadGroupAndOpenSheet(
+                                                                    specimen
+                                                                        .group
+                                                                        .id,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <Plus className="mr-2 h-4 w-4" />
+                                                            <span>
+                                                                Agregar más
+                                                                muestras al
+                                                                grupo
+                                                            </span>
+                                                        </DropdownMenuItem>
+                                                    );
+                                                })()}
                                             {auth.permissions?.includes(
                                                 'specimens.edit',
                                             ) &&

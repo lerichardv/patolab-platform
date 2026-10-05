@@ -979,24 +979,32 @@ export default function ReportWorkspace({
 
                     const cleanedTemplateContent =
                         cleanPastedHtml(rawTemplateContent);
+
+                    // If the template has no content for this field, do not modify existing content
+                    if (
+                        !cleanedTemplateContent ||
+                        isEmptyHtml(cleanedTemplateContent)
+                    ) {
+                        return;
+                    }
+
                     const mergedContent = isCurrentEmpty
                         ? cleanedTemplateContent
-                        : cleanPastedHtml(
-                              cleanedTemplateContent + currentContent,
-                          );
+                        : cleanedTemplateContent + currentContent;
 
                     editor.commands.setContent(mergedContent);
                 }
             });
 
             // 2. Update sections order Yjs document
-            if (sectionsOrderDoc) {
+            if (
+                sectionsOrderDoc &&
+                Array.isArray(template.sections_order) &&
+                template.sections_order.length > 0
+            ) {
                 const ytextOrder = sectionsOrderDoc.getText('content');
                 ytextOrder.delete(0, ytextOrder.toString().length);
-                ytextOrder.insert(
-                    0,
-                    JSON.stringify(template.sections_order || []),
-                );
+                ytextOrder.insert(0, JSON.stringify(template.sections_order));
             }
 
             // Update open text label Yjs document
@@ -1017,7 +1025,11 @@ export default function ReportWorkspace({
             }
 
             // 3. Update local states
-            if (template.sections_order) {
+            if (
+                template.sections_order &&
+                Array.isArray(template.sections_order) &&
+                template.sections_order.length > 0
+            ) {
                 const loaded = [...template.sections_order].sort(
                     (a, b) => a.order - b.order,
                 );

@@ -81,7 +81,8 @@ class Credit extends Model
 
     public function originalInvoice()
     {
-        return $this->invoices()->where('payment_type', 'credit')->first();
+        return $this->invoices()->where('invoice_type', '!=', 'credit payment')->first()
+            ?? $this->invoices()->first();
     }
 
     /**

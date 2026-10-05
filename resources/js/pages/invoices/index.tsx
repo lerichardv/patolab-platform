@@ -2307,35 +2307,95 @@ export default function InvoicesIndex({
                                                                                         .group
                                                                                         .specimens
                                                                                         ?.length >
-                                                                                        0 && (
-                                                                                        <>
-                                                                                            <DropdownMenuSeparator />
-                                                                                            <div className="p-1">
-                                                                                                <DropdownMenuItem
-                                                                                                    onClick={() => {
-                                                                                                        setSelectedGroup(
-                                                                                                            {
-                                                                                                                ...invoice.group,
-                                                                                                                invoice:
-                                                                                                                    invoice,
-                                                                                                            },
-                                                                                                        );
-                                                                                                        setIsGroupSheetOpen(
-                                                                                                            true,
-                                                                                                        );
-                                                                                                    }}
-                                                                                                    className="group flex cursor-pointer items-center justify-center gap-1.5 py-1.5 text-xs font-bold text-primary hover:bg-primary hover:text-white"
-                                                                                                >
-                                                                                                    <Plus className="h-3.5 w-3.5" />
-                                                                                                    <span>
-                                                                                                        Agregar
-                                                                                                        más
-                                                                                                        muestras
-                                                                                                    </span>
-                                                                                                </DropdownMenuItem>
-                                                                                            </div>
-                                                                                        </>
-                                                                                    )}
+                                                                                        0 &&
+                                                                                        (() => {
+                                                                                            const hasInvoiceNum =
+                                                                                                Boolean(
+                                                                                                    invoice.full_invoice_number ||
+                                                                                                    invoice.invoice_number,
+                                                                                                );
+                                                                                            const isCredit =
+                                                                                                invoice.payment_type ===
+                                                                                                'credit';
+                                                                                            const isInvoiceGen =
+                                                                                                invoice
+                                                                                                    .credit_relation
+                                                                                                    ?.status ===
+                                                                                                'invoice generated';
+                                                                                            const remaining =
+                                                                                                parseFloat(
+                                                                                                    String(
+                                                                                                        invoice
+                                                                                                            .credit_relation
+                                                                                                            ?.amount_remaining ??
+                                                                                                            0,
+                                                                                                    ),
+                                                                                                );
+                                                                                            const canAddSpecimens =
+                                                                                                isCredit &&
+                                                                                                !hasInvoiceNum &&
+                                                                                                !isInvoiceGen &&
+                                                                                                remaining >
+                                                                                                    0;
+
+                                                                                            if (
+                                                                                                !isCredit
+                                                                                            ) {
+                                                                                                return null;
+                                                                                            }
+
+                                                                                            return (
+                                                                                                <>
+                                                                                                    <DropdownMenuSeparator />
+                                                                                                    <div className="p-1">
+                                                                                                        <DropdownMenuItem
+                                                                                                            disabled={
+                                                                                                                !canAddSpecimens
+                                                                                                            }
+                                                                                                            onClick={() => {
+                                                                                                                if (
+                                                                                                                    !canAddSpecimens
+                                                                                                                ) {
+                                                                                                                    return;
+                                                                                                                }
+
+                                                                                                                setSelectedGroup(
+                                                                                                                    {
+                                                                                                                        ...invoice.group,
+                                                                                                                        invoice:
+                                                                                                                            invoice,
+                                                                                                                    },
+                                                                                                                );
+                                                                                                                setIsGroupSheetOpen(
+                                                                                                                    true,
+                                                                                                                );
+                                                                                                            }}
+                                                                                                            className={cn(
+                                                                                                                'group flex cursor-pointer items-center justify-center gap-1.5 py-1.5 text-xs font-bold',
+                                                                                                                canAddSpecimens
+                                                                                                                    ? 'text-primary hover:bg-primary hover:text-white'
+                                                                                                                    : 'cursor-not-allowed text-muted-foreground opacity-50 hover:bg-transparent',
+                                                                                                            )}
+                                                                                                            title={
+                                                                                                                !canAddSpecimens
+                                                                                                                    ? hasInvoiceNum ||
+                                                                                                                      isInvoiceGen
+                                                                                                                        ? 'No es posible agregar más muestras: este crédito ya cuenta con #factura emitida.'
+                                                                                                                        : 'El crédito no tiene saldo pendiente para agregar más muestras.'
+                                                                                                                    : undefined
+                                                                                                            }
+                                                                                                        >
+                                                                                                            <Plus className="h-3.5 w-3.5" />
+                                                                                                            <span>
+                                                                                                                Agregar
+                                                                                                                más
+                                                                                                                muestras
+                                                                                                            </span>
+                                                                                                        </DropdownMenuItem>
+                                                                                                    </div>
+                                                                                                </>
+                                                                                            );
+                                                                                        })()}
                                                                                 </DropdownMenuContent>
                                                                             </DropdownMenu>
                                                                         </div>

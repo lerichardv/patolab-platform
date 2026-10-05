@@ -31,6 +31,7 @@ interface Invoice {
     full_invoice_number?: string | null;
     cai_range_id?: number | null;
     payment_type?: string;
+    invoice_type?: string | null;
     specimen?: any;
 }
 
@@ -205,6 +206,7 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
     const remainingVal = parseFloat(String(credit.amount_remaining));
 
     const originalInvoice =
+        credit.invoices?.find((inv) => inv.invoice_type !== 'credit payment') ||
         credit.invoices?.find((inv) => inv.payment_type === 'credit') ||
         credit.invoices?.[0] ||
         credit.group?.invoice ||
@@ -339,10 +341,14 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
     const confirmSubmit = () => {
         setShowConfirm(false);
         post(payFinalCredit(credit.id).url, {
+            preserveScroll: true,
             onSuccess: () => {
                 toast.success('Factura final de crédito generada con éxito');
                 onSuccess();
                 reset();
+            },
+            onError: () => {
+                toast.error('Error al generar la factura final de crédito.');
             },
         });
     };
@@ -648,7 +654,9 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
                                     </strong>
                                     . Se conservará el mismo número de factura y
                                     el estado del crédito pasará a{' '}
-                                    <strong>Factura Generada</strong>.
+                                    <strong>Factura Generada</strong>. El saldo
+                                    permanecerá pendiente hasta que se marque
+                                    como pagado.
                                 </>
                             ) : (
                                 <>
@@ -658,7 +666,9 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
                                         L. {remainingVal.toFixed(2)}
                                     </strong>
                                     . El estado del crédito pasará a{' '}
-                                    <strong>Factura Generada</strong>.
+                                    <strong>Factura Generada</strong>. El saldo
+                                    permanecerá pendiente hasta que se marque
+                                    como pagado.
                                 </>
                             )}
                         </AlertDialogDescription>

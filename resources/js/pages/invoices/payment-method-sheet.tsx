@@ -99,6 +99,7 @@ interface PaymentMethodSheetProps {
     description?: string;
     className?: string;
     overlayClassName?: string;
+    disableCredit?: boolean;
 }
 
 export function PaymentMethodSheet({
@@ -112,6 +113,7 @@ export function PaymentMethodSheet({
     description = 'Configure el método de pago e ingrese la información fiscal requerida para facturar.',
     className,
     overlayClassName,
+    disableCredit = false,
 }: PaymentMethodSheetProps) {
     const [localPayment, setLocalPayment] = useState<PaymentData>({
         payment_type: '',
@@ -436,12 +438,14 @@ export function PaymentMethodSheet({
                                         <span>Cheque</span>
                                     </div>
                                 </SelectItem>
-                                <SelectItem value="credit">
-                                    <div className="flex items-center gap-2">
-                                        <Coins className="h-4 w-4 text-primary" />
-                                        <span>Al Crédito</span>
-                                    </div>
-                                </SelectItem>
+                                {!disableCredit && (
+                                    <SelectItem value="credit">
+                                        <div className="flex items-center gap-2">
+                                            <Coins className="h-4 w-4 text-primary" />
+                                            <span>Al Crédito</span>
+                                        </div>
+                                    </SelectItem>
+                                )}
                             </SelectContent>
                         </Select>
                         {localPaymentErrors.payment_type && (

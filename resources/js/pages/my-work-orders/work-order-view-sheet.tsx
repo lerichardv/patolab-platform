@@ -107,6 +107,7 @@ export default function WorkOrderViewSheet({
                                 'Error al cargar la orden de trabajo',
                             );
                         }
+
                         return res.json();
                     })
                     .then((data) => {

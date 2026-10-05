@@ -774,7 +774,18 @@ class SpecimenGroupController extends Controller
         }
 
         $invoice->load('creditRelation');
-        if (! $invoice->creditRelation || $invoice->creditRelation->amount_remaining <= 0) {
+        $credit = $invoice->creditRelation ?? Credit::where('group_id', $group->id)->first();
+
+        $hasInvoiceNumber = ! empty($invoice->full_invoice_number) || ! empty($invoice->invoice_number);
+        $isInvoiceGenerated = $credit && $credit->status === 'invoice generated';
+
+        if ($hasInvoiceNumber || $isInvoiceGenerated) {
+            throw ValidationException::withMessages([
+                'payment_type' => ['No se pueden agregar más muestras a un crédito que ya cuenta con un número de factura asignado (#factura).'],
+            ]);
+        }
+
+        if (! $credit || $credit->amount_remaining <= 0) {
             throw ValidationException::withMessages([
                 'payment_type' => ['No se pueden agregar muestras a un grupo cuyo crédito ya esté completamente pagado.'],
             ]);
@@ -1628,8 +1639,17 @@ class SpecimenGroupController extends Controller
         ])
             ->whereHas('invoice', function ($iq) {
                 $iq->where('payment_type', 'credit')
+                    ->where(function ($invQ) {
+                        $invQ->whereNull('full_invoice_number')
+                            ->orWhere('full_invoice_number', '');
+                    })
+                    ->where(function ($invQ) {
+                        $invQ->whereNull('invoice_number')
+                            ->orWhere('invoice_number', '');
+                    })
                     ->whereHas('creditRelation', function ($cq) {
-                        $cq->where('amount_remaining', '>', 0);
+                        $cq->where('amount_remaining', '>', 0)
+                            ->where('status', '!=', 'invoice generated');
                     });
             })
             ->when($term, function ($query, $term) {
@@ -1648,11 +1668,17 @@ class SpecimenGroupController extends Controller
 
         // Format for select dialog
         $formattedData = collect($groupsPaginated->items())->map(function ($group) {
+            $hasInvoiceNumber = ! empty($group->invoice?->full_invoice_number) || ! empty($group->invoice?->invoice_number);
+            $credit = $group->invoice?->creditRelation ?? Credit::where('group_id', $group->id)->first();
+            $isInvoiceGenerated = $credit && $credit->status === 'invoice generated';
+
             return [
                 'id' => $group->id,
                 'name' => $group->name,
                 'full_invoice_number' => $group->invoice?->full_invoice_number ?? 'Sin factura',
                 'customer_name' => $group->customer?->name ?? 'Desconocido',
+                'has_invoice_number' => $hasInvoiceNumber,
+                'can_add_specimens' => ! $hasInvoiceNumber && ! $isInvoiceGenerated && ($credit && $credit->amount_remaining > 0),
                 'specimen_codes' => $group->specimens->map(function ($s) {
                     return $s->sequence_code ?? 'Sin código';
                 })->toArray(),
@@ -1689,7 +1715,19 @@ class SpecimenGroupController extends Controller
             'specimens.products',
         ]);
 
-        return response()->json($group);
+        $invoice = $group->invoice;
+        $hasInvoiceNumber = ! empty($invoice?->full_invoice_number) || ! empty($invoice?->invoice_number);
+        $credit = $invoice?->creditRelation ?? Credit::where('group_id', $group->id)->first();
+        $isInvoiceGenerated = $credit && $credit->status === 'invoice generated';
+
+        $data = $group->toArray();
+        $data['can_add_specimens'] = ($invoice?->payment_type === 'credit')
+            && ! $hasInvoiceNumber
+            && ! $isInvoiceGenerated
+            && ($credit && $credit->amount_remaining > 0);
+        $data['has_invoice_number'] = $hasInvoiceNumber;
+
+        return response()->json($data);
     }
 
     public function customerInfo(SpecimenGroup $group)

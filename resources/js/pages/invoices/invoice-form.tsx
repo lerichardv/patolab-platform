@@ -2555,6 +2555,10 @@ export default function InvoiceForm({
                 banks={banks}
                 totalAmount={totalVal}
                 paymentData={data}
+                disableCredit={
+                    invoice?.invoice_type === 'credit payment' ||
+                    Boolean(invoice?.credit_payment_id)
+                }
                 onSave={(paymentData) => {
                     setData((d) => ({
                         ...d,

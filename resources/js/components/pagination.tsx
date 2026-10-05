@@ -53,6 +53,7 @@ export function Pagination({
 
         if (onPageChange) {
             onPageChange(url);
+
             return;
         }
 

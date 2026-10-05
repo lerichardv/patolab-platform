@@ -354,7 +354,7 @@ function CollaborativeEditorInner({
         };
         // Intentionally omit initialContent and onUpdate — using refs instead
         // so this effect never remounts on content changes.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [editor, provider, field]);
 
     useEffect(() => {

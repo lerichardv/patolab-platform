@@ -452,11 +452,18 @@ class ReportEditorController extends Controller
         $nextStatus = $statusService->getNextStatus($specimen);
         $availableStates = $statusService->getAvailableStatesForType($specimen->specimen_type);
 
+        $creationTargetStatus = $specimen->status;
+        if (in_array($specimen->status, ['registered', 'received', 'pending'])) {
+            if ($nextStatus && ! in_array($nextStatus, ['finalized', 'delivered', 'cancelled'])) {
+                $creationTargetStatus = $nextStatus;
+            }
+        }
+
         return Inertia::render('specimens/report-editor/report-editor', [
             'specimen' => $specimen,
             'report' => $specimen->report,
             'templates' => $templates,
-            'nextStatus' => $nextStatus,
+            'nextStatus' => $specimen->report ? $nextStatus : $creationTargetStatus,
             'availableStates' => $availableStates,
             'auth' => [
                 'user' => [
@@ -522,8 +529,10 @@ class ReportEditorController extends Controller
         $updateData = ['report_id' => $report->id];
         if (in_array($specimen->status, ['registered', 'received', 'pending'])) {
             $statusService = app(SpecimenStatusService::class);
-            $targetStatus = $statusService->getNextStatus($specimen) ?? $specimen->status;
-            $updateData['status'] = $targetStatus;
+            $candidate = $statusService->getNextStatus($specimen);
+            if ($candidate && ! in_array($candidate, ['finalized', 'delivered', 'cancelled'])) {
+                $updateData['status'] = $candidate;
+            }
         }
 
         $specimen->update($updateData);
@@ -656,8 +665,14 @@ class ReportEditorController extends Controller
                 'headings_toggles' => $firstTemplate?->headings_toggles ?? null,
             ]);
 
-            $statusService = app(SpecimenStatusService::class);
-            $targetStatus = $statusService->getNextStatus($specimen) ?? $specimen->status;
+            $targetStatus = $specimen->status;
+            if (in_array($specimen->status, ['registered', 'received', 'pending'])) {
+                $statusService = app(SpecimenStatusService::class);
+                $candidate = $statusService->getNextStatus($specimen);
+                if ($candidate && ! in_array($candidate, ['finalized', 'delivered', 'cancelled'])) {
+                    $targetStatus = $candidate;
+                }
+            }
 
             $specimen->update([
                 'report_id' => $report->id,
@@ -669,7 +684,9 @@ class ReportEditorController extends Controller
 
         $statusMeta = app(SpecimenStatusService::class)->getStatusMetadata($specimen->status);
         $statusLabel = $statusMeta['label'] ?? $specimen->status;
-        $successMessage = "Reporte creado y estado de muestra actualizado a {$statusLabel}.";
+        $successMessage = $specimen->wasChanged('status')
+            ? "Reporte creado y estado de muestra actualizado a {$statusLabel}."
+            : 'Reporte creado con éxito.';
 
         if (! $request->header('X-Inertia') && ($request->wantsJson() || $request->ajax())) {
             return response()->json([
@@ -836,20 +853,50 @@ class ReportEditorController extends Controller
             'headings_toggles' => $firstTemplate->headings_toggles ?? null,
         ];
 
-        // Update database report columns
+        $mergeField = function (string $field) use ($mergedTemplate, $specimen): string {
+            $existing = $specimen->report->{$field} ?? '';
+            $templateContent = $mergedTemplate->{$field} ?? '';
+
+            if (empty($templateContent)) {
+                return $existing;
+            }
+
+            $cleanExisting = trim(strip_tags(str_replace(['&nbsp;', "\xc2\xa0"], ' ', $existing)));
+            $hasMediaOrTable = (bool) preg_match('/<img|<table/i', $existing);
+
+            if (empty($cleanExisting) && ! $hasMediaOrTable) {
+                return $templateContent;
+            }
+
+            return $templateContent.$existing;
+        };
+
+        $sectionsOrder = (! empty($mergedTemplate->sections_order) && is_array($mergedTemplate->sections_order))
+            ? $mergedTemplate->sections_order
+            : $specimen->report->sections_order;
+
+        $headingsToggles = (! empty($mergedTemplate->headings_toggles) && (is_array($mergedTemplate->headings_toggles) || is_object($mergedTemplate->headings_toggles)))
+            ? $mergedTemplate->headings_toggles
+            : $specimen->report->headings_toggles;
+
+        $openTextLabel = ! empty($mergedTemplate->open_text_label)
+            ? $mergedTemplate->open_text_label
+            : ($specimen->report->open_text_label ?? 'Texto Libre');
+
+        // Update database report columns preserving existing galleries and content
         $specimen->report->update([
-            'macroscopy_html' => $mergedTemplate->macroscopy_html,
-            'microscopy_html' => $mergedTemplate->microscopy_html,
-            'diagnosis_html' => $mergedTemplate->diagnosis_html,
-            'clinical_details_html' => $mergedTemplate->clinical_details_html,
-            'comments_notes_html' => $mergedTemplate->comments_notes_html,
-            'protocols_html' => $mergedTemplate->protocols_html,
-            'legend_html' => $mergedTemplate->legend_html,
-            'open_text_html' => $mergedTemplate->open_text_html,
-            'open_text_label' => $mergedTemplate->open_text_label,
-            'addendum_html' => $mergedTemplate->addendum_html,
-            'sections_order' => $mergedTemplate->sections_order,
-            'headings_toggles' => $mergedTemplate->headings_toggles,
+            'macroscopy_html' => $mergeField('macroscopy_html'),
+            'microscopy_html' => $mergeField('microscopy_html'),
+            'diagnosis_html' => $mergeField('diagnosis_html'),
+            'clinical_details_html' => $mergeField('clinical_details_html'),
+            'comments_notes_html' => $mergeField('comments_notes_html'),
+            'protocols_html' => $mergeField('protocols_html'),
+            'legend_html' => $mergeField('legend_html'),
+            'open_text_html' => $mergeField('open_text_html'),
+            'open_text_label' => $openTextLabel,
+            'addendum_html' => $mergeField('addendum_html'),
+            'sections_order' => $sectionsOrder,
+            'headings_toggles' => $headingsToggles,
         ]);
 
         DB::table('specimen_reports')->where('id', $specimen->report->id)->update([

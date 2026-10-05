@@ -34,6 +34,7 @@ import { DeliveryDatePreview } from '@/components/delivery-date-preview';
 import FormCombobox from '@/components/form-combobox';
 import HeadingSheet from '@/components/heading-sheet';
 import SpecimenGroupInvoiceSummaryAlertDialog from '@/components/specimen-group-invoice-summary-alert-dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -147,6 +148,17 @@ export default function SpecimenGroupForm({
     const flash = pageProps.flash as Record<string, any> | undefined;
     const thirdAgePercent = parseFloat(settings?.third_age_discount || '30');
     const fourthAgePercent = parseFloat(settings?.fourth_age_discount || '40');
+
+    const isGroupLocked = Boolean(
+        group &&
+        (group.can_add_specimens === false ||
+            Boolean(group.has_invoice_number) ||
+            group.credit?.status === 'invoice generated' ||
+            (group.invoice &&
+                (Boolean(group.invoice.invoice_number) ||
+                    (Boolean(group.invoice.full_invoice_number) &&
+                        group.invoice.full_invoice_number !== 'Sin factura')))),
+    );
 
     // Page close/refresh prevention states
     const [isFormDirty, setIsFormDirty] = useState(false);
@@ -1800,6 +1812,14 @@ export default function SpecimenGroupForm({
     const handleSubmitGroup = (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (isGroupLocked) {
+            toast.error(
+                'No se pueden agregar más muestras a este grupo: el crédito ya cuenta con un número de factura asignado (#factura).',
+            );
+
+            return;
+        }
+
         // Step 2 validations
         if (!paymentType) {
             toast.error('Configure el método de pago.');
@@ -2021,6 +2041,20 @@ export default function SpecimenGroupForm({
                 )}
 
             {/* Wizard Steps indicator */}
+            {isGroupLocked && (
+                <div className="mx-5 mb-4">
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Crédito Facturado / Bloqueado</AlertTitle>
+                        <AlertDescription>
+                            Este crédito ya cuenta con un número de factura
+                            fiscal emitido (#factura). Conforme a la normativa
+                            de facturación, no es posible ingresar más muestras
+                            a este grupo.
+                        </AlertDescription>
+                    </Alert>
+                </div>
+            )}
             <div className="mx-5 mb-6 flex flex-col gap-4 rounded-lg border border-border/60 bg-muted/40 p-4">
                 <div className="mx-auto flex w-full max-w-lg flex-nowrap items-center justify-center gap-2 border-b border-border/40 pb-4 sm:gap-4">
                     {/* Step 1 */}
@@ -2202,7 +2236,7 @@ export default function SpecimenGroupForm({
                         </div>
                         <Button
                             onClick={handleOpenNestedForm}
-                            disabled={!globalCustomerId}
+                            disabled={!globalCustomerId || isGroupLocked}
                             className="text-xs font-semibold"
                             size="sm"
                         >
@@ -2419,7 +2453,7 @@ export default function SpecimenGroupForm({
                     <div className="mt-6 flex justify-end border-t pt-4">
                         <Button
                             onClick={handleNextStep}
-                            disabled={specimens.length === 0}
+                            disabled={specimens.length === 0 || isGroupLocked}
                             className="font-semibold"
                         >
                             Siguiente Paso
@@ -3553,7 +3587,7 @@ export default function SpecimenGroupForm({
                         <Button
                             type="submit"
                             className="w-full sm:w-auto"
-                            disabled={processing}
+                            disabled={processing || isGroupLocked}
                         >
                             {processing && <Spinner className="mr-2" />}
                             Facturar y Crear Muestras
@@ -4492,6 +4526,7 @@ export default function SpecimenGroupForm({
                                                             setNestedAutoReceivedAt(
                                                                 checked,
                                                             );
+
                                                             if (checked) {
                                                                 const existingSpec =
                                                                     nestedSpecimenToEditId

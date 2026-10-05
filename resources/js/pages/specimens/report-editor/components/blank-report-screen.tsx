@@ -144,9 +144,15 @@ export function BlankReportScreen({
         );
     };
 
-    const targetStateObj = availableStates.find(
-        (s: any) => (s.status ?? s) === nextStatus,
+    const willChangeStatus = Boolean(
+        nextStatus &&
+        nextStatus !== specimen.status &&
+        !['finalized', 'delivered', 'cancelled'].includes(nextStatus),
     );
+
+    const targetStateObj = willChangeStatus
+        ? availableStates.find((s: any) => (s.status ?? s) === nextStatus)
+        : null;
     const targetStatusLabel =
         targetStateObj?.label ||
         (nextStatus === 'macroscopic_review'
@@ -155,9 +161,7 @@ export function BlankReportScreen({
               ? 'Procesamiento'
               : nextStatus === 'microscopic_review'
                 ? 'Revisión Microscópica'
-                : nextStatus === 'finalized'
-                  ? 'Finalizado'
-                  : nextStatus || 'Siguiente Fase');
+                : nextStatus || 'Siguiente Fase');
 
     const currentStateObj = availableStates.find(
         (s: any) => (s.status ?? s) === specimen.status,
@@ -166,7 +170,13 @@ export function BlankReportScreen({
         currentStateObj?.label ||
         (specimen.status === 'received'
             ? 'Recibido'
-            : specimen.status || 'Inicial');
+            : specimen.status === 'processing'
+              ? 'En Procesamiento'
+              : specimen.status === 'microscopic_review'
+                ? 'Revisión Microscópica'
+                : specimen.status === 'macroscopic_review'
+                  ? 'Revisión Macroscópica'
+                  : specimen.status || 'Inicial');
 
     return (
         <EditorLayout
@@ -187,15 +197,27 @@ export function BlankReportScreen({
                     </h2>
                     <p className="mb-6 text-sm leading-relaxed text-muted-foreground">
                         Esta muestra aún no posee un registro de reporte. Al
-                        iniciar el reporte se creará la plantilla del documento
-                        y el estado cambiará de{' '}
-                        <span className="font-semibold text-primary">
-                            {currentStatusLabel}
-                        </span>{' '}
-                        a{' '}
-                        <span className="font-semibold text-violet-500">
-                            {targetStatusLabel}
-                        </span>
+                        iniciar el reporte se creará la plantilla del documento{' '}
+                        {willChangeStatus ? (
+                            <>
+                                y el estado cambiará de{' '}
+                                <span className="font-semibold text-primary">
+                                    {currentStatusLabel}
+                                </span>{' '}
+                                a{' '}
+                                <span className="font-semibold text-violet-500">
+                                    {targetStatusLabel}
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                para comenzar el análisis manteniendo el estado
+                                actual en{' '}
+                                <span className="font-semibold text-primary">
+                                    {currentStatusLabel}
+                                </span>
+                            </>
+                        )}
                         .
                     </p>
                     {!isAssigned ? (
