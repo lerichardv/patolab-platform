@@ -654,6 +654,12 @@ class InvoiceController extends Controller
             ]);
         }
 
+        if ($invoice->invoice_type === 'credit payment' && $validated['payment_type'] === 'credit') {
+            throw ValidationException::withMessages([
+                'payment_type' => 'Una factura de abono a crédito no puede pagarse con tipo de pago crédito.',
+            ]);
+        }
+
         if ($isSpecimenOrGroup && $wasCredit && $validated['payment_type'] !== 'credit') {
             throw ValidationException::withMessages([
                 'payment_type' => 'Una factura registrada como crédito no se puede cambiar a otro método de pago. Debe procesarse mediante "Pago final" en el módulo de Créditos.',

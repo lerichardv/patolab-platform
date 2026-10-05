@@ -234,9 +234,9 @@ test('specimen group search lists only groups paid in credit with remaining bala
         'is_group' => true,
     ]);
     $invoiceC = Invoice::create([
-        'full_invoice_number' => '000-001-01-00000004',
-        'invoice_number' => '00000004',
-        'cai_range_id' => $this->caiRange->id,
+        'full_invoice_number' => null,
+        'invoice_number' => null,
+        'cai_range_id' => null,
         'customer_id' => $this->customer->id,
         'created_by_id' => $this->user->id,
         'payment_type' => 'credit',
@@ -359,4 +359,174 @@ test('cannot add specimens to groups that are not credit or are already paid', f
             ],
         ]);
     $responseB->assertSessionHasErrors(['payment_type']);
+
+    // 3. Group C: Credit with pending balance, BUT already has an invoice number (#factura)
+    $creditC = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 500,
+        'amount_paid' => 100,
+        'amount_remaining' => 400,
+        'is_group' => true,
+    ]);
+    $invoiceC = Invoice::create([
+        'full_invoice_number' => '000-001-01-00000007',
+        'invoice_number' => '00000007',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'created_by_id' => $this->user->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $creditC->id,
+        'total' => 500,
+        'total_paid' => 100,
+        'is_group' => true,
+        'invoice_file' => '',
+    ]);
+    $groupC = SpecimenGroup::create([
+        'name' => 'Invoiced Credit Group C',
+        'invoice_id' => $invoiceC->id,
+        'customer_id' => $this->customer->id,
+        'access_token' => 'tokenC7',
+    ]);
+    $invoiceC->update(['group_id' => $groupC->id]);
+    $creditC->update(['group_id' => $groupC->id]);
+
+    $responseC = $this->actingAs($this->user)
+        ->post(route('specimen-groups.add-specimens', $groupC->id), [
+            'payment_type' => 'credit',
+            'specimens' => [
+                [
+                    'customer' => $this->customer->id,
+                    'specimen_type' => $this->specimenType->id,
+                    'specimen_type_examination' => $this->examination->id,
+                    'specimen_category' => $this->category->id,
+                    'referrer' => $this->referrer->id,
+                    'status' => 'received',
+                    'priority_id' => $this->priority->id,
+                    'selected_price' => '100',
+                    'quantity' => 1,
+                ],
+            ],
+        ]);
+    $responseC->assertSessionHasErrors(['payment_type']);
+
+    // 4. Group D: Credit with status "invoice generated"
+    $creditD = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 500,
+        'amount_paid' => 500,
+        'amount_remaining' => 0,
+        'status' => 'invoice generated',
+        'is_group' => true,
+    ]);
+    $invoiceD = Invoice::create([
+        'full_invoice_number' => null,
+        'invoice_number' => null,
+        'cai_range_id' => null,
+        'customer_id' => $this->customer->id,
+        'created_by_id' => $this->user->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $creditD->id,
+        'total' => 500,
+        'total_paid' => 500,
+        'is_group' => true,
+        'invoice_file' => '',
+    ]);
+    $groupD = SpecimenGroup::create([
+        'name' => 'Invoice Generated Credit Group D',
+        'invoice_id' => $invoiceD->id,
+        'customer_id' => $this->customer->id,
+        'access_token' => 'tokenD8',
+    ]);
+    $invoiceD->update(['group_id' => $groupD->id]);
+    $creditD->update(['group_id' => $groupD->id]);
+
+    $responseD = $this->actingAs($this->user)
+        ->post(route('specimen-groups.add-specimens', $groupD->id), [
+            'payment_type' => 'credit',
+            'specimens' => [
+                [
+                    'customer' => $this->customer->id,
+                    'specimen_type' => $this->specimenType->id,
+                    'specimen_type_examination' => $this->examination->id,
+                    'specimen_category' => $this->category->id,
+                    'referrer' => $this->referrer->id,
+                    'status' => 'received',
+                    'priority_id' => $this->priority->id,
+                    'selected_price' => '100',
+                    'quantity' => 1,
+                ],
+            ],
+        ]);
+    $responseD->assertSessionHasErrors(['payment_type']);
+});
+
+test('search endpoint excludes credit groups that already have an invoice number or invoice generated status', function () {
+    // Eligible group: credit with remaining balance and no invoice number
+    $creditEligible = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 500,
+        'amount_paid' => 0,
+        'amount_remaining' => 500,
+        'status' => 'pending',
+        'is_group' => true,
+    ]);
+    $invoiceEligible = Invoice::create([
+        'full_invoice_number' => null,
+        'invoice_number' => null,
+        'cai_range_id' => null,
+        'customer_id' => $this->customer->id,
+        'created_by_id' => $this->user->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $creditEligible->id,
+        'total' => 500,
+        'total_paid' => 0,
+        'is_group' => true,
+        'invoice_file' => '',
+    ]);
+    $groupEligible = SpecimenGroup::create([
+        'name' => 'Eligible Open Credit Group',
+        'invoice_id' => $invoiceEligible->id,
+        'customer_id' => $this->customer->id,
+        'access_token' => 'tokenEligible',
+    ]);
+    $invoiceEligible->update(['group_id' => $groupEligible->id]);
+    $creditEligible->update(['group_id' => $groupEligible->id]);
+
+    // Ineligible group 1: has invoice number
+    $creditWithInv = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 500,
+        'amount_paid' => 100,
+        'amount_remaining' => 400,
+        'status' => 'partial',
+        'is_group' => true,
+    ]);
+    $invoiceWithInv = Invoice::create([
+        'full_invoice_number' => '000-001-01-00000088',
+        'invoice_number' => '00000088',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'created_by_id' => $this->user->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $creditWithInv->id,
+        'total' => 500,
+        'total_paid' => 100,
+        'is_group' => true,
+        'invoice_file' => '',
+    ]);
+    $groupWithInv = SpecimenGroup::create([
+        'name' => 'Ineligible Group With Invoice Number',
+        'invoice_id' => $invoiceWithInv->id,
+        'customer_id' => $this->customer->id,
+        'access_token' => 'tokenWithInv',
+    ]);
+    $invoiceWithInv->update(['group_id' => $groupWithInv->id]);
+    $creditWithInv->update(['group_id' => $groupWithInv->id]);
+
+    $response = $this->actingAs($this->user)->getJson(route('specimen-groups.search'));
+    $response->assertOk();
+
+    $ids = collect($response->json('data'))->pluck('id')->toArray();
+    expect($ids)->toContain($groupEligible->id)
+        ->and($ids)->not->toContain($groupWithInv->id);
 });

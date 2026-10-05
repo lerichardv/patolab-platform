@@ -455,11 +455,13 @@ export default function CreditViewSheet({ credit, open, onOpenChange }: Props) {
     const isPaid = remainingVal === 0;
     const isPartial = amountPaid > 0 && remainingVal > 0;
 
-    const originalInvoice = credit.invoices?.find(
-        (inv) => inv.payment_type === 'credit',
-    );
+    const originalInvoice =
+        credit.invoices?.find((inv) => inv.invoice_type !== 'credit payment') ||
+        credit.invoices?.[0];
     const paymentInvoices =
-        credit.invoices?.filter((inv) => inv.payment_type !== 'credit') || [];
+        credit.invoices?.filter(
+            (inv) => inv.invoice_type === 'credit payment',
+        ) || [];
 
     const creditSpecimens =
         credit.invoice_specimens || credit.credit_invoice_specimens || [];

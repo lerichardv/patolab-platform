@@ -91,9 +91,9 @@ test('adds a specimen to a group with 35 existing specimens and attaches medical
     ]);
 
     $invoice = Invoice::create([
-        'full_invoice_number' => '000-001-01-00000021',
-        'invoice_number' => '00000021',
-        'cai_range_id' => $this->caiRange->id,
+        'full_invoice_number' => null,
+        'invoice_number' => null,
+        'cai_range_id' => null,
         'customer_id' => $this->customer->id,
         'created_by_id' => $this->user->id,
         'payment_type' => 'credit',

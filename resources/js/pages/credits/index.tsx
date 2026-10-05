@@ -473,7 +473,7 @@ export default function CreditsIndex({
 
     const handleMarkAsPaidClick = (credit: Credit) => {
         const totalAmount = parseFloat(
-            String(credit.credit_amount || 0),
+            String(credit.amount_remaining ?? credit.credit_amount ?? 0),
         ).toFixed(2);
         setMarkAsPaidData({
             payment_type: 'cash',
@@ -497,9 +497,13 @@ export default function CreditsIndex({
 
     const handlePaymentTypeChange = (type: string) => {
         const totalAmount = creditToMarkAsPaid
-            ? parseFloat(String(creditToMarkAsPaid.credit_amount || 0)).toFixed(
-                  2,
-              )
+            ? parseFloat(
+                  String(
+                      creditToMarkAsPaid.amount_remaining ??
+                          creditToMarkAsPaid.credit_amount ??
+                          0,
+                  ),
+              ).toFixed(2)
             : '';
 
         setMarkAsPaidData((prev) => ({
@@ -1001,12 +1005,12 @@ export default function CreditsIndex({
                                     const originalInvoice =
                                         credit.invoices?.find(
                                             (inv) =>
-                                                inv.payment_type === 'credit',
-                                        );
+                                                inv.invoice_type !== 'credit payment',
+                                        ) || credit.invoices?.[0];
                                     const paymentInvoices =
                                         credit.invoices?.filter(
                                             (inv) =>
-                                                inv.payment_type !== 'credit',
+                                                inv.invoice_type === 'credit payment',
                                         ) || [];
                                     const remainingVal = parseFloat(
                                         String(credit.amount_remaining),
@@ -1498,8 +1502,17 @@ export default function CreditsIndex({
                                                                         Final
                                                                     </span>
                                                                 </DropdownMenuItem>
-                                                                {credit.status ===
-                                                                    'invoice generated' && (
+                                                                {(credit.status ===
+                                                                    'invoice generated' ||
+                                                                    (Boolean(
+                                                                        originalInvoice?.full_invoice_number,
+                                                                    ) &&
+                                                                        remainingVal >
+                                                                            0 &&
+                                                                        credit.status !==
+                                                                            'paid' &&
+                                                                        credit.status !==
+                                                                            'cancelled')) && (
                                                                     <DropdownMenuItem
                                                                         onClick={() =>
                                                                             handleMarkAsPaidClick(
@@ -1885,7 +1898,9 @@ export default function CreditsIndex({
                                 {creditToMarkAsPaid
                                     ? parseFloat(
                                           String(
-                                              creditToMarkAsPaid.credit_amount,
+                                              creditToMarkAsPaid.amount_remaining ??
+                                                  creditToMarkAsPaid.credit_amount ??
+                                                  0,
                                           ),
                                       ).toFixed(2)
                                     : '0.00'}

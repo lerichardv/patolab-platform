@@ -11,6 +11,7 @@ use App\Models\SpecimenType;
 use App\Models\User;
 use App\Services\SpecimenStatusService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
@@ -366,4 +367,36 @@ test('specimen type can be stored and updated with requires_report', function ()
     $type->refresh();
     expect($type->name)->toBe('Tipo Con Reporte');
     expect($type->requires_report)->toBeTrue();
+});
+
+test('cannot transition to finalized when specimen requires report but report does not exist', function () {
+    $user = User::factory()->create();
+    $role = Role::create(['name' => 'Admin Finalize', 'slug' => 'admin']);
+    $user->update(['role_id' => $role->id]);
+
+    $type = SpecimenType::create(['name' => 'Report Required Specimen', 'active' => true, 'requires_report' => true]);
+    $type->states()->create(['status' => 'received', 'step_order' => 1, 'active' => true]);
+    $type->states()->create(['status' => 'finalized', 'step_order' => 2, 'active' => true]);
+
+    $priority = Priority::create(['name' => 'Normal Fin', 'order' => 1, 'color' => '#000000']);
+    $customer = Customer::factory()->create();
+    $category = SpecimenCategory::create(['name' => 'Cat Test Fin', 'quantity' => 1, 'active' => true]);
+    $referrerType = ReferrerType::create(['name' => 'Médico Test Fin', 'active' => true]);
+    $referrer = Referrer::create(['name' => 'Dr. Ref Test Fin', 'referrer_type' => $referrerType->id, 'active' => true]);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'TEST-NO-REP-FIN-2026',
+        'status' => 'received',
+        'specimen_type' => $type->id,
+        'customer' => $customer->id,
+        'specimen_category' => $category->id,
+        'referrer' => $referrer->id,
+        'priority_id' => $priority->id,
+        'report_id' => null,
+    ]);
+
+    $service = app(SpecimenStatusService::class);
+
+    expect(fn () => $service->transition($specimen, 'finalized', ['user' => $user]))
+        ->toThrow(ValidationException::class);
 });

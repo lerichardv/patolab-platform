@@ -420,6 +420,7 @@ export default function PriceQuoteForm({
                 (!item.custom_specimen_price ||
                     item.custom_specimen_price <= 0),
         );
+
         if (invalidCustomPriceItem) {
             toast.error(
                 `Debe ingresar un monto válido mayor a 0 para el precio personalizado en "${invalidCustomPriceItem.examination_name || 'el examen'}".`,

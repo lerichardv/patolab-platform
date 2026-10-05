@@ -318,3 +318,44 @@ test('unassigned non-admin user is forbidden from saving report', function () {
 
     $response->assertStatus(403);
 });
+
+test('creating a report on a specimen already in microscopic_review keeps status as microscopic_review and never finalizes', function () {
+    $this->actingAs($this->assignedUser);
+
+    $this->specimen->update([
+        'status' => 'microscopic_review',
+        'report_id' => null,
+    ]);
+
+    $response = $this->post(route('specimens.report-editor.store', $this->specimen->sequence_code), []);
+    $response->assertRedirect();
+
+    $this->specimen->refresh();
+    expect($this->specimen->report_id)->not->toBeNull()
+        ->and($this->specimen->status)->toBe('microscopic_review')
+        ->and($this->specimen->finalized_at)->toBeNull();
+});
+
+test('creating a report on a specimen in received when macroscopic review is disabled advances to processing and not finalized', function () {
+    $this->actingAs($this->assignedUser);
+
+    // Disable macroscopic_review
+    $this->specimenType->states()->create(['status' => 'received', 'step_order' => 1, 'active' => true]);
+    $this->specimenType->states()->create(['status' => 'macroscopic_review', 'step_order' => 2, 'active' => false]);
+    $this->specimenType->states()->create(['status' => 'processing', 'step_order' => 3, 'active' => true]);
+    $this->specimenType->states()->create(['status' => 'microscopic_review', 'step_order' => 4, 'active' => true]);
+    $this->specimenType->states()->create(['status' => 'finalized', 'step_order' => 5, 'active' => true]);
+
+    $this->specimen->update([
+        'status' => 'received',
+        'report_id' => null,
+    ]);
+
+    $response = $this->post(route('specimens.report-editor.store', $this->specimen->sequence_code), []);
+    $response->assertRedirect();
+
+    $this->specimen->refresh();
+    expect($this->specimen->report_id)->not->toBeNull()
+        ->and($this->specimen->status)->toBe('processing')
+        ->and($this->specimen->finalized_at)->toBeNull();
+});

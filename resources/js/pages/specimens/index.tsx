@@ -972,6 +972,18 @@ export default function SpecimensIndex({
             const response = await axios.get(
                 `/specimen-groups/${groupId}/details`,
             );
+
+            if (response.data?.can_add_specimens === false) {
+                toast.error(
+                    'Este crédito ya cuenta con número de factura asignado (#factura). No se pueden agregar más muestras.',
+                    {
+                        id: toastId,
+                    },
+                );
+
+                return;
+            }
+
             setSelectedGroup(response.data);
             setIsGroupSheetOpen(true);
             toast.dismiss(toastId);

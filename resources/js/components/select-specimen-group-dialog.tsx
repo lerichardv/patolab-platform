@@ -2,6 +2,7 @@ import axios from 'axios';
 import debounce from 'lodash/debounce';
 import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import SelectSpecimenGroupSkeleton from '@/components/select-specimen-group-skeleton';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +20,8 @@ interface SpecimenGroupListItem {
     name: string;
     full_invoice_number: string;
     customer_name: string;
+    has_invoice_number?: boolean;
+    can_add_specimens?: boolean;
     specimen_codes?: string[];
 }
 
@@ -147,6 +150,14 @@ export default function SelectSpecimenGroupDialog({
                 `/specimen-groups/${selectedGroupId}/details`,
             );
 
+            if (response.data?.can_add_specimens === false) {
+                toast.error(
+                    'Este crédito ya cuenta con número de factura asignado (#factura). No se pueden agregar más muestras.',
+                );
+
+                return;
+            }
+
             onConfirm(response.data);
             onOpenChange(false);
         } catch (error) {
@@ -193,19 +204,30 @@ export default function SelectSpecimenGroupDialog({
                             </div>
                         ) : (
                             groups.map((group) => {
+                                const isLocked =
+                                    group.can_add_specimens === false ||
+                                    Boolean(group.has_invoice_number) ||
+                                    (Boolean(group.full_invoice_number) &&
+                                        group.full_invoice_number !==
+                                            'Sin factura');
                                 const isSelected = selectedGroupId === group.id;
 
                                 return (
                                     <button
                                         key={group.id}
                                         type="button"
-                                        onClick={() =>
-                                            setSelectedGroupId(group.id)
-                                        }
+                                        disabled={isLocked}
+                                        onClick={() => {
+                                            if (!isLocked) {
+                                                setSelectedGroupId(group.id);
+                                            }
+                                        }}
                                         className={`flex w-full items-start gap-4 p-3 text-left transition-colors ${
-                                            isSelected
-                                                ? 'bg-primary text-white hover:bg-primary/90'
-                                                : 'hover:bg-muted/50'
+                                            isLocked
+                                                ? 'cursor-not-allowed bg-muted/20 opacity-60'
+                                                : isSelected
+                                                  ? 'bg-primary text-white hover:bg-primary/90'
+                                                  : 'hover:bg-muted/50'
                                         }`}
                                     >
                                         <div className="mt-1 flex shrink-0 items-center justify-center">
@@ -224,15 +246,22 @@ export default function SelectSpecimenGroupDialog({
 
                                         <div className="flex flex-1 flex-col gap-1">
                                             <div className="flex items-start justify-between gap-2">
-                                                <span
-                                                    className={`text-sm font-semibold ${
-                                                        isSelected
-                                                            ? 'text-white'
-                                                            : 'text-foreground'
-                                                    }`}
-                                                >
-                                                    {group.name}
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span
+                                                        className={`text-sm font-semibold ${
+                                                            isSelected
+                                                                ? 'text-white'
+                                                                : 'text-foreground'
+                                                        }`}
+                                                    >
+                                                        {group.name}
+                                                    </span>
+                                                    {isLocked && (
+                                                        <span className="shrink-0 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+                                                            Factura Asignada
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <span
                                                     className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] ${
                                                         isSelected

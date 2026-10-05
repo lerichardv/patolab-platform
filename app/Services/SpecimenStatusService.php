@@ -202,6 +202,12 @@ class SpecimenStatusService
             }
 
             if ($requiresReport) {
+                if (! $specimen->report_id) {
+                    throw ValidationException::withMessages([
+                        'error' => ['No se puede finalizar una muestra que requiere informe sin antes haber creado su reporte.'],
+                    ]);
+                }
+
                 $unsignedUsers = $specimen->users()->where(function ($q) {
                     $q->whereNull('user_signature')->orWhere('user_signature', '');
                 })->get();

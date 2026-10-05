@@ -45,6 +45,15 @@ const STATUS_COLORS: Record<string, string> = {
     cancelled: '#ef4444', // red-500
 };
 
+const CANONICAL_STATUS_ORDER: Record<string, number> = {
+    received: 1,
+    macroscopic_review: 2,
+    processing: 3,
+    microscopic_review: 4,
+    finalized: 5,
+    delivered: 6,
+};
+
 const STATUS_STEPS = [
     {
         key: 'received',
@@ -473,7 +482,56 @@ export default function PublicGroupProgress({ group }: Props) {
                                                                                   .filter(
                                                                                       Boolean,
                                                                                   ) as typeof STATUS_STEPS)
-                                                                            : STATUS_STEPS;
+                                                                            : [
+                                                                                  ...STATUS_STEPS,
+                                                                              ];
+
+                                                                    // If specimen is currently in a canonical workflow state that is not in the active flow (e.g. disabled later), insert it so it's visible
+                                                                    if (
+                                                                        specimen.status &&
+                                                                        specimen.status !==
+                                                                            'cancelled' &&
+                                                                        !steps.some(
+                                                                            (
+                                                                                s,
+                                                                            ) =>
+                                                                                s.key ===
+                                                                                specimen.status,
+                                                                        )
+                                                                    ) {
+                                                                        const missingStep =
+                                                                            STATUS_STEPS.find(
+                                                                                (
+                                                                                    s,
+                                                                                ) =>
+                                                                                    s.key ===
+                                                                                    specimen.status,
+                                                                            );
+
+                                                                        if (
+                                                                            missingStep
+                                                                        ) {
+                                                                            steps.push(
+                                                                                missingStep,
+                                                                            );
+                                                                            steps.sort(
+                                                                                (
+                                                                                    a,
+                                                                                    b,
+                                                                                ) =>
+                                                                                    (CANONICAL_STATUS_ORDER[
+                                                                                        a
+                                                                                            .key
+                                                                                    ] ||
+                                                                                        99) -
+                                                                                    (CANONICAL_STATUS_ORDER[
+                                                                                        b
+                                                                                            .key
+                                                                                    ] ||
+                                                                                        99),
+                                                                            );
+                                                                        }
+                                                                    }
 
                                                                     const isDelivered =
                                                                         specimen.status ===
@@ -492,16 +550,52 @@ export default function PublicGroupProgress({ group }: Props) {
                                                                             step,
                                                                             idx,
                                                                         ) => {
-                                                                            const isPastStep =
+                                                                            let isPastStep = false;
+                                                                            let isCurrentStep = false;
+
+                                                                            if (
                                                                                 isDelivered
-                                                                                    ? true
-                                                                                    : idx <
-                                                                                      currentStepIndex;
-                                                                            const isCurrentStep =
-                                                                                isDelivered
-                                                                                    ? false
-                                                                                    : idx ===
-                                                                                      currentStepIndex;
+                                                                            ) {
+                                                                                isPastStep = true;
+                                                                            } else if (
+                                                                                currentStepIndex !==
+                                                                                -1
+                                                                            ) {
+                                                                                isPastStep =
+                                                                                    idx <
+                                                                                    currentStepIndex;
+                                                                                isCurrentStep =
+                                                                                    idx ===
+                                                                                    currentStepIndex;
+                                                                            } else {
+                                                                                // Fallback: compare canonical order if current status wasn't directly found in steps
+                                                                                const currentOrder =
+                                                                                    CANONICAL_STATUS_ORDER[
+                                                                                        specimen
+                                                                                            .status
+                                                                                    ] ??
+                                                                                    0;
+                                                                                const stepOrder =
+                                                                                    CANONICAL_STATUS_ORDER[
+                                                                                        step
+                                                                                            .key
+                                                                                    ] ??
+                                                                                    0;
+
+                                                                                if (
+                                                                                    currentOrder >
+                                                                                        0 &&
+                                                                                    stepOrder >
+                                                                                        0
+                                                                                ) {
+                                                                                    isPastStep =
+                                                                                        stepOrder <
+                                                                                        currentOrder;
+                                                                                    isCurrentStep =
+                                                                                        stepOrder ===
+                                                                                        currentOrder;
+                                                                                }
+                                                                            }
 
                                                                             return (
                                                                                 <div
