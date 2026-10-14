@@ -22,6 +22,7 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberPicker } from '@/components/ui/number-picker';
@@ -121,6 +122,9 @@ export default function GroupInvoiceForm({
             : '0',
         payment_type: invoice?.payment_type || 'cash',
         total_paid: invoice?.total_paid ? invoice.total_paid.toString() : '0',
+        invoice_date: invoice?.invoice_date
+            ? invoice.invoice_date.split(/[ T]/)[0]
+            : new Date().toISOString().split('T')[0],
         group_specimens: [] as any[],
         proof_of_payment: null as File | null,
         has_initial_payment: false,
@@ -523,6 +527,10 @@ export default function GroupInvoiceForm({
             }
         }
 
+        if (!data.invoice_date) {
+            localErrors.invoice_date = 'La fecha de factura es requerida.';
+        }
+
         if (Object.keys(localErrors).length > 0) {
             Object.entries(localErrors).forEach(([k, v]) =>
                 setError(k as any, v),
@@ -575,26 +583,44 @@ export default function GroupInvoiceForm({
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
                 {/* Left Column: Form Inputs */}
                 <div className="flex flex-col gap-6 lg:col-span-8">
-                    {/* Cliente */}
-                    <div className="grid gap-2">
-                        <Label htmlFor="customer_id">
-                            Cliente / Paciente{' '}
-                            <span className="text-destructive">*</span>
-                        </Label>
-                        <AsyncCustomerCombobox
-                            placeholder="Seleccione un Cliente"
-                            value={data.customer_id}
-                            initialCustomer={selectedCustomerData}
-                            onChange={(val, customer) => {
-                                setData('customer_id', val);
-                                setSelectedCustomerData(customer ?? null);
-                            }}
-                        />
-                        {errors.customer_id && (
-                            <p className="text-xs text-destructive">
-                                {errors.customer_id}
-                            </p>
-                        )}
+                    {/* Cliente y Fecha de Factura */}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div className="grid gap-2 sm:col-span-2">
+                            <Label htmlFor="customer_id">
+                                Cliente / Paciente{' '}
+                                <span className="text-destructive">*</span>
+                            </Label>
+                            <AsyncCustomerCombobox
+                                placeholder="Seleccione un Cliente"
+                                value={data.customer_id}
+                                initialCustomer={selectedCustomerData}
+                                onChange={(val, customer) => {
+                                    setData('customer_id', val);
+                                    setSelectedCustomerData(customer ?? null);
+                                }}
+                            />
+                            {errors.customer_id && (
+                                <p className="text-xs text-destructive">
+                                    {errors.customer_id}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="invoice_date">
+                                Fecha de Factura{' '}
+                                <span className="text-destructive">*</span>
+                            </Label>
+                            <DatePicker
+                                value={data.invoice_date}
+                                onChange={(val) => setData('invoice_date', val)}
+                            />
+                            {errors.invoice_date && (
+                                <p className="text-xs text-destructive">
+                                    {errors.invoice_date}
+                                </p>
+                            )}
+                        </div>
                     </div>
 
                     {/* Group Specimens Pricing & Supplies List grouped per specimen and per examination */}

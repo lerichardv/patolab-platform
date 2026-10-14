@@ -19,6 +19,7 @@ use App\Models\WorkOrderType;
 use App\Services\DateFilterService;
 use App\Services\InvoiceCalculationService;
 use App\Services\InvoicePdfService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -658,6 +659,7 @@ class InvoiceController extends Controller
             'group_specimens.*.additional_discount_enabled' => 'nullable|boolean',
             'group_specimens.*.additional_discount' => 'nullable|numeric|min:0',
             'pay_isv' => 'nullable|boolean',
+            'invoice_date' => 'nullable|date',
             'has_initial_payment' => 'nullable|boolean',
             'initial_payment_amount' => 'nullable|numeric|min:0',
             'initial_payment_type' => 'nullable|in:cash,credit card,bank transfer,check',
@@ -749,6 +751,11 @@ class InvoiceController extends Controller
             $validated['taxable_amount_18'] = 0.00;
             $validated['isv_15'] = 0.00;
             $validated['isv_18'] = 0.00;
+        }
+
+        if ($request->filled('invoice_date')) {
+            $validated['invoice_date'] = Carbon::parse($request->input('invoice_date'))
+                ->setTimeFrom($invoice->invoice_date ?? now());
         }
 
         DB::transaction(function () use ($request, $validated, $invoice, $groupSpecimensData) {

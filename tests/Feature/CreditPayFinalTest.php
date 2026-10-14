@@ -522,3 +522,76 @@ test('payFinal preserves existing invoice number when already present and allows
     expect($credit->status)->toEqual('paid');
     expect($credit->amount_remaining)->toEqual(0.00);
 });
+
+test('payFinal with custom invoice_date updates invoice date directly', function () {
+    $specimen = Specimen::create([
+        'sequence_code' => 'BIO-0099-08-2026',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->type->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'status' => 'received',
+        'priority_id' => $this->priority->id,
+        'quantity' => 1,
+    ]);
+
+    $credit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 600.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 600.00,
+        'is_group' => true,
+        'status' => 'pending',
+    ]);
+
+    $originalInvoice = Invoice::create([
+        'customer_id' => $this->customer->id,
+        'created_by_id' => $this->user->id,
+        'payment_type' => 'credit',
+        'amount' => 600.00,
+        'discount' => 0.00,
+        'subtotal' => 600.00,
+        'exempt_amount' => 600.00,
+        'tax_exempt_amount' => 600.00,
+        'total' => 600.00,
+        'total_paid' => 0.00,
+        'invoice_file' => 'invoices/sample.pdf',
+        'credit_payment_id' => $credit->id,
+        'is_group' => true,
+        'quantity' => 1,
+    ]);
+
+    InvoiceSpecimen::create([
+        'credit_id' => $credit->id,
+        'invoice_id' => $originalInvoice->id,
+        'specimen_id' => $specimen->id,
+        'is_paid' => false,
+        'amount' => 600.00,
+        'discount' => 0.00,
+        'subtotal' => 600.00,
+        'total' => 600.00,
+        'quantity' => 1,
+    ]);
+
+    $pdfServiceMock = Mockery::mock(InvoicePdfService::class);
+    $pdfServiceMock->shouldReceive('generateAndStoreInvoice')->once();
+    app()->instance(InvoicePdfService::class, $pdfServiceMock);
+
+    $response = $this->actingAs($this->user)->post(route('credits.pay-final', $credit->id), [
+        'specimens' => [
+            ['id' => $specimen->id, 'quantity' => 1],
+        ],
+        'invoice_date' => '2026-09-20',
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success');
+
+    $originalInvoice->refresh();
+    expect($originalInvoice->invoice_date->format('Y-m-d'))->toEqual('2026-09-20');
+    expect($originalInvoice->full_invoice_number)->not->toBeNull();
+
+    $credit->refresh();
+    expect($credit->status)->toEqual('invoice generated');
+});

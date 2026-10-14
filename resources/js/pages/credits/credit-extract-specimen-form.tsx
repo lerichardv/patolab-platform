@@ -1,4 +1,5 @@
 import { useForm } from '@inertiajs/react';
+import { format } from 'date-fns';
 import { Info } from 'lucide-react';
 import type { FormEventHandler } from 'react';
 import { useMemo, useState } from 'react';
@@ -18,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
@@ -295,6 +297,7 @@ export default function CreditExtractSpecimenForm({
     const { data, setData, post, processing, errors, reset } = useForm({
         specimen_ids: [] as number[],
         is_social_security: false,
+        invoice_date: format(new Date(), 'yyyy-MM-dd'),
     });
 
     const handleSpecimenToggle = (specimenId: number) => {
@@ -677,6 +680,26 @@ export default function CreditExtractSpecimenForm({
                         }
                     />
                 </div>
+
+                {data.is_social_security && (
+                    <div className="space-y-1.5 border-t border-border/50 pt-3">
+                        <Label
+                            htmlFor="extract_invoice_date"
+                            className="text-xs font-semibold"
+                        >
+                            Fecha de Factura *
+                        </Label>
+                        <DatePicker
+                            value={data.invoice_date}
+                            onChange={(date) => setData('invoice_date', date)}
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                            Fecha oficial que se registrará en la factura
+                            emitida para el Seguro.
+                        </p>
+                        <InputError message={errors.invoice_date} />
+                    </div>
+                )}
             </div>
 
             {/* Live separation summary card */}
@@ -844,6 +867,16 @@ export default function CreditExtractSpecimenForm({
                                     : 'No (Sin número fiscal)'}
                             </span>
                         </div>
+                        {data.is_social_security && data.invoice_date && (
+                            <div className="flex justify-between border-b pb-2">
+                                <span className="font-medium text-muted-foreground">
+                                    Fecha de Factura:
+                                </span>
+                                <span className="font-semibold text-foreground">
+                                    {data.invoice_date}
+                                </span>
+                            </div>
+                        )}
                         <div className="flex justify-between border-b pb-2">
                             <span className="font-medium text-muted-foreground">
                                 Muestras en grupo original:
