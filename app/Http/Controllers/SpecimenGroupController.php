@@ -290,7 +290,7 @@ class SpecimenGroupController extends Controller
                 'created_by_id' => auth()->id(),
                 'specimen_id' => null, // Left null since it is linked to a group
                 'payment_type' => $validated['payment_type'],
-                'invoice_date' => ($validated['payment_type'] !== 'credit' && $fullInvoiceNumber) ? now() : null,
+                'invoice_date' => $fullInvoiceNumber ? now() : null,
                 'credit_payment_id' => $creditId,
                 'quantity' => $totalQuantity,
                 'amount' => $totalAmount,

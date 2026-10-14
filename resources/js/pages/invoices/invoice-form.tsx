@@ -509,6 +509,10 @@ export default function InvoiceForm({
                 invoice.groupSpecimens ||
                 invoice.invoice_specimens ||
                 invoice.invoiceSpecimens ||
+                invoice.specimen?.invoice_specimens ||
+                invoice.specimen?.invoiceSpecimens ||
+                invoice.specimen?.invoiceRelation?.invoice_specimens ||
+                invoice.specimen?.invoiceRelation?.invoiceSpecimens ||
                 [];
 
             if (rawGroupSpecimens.length > 0) {
@@ -538,7 +542,7 @@ export default function InvoiceForm({
                             : '0';
                         let selected_price = '';
 
-                        let matched = sortedPrices.find(
+                        const matched = sortedPrices.find(
                             (p: any) =>
                                 Math.abs(
                                     parseFloat(p.amount) -
@@ -546,33 +550,30 @@ export default function InvoiceForm({
                                 ) < 0.01,
                         );
 
-                        if (
-                            !matched &&
-                            rawSelected !== 'custom' &&
-                            amount > 0
-                        ) {
-                            matched = sortedPrices.find(
-                                (p: any) =>
-                                    Math.abs(parseFloat(p.amount) - amount) <
-                                    0.01,
-                            );
-                        }
-
                         if (matched) {
                             selected_price = matched.amount.toString();
-                        } else if (rawSelected === 'custom') {
+                            custom_specimen_price = '0';
+                        } else if (
+                            rawSelected === 'custom' ||
+                            (parseFloat(rawSelected) > 0 && !matched) ||
+                            parseFloat(custom_specimen_price) > 0
+                        ) {
                             selected_price = 'custom';
                             custom_specimen_price =
                                 parseFloat(custom_specimen_price) > 0
                                     ? custom_specimen_price
-                                    : amount > 0
-                                      ? amount.toString()
-                                      : maxPrice.toString();
+                                    : parseFloat(rawSelected) > 0
+                                      ? rawSelected
+                                      : amount > 0
+                                        ? amount.toString()
+                                        : maxPrice.toString();
                         } else if (sortedPrices.length > 0) {
                             selected_price = sortedPrices[0].amount.toString();
+                            custom_specimen_price = '0';
                         } else {
                             selected_price = 'custom';
-                            custom_specimen_price = amount.toString();
+                            custom_specimen_price =
+                                amount > 0 ? amount.toString() : '0';
                         }
 
                         return {
@@ -600,11 +601,16 @@ export default function InvoiceForm({
                             max_price: maxPrice,
                             age_discount_type: gs.age_discount_type || null,
                             age_discount_amount:
-                                gs.age_discount_amount?.toString() || '0',
-                            additional_discount_enabled:
-                                !!gs.additional_discount_enabled,
+                                gs.age_discount_amount != null
+                                    ? gs.age_discount_amount.toString()
+                                    : '0',
+                            additional_discount_enabled: Boolean(
+                                gs.additional_discount_enabled,
+                            ),
                             additional_discount:
-                                gs.additional_discount?.toString() || '0',
+                                gs.additional_discount != null
+                                    ? gs.additional_discount.toString()
+                                    : '0',
                             insumos: (spec?.products || []).map((p: any) => ({
                                 id: p.id,
                                 quantity: p.pivot?.quantity || 0,
@@ -616,17 +622,25 @@ export default function InvoiceForm({
                     },
                 );
 
-                const totalDisc = parseFloat(invoice.discount || 0) || 0;
-                const additionalDisc = Math.max(0, totalDisc - ageAmt);
+                const singleItem =
+                    loadedGroupSpecimens.length === 1
+                        ? loadedGroupSpecimens[0]
+                        : null;
 
                 setData((d: any) => ({
                     ...d,
                     quantity: qty,
-                    selected_price: '',
-                    custom_specimen_price: '0',
+                    selected_price: singleItem ? singleItem.selected_price : '',
+                    custom_specimen_price: singleItem
+                        ? singleItem.custom_specimen_price
+                        : '0',
                     group_specimens: loadedGroupSpecimens,
-                    additional_discount_enabled: additionalDisc > 0,
-                    additional_discount: additionalDisc.toString(),
+                    additional_discount_enabled: singleItem
+                        ? Boolean(singleItem.additional_discount_enabled)
+                        : false,
+                    additional_discount: singleItem
+                        ? singleItem.additional_discount || '0'
+                        : '0',
                     custom_amount_enabled: customEnabled,
                     custom_amount: customAmt.toString(),
                     custom_amount_reason: customReason,
@@ -675,10 +689,21 @@ export default function InvoiceForm({
                             : amount.toFixed(2);
                 }
 
+                const existingInvSpec =
+                    (spec?.invoice_specimens ||
+                        spec?.invoiceSpecimens ||
+                        spec?.invoiceRelation?.invoice_specimens ||
+                        spec?.invoiceRelation?.invoiceSpecimens ||
+                        [])[0] || null;
+
                 const singleLoadedItem = {
-                    id: 0,
+                    id:
+                        existingInvSpec?.id ||
+                        invoice.invoice_specimens?.[0]?.id ||
+                        0,
                     specimen_id: spec.id,
-                    examination_id: examObj?.id,
+                    examination_id:
+                        examObj?.id || existingInvSpec?.examination_id,
                     sequence_code: spec?.sequence_code || 'Sin código',
                     patient_name:
                         spec?.customer_relation?.name ||
@@ -691,14 +716,23 @@ export default function InvoiceForm({
                     type_name: spec?.type?.name || 'N/A',
                     examination_name: examObj?.name || 'N/A',
                     available_prices: availablePrices,
-                    selected_price,
-                    custom_specimen_price,
+                    selected_price:
+                        existingInvSpec?.selected_price || selected_price,
+                    custom_specimen_price:
+                        existingInvSpec?.custom_specimen_price?.toString() ||
+                        custom_specimen_price,
                     quantity: qty,
                     max_price: maxPrice,
-                    age_discount_type: ageType,
-                    age_discount_amount: ageAmt.toString(),
-                    additional_discount_enabled: false,
-                    additional_discount: '0',
+                    age_discount_type:
+                        existingInvSpec?.age_discount_type || ageType,
+                    age_discount_amount:
+                        existingInvSpec?.age_discount_amount?.toString() ||
+                        ageAmt.toString(),
+                    additional_discount_enabled: Boolean(
+                        existingInvSpec?.additional_discount_enabled,
+                    ),
+                    additional_discount:
+                        existingInvSpec?.additional_discount?.toString() || '0',
                     insumos: (spec?.products || []).map((p: any) => ({
                         id: p.id,
                         quantity: p.pivot?.quantity || 0,

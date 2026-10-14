@@ -35,6 +35,7 @@ interface Credit {
     group?: {
         id: number;
         invoice?: Invoice;
+        specimens?: any[];
     };
     specimen?: any;
 }
@@ -49,6 +50,7 @@ interface Props {
     banks?: Bank[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onSuccess?: () => void;
 }
 
 export default function CreditFinalPaymentSheet({
@@ -56,6 +58,7 @@ export default function CreditFinalPaymentSheet({
     banks = [],
     open,
     onOpenChange,
+    onSuccess,
 }: Props) {
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -68,7 +71,10 @@ export default function CreditFinalPaymentSheet({
                     <CreditFinalPaymentForm
                         credit={credit}
                         banks={banks}
-                        onSuccess={() => onOpenChange(false)}
+                        onSuccess={() => {
+                            onOpenChange(false);
+                            onSuccess?.();
+                        }}
                     />
                 )}
             </SheetContent>

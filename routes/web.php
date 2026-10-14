@@ -4,6 +4,9 @@ use App\Http\Controllers\AiAssistantController;
 use App\Http\Controllers\CaiRangeController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerPortal\CustomerPortalAuthController;
+use App\Http\Controllers\CustomerPortal\CustomerPortalSettingsController;
+use App\Http\Controllers\CustomerPortal\CustomerPortalSpecimenController;
 use App\Http\Controllers\CustomerSearchController;
 use App\Http\Controllers\CuttingCodeController;
 use App\Http\Controllers\CuttingFormDataController;
@@ -86,13 +89,35 @@ Route::get('specimen/{specimen_code}', [SpecimenController::class, 'showPublic']
 Route::get('specimen-group/{id}', [SpecimenGroupController::class, 'showPublic'])->name('specimen-groups.show-public');
 Route::get('maintenance', fn () => response()->view('errors.503'))->name('maintenance');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+// Customer Portal routes
+Route::prefix('portal')->name('customer-portal.')->group(function () {
+    Route::middleware('guest:customer')->group(function () {
+        Route::get('login', [CustomerPortalAuthController::class, 'create'])->name('login');
+        Route::post('login', [CustomerPortalAuthController::class, 'store'])->name('login.store');
+    });
+
+    Route::middleware(['auth:customer', 'customer.active'])->group(function () {
+        Route::post('logout', [CustomerPortalAuthController::class, 'destroy'])->name('logout');
+
+        Route::get('/', [CustomerPortalSpecimenController::class, 'index'])->name('dashboard');
+        Route::get('specimens', [CustomerPortalSpecimenController::class, 'index'])->name('specimens.index');
+        Route::get('specimens/{specimen_code}', [CustomerPortalSpecimenController::class, 'show'])->name('specimens.show');
+        Route::get('specimens/{specimen_code}/report', [CustomerPortalSpecimenController::class, 'downloadReport'])->name('specimens.report');
+
+        Route::get('settings/profile', [CustomerPortalSettingsController::class, 'editProfile'])->name('settings.profile');
+        Route::get('settings/password', [CustomerPortalSettingsController::class, 'editPassword'])->name('settings.password');
+        Route::put('settings/password', [CustomerPortalSettingsController::class, 'updatePassword'])->name('settings.password.update');
+    });
+});
+
+Route::middleware(['auth:web', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
     Route::get('customers/import', [CustomerController::class, 'importPage'])->name('customers.import-page');
     Route::post('customers/import/parse', [CustomerController::class, 'parseImport'])->name('customers.import-parse');
     Route::post('customers/import/row', [CustomerController::class, 'importRow'])->name('customers.import-row');
     Route::get('customers/search', [CustomerSearchController::class, 'search'])->name('customers.search');
+    Route::get('customers/check-email', [CustomerController::class, 'checkEmail'])->name('customers.check-email');
     Route::resource('customers', CustomerController::class);
 
     Route::get('departments', function () {

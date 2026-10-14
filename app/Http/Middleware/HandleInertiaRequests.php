@@ -41,8 +41,16 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'debugReport' => filter_var(env('DEBUG_REPORT', false), FILTER_VALIDATE_BOOLEAN),
             'auth' => [
-                'user' => $request->user() ? $request->user()->load('role') : null,
-                'permissions' => $request->user() ? ($request->user()->role ? ($request->user()->role->slug === 'admin' ? Permission::pluck('slug')->toArray() : $request->user()->role->permissions->pluck('slug')->toArray()) : []) : [],
+                'user' => $request->user('web') ? $request->user('web')->load('role') : null,
+                'permissions' => $request->user('web') ? ($request->user('web')->role ? ($request->user('web')->role->slug === 'admin' ? Permission::pluck('slug')->toArray() : $request->user('web')->role->permissions->pluck('slug')->toArray()) : []) : [],
+                'customer' => $request->user('customer') ? [
+                    'id' => $request->user('customer')->id,
+                    'name' => $request->user('customer')->name,
+                    'email' => $request->user('customer')->email,
+                    'id_number' => $request->user('customer')->id_number,
+                    'phone' => $request->user('customer')->phone,
+                    'type' => $request->user('customer')->type,
+                ] : null,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [

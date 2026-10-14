@@ -144,7 +144,8 @@ export default function UserForm({ user, roles, onSuccess }: UserFormProps) {
                     rows={3}
                 />
                 <p className="text-xs text-muted-foreground">
-                    Texto que aparece debajo del nombre en los reportes (soporta múltiples líneas).
+                    Texto que aparece debajo del nombre en los reportes (soporta
+                    múltiples líneas).
                 </p>
                 <InputError message={errors.signature_subtext} />
             </div>

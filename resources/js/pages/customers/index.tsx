@@ -2,13 +2,14 @@ import { Head, router, usePage } from '@inertiajs/react';
 import debounce from 'lodash/debounce';
 import {
     Edit2,
+    ExternalLink,
     FileSpreadsheet,
     Plus,
     Search,
     Trash2,
     Upload,
 } from 'lucide-react';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
     index as customersIndex,
@@ -30,6 +31,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -37,6 +39,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import {
     Table,
     TableBody,
@@ -45,6 +48,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { login as customerPortalLogin } from '@/routes/customer-portal';
 import CustomerSheet from './customer-sheet';
 
 interface Customer {
@@ -61,6 +65,7 @@ interface Customer {
     city: string;
     address: string;
     email: string;
+    portal_access?: boolean;
     department?: {
         id: number;
         name: string;
@@ -91,6 +96,7 @@ interface Props {
         gender?: string;
         state?: string;
         city?: string;
+        portal_access?: string;
     };
 }
 
@@ -109,7 +115,7 @@ export default function CustomersIndex({ customers, filters }: Props) {
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value };
 
-        if (value === 'all' || value === '') {
+        if (value === 'all' || value === '' || value === 'false') {
             delete newFilters[key as keyof typeof filters];
         }
 
@@ -119,10 +125,11 @@ export default function CustomersIndex({ customers, filters }: Props) {
         });
     };
 
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            handleFilterChange('search', value);
-        }, 300),
+    const debouncedSearch = useMemo(
+        () =>
+            debounce((value: string) => {
+                handleFilterChange('search', value);
+            }, 300),
         [filters],
     );
 
@@ -212,7 +219,7 @@ export default function CustomersIndex({ customers, filters }: Props) {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
                     <div className="relative">
                         <Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -265,6 +272,27 @@ export default function CustomersIndex({ customers, filters }: Props) {
                             handleFilterChange('city', e.target.value)
                         }
                     />
+                    <div className="flex h-9 items-center justify-between gap-2 rounded-md border border-input bg-background px-3 shadow-xs">
+                        <Label
+                            htmlFor="portal-access-filter"
+                            className="cursor-pointer truncate text-xs font-medium text-muted-foreground select-none hover:text-foreground"
+                        >
+                            Acceso al portal
+                        </Label>
+                        <Switch
+                            id="portal-access-filter"
+                            checked={
+                                filters.portal_access === 'true' ||
+                                filters.portal_access === '1'
+                            }
+                            onCheckedChange={(checked) =>
+                                handleFilterChange(
+                                    'portal_access',
+                                    checked ? 'true' : '',
+                                )
+                            }
+                        />
+                    </div>
                 </div>
 
                 <div className="rounded-md border bg-card">
@@ -292,17 +320,38 @@ export default function CustomersIndex({ customers, filters }: Props) {
                                             {customer.id_number}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge
-                                                variant={
-                                                    customer.type === 'cliente'
-                                                        ? 'default'
-                                                        : 'secondary'
-                                                }
-                                            >
-                                                {customer.type === 'cliente'
-                                                    ? 'Cliente'
-                                                    : 'Empresa'}
-                                            </Badge>
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <Badge
+                                                    variant={
+                                                        customer.type ===
+                                                        'cliente'
+                                                            ? 'default'
+                                                            : 'secondary'
+                                                    }
+                                                >
+                                                    {customer.type === 'cliente'
+                                                        ? 'Cliente'
+                                                        : 'Empresa'}
+                                                </Badge>
+                                                {customer.portal_access && (
+                                                    <a
+                                                        href={
+                                                            customerPortalLogin()
+                                                                .url
+                                                        }
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        title="Abrir Portal del Cliente"
+                                                    >
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="cursor-pointer border-emerald-300 text-[10px] text-emerald-600 transition-colors hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                                                        >
+                                                            Portal
+                                                        </Badge>
+                                                    </a>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex flex-col text-xs">
@@ -327,6 +376,26 @@ export default function CustomersIndex({ customers, filters }: Props) {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
+                                                {customer.portal_access && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        asChild
+                                                        className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                                                        title="Abrir Portal del Cliente"
+                                                    >
+                                                        <a
+                                                            href={
+                                                                customerPortalLogin()
+                                                                    .url
+                                                            }
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            <ExternalLink className="h-4 w-4" />
+                                                        </a>
+                                                    </Button>
+                                                )}
                                                 {auth.permissions?.includes(
                                                     'patients.edit',
                                                 ) && (

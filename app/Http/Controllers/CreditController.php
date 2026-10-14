@@ -671,13 +671,20 @@ class CreditController extends Controller
             throw new \Exception('No se pudo encontrar la factura original del crédito.');
         }
 
+        if ($credit->status === 'invoice generated' || $credit->status === 'paid') {
+            return redirect()->back()->with('error', 'La factura final de crédito ya ha sido generada previamente.');
+        }
+
         DB::transaction(function () use ($credit, $originalInvoice) {
             $invoiceUpdateData = [
-                'invoice_date' => now(),
+                'invoice_date' => $originalInvoice->invoice_date ?? $originalInvoice->created_at ?? now(),
+                'total_paid' => $originalInvoice->total,
             ];
 
-            // If the invoice does not already have an invoice number, full invoice number, and cai range id, assign them from the active CAI range
-            if (empty($originalInvoice->invoice_number) || empty($originalInvoice->full_invoice_number) || empty($originalInvoice->cai_range_id)) {
+            // If the invoice does not already have an invoice number, assign one from the active CAI range; otherwise keep the existing one
+            $hasExistingInvoiceNumber = ! empty($originalInvoice->full_invoice_number) || ! empty($originalInvoice->invoice_number);
+
+            if (! $hasExistingInvoiceNumber) {
                 // Get CAI range
                 $caiRange = CaiRange::where('status', 'active')->first();
                 if (! $caiRange) {
@@ -697,16 +704,33 @@ class CreditController extends Controller
                 $invoiceUpdateData['cai_range_id'] = $caiRange->id;
                 $invoiceUpdateData['invoice_number'] = $invoiceNumber;
                 $invoiceUpdateData['full_invoice_number'] = $fullInvoiceNumber;
+                $invoiceUpdateData['invoice_date'] = $originalInvoice->invoice_date ?? now();
             }
+
+            // Mark line items associated with this credit as paid
+            InvoiceSpecimen::where('credit_id', $credit->id)
+                ->when($originalInvoice, function ($q) use ($originalInvoice) {
+                    $q->orWhere('invoice_id', $originalInvoice->id);
+                })
+                ->when($credit->specimen_id, function ($q) use ($credit) {
+                    $q->orWhere('specimen_id', $credit->specimen_id);
+                })
+                ->update([
+                    'is_paid' => true,
+                    'quantity_paid' => DB::raw('quantity'),
+                    'updated_at' => now(),
+                ]);
 
             // Update original invoice details
             $originalInvoice->update($invoiceUpdateData);
 
-            // Update credit status to invoice generated, keeping remaining balance pending until marked as paid
-            $amountRemaining = max(0, (float) ($credit->credit_amount ?: $originalInvoice->total) - (float) $credit->amount_paid);
+            // Update credit status to invoice generated and settle remaining balance
+            $creditAmount = $originalInvoice->total ?: $credit->credit_amount;
             $credit->update([
-                'credit_amount' => $originalInvoice->total ?: $credit->credit_amount,
-                'amount_remaining' => $amountRemaining,
+                'credit_amount' => $creditAmount,
+                'amount_paid' => $creditAmount,
+                'amount_remaining' => 0.00,
+                'last_payment_date' => now(),
                 'status' => 'invoice generated',
             ]);
 
@@ -1135,6 +1159,10 @@ class CreditController extends Controller
     public function markAsPaid(Request $request, Credit $credit)
     {
         Gate::authorize('credits.manage');
+
+        if ($credit->status !== 'invoice generated') {
+            return redirect()->back()->with('error', 'El crédito debe tener su factura final generada antes de marcarse como pagado.');
+        }
 
         $validated = $request->validate([
             'payment_type' => 'required|in:cash,credit card,bank transfer,check',

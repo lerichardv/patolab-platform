@@ -74,7 +74,7 @@ export default function SpecimenGroupMergeSkeleton() {
             </div>
 
             {/* Bottom Actions Skeleton */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/40">
+            <div className="flex items-center justify-end gap-3 border-t border-border/40 pt-4">
                 <Skeleton className="h-9 w-24 rounded-md" />
                 <Skeleton className="h-9 w-36 rounded-md" />
             </div>

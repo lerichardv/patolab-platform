@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { ShieldCheck } from 'lucide-react';
 import {
     Card,
     CardContent,
@@ -28,18 +29,20 @@ export default function AuthSimpleLayout({
             <div className="relative z-10 w-full max-w-sm">
                 <div className="flex flex-col gap-6">
                     <div className="flex flex-col items-center gap-2">
-                        <Link
-                            href={home()}
-                            className="flex flex-col items-center gap-2 font-medium"
-                        >
-                            <div className="mb-2 flex h-20 w-20 items-center justify-center rounded-2xl bg-background shadow-md ring-1 ring-border">
-                                <img
-                                    src="/images/patolab-isotipo.png"
-                                    alt="PatoLab Logo"
-                                    className="size-14"
-                                />
-                            </div>
-                        </Link>
+                        <div className="mb-2 flex h-20 w-20 items-center justify-center">
+                            <img
+                                src="/images/patolab-isotipo.png"
+                                alt="PatoLab Logo"
+                                className="size-18"
+                            />
+                        </div>
+                        <h1 className="text-center text-3xl font-bold tracking-tight text-foreground">
+                            Portal Administrativo
+                        </h1>
+                        <p className="flex items-center gap-1.5 text-center text-sm font-medium text-muted-foreground">
+                            Acceso exclusivo para patólogos y personal
+                            administrativo
+                        </p>
                     </div>
 
                     <Card className="border-border/40 bg-background/60 shadow-xl backdrop-blur-xl">

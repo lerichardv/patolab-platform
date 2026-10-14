@@ -24,652 +24,694 @@ import multer from 'multer';
 import * as Y from 'yjs';
 
 const TextStyle = Mark.create({
-	name: 'textStyle',
-	priority: 101,
-	addAttributes() {
-		return {
-			fontSize: {
-				default: null,
-				parseHTML: element =>
-					element.style.fontSize?.replace(/['"]/g, '') || null,
-				renderHTML: attributes => {
-					if (!attributes.fontSize) {
-						return {};
-					}
+    name: 'textStyle',
+    priority: 101,
+    addAttributes() {
+        return {
+            fontSize: {
+                default: null,
+                parseHTML: (element) =>
+                    element.style.fontSize?.replace(/['"]/g, '') || null,
+                renderHTML: (attributes) => {
+                    if (!attributes.fontSize) {
+                        return {};
+                    }
 
-					return { style: `font-size: ${attributes.fontSize}` };
-				},
-			},
-		};
-	},
-	parseHTML() {
-		return [
-			{
-				tag: 'span',
-				getAttrs: element =>
-					element.style.fontSize ? {} : false,
-			},
-		];
-	},
-	renderHTML({ HTMLAttributes }) {
-		return [
-			'span',
-			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
-			0,
-		];
-	},
+                    return { style: `font-size: ${attributes.fontSize}` };
+                },
+            },
+        };
+    },
+    parseHTML() {
+        return [
+            {
+                tag: 'span',
+                getAttrs: (element) => (element.style.fontSize ? {} : false),
+            },
+        ];
+    },
+    renderHTML({ HTMLAttributes }) {
+        return [
+            'span',
+            mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+            0,
+        ];
+    },
 });
 
 const FontSize = Extension.create({
-	name: 'fontSize',
-	addOptions() {
-		return {
-			types: ['textStyle'],
-		};
-	},
-	addGlobalAttributes() {
-		return [
-			{
-				types: this.options.types,
-				attributes: {
-					fontSize: {
-						default: null,
-						parseHTML: element =>
-							element.style.fontSize?.replace(/['"]/g, '') || null,
-						renderHTML: attributes => {
-							if (!attributes.fontSize) {
-								return {};
-							}
+    name: 'fontSize',
+    addOptions() {
+        return {
+            types: ['textStyle'],
+        };
+    },
+    addGlobalAttributes() {
+        return [
+            {
+                types: this.options.types,
+                attributes: {
+                    fontSize: {
+                        default: null,
+                        parseHTML: (element) =>
+                            element.style.fontSize?.replace(/['"]/g, '') ||
+                            null,
+                        renderHTML: (attributes) => {
+                            if (!attributes.fontSize) {
+                                return {};
+                            }
 
-							return { style: `font-size: ${attributes.fontSize}` };
-						},
-					},
-				},
-			},
-		];
-	},
+                            return {
+                                style: `font-size: ${attributes.fontSize}`,
+                            };
+                        },
+                    },
+                },
+            },
+        ];
+    },
 });
 
 const LineHeight = Extension.create({
-	name: 'lineHeight',
-	addOptions() {
-		return {
-			types: ['paragraph', 'heading'],
-		};
-	},
-	addGlobalAttributes() {
-		return [
-			{
-				types: this.options.types,
-				attributes: {
-					lineHeight: {
-						default: null,
-						parseHTML: element =>
-							element.style.lineHeight ||
-							element.getAttribute('data-line-height') ||
-							null,
-						renderHTML: attributes => {
-							if (!attributes.lineHeight) {
-								return {};
-							}
+    name: 'lineHeight',
+    addOptions() {
+        return {
+            types: ['paragraph', 'heading'],
+        };
+    },
+    addGlobalAttributes() {
+        return [
+            {
+                types: this.options.types,
+                attributes: {
+                    lineHeight: {
+                        default: null,
+                        parseHTML: (element) =>
+                            element.style.lineHeight ||
+                            element.getAttribute('data-line-height') ||
+                            null,
+                        renderHTML: (attributes) => {
+                            if (!attributes.lineHeight) {
+                                return {};
+                            }
 
-							return {
-								style: `line-height: ${attributes.lineHeight}`,
-								'data-line-height': attributes.lineHeight,
-							};
-						},
-					},
-				},
-			},
-		];
-	},
+                            return {
+                                style: `line-height: ${attributes.lineHeight}`,
+                                'data-line-height': attributes.lineHeight,
+                            };
+                        },
+                    },
+                },
+            },
+        ];
+    },
 });
 
 const CustomImage = Image.extend({
-	addAttributes() {
-		return {
-			...this.parent?.(),
-			order: {
-				default: null,
-				parseHTML: element => {
-					const order = element.getAttribute('data-order');
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+            order: {
+                default: null,
+                parseHTML: (element) => {
+                    const order = element.getAttribute('data-order');
 
-					return order ? parseInt(order, 10) : null;
-				},
-				renderHTML: attributes => {
-					if (attributes.order === null || attributes.order === undefined) {
-						return {};
-					}
+                    return order ? parseInt(order, 10) : null;
+                },
+                renderHTML: (attributes) => {
+                    if (
+                        attributes.order === null ||
+                        attributes.order === undefined
+                    ) {
+                        return {};
+                    }
 
-					return {
-						'data-order': attributes.order,
-					};
-				},
-			},
-			caption: {
-				default: '',
-				parseHTML: element =>
-					element.getAttribute('data-caption') ||
-					element.getAttribute('alt') ||
-					'',
-				renderHTML: attributes => {
-					if (!attributes.caption) {
-						return {};
-					}
+                    return {
+                        'data-order': attributes.order,
+                    };
+                },
+            },
+            caption: {
+                default: '',
+                parseHTML: (element) =>
+                    element.getAttribute('data-caption') ||
+                    element.getAttribute('alt') ||
+                    '',
+                renderHTML: (attributes) => {
+                    if (!attributes.caption) {
+                        return {};
+                    }
 
-					return {
-						'data-caption': attributes.caption,
-						alt: attributes.caption,
-					};
-				},
-			},
-			alignment: {
-				default: 'center',
-				parseHTML: element => {
-					const align = element.getAttribute('data-align');
+                    return {
+                        'data-caption': attributes.caption,
+                        alt: attributes.caption,
+                    };
+                },
+            },
+            alignment: {
+                default: 'center',
+                parseHTML: (element) => {
+                    const align = element.getAttribute('data-align');
 
-					if (align) {
-						return align;
-					}
+                    if (align) {
+                        return align;
+                    }
 
-					const classes = element.getAttribute('class') || '';
+                    const classes = element.getAttribute('class') || '';
 
-					if (classes.includes('align-left')) {
-						return 'left';
-					}
+                    if (classes.includes('align-left')) {
+                        return 'left';
+                    }
 
-					if (classes.includes('align-center')) {
-						return 'center';
-					}
+                    if (classes.includes('align-center')) {
+                        return 'center';
+                    }
 
-					if (classes.includes('align-right')) {
-						return 'right';
-					}
+                    if (classes.includes('align-right')) {
+                        return 'right';
+                    }
 
-					if (classes.includes('align-justify')) {
-						return 'justify';
-					}
+                    if (classes.includes('align-justify')) {
+                        return 'justify';
+                    }
 
-					const style = element.getAttribute('style') || '';
+                    const style = element.getAttribute('style') || '';
 
-					if (style.includes('margin-left: 0') || style.includes('margin-right: auto')) {
-						return 'left';
-					}
+                    if (
+                        style.includes('margin-left: 0') ||
+                        style.includes('margin-right: auto')
+                    ) {
+                        return 'left';
+                    }
 
-					if (style.includes('margin-left: auto') && style.includes('margin-right: auto')) {
-						return 'center';
-					}
+                    if (
+                        style.includes('margin-left: auto') &&
+                        style.includes('margin-right: auto')
+                    ) {
+                        return 'center';
+                    }
 
-					if (style.includes('margin-left: auto') && style.includes('margin-right: 0')) {
-						return 'right';
-					}
+                    if (
+                        style.includes('margin-left: auto') &&
+                        style.includes('margin-right: 0')
+                    ) {
+                        return 'right';
+                    }
 
-					return 'center';
-				},
-				renderHTML: attributes => {
-					const isLeft = attributes.alignment === 'left';
-					const isRight = attributes.alignment === 'right';
-					const marginLeft = isLeft ? '0' : 'auto';
-					const marginRight = isRight ? '0' : 'auto';
+                    return 'center';
+                },
+                renderHTML: (attributes) => {
+                    const isLeft = attributes.alignment === 'left';
+                    const isRight = attributes.alignment === 'right';
+                    const marginLeft = isLeft ? '0' : 'auto';
+                    const marginRight = isRight ? '0' : 'auto';
 
-					return {
-						'data-align': attributes.alignment,
-						class: `align-${attributes.alignment}`,
-						style: `display: block; margin-left: ${marginLeft}; margin-right: ${marginRight};`
-					};
-				},
-			},
-			width: {
-				default: null,
-				parseHTML: element => {
-					const width = element.getAttribute('width') || element.style.width;
+                    return {
+                        'data-align': attributes.alignment,
+                        class: `align-${attributes.alignment}`,
+                        style: `display: block; margin-left: ${marginLeft}; margin-right: ${marginRight};`,
+                    };
+                },
+            },
+            width: {
+                default: null,
+                parseHTML: (element) => {
+                    const width =
+                        element.getAttribute('width') || element.style.width;
 
-					return width ? parseInt(width, 10) : null;
-				},
-			},
-			height: {
-				default: null,
-				parseHTML: element => {
-					const height = element.getAttribute('height') || element.style.height;
+                    return width ? parseInt(width, 10) : null;
+                },
+            },
+            height: {
+                default: null,
+                parseHTML: (element) => {
+                    const height =
+                        element.getAttribute('height') || element.style.height;
 
-					return height ? parseInt(height, 10) : null;
-				},
-			},
-		};
-	},
+                    return height ? parseInt(height, 10) : null;
+                },
+            },
+        };
+    },
 
-	renderHTML({ HTMLAttributes }) {
-		const isLeft = HTMLAttributes.alignment === 'left';
-		const isRight = HTMLAttributes.alignment === 'right';
-		const marginLeft = isLeft ? '0' : 'auto';
-		const marginRight = isRight ? '0' : 'auto';
+    renderHTML({ HTMLAttributes }) {
+        const isLeft = HTMLAttributes.alignment === 'left';
+        const isRight = HTMLAttributes.alignment === 'right';
+        const marginLeft = isLeft ? '0' : 'auto';
+        const marginRight = isRight ? '0' : 'auto';
 
-		const styles = [`display: block`, `margin-left: ${marginLeft}`, `margin-right: ${marginRight}`];
+        const styles = [
+            `display: block`,
+            `margin-left: ${marginLeft}`,
+            `margin-right: ${marginRight}`,
+        ];
 
-		if (HTMLAttributes.width) {
-			styles.push(`width: ${HTMLAttributes.width}px`);
-		}
+        if (HTMLAttributes.width) {
+            styles.push(`width: ${HTMLAttributes.width}px`);
+        }
 
-		if (HTMLAttributes.height) {
-			styles.push(`height: ${HTMLAttributes.height}px`);
-		}
+        if (HTMLAttributes.height) {
+            styles.push(`height: ${HTMLAttributes.height}px`);
+        }
 
-		const extra = {
-			'data-align': HTMLAttributes.alignment || 'center',
-			class: `align-${HTMLAttributes.alignment || 'center'}`,
-			style: styles.join('; ') + ';'
-		};
+        const extra = {
+            'data-align': HTMLAttributes.alignment || 'center',
+            class: `align-${HTMLAttributes.alignment || 'center'}`,
+            style: styles.join('; ') + ';',
+        };
 
-		if (HTMLAttributes.order !== null && HTMLAttributes.order !== undefined) {
-			extra['data-order'] = HTMLAttributes.order;
-		}
+        if (
+            HTMLAttributes.order !== null &&
+            HTMLAttributes.order !== undefined
+        ) {
+            extra['data-order'] = HTMLAttributes.order;
+        }
 
-		return [
-			'img',
-			mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, extra)
-		];
-	},
+        return [
+            'img',
+            mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, extra),
+        ];
+    },
 });
 
 const ImageGrid = Node.create({
-	name: 'imageGrid',
-	group: 'block',
-	content: 'image*',
-	defining: true,
+    name: 'imageGrid',
+    group: 'block',
+    content: 'image*',
+    defining: true,
 
-	addAttributes() {
-		return {
-			columns: {
-				default: 2,
-				parseHTML: element => {
-					const cols = element.getAttribute('data-columns');
+    addAttributes() {
+        return {
+            columns: {
+                default: 2,
+                parseHTML: (element) => {
+                    const cols = element.getAttribute('data-columns');
 
-					return cols ? parseInt(cols, 10) : 2;
-				},
-				renderHTML: attributes => ({
-					'data-columns': attributes.columns,
-				}),
-			},
-			alignment: {
-				default: 'center',
-				parseHTML: element => {
-					return element.getAttribute('data-align') || 'center';
-				},
-				renderHTML: attributes => ({
-					'data-align': attributes.alignment || 'center',
-				}),
-			},
-			width: {
-				default: null,
-				parseHTML: element => {
-					const w = element.getAttribute('width') || element.style.width;
+                    return cols ? parseInt(cols, 10) : 2;
+                },
+                renderHTML: (attributes) => ({
+                    'data-columns': attributes.columns,
+                }),
+            },
+            alignment: {
+                default: 'center',
+                parseHTML: (element) => {
+                    return element.getAttribute('data-align') || 'center';
+                },
+                renderHTML: (attributes) => ({
+                    'data-align': attributes.alignment || 'center',
+                }),
+            },
+            width: {
+                default: null,
+                parseHTML: (element) => {
+                    const w =
+                        element.getAttribute('width') || element.style.width;
 
-					return w ? parseInt(w, 10) : null;
-				},
-				renderHTML: attributes => {
-					if (!attributes.width) {
-return {};
-}
+                    return w ? parseInt(w, 10) : null;
+                },
+                renderHTML: (attributes) => {
+                    if (!attributes.width) {
+                        return {};
+                    }
 
-					return {
-						width: attributes.width,
-					};
-				},
-			},
-		};
-	},
+                    return {
+                        width: attributes.width,
+                    };
+                },
+            },
+        };
+    },
 
-	parseHTML() {
-		return [{ tag: 'div[data-type="image-grid"]' }];
-	},
+    parseHTML() {
+        return [{ tag: 'div[data-type="image-grid"]' }];
+    },
 
-	renderHTML({ node, HTMLAttributes }) {
-		const align = node?.attrs?.alignment || HTMLAttributes?.alignment || 'center';
-		const isLeft = align === 'left';
-		const isRight = align === 'right';
-		const marginLeft = isLeft ? '0' : 'auto';
-		const marginRight = isRight ? '0' : 'auto';
+    renderHTML({ node, HTMLAttributes }) {
+        const align =
+            node?.attrs?.alignment || HTMLAttributes?.alignment || 'center';
+        const isLeft = align === 'left';
+        const isRight = align === 'right';
+        const marginLeft = isLeft ? '0' : 'auto';
+        const marginRight = isRight ? '0' : 'auto';
 
-		const styles = [
-			`display: flex`,
-			`flex-wrap: nowrap`,
-			`margin-left: ${marginLeft}`,
-			`margin-right: ${marginRight}`,
-		];
-		const width = node?.attrs?.width || HTMLAttributes?.width;
+        const styles = [
+            `display: flex`,
+            `flex-wrap: nowrap`,
+            `margin-left: ${marginLeft}`,
+            `margin-right: ${marginRight}`,
+        ];
+        const width = node?.attrs?.width || HTMLAttributes?.width;
 
-		if (width) {
-			styles.push(`width: ${width}px`);
-		}
+        if (width) {
+            styles.push(`width: ${width}px`);
+        }
 
-		return [
-			'div',
-			mergeAttributes(HTMLAttributes, {
-				'data-type': 'image-grid',
-				'data-align': align,
-				class: `align-${align}`,
-				style: styles.join('; ') + ';',
-			}),
-			0,
-		];
-	},
+        return [
+            'div',
+            mergeAttributes(HTMLAttributes, {
+                'data-type': 'image-grid',
+                'data-align': align,
+                class: `align-${align}`,
+                style: styles.join('; ') + ';',
+            }),
+            0,
+        ];
+    },
 });
 
 const CustomBulletList = BulletList.extend({
-	addAttributes() {
-		return {
-			...this.parent?.(),
-			listStyleType: {
-				default: 'disc',
-				parseHTML: element =>
-					element.getAttribute('data-list-style-type') ||
-					element.style.listStyleType ||
-					'disc',
-				renderHTML: attributes => {
-					return {
-						style: `list-style-type: ${attributes.listStyleType}`,
-						'data-list-style-type': attributes.listStyleType,
-					};
-				},
-			},
-		};
-	},
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+            listStyleType: {
+                default: 'disc',
+                parseHTML: (element) =>
+                    element.getAttribute('data-list-style-type') ||
+                    element.style.listStyleType ||
+                    'disc',
+                renderHTML: (attributes) => {
+                    return {
+                        style: `list-style-type: ${attributes.listStyleType}`,
+                        'data-list-style-type': attributes.listStyleType,
+                    };
+                },
+            },
+        };
+    },
 });
 
 const extensions = [
-	StarterKit.configure({
-		undoRedo: false,
-		bulletList: false,
-		trailingNode: false,
-	}),
-	TextStyle,
-	FontSize,
-	LineHeight,
-	CustomBulletList,
-	CustomImage.configure({
-		allowBase64: false,
-		resize: {
-			enabled: true,
-			alwaysPreserveAspectRatio: true,
-		},
-	}),
-	TableKit.configure({
-		table: { resizable: true },
-	}),
-	TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
-	Highlight.configure({ multicolor: true }),
-	Underline,
-	ImageGrid,
+    StarterKit.configure({
+        undoRedo: false,
+        bulletList: false,
+        trailingNode: false,
+    }),
+    TextStyle,
+    FontSize,
+    LineHeight,
+    CustomBulletList,
+    CustomImage.configure({
+        allowBase64: false,
+        resize: {
+            enabled: true,
+            alwaysPreserveAspectRatio: true,
+        },
+    }),
+    TableKit.configure({
+        table: { resizable: true },
+    }),
+    TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
+    Highlight.configure({ multicolor: true }),
+    Underline,
+    ImageGrid,
 ];
 
-const webhookUrl = process.env.WEBHOOK_URL || 'http://127.0.0.1:8001/api/collaboration';
+const webhookUrl =
+    process.env.WEBHOOK_URL || 'http://127.0.0.1:8001/api/collaboration';
 
 /**
  * Fix 3: Retry a POST to the Laravel webhook up to maxRetries times with linear backoff.
  * A new AbortSignal.timeout is created per attempt so it is never reused.
  */
 const fetchWithRetry = async (url, bodyJson, maxRetries = 3) => {
-	let lastError;
+    let lastError;
 
-	for (let attempt = 1; attempt <= maxRetries; attempt++) {
-		try {
-			const res = await fetch(url, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				signal: AbortSignal.timeout(8000),
-				body: bodyJson,
-			});
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: AbortSignal.timeout(8000),
+                body: bodyJson,
+            });
 
-			if (res.ok) {
-				return res;
-			}
+            if (res.ok) {
+                return res;
+            }
 
-			throw new Error(`HTTP ${res.status}`);
-		} catch (err) {
-			lastError = err;
+            throw new Error(`HTTP ${res.status}`);
+        } catch (err) {
+            lastError = err;
 
-			if (attempt < maxRetries) {
-				const delay = attempt * 1000;
-				console.warn(`[onStoreDocument] Attempt ${attempt} failed, retrying in ${delay}ms...`, err.message);
-				await new Promise(r => setTimeout(r, delay));
-			}
-		}
-	}
+            if (attempt < maxRetries) {
+                const delay = attempt * 1000;
+                console.warn(
+                    `[onStoreDocument] Attempt ${attempt} failed, retrying in ${delay}ms...`,
+                    err.message,
+                );
+                await new Promise((r) => setTimeout(r, delay));
+            }
+        }
+    }
 
-	throw lastError;
+    throw lastError;
 };
 
 const updateSaveStatus = (instance, reportId, status) => {
-	const docName = `report-${reportId}-save-status`;
-	const doc = instance.documents.get(docName);
+    const docName = `report-${reportId}-save-status`;
+    const doc = instance.documents.get(docName);
 
-	if (doc) {
-		const ytext = doc.getText('content');
-		doc.transact(() => {
-			ytext.delete(0, ytext.length);
-			ytext.insert(0, status);
-		});
-	}
+    if (doc) {
+        const ytext = doc.getText('content');
+        doc.transact(() => {
+            ytext.delete(0, ytext.length);
+            ytext.insert(0, status);
+        });
+    }
 };
 
 const isPlainTextField = (documentName) => {
-	return documentName.endsWith('-report_date') ||
-		documentName.endsWith('-sample_collection_date') ||
-		documentName.endsWith('-finalization_date') ||
-		documentName.endsWith('-status') ||
-		documentName.endsWith('-save-status') ||
-		documentName.endsWith('-sections_order') ||
-		documentName.endsWith('-open_text_label') ||
-		documentName.endsWith('-headings_toggles') ||
-		documentName.endsWith('-insumos');
+    return (
+        documentName.endsWith('-report_date') ||
+        documentName.endsWith('-sample_collection_date') ||
+        documentName.endsWith('-finalization_date') ||
+        documentName.endsWith('-status') ||
+        documentName.endsWith('-save-status') ||
+        documentName.endsWith('-sections_order') ||
+        documentName.endsWith('-open_text_label') ||
+        documentName.endsWith('-headings_toggles') ||
+        documentName.endsWith('-insumos')
+    );
 };
 
 // Custom Webhook extension
 const customWebhookExtension = {
-	async onConnect(data) {
-		try {
-			console.log(`[webhook:onConnect] Connecting peer for room: ${data.documentName}`);
-			const response = await fetch(webhookUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				signal: AbortSignal.timeout(5000),
-				body: JSON.stringify({
-					event: 'onConnect',
-					payload: {
-						documentName: data.documentName,
-						requestParameters: Object.fromEntries(data.requestParameters.entries()),
-					}
-				})
-			});
+    async onConnect(data) {
+        try {
+            console.log(
+                `[webhook:onConnect] Connecting peer for room: ${data.documentName}`,
+            );
+            const res = await fetchWithRetry(
+                webhookUrl,
+                JSON.stringify({
+                    event: 'onConnect',
+                    payload: {
+                        documentName: data.documentName,
+                        requestParameters: Object.fromEntries(
+                            data.requestParameters.entries(),
+                        ),
+                    },
+                }),
+                3,
+            );
 
-			if (!response.ok) {
-				console.error(`[webhook:onConnect] Laravel returned status ${response.status}`);
+            const resData = await res.json();
 
-				return;
-			}
+            return {
+                documentState: resData.document || null,
+            };
+        } catch (error) {
+            console.error(`[webhook:onConnect] Error:`, error.message);
 
-			const resData = await response.json();
+            return {
+                documentState: null,
+            };
+        }
+    },
 
-			return {
-				documentState: resData.document || null,
-			};
-		} catch (error) {
-			console.error(`[webhook:onConnect] Error:`, error);
-		}
-	},
+    async onLoadDocument(data) {
+        console.log(
+            `[webhook:onLoadDocument] Loading document: ${data.documentName}`,
+        );
 
-	async onLoadDocument(data) {
-		try {
-			console.log(`[webhook:onLoadDocument] Loading document: ${data.documentName}`);
+        // 1. First, check if we received a saved binary state during onConnect
+        const savedStateBase64 = data.context?.documentState;
+        let isLoaded = false;
 
-			// 1. First, check if we received a saved binary state during onConnect
-			const savedStateBase64 = data.context?.documentState;
-			let isLoaded = false;
+        if (savedStateBase64) {
+            console.log(
+                `[webhook:onLoadDocument] Restoring document from saved binary state`,
+            );
+            const binaryState = Buffer.from(savedStateBase64, 'base64');
+            Y.applyUpdate(data.document, binaryState);
 
-			if (savedStateBase64) {
-				console.log(`[webhook:onLoadDocument] Restoring document from saved binary state`);
-				const binaryState = Buffer.from(savedStateBase64, 'base64');
-				Y.applyUpdate(data.document, binaryState);
+            if (isPlainTextField(data.documentName)) {
+                const text = data.document.getText('content').toString();
 
-				if (isPlainTextField(data.documentName)) {
-					const text = data.document.getText('content').toString();
+                if (text && text.trim() !== '') {
+                    isLoaded = true;
+                }
+            } else {
+                try {
+                    const docJson = TiptapTransformer.fromYdoc(
+                        data.document,
+                        'content',
+                    );
+                    const htmlValue = generateHTML(docJson, extensions);
+                    const cleanText = htmlValue
+                        .replace(/<[^>]*>/g, '')
+                        .replace(/&nbsp;/gi, ' ')
+                        .trim();
+                    const hasMediaOrTable = /<img|<table/i.test(htmlValue);
 
-					if (text && text.trim() !== '') {
-						isLoaded = true;
-					}
-				} else {
-					try {
-						const docJson = TiptapTransformer.fromYdoc(data.document, 'content');
-						const htmlValue = generateHTML(docJson, extensions);
-						const cleanText = htmlValue.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
-						const hasMediaOrTable = /<img|<table/i.test(htmlValue);
+                    if (cleanText !== '' || hasMediaOrTable) {
+                        isLoaded = true;
+                    } else {
+                        console.log(
+                            `[webhook:onLoadDocument] Restored Yjs binary state is empty for ${data.documentName}`,
+                        );
+                    }
+                } catch (err) {
+                    isLoaded = true;
+                }
+            }
+        }
 
-						if (cleanText !== '' || hasMediaOrTable) {
-							isLoaded = true;
-						} else {
-							console.log(`[webhook:onLoadDocument] Restored Yjs binary state is empty for ${data.documentName}`);
-						}
-					} catch (err) {
-						isLoaded = true;
-					}
-				}
-			}
+        if (!isLoaded) {
+            const isPlainText = isPlainTextField(data.documentName);
 
-			if (!isLoaded) {
-				const isPlainText = isPlainTextField(data.documentName);
+            // 2. Fetch initial HTML/content from Laravel using fetchWithRetry BEFORE modifying document
+            const res = await fetchWithRetry(
+                webhookUrl,
+                JSON.stringify({
+                    event: 'create',
+                    payload: {
+                        documentName: data.documentName,
+                        requestParameters: Object.fromEntries(
+                            data.requestParameters.entries(),
+                        ),
+                    },
+                }),
+                3,
+            );
 
-				// Clear any previous content to ensure clean slate
-				data.document.transact(() => {
-					if (isPlainText) {
-						const ytext = data.document.getText('content');
+            const resData = await res.json();
+            const htmlContent = resData.content;
 
-						if (ytext.length > 0) {
-							ytext.delete(0, ytext.length);
-						}
-					} else {
-						const yxml = data.document.getXmlFragment('content');
+            if (htmlContent) {
+                console.log(
+                    `[webhook:onLoadDocument] Seeding document with initial content`,
+                );
 
-						if (yxml.length > 0) {
-							yxml.delete(0, yxml.length);
-						}
-					}
-				});
+                if (isPlainText) {
+                    const ytext = data.document.getText('content');
+                    data.document.transact(() => {
+                        if (ytext.length > 0) {
+                            ytext.delete(0, ytext.length);
+                        }
 
-				// 2. If no binary state exists, fetch the initial HTML/content using the "create" event
-				const response = await fetch(webhookUrl, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					signal: AbortSignal.timeout(5000),
-					body: JSON.stringify({
-						event: 'create',
-						payload: {
-							documentName: data.documentName,
-							requestParameters: Object.fromEntries(data.requestParameters.entries()),
-						}
-					})
-				});
+                        ytext.insert(0, htmlContent);
+                    });
+                } else {
+                    // Parse HTML into ProseMirror JSON using Tiptap
+                    const docJson = generateJSON(htmlContent, extensions);
+                    // Convert ProseMirror JSON to Yjs Ydoc update
+                    const initialYdoc = TiptapTransformer.toYdoc(
+                        docJson,
+                        'content',
+                        extensions,
+                    );
+                    // Clear previous empty nodes atomically within transact and apply new update
+                    data.document.transact(() => {
+                        const yxml = data.document.getXmlFragment('content');
+                        if (yxml.length > 0) {
+                            yxml.delete(0, yxml.length);
+                        }
+                        const update = Y.encodeStateAsUpdate(initialYdoc);
+                        Y.applyUpdate(data.document, update);
+                    });
+                }
+            } else {
+                console.log(`[webhook:onLoadDocument] Document starts empty`);
+            }
+        }
+    },
 
-				if (!response.ok) {
-					console.error(`[webhook:onLoadDocument] Laravel returned status ${response.status}`);
+    async onStoreDocument(data) {
+        if (
+            data.documentName.endsWith('-save-status') ||
+            data.documentName.endsWith('-insumos')
+        ) {
+            return;
+        }
 
-					return;
-				}
+        const match = data.documentName.match(/^report-(\d+)-/);
+        const reportId = match ? match[1] : null;
 
-				const resData = await response.json();
-				const htmlContent = resData.content;
+        if (reportId) {
+            updateSaveStatus(data.instance, reportId, 'saving');
+        }
 
-				if (htmlContent) {
-					console.log(`[webhook:onLoadDocument] Seeding document with initial content`);
+        try {
+            const binaryState = Y.encodeStateAsUpdate(data.document);
+            const base64State = Buffer.from(binaryState).toString('base64');
 
-					if (isPlainText) {
-						// Seed with plain text
-						const ytext = data.document.getText('content');
-						data.document.transact(() => {
-							if (ytext.length > 0) {
-								ytext.delete(0, ytext.length);
-							}
+            let rawText = '';
+            let htmlValue = '';
 
-							ytext.insert(0, htmlContent);
-						});
-					} else {
-						// Parse HTML into ProseMirror JSON using Tiptap
-						const docJson = generateJSON(htmlContent, extensions);
-						// Convert ProseMirror JSON to Yjs Ydoc update
-						const initialYdoc = TiptapTransformer.toYdoc(docJson, 'content', extensions);
-						// Merge it into the document via Y.applyUpdate
-						const update = Y.encodeStateAsUpdate(initialYdoc);
-						Y.applyUpdate(data.document, update);
-					}
-				} else {
-					console.log(`[webhook:onLoadDocument] Document starts empty`);
-				}
-			}
-		} catch (error) {
-			console.error(`[webhook:onLoadDocument] Error:`, error);
-		}
-	},
+            if (isPlainTextField(data.documentName)) {
+                rawText = data.document.getText('content').toString();
+                htmlValue = rawText;
+            } else {
+                const docJson = TiptapTransformer.fromYdoc(
+                    data.document,
+                    'content',
+                );
+                htmlValue = generateHTML(docJson, extensions);
+            }
 
-	async onStoreDocument(data) {
-		if (data.documentName.endsWith('-save-status') || data.documentName.endsWith('-insumos')) {
-			return;
-		}
+            await fetchWithRetry(
+                webhookUrl,
+                JSON.stringify({
+                    event: 'onChange',
+                    payload: {
+                        documentName: data.documentName,
+                        document: base64State,
+                        text: rawText,
+                        html: htmlValue,
+                    },
+                }),
+            );
 
-		const match = data.documentName.match(/^report-(\d+)-/);
-		const reportId = match ? match[1] : null;
+            if (reportId) {
+                updateSaveStatus(data.instance, reportId, 'saved');
+                setTimeout(
+                    () => updateSaveStatus(data.instance, reportId, 'idle'),
+                    1300,
+                );
+            }
+        } catch (error) {
+            console.error(
+                `[webhook:onStoreDocument] All retries exhausted:`,
+                error.message,
+            );
 
-		if (reportId) {
-			updateSaveStatus(data.instance, reportId, 'saving');
-		}
-
-		try {
-			const binaryState = Y.encodeStateAsUpdate(data.document);
-			const base64State = Buffer.from(binaryState).toString('base64');
-
-			let rawText = '';
-			let htmlValue = '';
-
-			if (isPlainTextField(data.documentName)) {
-				rawText = data.document.getText('content').toString();
-				htmlValue = rawText;
-			} else {
-				const docJson = TiptapTransformer.fromYdoc(data.document, 'content');
-				htmlValue = generateHTML(docJson, extensions);
-			}
-
-			await fetchWithRetry(webhookUrl, JSON.stringify({
-				event: 'onChange',
-				payload: {
-					documentName: data.documentName,
-					document: base64State,
-					text: rawText,
-					html: htmlValue,
-				},
-			}));
-
-			if (reportId) {
-				updateSaveStatus(data.instance, reportId, 'saved');
-				setTimeout(() => updateSaveStatus(data.instance, reportId, 'idle'), 1300);
-			}
-		} catch (error) {
-			console.error(`[webhook:onStoreDocument] All retries exhausted:`, error.message);
-
-			if (reportId) {
-				// Propagate failure to UI so user knows the save did not succeed
-				updateSaveStatus(data.instance, reportId, 'error');
-			}
-		}
-	}
+            if (reportId) {
+                // Propagate failure to UI so user knows the save did not succeed
+                updateSaveStatus(data.instance, reportId, 'error');
+            }
+        }
+    },
 };
 
 // 1. Initialize Hocuspocus WITH your Custom Webhook Extension
 const hocuspocus = new Hocuspocus({
-	debounce: 1000,
-	maxDebounce: 10000,
-	// Fix 4: Wait for in-flight onStoreDocument calls to finish before destroying the session
-	unloadImmediately: false,
-	extensions: [
-		customWebhookExtension,
-	],
+    debounce: 1000,
+    maxDebounce: 10000,
+    // Fix 4: Wait for in-flight onStoreDocument calls to finish before destroying the session
+    unloadImmediately: false,
+    extensions: [customWebhookExtension],
 });
 
 // 2. Setup Express for standard HTTP routes if needed
@@ -681,154 +723,199 @@ app.use(cors());
 const uploadDir = path.join(os.tmpdir(), 'whisper-chunks');
 
 if (!existsSync(uploadDir)) {
-	mkdirSync(uploadDir, { recursive: true });
+    mkdirSync(uploadDir, { recursive: true });
 }
 
 const upload = multer({ dest: uploadDir });
 
 app.post('/api/dictate-chunk', upload.single('audio'), async (req, res) => {
-	if (!req.file) {
-		return res.status(400).json({ error: 'No se recibió ningún archivo de audio.' });
-	}
+    if (!req.file) {
+        return res
+            .status(400)
+            .json({ error: 'No se recibió ningún archivo de audio.' });
+    }
 
-	const inputPath = req.file.path;
+    const inputPath = req.file.path;
 
-	try {
-		console.log('[OpenAI Dictate] Sending audio file to OpenAI Whisper API:', inputPath);
+    try {
+        console.log(
+            '[OpenAI Dictate] Sending audio file to OpenAI Whisper API:',
+            inputPath,
+        );
 
-		const fileBuffer = await fs.readFile(inputPath);
-		const fileBlob = new Blob([fileBuffer]);
+        const fileBuffer = await fs.readFile(inputPath);
+        const fileBlob = new Blob([fileBuffer]);
 
-		const formData = new FormData();
-		formData.append("model", "whisper-1");
-		formData.append("language", "es");
-		formData.append("prompt", "biopsia, macroscopía, microscopía, diagnóstico");
-		formData.append("file", fileBlob, req.file.originalname || "audio.webm");
+        const formData = new FormData();
+        formData.append('model', 'whisper-1');
+        formData.append('language', 'es');
+        formData.append(
+            'prompt',
+            'biopsia, macroscopía, microscopía, diagnóstico',
+        );
+        formData.append(
+            'file',
+            fileBlob,
+            req.file.originalname || 'audio.webm',
+        );
 
-		const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-			},
-			signal: AbortSignal.timeout(15000),
-			body: formData,
-		});
+        const response = await fetch(
+            'https://api.openai.com/v1/audio/transcriptions',
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                },
+                signal: AbortSignal.timeout(15000),
+                body: formData,
+            },
+        );
 
-		if (!response.ok) {
-			const errText = await response.text();
+        if (!response.ok) {
+            const errText = await response.text();
 
-			throw new Error(`STT error ${response.status}: ${errText}`);
-		}
+            throw new Error(`STT error ${response.status}: ${errText}`);
+        }
 
-		const result = await response.json();
-		const cleanText = (result.text || '').trim();
+        const result = await response.json();
+        const cleanText = (result.text || '').trim();
 
-		console.log('[OpenAI Dictate] Transcribed text:', cleanText);
+        console.log('[OpenAI Dictate] Transcribed text:', cleanText);
 
-		// Clean up files
-		fs.unlink(inputPath).catch(() => {});
+        // Clean up files
+        fs.unlink(inputPath).catch(() => {});
 
-		return res.json({ success: true, text: cleanText });
-	} catch (error) {
-		console.error('Error en OpenAI Dictado:', error);
-		// Clean up files
-		fs.unlink(inputPath).catch(() => {});
+        return res.json({ success: true, text: cleanText });
+    } catch (error) {
+        console.error('Error en OpenAI Dictado:', error);
+        // Clean up files
+        fs.unlink(inputPath).catch(() => {});
 
-		return res.status(500).json({
-			error: 'Error procesando la transcripción de audio.',
-			details: error.message
-		});
-	}
+        return res.status(500).json({
+            error: 'Error procesando la transcripción de audio.',
+            details: error.message,
+        });
+    }
 });
 
 app.post('/api/fix-grammar', express.json(), async (req, res) => {
-	const { text, reportId, docName } = req.body;
+    const { text, reportId, docName } = req.body;
 
-	if (!text || text.trim() === '') {
-		return res.status(400).json({ error: 'No se proporcionó texto para corregir.' });
-	}
+    if (!text || text.trim() === '') {
+        return res
+            .status(400)
+            .json({ error: 'No se proporcionó texto para corregir.' });
+    }
 
-	if (text.length > 3000) {
-		return res.status(400).json({ error: 'El texto no debe superar los 3000 caracteres.' });
-	}
+    if (text.length > 3000) {
+        return res
+            .status(400)
+            .json({ error: 'El texto no debe superar los 3000 caracteres.' });
+    }
 
-	try {
-		console.log('[OpenAI Grammar] Sending request to OpenAI API...');
+    try {
+        console.log('[OpenAI Grammar] Sending request to OpenAI API...');
 
-		const response = await fetch("https://api.openai.com/v1/chat/completions", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-			},
-			signal: AbortSignal.timeout(15000),
-			body: JSON.stringify({
-				model: "gpt-4o",
-				messages: [
-					{
-						role: "system",
-						content: "Eres un corrector gramatical experto en informes médicos y patológicos. Corrige la ortografía, puntuación y coherencia técnica en español. Mantén estrictamente el vocabulario médico original y la estructura de párrafos y saltos de línea del texto original. Devuelve ÚNICAMENTE el texto completamente corregido, manteniendo los mismos saltos de línea y párrafos. No agregues introducciones, no expliques los cambios, no uses viñetas ni bloques de código. Tu respuesta debe ser exclusivamente el texto corregido."
-					},
-					{ role: "user", content: text }
-				],
-				temperature: 0.1
-			})
-		});
+        const response = await fetch(
+            'https://api.openai.com/v1/chat/completions',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                },
+                signal: AbortSignal.timeout(15000),
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: [
+                        {
+                            role: 'system',
+                            content:
+                                'Eres un corrector gramatical experto en informes médicos y patológicos. Corrige la ortografía, puntuación y coherencia técnica en español. Mantén estrictamente el vocabulario médico original y la estructura de párrafos y saltos de línea del texto original. Devuelve ÚNICAMENTE el texto completamente corregido, manteniendo los mismos saltos de línea y párrafos. No agregues introducciones, no expliques los cambios, no uses viñetas ni bloques de código. Tu respuesta debe ser exclusivamente el texto corregido.',
+                        },
+                        { role: 'user', content: text },
+                    ],
+                    temperature: 0.1,
+                }),
+            },
+        );
 
-		if (!response.ok) {
-			const errText = await response.text();
+        if (!response.ok) {
+            const errText = await response.text();
 
-			throw new Error(`OpenAI grammar correction error ${response.status}: ${errText}`);
-		}
+            throw new Error(
+                `OpenAI grammar correction error ${response.status}: ${errText}`,
+            );
+        }
 
-		const resData = await response.json();
-		const correctedText = resData.choices[0].message.content.trim();
+        const resData = await response.json();
+        const correctedText = resData.choices[0].message.content.trim();
 
-		console.log('[OpenAI Grammar] Corrected text successfully.');
+        console.log('[OpenAI Grammar] Corrected text successfully.');
 
-		if (reportId && docName) {
-			const targetRoom = `report-${reportId}-${docName}`;
+        if (reportId && docName) {
+            const targetRoom = `report-${reportId}-${docName}`;
 
-			try {
-				const activeDoc = hocuspocus.documents.get(targetRoom);
+            try {
+                const activeDoc = hocuspocus.documents.get(targetRoom);
 
-				if (activeDoc && correctedText.length > 0) {
-					activeDoc.transact(() => {
-						const ytext = activeDoc.getText('content');
-						ytext.delete(0, ytext.length);
-						ytext.insert(0, correctedText);
-					});
+                if (activeDoc && correctedText.length > 0) {
+                    activeDoc.transact(() => {
+                        const ytext = activeDoc.getText('content');
+                        ytext.delete(0, ytext.length);
+                        ytext.insert(0, correctedText);
+                    });
 
-					return res.json({ success: true, text: correctedText, injected: true });
-				}
-			} catch (err) {
-				console.error(`[OpenAI Grammar] Error updating Yjs document:`, err);
-			}
-		}
+                    return res.json({
+                        success: true,
+                        text: correctedText,
+                        injected: true,
+                    });
+                }
+            } catch (err) {
+                console.error(
+                    `[OpenAI Grammar] Error updating Yjs document:`,
+                    err,
+                );
+            }
+        }
 
-		return res.json({ success: true, text: correctedText, injected: false });
-	} catch (error) {
-		console.error('Error en OpenAI Corrector:', error);
+        return res.json({
+            success: true,
+            text: correctedText,
+            injected: false,
+        });
+    } catch (error) {
+        console.error('Error en OpenAI Corrector:', error);
 
-		return res.status(500).json({ error: 'Error en el servidor de optimización de texto', details: error.message });
-	}
+        return res.status(500).json({
+            error: 'Error en el servidor de optimización de texto',
+            details: error.message,
+        });
+    }
 });
 
 app.post('/api/suggest-improvements', express.json(), async (req, res) => {
-	const { text, messages } = req.body;
+    const { text, messages } = req.body;
 
-	if (!text || text.trim() === '') {
-		return res.status(400).json({ error: 'No se proporcionó texto para mejorar.' });
-	}
+    if (!text || text.trim() === '') {
+        return res
+            .status(400)
+            .json({ error: 'No se proporcionó texto para mejorar.' });
+    }
 
-	if (text.length > 3000) {
-		return res.status(400).json({ error: 'El texto no debe superar los 3000 caracteres.' });
-	}
+    if (text.length > 3000) {
+        return res
+            .status(400)
+            .json({ error: 'El texto no debe superar los 3000 caracteres.' });
+    }
 
-	try {
-		console.log('[OpenAI Suggestions Chat] Sending request to OpenAI API...');
+    try {
+        console.log(
+            '[OpenAI Suggestions Chat] Sending request to OpenAI API...',
+        );
 
-		const systemInstruction = `Eres un patólogo y asesor de redacción científica de primer nivel en un laboratorio de patología médica.
+        const systemInstruction = `Eres un patólogo y asesor de redacción científica de primer nivel en un laboratorio de patología médica.
 Tu tarea es ayudar al usuario a refactorizar, corregir y pulir el texto seleccionado de un informe de patología en español a través de una conversación de chat interactiva.
 
 El texto original seleccionado por el usuario es:
@@ -842,80 +929,99 @@ Instrucciones:
 - Devuelve ÚNICAMENTE tu respuesta o sugerencia de redacción en español, manteniendo los mismos saltos de línea y párrafos siempre que sea posible.
 - No agregues introducciones, explicaciones, ni uses bloques de código ni formatos adicionales. Tu respuesta debe ser exclusivamente el texto del mensaje con la propuesta mejorada para que pueda ser copiado y aplicado directamente.`;
 
-		const apiMessages = [
-			{ role: "system", content: systemInstruction },
-			...(messages || [])
-		];
+        const apiMessages = [
+            { role: 'system', content: systemInstruction },
+            ...(messages || []),
+        ];
 
-		const response = await fetch("https://api.openai.com/v1/chat/completions", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-			},
-			signal: AbortSignal.timeout(15000),
-			body: JSON.stringify({
-				model: "gpt-4o",
-				messages: apiMessages,
-				temperature: 0.3
-			})
-		});
+        const response = await fetch(
+            'https://api.openai.com/v1/chat/completions',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                },
+                signal: AbortSignal.timeout(15000),
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: apiMessages,
+                    temperature: 0.3,
+                }),
+            },
+        );
 
-		if (!response.ok) {
-			const errText = await response.text();
+        if (!response.ok) {
+            const errText = await response.text();
 
-			throw new Error(`OpenAI suggestion chat error ${response.status}: ${errText}`);
-		}
+            throw new Error(
+                `OpenAI suggestion chat error ${response.status}: ${errText}`,
+            );
+        }
 
-		const resData = await response.json();
-		const replyText = resData.choices[0].message.content.trim();
+        const resData = await response.json();
+        const replyText = resData.choices[0].message.content.trim();
 
-		console.log('[OpenAI Suggestions Chat] Reply generated successfully.');
+        console.log('[OpenAI Suggestions Chat] Reply generated successfully.');
 
-		return res.json({ success: true, text: replyText });
-	} catch (error) {
-		console.error('Error en Sugerencias OpenAI Chat:', error);
+        return res.json({ success: true, text: replyText });
+    } catch (error) {
+        console.error('Error en Sugerencias OpenAI Chat:', error);
 
-		return res.status(500).json({ error: 'Error en el servidor de chat de IA', details: error.message });
-	}
+        return res.status(500).json({
+            error: 'Error en el servidor de chat de IA',
+            details: error.message,
+        });
+    }
 });
 
 app.post('/api/refresh-insumos', express.json(), (req, res) => {
-	const { reportId } = req.body;
+    const { reportId } = req.body;
 
-	if (!reportId) {
-		return res.status(400).json({ error: 'Falta el reportId.' });
-	}
+    if (!reportId) {
+        return res.status(400).json({ error: 'Falta el reportId.' });
+    }
 
-	const targetRoom = `report-${reportId}-insumos`;
-	console.log(`[insumos] Requesting refresh for room: ${targetRoom}`);
+    const targetRoom = `report-${reportId}-insumos`;
+    console.log(`[insumos] Requesting refresh for room: ${targetRoom}`);
 
-	try {
-		const activeDoc = hocuspocus.documents.get(targetRoom);
+    try {
+        const activeDoc = hocuspocus.documents.get(targetRoom);
 
-		if (activeDoc) {
-			activeDoc.transact(() => {
-				const ytext = activeDoc.getText('content');
-				ytext.delete(0, ytext.length);
-				ytext.insert(0, Date.now().toString());
-			});
-			console.log(`[insumos] Refreshed document ${targetRoom} successfully`);
+        if (activeDoc) {
+            activeDoc.transact(() => {
+                const ytext = activeDoc.getText('content');
+                ytext.delete(0, ytext.length);
+                ytext.insert(0, Date.now().toString());
+            });
+            console.log(
+                `[insumos] Refreshed document ${targetRoom} successfully`,
+            );
 
-			return res.json({ success: true, updated: true });
-		} else {
-			console.log(`[insumos] Room ${targetRoom} not currently active on server`);
+            return res.json({ success: true, updated: true });
+        } else {
+            console.log(
+                `[insumos] Room ${targetRoom} not currently active on server`,
+            );
 
-			return res.json({ success: true, updated: false, message: 'Room not active' });
-		}
-	} catch (err) {
-		console.error(`[insumos] Error updating insumos Yjs document:`, err);
+            return res.json({
+                success: true,
+                updated: false,
+                message: 'Room not active',
+            });
+        }
+    } catch (err) {
+        console.error(`[insumos] Error updating insumos Yjs document:`, err);
 
-		return res.status(500).json({ error: 'Error actualizando el documento Yjs de insumos', details: err.message });
-	}
+        return res.status(500).json({
+            error: 'Error actualizando el documento Yjs de insumos',
+            details: err.message,
+        });
+    }
 });
 
 app.get('/health', (req, res) => {
-	res.json({ status: 'ok', service: 'Hocuspocus Express Server' });
+    res.json({ status: 'ok', service: 'Hocuspocus Express Server' });
 });
 
 // 3. Create standard HTTP Server wrapping the Express App
@@ -923,57 +1029,66 @@ const server = createServer(app);
 
 // 4. Configure crossws to intercept and stream WebSocket traffic to Hocuspocus
 const ws = crossws({
-	hooks: {
-		open(peer) {
-			console.log(`[ws:open] Peer connected: ${peer.id}`);
+    hooks: {
+        open(peer) {
+            console.log(`[ws:open] Peer connected: ${peer.id}`);
 
-			try {
-				// Forward connection metadata to Hocuspocus
-				const clientConnection = hocuspocus.handleConnection(
-					peer.websocket,
-					peer.request,
-					// You can seed context objects here if needed
-					{}
-				);
-				// Attach the connection reference to the peer instance wrapper
-				peer._hocuspocus = clientConnection;
-				console.log(`[ws:open] Hocuspocus handled connection successfully`);
-			} catch (err) {
-				console.error(`[ws:open] Error in handleConnection:`, err);
-			}
-		},
-		message(peer, message) {
-			// Forward incoming data buffers to the Yjs merge processor
-			peer._hocuspocus?.handleMessage(message.uint8Array());
-		},
-		close(peer, event) {
-			console.log(`[ws:close] Peer closed: ${peer.id}, code: ${event.code}, reason: ${event.reason}`);
-			// Inform Hocuspocus that a user left (triggers final webhook saves)
-			peer._hocuspocus?.handleClose({
-				code: event.code,
-				reason: event.reason,
-			});
-		},
-		error(peer, error) {
-			console.error(`❌ WebSocket error on peer instance [${peer.id}]:`, error);
-		},
-	},
+            try {
+                // Forward connection metadata to Hocuspocus
+                const clientConnection = hocuspocus.handleConnection(
+                    peer.websocket,
+                    peer.request,
+                    // You can seed context objects here if needed
+                    {},
+                );
+                // Attach the connection reference to the peer instance wrapper
+                peer._hocuspocus = clientConnection;
+                console.log(
+                    `[ws:open] Hocuspocus handled connection successfully`,
+                );
+            } catch (err) {
+                console.error(`[ws:open] Error in handleConnection:`, err);
+            }
+        },
+        message(peer, message) {
+            // Forward incoming data buffers to the Yjs merge processor
+            peer._hocuspocus?.handleMessage(message.uint8Array());
+        },
+        close(peer, event) {
+            console.log(
+                `[ws:close] Peer closed: ${peer.id}, code: ${event.code}, reason: ${event.reason}`,
+            );
+            // Inform Hocuspocus that a user left (triggers final webhook saves)
+            peer._hocuspocus?.handleClose({
+                code: event.code,
+                reason: event.reason,
+            });
+        },
+        error(peer, error) {
+            console.error(
+                `❌ WebSocket error on peer instance [${peer.id}]:`,
+                error,
+            );
+        },
+    },
 });
 
 // 5. Intercept Nginx or Browser protocol upgrade handshakes
 server.on('upgrade', (request, socket, head) => {
-	console.log(`[upgrade] Upgrade request for URL: ${request.url}`);
+    console.log(`[upgrade] Upgrade request for URL: ${request.url}`);
 
-	try {
-		ws.handleUpgrade(request, socket, head);
-		console.log(`[upgrade] ws.handleUpgrade completed`);
-	} catch (err) {
-		console.error(`[upgrade] Error during ws.handleUpgrade:`, err);
-	}
+    try {
+        ws.handleUpgrade(request, socket, head);
+        console.log(`[upgrade] ws.handleUpgrade completed`);
+    } catch (err) {
+        console.error(`[upgrade] Error during ws.handleUpgrade:`, err);
+    }
 });
 
 // 6. Start the server instance execution pool
 const PORT = process.env.PORT || 1234;
 server.listen(PORT, '0.0.0.0', () => {
-	console.log(`🚀 Express + Hocuspocus v4 backend listening on http://127.0.0.1:${PORT}`);
+    console.log(
+        `🚀 Express + Hocuspocus v4 backend listening on http://127.0.0.1:${PORT}`,
+    );
 });

@@ -5,8 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\Department;
 use App\Models\Municipality;
+use App\Services\ResendService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -59,11 +64,15 @@ class CustomerController extends Controller
             });
         }
 
+        if ($request->boolean('portal_access')) {
+            $query->where('portal_access', true);
+        }
+
         $customers = $query->latest()->paginate(10)->withQueryString();
 
         return Inertia::render('customers/index', [
             'customers' => $customers,
-            'filters' => $request->only(['search', 'type', 'gender', 'state', 'city']),
+            'filters' => $request->only(['search', 'type', 'gender', 'state', 'city', 'portal_access']),
         ]);
     }
 
@@ -83,9 +92,54 @@ class CustomerController extends Controller
             'secondary_phone' => 'nullable|string',
             'address' => 'nullable|string',
             'email' => 'required|email',
+            'portal_access' => 'nullable|boolean',
+            'password' => 'nullable|string|min:6',
+            'send_portal_email' => 'nullable|boolean',
         ]);
 
+        if ($request->boolean('portal_access') && ! empty($validated['email'])) {
+            $email = trim(mb_strtolower((string) $validated['email']));
+            $exists = Customer::whereRaw('LOWER(TRIM(email)) = ?', [$email])->exists();
+            if ($exists) {
+                throw ValidationException::withMessages([
+                    'email' => 'Este correo electrónico ya está siendo utilizado por otro cliente y no puede ser usado para este cliente porque causará conflicto con el acceso al portal.',
+                ]);
+            }
+        }
+
+        $plainPassword = $request->input('password');
+        if ($request->boolean('portal_access')) {
+            Gate::authorize('patients.portal_access');
+
+            if (empty($plainPassword)) {
+                $plainPassword = Str::random(8);
+            }
+            $validated['password'] = Hash::make($plainPassword);
+            $validated['portal_access'] = true;
+        } else {
+            $validated['portal_access'] = false;
+            unset($validated['password']);
+        }
+
         $customer = Customer::create($validated);
+
+        if ($request->boolean('portal_access') && $request->boolean('send_portal_email') && ! empty($customer->email)) {
+            try {
+                $htmlContent = view('emails.customer_portal_credentials', [
+                    'customer' => $customer,
+                    'password' => $plainPassword,
+                    'loginUrl' => route('customer-portal.login'),
+                ])->render();
+
+                app(ResendService::class)->sendEmail(
+                    $customer->email,
+                    'Bienvenido al Portal de Clientes — PatoLab',
+                    $htmlContent
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Error sending customer portal welcome email: '.$e->getMessage());
+            }
+        }
 
         return redirect()->back()->with('created_customer', [
             'id' => $customer->id,
@@ -96,6 +150,7 @@ class CustomerController extends Controller
             'type' => $customer->type,
             'age' => $customer->age,
             'age_unit' => $customer->age_unit ?? 'years',
+            'portal_access' => $customer->portal_access,
         ]);
     }
 
@@ -114,10 +169,60 @@ class CustomerController extends Controller
             'city' => 'nullable|exists:municipalities,id',
             'secondary_phone' => 'nullable|string',
             'address' => 'nullable|string',
-            'email' => (! empty($customer->email) ? 'required' : 'nullable').'|email',
+            'email' => ($request->boolean('portal_access') || ! empty($customer->email) ? 'required' : 'nullable').'|email',
+            'portal_access' => 'nullable|boolean',
+            'password' => 'nullable|string|min:6',
+            'send_portal_email' => 'nullable|boolean',
         ]);
 
+        if ($request->boolean('portal_access') && ! empty($validated['email'])) {
+            $email = trim(mb_strtolower((string) $validated['email']));
+            $exists = Customer::whereRaw('LOWER(TRIM(email)) = ?', [$email])
+                ->where('id', '!=', $customer->id)
+                ->exists();
+            if ($exists) {
+                throw ValidationException::withMessages([
+                    'email' => 'Este correo electrónico ya está siendo utilizado por otro cliente y no puede ser usado para este cliente porque causará conflicto con el acceso al portal.',
+                ]);
+            }
+        }
+
+        $plainPassword = $request->input('password');
+        if ($request->has('portal_access')) {
+            $isToggling = (bool) $request->boolean('portal_access') !== (bool) $customer->portal_access;
+            if ($isToggling || ! empty($plainPassword)) {
+                Gate::authorize('patients.portal_access');
+            }
+            $validated['portal_access'] = $request->boolean('portal_access');
+        } elseif (! empty($plainPassword)) {
+            Gate::authorize('patients.portal_access');
+        }
+
+        if (! empty($plainPassword)) {
+            $validated['password'] = Hash::make($plainPassword);
+        } else {
+            unset($validated['password']);
+        }
+
         $customer->update($validated);
+
+        if ($request->boolean('send_portal_email') && ! empty($customer->email)) {
+            try {
+                $htmlContent = view('emails.customer_portal_credentials', [
+                    'customer' => $customer,
+                    'password' => $plainPassword ?? null,
+                    'loginUrl' => route('customer-portal.login'),
+                ])->render();
+
+                app(ResendService::class)->sendEmail(
+                    $customer->email,
+                    'Credenciales de Acceso al Portal de Clientes — PatoLab',
+                    $htmlContent
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Error sending customer portal credentials on update: '.$e->getMessage());
+            }
+        }
 
         return redirect()->back();
     }
@@ -128,6 +233,34 @@ class CustomerController extends Controller
         $customer->update(['active' => false]);
 
         return redirect()->back();
+    }
+
+    public function checkEmail(Request $request): JsonResponse
+    {
+        if (! Gate::allows('patients.create') && ! Gate::allows('patients.edit') && ! Gate::allows('patients.view')) {
+            abort(403);
+        }
+
+        $email = trim(mb_strtolower((string) $request->query('email', '')));
+        $ignoreId = $request->query('ignore_id');
+
+        if ($email === '') {
+            return response()->json([
+                'unique' => true,
+                'message' => null,
+            ]);
+        }
+
+        $exists = Customer::whereRaw('LOWER(TRIM(email)) = ?', [$email])
+            ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
+            ->exists();
+
+        return response()->json([
+            'unique' => ! $exists,
+            'message' => $exists
+                ? 'Este correo electrónico ya está siendo utilizado por otro cliente y no puede ser usado para este cliente porque causará conflicto con el acceso al portal.'
+                : null,
+        ]);
     }
 
     public function export(Request $request)
@@ -174,6 +307,10 @@ class CustomerController extends Controller
                         $q->where('name', 'like', "%{$city}%");
                     });
             });
+        }
+
+        if ($request->boolean('portal_access')) {
+            $query->where('portal_access', true);
         }
 
         $customers = $query->latest()->get();

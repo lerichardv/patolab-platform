@@ -5,6 +5,7 @@ use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\InvoiceSpecimen;
 use App\Models\Location;
 use App\Models\Permission;
 use App\Models\Priority;
@@ -76,7 +77,7 @@ beforeEach(function () {
     ]);
 });
 
-test('submitting a final payment assigns CAI invoice number, updates status to invoice generated, and keeps balance unpaid until marked as paid', function () {
+test('submitting a final payment assigns CAI invoice number, updates status to invoice generated, and settles remaining balance', function () {
     // 1. Create specimen & original credit invoice
     $specimen = Specimen::create([
         'sequence_code' => 'BIO-0001-08-2026',
@@ -140,27 +141,27 @@ test('submitting a final payment assigns CAI invoice number, updates status to i
     $response->assertRedirect();
     $response->assertSessionHasNoErrors();
 
-    // Assert credit status is invoice generated and balance remains unpaid
+    // Assert credit status is invoice generated and balance is settled
     $credit->refresh();
-    expect($credit->amount_paid)->toEqual(0.00);
-    expect($credit->amount_remaining)->toEqual(500.00);
+    expect($credit->amount_paid)->toEqual(500.00);
+    expect($credit->amount_remaining)->toEqual(0.00);
     expect($credit->status)->toEqual('invoice generated');
 
-    // Assert specimens are NOT yet marked as paid
+    // Assert specimens are marked as paid
     $specimenRecord = DB::table('invoice_specimens')
         ->where('credit_id', $credit->id)
         ->where('specimen_id', $specimen->id)
         ->first();
-    expect($specimenRecord->is_paid)->toEqual(0);
-    expect($specimenRecord->quantity_paid)->toEqual(0);
+    expect($specimenRecord->is_paid)->toEqual(1);
+    expect($specimenRecord->quantity_paid)->toEqual(1);
 
-    // Assert invoice was updated with CAI details and invoice_date, but payment_type remains credit and total_paid is 0
+    // Assert invoice was updated with CAI details and invoice_date, and total_paid is 500
     $originalInvoice->refresh();
     expect($originalInvoice->invoice_number)->toEqual('00000001');
     expect($originalInvoice->full_invoice_number)->toEqual('000-001-01-00000001');
     expect($originalInvoice->invoice_date)->not->toBeNull();
     expect($originalInvoice->payment_type)->toEqual('credit');
-    expect($originalInvoice->total_paid)->toEqual(0.00);
+    expect($originalInvoice->total_paid)->toEqual(500.00);
 });
 
 test('a credit with invoice generated status can be marked as paid with payment details and proof, liquidating the balance', function () {
@@ -273,12 +274,42 @@ test('payFinal does not regenerate invoice number if invoice already has one ass
     expect($originalInvoice->invoice_number)->toEqual('00000099');
     expect($originalInvoice->full_invoice_number)->toEqual('000-001-01-00000099');
     expect($originalInvoice->cai_range_id)->toEqual($this->caiRange->id);
-    expect($originalInvoice->total_paid)->toEqual(0.00);
+    expect($originalInvoice->total_paid)->toEqual(500.00);
 
-    // Credit status updated to invoice generated and balance remaining is 500
+    // Credit status updated to invoice generated and balance remaining is 0
     $credit->refresh();
     expect($credit->status)->toEqual('invoice generated');
-    expect($credit->amount_remaining)->toEqual(500.00);
+    expect($credit->amount_remaining)->toEqual(0.00);
+    expect($credit->amount_paid)->toEqual(500.00);
+});
+
+test('payFinal prevents duplicate invoice generation if credit is already invoice generated', function () {
+    $credit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 500.00,
+        'amount_paid' => 500.00,
+        'amount_remaining' => 0.00,
+        'status' => 'invoice generated',
+    ]);
+
+    $originalInvoice = Invoice::create([
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $credit->id,
+        'total' => 500.00,
+        'total_paid' => 500.00,
+        'cai_range_id' => $this->caiRange->id,
+        'invoice_number' => '00000099',
+        'full_invoice_number' => '000-001-01-00000099',
+        'invoice_file' => 'invoices/existing.pdf',
+    ]);
+
+    $response = $this->actingAs($this->user)->post(route('credits.pay-final', $credit->id), [
+        'amount_paid' => 500.00,
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('error', 'La factura final de crédito ya ha sido generada previamente.');
 });
 
 test('updating a credit payment invoice to payment_type credit fails validation', function () {
@@ -313,4 +344,181 @@ test('updating a credit payment invoice to payment_type credit fails validation'
     ]);
 
     $response->assertSessionHasErrors(['payment_type']);
+});
+
+test('invoices index loads complete credit relation fields and specimens for credit invoices', function () {
+    $viewInvoicesPermission = Permission::create(['slug' => 'invoices.view', 'name' => 'Ver Facturas']);
+    $this->adminRole->permissions()->attach($viewInvoicesPermission);
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'BIO-0002-08-2026',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->type->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'status' => 'received',
+        'priority_id' => $this->priority->id,
+        'quantity' => 1,
+    ]);
+
+    $credit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 600.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 600.00,
+        'is_group' => true,
+        'status' => 'pending',
+    ]);
+
+    $invoice = Invoice::create([
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $credit->id,
+        'total' => 600.00,
+        'total_paid' => 0.00,
+        'invoice_file' => 'invoices/test.pdf',
+    ]);
+
+    InvoiceSpecimen::create([
+        'credit_id' => $credit->id,
+        'invoice_id' => $invoice->id,
+        'specimen_id' => $specimen->id,
+        'examination_id' => $this->examination->id,
+        'is_group' => true,
+        'quantity' => 1,
+        'amount' => 600.00,
+        'discount' => 0.00,
+        'subtotal' => 600.00,
+        'total' => 600.00,
+        'selected_price' => '600.00',
+    ]);
+
+    $response = $this->actingAs($this->user)->get(route('invoices.index'));
+    $response->assertOk();
+
+    $invoicesProp = $response->viewData('page')['props']['invoices'];
+    $data = isset($invoicesProp['data']) ? $invoicesProp['data'] : $invoicesProp;
+    $loadedInvoice = collect($data)->firstWhere('id', $invoice->id);
+
+    expect($loadedInvoice)->not->toBeNull();
+    expect($loadedInvoice['credit_relation'])->not->toBeNull();
+    expect($loadedInvoice['credit_relation']['is_group'])->toBeTrue();
+    expect($loadedInvoice['credit_relation']['credit_invoice_specimens'])->toBeArray();
+    expect(count($loadedInvoice['credit_relation']['credit_invoice_specimens']))->toBeGreaterThanOrEqual(1);
+});
+
+test('markAsPaid is rejected if credit status is pending (must generate final invoice first)', function () {
+    $credit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 500.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 500.00,
+        'status' => 'pending',
+    ]);
+
+    Invoice::create([
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $credit->id,
+        'total' => 500.00,
+        'total_paid' => 0.00,
+        'invoice_file' => 'invoices/original.pdf',
+    ]);
+
+    $response = $this->actingAs($this->user)->post(route('credits.mark-as-paid', $credit->id), [
+        'payment_type' => 'cash',
+        'payment_method_date' => now()->format('Y-m-d'),
+        'cash_value' => 500.00,
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('error', 'El crédito debe tener su factura final generada antes de marcarse como pagado.');
+
+    $credit->refresh();
+    expect($credit->status)->toEqual('pending');
+});
+
+test('payFinal preserves existing invoice number when already present and allows subsequent markAsPaid', function () {
+    $specimen = Specimen::create([
+        'sequence_code' => 'BIO-0099-08-2026',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->type->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'status' => 'received',
+        'priority_id' => $this->priority->id,
+        'is_group' => false,
+    ]);
+
+    $credit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 800.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 800.00,
+        'specimen_id' => $specimen->id,
+        'status' => 'pending',
+    ]);
+
+    $originalInvoice = Invoice::create([
+        'customer_id' => $this->customer->id,
+        'specimen_id' => $specimen->id,
+        'invoice_number' => '00030184',
+        'full_invoice_number' => '000-001-01-00030184',
+        'cai_range_id' => $this->caiRange->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $credit->id,
+        'total' => 800.00,
+        'total_paid' => 0.00,
+        'invoice_file' => 'invoices/existing.pdf',
+    ]);
+
+    InvoiceSpecimen::create([
+        'credit_id' => $credit->id,
+        'invoice_id' => $originalInvoice->id,
+        'specimen_id' => $specimen->id,
+        'examination_id' => $this->examination->id,
+        'quantity' => 1,
+        'amount' => 800.00,
+        'discount' => 0.00,
+        'subtotal' => 800.00,
+        'total' => 800.00,
+        'selected_price' => '800.00',
+    ]);
+
+    $pdfServiceMock = Mockery::mock(InvoicePdfService::class);
+    $pdfServiceMock->shouldReceive('generateAndStoreInvoice')->twice();
+    app()->instance(InvoicePdfService::class, $pdfServiceMock);
+
+    // 1. Pay final invoice - must keep existing invoice number
+    $response = $this->actingAs($this->user)->post(route('credits.pay-final', $credit->id), [
+        'specimens' => [
+            ['id' => $specimen->id, 'quantity' => 1],
+        ],
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success');
+
+    $originalInvoice->refresh();
+    expect($originalInvoice->invoice_number)->toEqual('00030184');
+    expect($originalInvoice->full_invoice_number)->toEqual('000-001-01-00030184');
+
+    $credit->refresh();
+    expect($credit->status)->toEqual('invoice generated');
+
+    // 2. Mark as paid - allowed once invoice is generated
+    $response2 = $this->actingAs($this->user)->post(route('credits.mark-as-paid', $credit->id), [
+        'payment_type' => 'cash',
+        'payment_method_date' => now()->format('Y-m-d'),
+        'cash_value' => 800.00,
+    ]);
+
+    $response2->assertRedirect();
+    $response2->assertSessionHas('success');
+
+    $credit->refresh();
+    expect($credit->status)->toEqual('paid');
+    expect($credit->amount_remaining)->toEqual(0.00);
 });

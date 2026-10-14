@@ -1097,6 +1097,47 @@ export default function ReportWorkspace({
      * Does NOT update the Yjs status room or show toasts; callers handle those.
      */
     const saveReportEditorAsync = (): Promise<void> => {
+        // Data loss prevention circuit breaker:
+        // If the report in the database originally had substantive text in any main section,
+        // but now ALL main sections are completely empty, abort the save to prevent accidental wiping.
+        const isFieldEmpty = (html: string | undefined | null) => {
+            if (!html) return true;
+            const stripped = html
+                .replace(/<[^>]*>/g, '')
+                .replace(/&nbsp;/gi, ' ')
+                .trim();
+            const hasMedia = /<img|<table/i.test(html);
+            return stripped === '' && !hasMedia;
+        };
+
+        const initialHadContent = Boolean(
+            !isFieldEmpty(report?.macroscopy_html) ||
+            !isFieldEmpty(report?.microscopy_html) ||
+            !isFieldEmpty(report?.diagnosis_html) ||
+            !isFieldEmpty(report?.clinical_details_html),
+        );
+
+        const currentAllEmpty = Boolean(
+            isFieldEmpty(macroscopyHtml) &&
+            isFieldEmpty(microscopyHtml) &&
+            isFieldEmpty(diagnosisHtml) &&
+            isFieldEmpty(clinicalDetailsHtml),
+        );
+
+        if (initialHadContent && currentAllEmpty) {
+            console.error(
+                '[CircuitBreaker] Aborting save: detected attempt to overwrite existing report with completely blank content.',
+            );
+            toast.error(
+                'Protección de datos: Se detectó contenido en blanco inesperado. Se bloqueó la sobrescritura del reporte.',
+            );
+            return Promise.reject(
+                new Error(
+                    'Protección de datos: Se detectó contenido en blanco inesperado.',
+                ),
+            );
+        }
+
         const cleanOpenTextLabel = sanitizeOpenTextLabel(openTextLabel);
 
         return saveReportEditor(specimen.sequence_code, {

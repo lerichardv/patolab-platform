@@ -17,6 +17,7 @@ interface Customer {
     city: string;
     address: string;
     email: string;
+    portal_access?: boolean;
 }
 
 interface Props {

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EncryptCookies;
+use App\Http\Middleware\EnsureCustomerPortalActive;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Cookie\Middleware\EncryptCookies as BaseEncryptCookies;
@@ -30,6 +31,18 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'api/collaboration',
+        ]);
+
+        $middleware->redirectGuestsTo(function ($request) {
+            if ($request->is('portal*')) {
+                return route('customer-portal.login');
+            }
+
+            return route('login');
+        });
+
+        $middleware->alias([
+            'customer.active' => EnsureCustomerPortalActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

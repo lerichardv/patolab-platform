@@ -91,6 +91,7 @@ import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 import CreditEditSheet from './credit-edit-sheet';
 import CreditExtractSpecimenSheet from './credit-extract-specimen-sheet';
 import CreditFinalPaymentSheet from './credit-final-payment-sheet';
+import CreditMarkAsPaidDialog from './credit-mark-as-paid-dialog';
 import CreditViewSheet from './credit-view-sheet';
 
 interface Customer {
@@ -324,7 +325,9 @@ export default function CreditsIndex({
         setSelectedGroupIdForCustomerChange,
     ] = useState<number | null>(null);
     const [isGroupMergeSheetOpen, setIsGroupMergeSheetOpen] = useState(false);
-    const [selectedGroupIdForMerge, setSelectedGroupIdForMerge] = useState<number | null>(null);
+    const [selectedGroupIdForMerge, setSelectedGroupIdForMerge] = useState<
+        number | null
+    >(null);
 
     const handleMergeGroupClick = (groupId: number) => {
         setSelectedGroupIdForMerge(groupId);
@@ -351,30 +354,6 @@ export default function CreditsIndex({
         null,
     );
     const [isMarkAsPaidDialogOpen, setIsMarkAsPaidDialogOpen] = useState(false);
-
-    const {
-        data: markAsPaidData,
-        setData: setMarkAsPaidData,
-        post: postMarkAsPaid,
-        processing: isMarkingAsPaid,
-        errors: markAsPaidErrors,
-        reset: resetMarkAsPaid,
-        clearErrors: clearMarkAsPaidErrors,
-    } = useForm({
-        payment_type: 'cash',
-        payment_method_date: new Date().toISOString().split('T')[0],
-        cash_value: '',
-        check_number: '',
-        check_value: '',
-        card_last_4: '',
-        card_value_charged: '',
-        card_expiration: '',
-        card_authorization_code: '',
-        transfer_bank_id: '',
-        transfer_value: '',
-        transfer_authorization_code: '',
-        proof_of_payment: null as File | null,
-    });
 
     const containerRef = useRef<HTMLDivElement>(null);
     const [showLeftShadow, setShowLeftShadow] = useState(false);
@@ -472,90 +451,8 @@ export default function CreditsIndex({
     };
 
     const handleMarkAsPaidClick = (credit: Credit) => {
-        const totalAmount = parseFloat(
-            String(credit.amount_remaining ?? credit.credit_amount ?? 0),
-        ).toFixed(2);
-        setMarkAsPaidData({
-            payment_type: 'cash',
-            payment_method_date: new Date().toISOString().split('T')[0],
-            cash_value: totalAmount,
-            check_number: '',
-            check_value: '',
-            card_last_4: '',
-            card_value_charged: '',
-            card_expiration: '',
-            card_authorization_code: '',
-            transfer_bank_id: '',
-            transfer_value: '',
-            transfer_authorization_code: '',
-            proof_of_payment: null,
-        });
-        clearMarkAsPaidErrors();
         setCreditToMarkAsPaid(credit);
         setIsMarkAsPaidDialogOpen(true);
-    };
-
-    const handlePaymentTypeChange = (type: string) => {
-        const totalAmount = creditToMarkAsPaid
-            ? parseFloat(
-                  String(
-                      creditToMarkAsPaid.amount_remaining ??
-                          creditToMarkAsPaid.credit_amount ??
-                          0,
-                  ),
-              ).toFixed(2)
-            : '';
-
-        setMarkAsPaidData((prev) => ({
-            ...prev,
-            payment_type: type,
-            cash_value: type === 'cash' ? totalAmount : '',
-            check_value: type === 'check' ? totalAmount : '',
-            check_number: '',
-            card_value_charged: type === 'credit card' ? totalAmount : '',
-            card_last_4: '',
-            card_expiration: '',
-            card_authorization_code: '',
-            transfer_value: type === 'bank transfer' ? totalAmount : '',
-            transfer_bank_id: '',
-            transfer_authorization_code: '',
-            proof_of_payment: type === 'cash' ? null : prev.proof_of_payment,
-        }));
-    };
-
-    const confirmMarkAsPaid = (e?: React.FormEvent) => {
-        if (e) {
-            e.preventDefault();
-        }
-
-        if (!creditToMarkAsPaid) {
-            return;
-        }
-
-        if (
-            markAsPaidData.payment_type !== 'cash' &&
-            !markAsPaidData.proof_of_payment
-        ) {
-            toast.error('El comprobante de pago es requerido.');
-
-            return;
-        }
-
-        postMarkAsPaid(`/credits/${creditToMarkAsPaid.id}/mark-as-paid`, {
-            forceFormData: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                setIsMarkAsPaidDialogOpen(false);
-                setCreditToMarkAsPaid(null);
-                resetMarkAsPaid();
-                toast.success('Crédito marcado como pagado con éxito');
-            },
-            onError: () => {
-                toast.error(
-                    'Por favor complete todos los campos obligatorios del pago.',
-                );
-            },
-        });
     };
 
     const getStatusBadge = (credit: Credit) => {
@@ -1005,12 +902,14 @@ export default function CreditsIndex({
                                     const originalInvoice =
                                         credit.invoices?.find(
                                             (inv) =>
-                                                inv.invoice_type !== 'credit payment',
+                                                inv.invoice_type !==
+                                                'credit payment',
                                         ) || credit.invoices?.[0];
                                     const paymentInvoices =
                                         credit.invoices?.filter(
                                             (inv) =>
-                                                inv.invoice_type === 'credit payment',
+                                                inv.invoice_type ===
+                                                'credit payment',
                                         ) || [];
                                     const remainingVal = parseFloat(
                                         String(credit.amount_remaining),
@@ -1473,46 +1372,44 @@ export default function CreditsIndex({
                                                                 align="end"
                                                                 className="w-52"
                                                             >
-                                                                <DropdownMenuItem
-                                                                    onClick={() => {
-                                                                        if (
-                                                                            remainingVal >
-                                                                            0
-                                                                        ) {
-                                                                            handlePayFinalClick(
-                                                                                credit,
-                                                                            );
-                                                                        }
-                                                                    }}
-                                                                    disabled={
-                                                                        remainingVal <=
-                                                                        0
-                                                                    }
-                                                                    className={
-                                                                        remainingVal <=
-                                                                        0
-                                                                            ? 'opacity-50'
-                                                                            : ''
-                                                                    }
-                                                                >
-                                                                    <Coins className="mr-2 h-4 w-4 text-muted-foreground" />
-                                                                    <span>
-                                                                        Generar
-                                                                        Factura
-                                                                        Final
-                                                                    </span>
-                                                                </DropdownMenuItem>
-                                                                {(credit.status ===
-                                                                    'invoice generated' ||
-                                                                    (Boolean(
-                                                                        originalInvoice?.full_invoice_number,
-                                                                    ) &&
-                                                                        remainingVal >
-                                                                            0 &&
-                                                                        credit.status !==
-                                                                            'paid' &&
-                                                                        credit.status !==
-                                                                            'cancelled')) && (
+                                                                {credit.status !==
+                                                                    'invoice generated' &&
+                                                                    credit.status !==
+                                                                        'paid' &&
+                                                                    credit.status !==
+                                                                        'cancelled' && (
+                                                                        <DropdownMenuItem
+                                                                            onClick={() => {
+                                                                                if (
+                                                                                    remainingVal >
+                                                                                    0
+                                                                                ) {
+                                                                                    handlePayFinalClick(
+                                                                                        credit,
+                                                                                    );
+                                                                                }
+                                                                            }}
+                                                                            disabled={
+                                                                                remainingVal <=
+                                                                                0
+                                                                            }
+                                                                            className={
+                                                                                remainingVal <=
+                                                                                0
+                                                                                    ? 'opacity-50'
+                                                                                    : ''
+                                                                            }
+                                                                        >
+                                                                            <Coins className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                                            <span>
+                                                                                Generar
+                                                                                Factura
+                                                                                Final
+                                                                            </span>
+                                                                        </DropdownMenuItem>
+                                                                    )}
+                                                                {credit.status ===
+                                                                    'invoice generated' && (
                                                                     <DropdownMenuItem
                                                                         onClick={() =>
                                                                             handleMarkAsPaidClick(
@@ -1715,6 +1612,9 @@ export default function CreditsIndex({
                 banks={banks}
                 open={isFinalPaymentSheetOpen}
                 onOpenChange={setIsFinalPaymentSheetOpen}
+                onSuccess={() => {
+                    router.reload({ only: ['credits'] });
+                }}
             />
 
             <CreditExtractSpecimenSheet
@@ -1855,573 +1755,13 @@ export default function CreditsIndex({
                 </AlertDialogContent>
             </AlertDialog>
             {/* DIÁLOGO PARA MARCAR COMO PAGADO */}
-            <AlertDialog
+            <CreditMarkAsPaidDialog
                 open={isMarkAsPaidDialogOpen}
-                onOpenChange={(open) => {
-                    if (!isMarkingAsPaid) {
-                        setIsMarkAsPaidDialogOpen(open);
-
-                        if (!open) {
-                            setCreditToMarkAsPaid(null);
-                            resetMarkAsPaid();
-                        }
-                    }
-                }}
-            >
-                <AlertDialogContent className="max-h-[90vh] w-full max-w-[580px] overflow-y-auto">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2">
-                            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                            Marcar Crédito como Pagado
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Ingrese el método de pago y comprobante para marcar
-                            el crédito #{creditToMarkAsPaid?.id} (Cliente:{' '}
-                            <strong>
-                                {creditToMarkAsPaid?.customer?.name}
-                            </strong>
-                            ) como <strong>Pagado</strong>.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-
-                    <form
-                        onSubmit={confirmMarkAsPaid}
-                        className="mt-2 flex flex-col gap-4"
-                    >
-                        {/* Monto del crédito */}
-                        <div className="flex items-center justify-between rounded-lg border bg-muted/40 p-3 text-sm">
-                            <span className="text-muted-foreground">
-                                Monto Total a Liquidar:
-                            </span>
-                            <span className="font-mono text-base font-bold text-foreground">
-                                L.{' '}
-                                {creditToMarkAsPaid
-                                    ? parseFloat(
-                                          String(
-                                              creditToMarkAsPaid.amount_remaining ??
-                                                  creditToMarkAsPaid.credit_amount ??
-                                                  0,
-                                          ),
-                                      ).toFixed(2)
-                                    : '0.00'}
-                            </span>
-                        </div>
-
-                        {/* Tipo de Pago selector */}
-                        <div className="grid gap-2">
-                            <Label htmlFor="mark_payment_type">
-                                Tipo de Pago{' '}
-                                <span className="text-destructive">*</span>
-                            </Label>
-                            <Select
-                                value={markAsPaidData.payment_type}
-                                onValueChange={handlePaymentTypeChange}
-                            >
-                                <SelectTrigger
-                                    id="mark_payment_type"
-                                    className="w-full"
-                                >
-                                    <SelectValue placeholder="Seleccione el tipo de pago" />
-                                </SelectTrigger>
-                                <SelectContent className="z-[150]">
-                                    <SelectItem value="cash">
-                                        <div className="flex items-center gap-2">
-                                            <Wallet className="h-4 w-4 text-primary" />
-                                            <span>Efectivo</span>
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="credit card">
-                                        <div className="flex items-center gap-2">
-                                            <CreditCard className="h-4 w-4 text-primary" />
-                                            <span>Tarjeta de Crédito</span>
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="bank transfer">
-                                        <div className="flex items-center gap-2">
-                                            <Landmark className="h-4 w-4 text-primary" />
-                                            <span>Transferencia Bancaria</span>
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="check">
-                                        <div className="flex items-center gap-2">
-                                            <Receipt className="h-4 w-4 text-primary" />
-                                            <span>Cheque</span>
-                                        </div>
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {markAsPaidErrors.payment_type && (
-                                <p className="text-xs text-destructive">
-                                    {markAsPaidErrors.payment_type}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Payment Method Date */}
-                        {markAsPaidData.payment_type !== '' && (
-                            <div className="grid gap-2">
-                                <Label htmlFor="mark_payment_date">
-                                    Fecha de Pago{' '}
-                                    <span className="text-destructive">*</span>
-                                </Label>
-                                <Input
-                                    id="mark_payment_date"
-                                    type="date"
-                                    value={markAsPaidData.payment_method_date}
-                                    onChange={(e) =>
-                                        setMarkAsPaidData(
-                                            'payment_method_date',
-                                            e.target.value,
-                                        )
-                                    }
-                                    required
-                                />
-                                {markAsPaidErrors.payment_method_date && (
-                                    <p className="text-xs text-destructive">
-                                        {markAsPaidErrors.payment_method_date}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Cash Fields */}
-                        {markAsPaidData.payment_type === 'cash' && (
-                            <div className="grid gap-2 rounded-lg border bg-muted/40 p-4">
-                                <Label htmlFor="mark_cash_value">
-                                    Valor Recibido (L.){' '}
-                                    <span className="text-destructive">*</span>
-                                </Label>
-                                <Input
-                                    id="mark_cash_value"
-                                    type="number"
-                                    step="0.01"
-                                    value={markAsPaidData.cash_value}
-                                    onChange={(e) =>
-                                        setMarkAsPaidData(
-                                            'cash_value',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="0.00"
-                                    className="font-mono"
-                                    required
-                                />
-                                {markAsPaidErrors.cash_value && (
-                                    <p className="text-xs text-destructive">
-                                        {markAsPaidErrors.cash_value}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Check Fields */}
-                        {markAsPaidData.payment_type === 'check' && (
-                            <div className="grid gap-4 rounded-lg border bg-muted/40 p-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mark_check_number">
-                                        Número de Cheque{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        id="mark_check_number"
-                                        type="text"
-                                        value={markAsPaidData.check_number}
-                                        onChange={(e) =>
-                                            setMarkAsPaidData(
-                                                'check_number',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Ej. 123456"
-                                        required
-                                    />
-                                    {markAsPaidErrors.check_number && (
-                                        <p className="text-xs text-destructive">
-                                            {markAsPaidErrors.check_number}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mark_check_value">
-                                        Valor del Cheque (L.){' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        id="mark_check_value"
-                                        type="number"
-                                        step="0.01"
-                                        value={markAsPaidData.check_value}
-                                        onChange={(e) =>
-                                            setMarkAsPaidData(
-                                                'check_value',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="0.00"
-                                        className="font-mono"
-                                        required
-                                    />
-                                    {markAsPaidErrors.check_value && (
-                                        <p className="text-xs text-destructive">
-                                            {markAsPaidErrors.check_value}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Credit Card Fields */}
-                        {markAsPaidData.payment_type === 'credit card' && (
-                            <div className="grid gap-4 rounded-lg border bg-muted/40 p-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="mark_card_last_4">
-                                            Últimos 4 Dígitos
-                                        </Label>
-                                        <Input
-                                            id="mark_card_last_4"
-                                            type="text"
-                                            maxLength={4}
-                                            value={markAsPaidData.card_last_4}
-                                            onChange={(e) =>
-                                                setMarkAsPaidData(
-                                                    'card_last_4',
-                                                    e.target.value
-                                                        .replace(/\D/g, '')
-                                                        .slice(0, 4),
-                                                )
-                                            }
-                                            placeholder="1234"
-                                        />
-                                        {markAsPaidErrors.card_last_4 && (
-                                            <p className="text-xs text-destructive">
-                                                {markAsPaidErrors.card_last_4}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="mark_card_expiration">
-                                            Vencimiento
-                                        </Label>
-                                        <Input
-                                            id="mark_card_expiration"
-                                            type="text"
-                                            placeholder="MM/AA"
-                                            maxLength={7}
-                                            value={
-                                                markAsPaidData.card_expiration
-                                            }
-                                            onChange={(e) =>
-                                                setMarkAsPaidData(
-                                                    'card_expiration',
-                                                    formatCardExpiration(
-                                                        e.target.value,
-                                                    ),
-                                                )
-                                            }
-                                        />
-                                        {markAsPaidErrors.card_expiration && (
-                                            <p className="text-xs text-destructive">
-                                                {
-                                                    markAsPaidErrors.card_expiration
-                                                }
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mark_card_authorization_code">
-                                        Código de Autorización
-                                    </Label>
-                                    <Input
-                                        id="mark_card_authorization_code"
-                                        type="text"
-                                        value={
-                                            markAsPaidData.card_authorization_code
-                                        }
-                                        onChange={(e) =>
-                                            setMarkAsPaidData(
-                                                'card_authorization_code',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Ej. 987654"
-                                    />
-                                    {markAsPaidErrors.card_authorization_code && (
-                                        <p className="text-xs text-destructive">
-                                            {
-                                                markAsPaidErrors.card_authorization_code
-                                            }
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mark_card_value_charged">
-                                        Monto Cargado (L.){' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        id="mark_card_value_charged"
-                                        type="number"
-                                        step="0.01"
-                                        value={
-                                            markAsPaidData.card_value_charged
-                                        }
-                                        onChange={(e) =>
-                                            setMarkAsPaidData(
-                                                'card_value_charged',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="0.00"
-                                        className="font-mono"
-                                        required
-                                    />
-                                    {markAsPaidErrors.card_value_charged && (
-                                        <p className="text-xs text-destructive">
-                                            {
-                                                markAsPaidErrors.card_value_charged
-                                            }
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Bank Transfer Fields */}
-                        {markAsPaidData.payment_type === 'bank transfer' && (
-                            <div className="grid gap-4 rounded-lg border bg-muted/40 p-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mark_transfer_bank_id">
-                                        Banco{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Select
-                                        value={markAsPaidData.transfer_bank_id}
-                                        onValueChange={(val) =>
-                                            setMarkAsPaidData(
-                                                'transfer_bank_id',
-                                                val,
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger
-                                            id="mark_transfer_bank_id"
-                                            className="w-full"
-                                        >
-                                            <SelectValue placeholder="Seleccione un Banco" />
-                                        </SelectTrigger>
-                                        <SelectContent className="z-[150]">
-                                            {banks && banks.length > 0 ? (
-                                                banks.map((bank) => (
-                                                    <SelectItem
-                                                        key={bank.id}
-                                                        value={bank.id.toString()}
-                                                    >
-                                                        {bank.name}
-                                                    </SelectItem>
-                                                ))
-                                            ) : (
-                                                <SelectItem
-                                                    value="none"
-                                                    disabled
-                                                >
-                                                    No hay bancos registrados
-                                                </SelectItem>
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                    {markAsPaidErrors.transfer_bank_id && (
-                                        <p className="text-xs text-destructive">
-                                            {markAsPaidErrors.transfer_bank_id}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mark_transfer_authorization_code">
-                                        Código de Autorización / Referencia{' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        id="mark_transfer_authorization_code"
-                                        type="text"
-                                        value={
-                                            markAsPaidData.transfer_authorization_code
-                                        }
-                                        onChange={(e) =>
-                                            setMarkAsPaidData(
-                                                'transfer_authorization_code',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Ej. 11223344"
-                                        required
-                                    />
-                                    {markAsPaidErrors.transfer_authorization_code && (
-                                        <p className="text-xs text-destructive">
-                                            {
-                                                markAsPaidErrors.transfer_authorization_code
-                                            }
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mark_transfer_value">
-                                        Monto Transferido (L.){' '}
-                                        <span className="text-destructive">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        id="mark_transfer_value"
-                                        type="number"
-                                        step="0.01"
-                                        value={markAsPaidData.transfer_value}
-                                        onChange={(e) =>
-                                            setMarkAsPaidData(
-                                                'transfer_value',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="0.00"
-                                        className="font-mono"
-                                        required
-                                    />
-                                    {markAsPaidErrors.transfer_value && (
-                                        <p className="text-xs text-destructive">
-                                            {markAsPaidErrors.transfer_value}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Comprobante de Pago */}
-                        <div className="space-y-2">
-                            <Label htmlFor="mark_proof_of_payment">
-                                Comprobante de Pago (PDF o Imagen){' '}
-                                {markAsPaidData.payment_type !== 'cash' && (
-                                    <span className="text-destructive">*</span>
-                                )}
-                            </Label>
-
-                            {markAsPaidData.proof_of_payment ? (
-                                <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-500/10">
-                                    <div className="flex items-center gap-3">
-                                        <div className="rounded-md bg-emerald-500/10 p-2 text-emerald-500">
-                                            <FileText className="h-5 w-5" />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="max-w-[200px] truncate text-xs font-semibold text-foreground sm:max-w-xs">
-                                                {
-                                                    markAsPaidData
-                                                        .proof_of_payment.name
-                                                }
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground">
-                                                {(
-                                                    markAsPaidData
-                                                        .proof_of_payment.size /
-                                                    1024 /
-                                                    1024
-                                                ).toFixed(2)}{' '}
-                                                MB
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() =>
-                                            setMarkAsPaidData(
-                                                'proof_of_payment',
-                                                null,
-                                            )
-                                        }
-                                        className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="group relative">
-                                    <input
-                                        type="file"
-                                        id="mark_proof_of_payment"
-                                        className="hidden"
-                                        accept=".pdf,image/*"
-                                        onChange={(e) => {
-                                            const file =
-                                                e.target.files?.[0] || null;
-                                            setMarkAsPaidData(
-                                                'proof_of_payment',
-                                                file,
-                                            );
-                                        }}
-                                    />
-                                    <label
-                                        htmlFor="mark_proof_of_payment"
-                                        className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 bg-card p-4 transition-all duration-200 hover:border-primary/50 hover:bg-accent/10"
-                                    >
-                                        <div className="mb-1.5 rounded-full bg-secondary p-2 text-secondary-foreground transition-transform duration-200 group-hover:scale-110">
-                                            <Upload className="h-4 w-4" />
-                                        </div>
-                                        <span className="text-xs font-semibold text-foreground">
-                                            Subir Comprobante
-                                        </span>
-                                        <span className="mt-0.5 text-[10px] text-muted-foreground">
-                                            PDF hasta 30MB, imágenes hasta 10MB
-                                        </span>
-                                    </label>
-                                </div>
-                            )}
-                            {markAsPaidErrors.proof_of_payment && (
-                                <p className="text-xs text-destructive">
-                                    {markAsPaidErrors.proof_of_payment}
-                                </p>
-                            )}
-                        </div>
-
-                        <AlertDialogFooter className="pt-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                    setIsMarkAsPaidDialogOpen(false);
-                                    setCreditToMarkAsPaid(null);
-                                    resetMarkAsPaid();
-                                }}
-                                disabled={isMarkingAsPaid}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={isMarkingAsPaid}
-                                className="bg-emerald-600 text-white hover:bg-emerald-700"
-                            >
-                                {isMarkingAsPaid && (
-                                    <Spinner className="mr-2" />
-                                )}
-                                {isMarkingAsPaid
-                                    ? 'Guardando...'
-                                    : 'Confirmar y Marcar como Pagado'}
-                            </Button>
-                        </AlertDialogFooter>
-                    </form>
-                </AlertDialogContent>
-            </AlertDialog>
+                onOpenChange={setIsMarkAsPaidDialogOpen}
+                credit={creditToMarkAsPaid}
+                banks={banks}
+                onSuccess={() => router.reload({ only: ['credits'] })}
+            />
         </>
     );
 }

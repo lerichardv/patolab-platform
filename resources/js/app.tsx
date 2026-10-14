@@ -6,6 +6,8 @@ import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 
+import CustomerPortalLayout from '@/pages/customers/customer-portal/layout';
+
 // Silence noisy warnings from browser extensions (e.g., MetaMask)
 if (typeof window !== 'undefined') {
     const filterWarning = (msg: string) => {
@@ -62,7 +64,10 @@ createInertiaApp({
             case name === 'work-orders/delivery-notes/editor':
             case name.startsWith('work-orders/delivery-notes/'):
             case name.startsWith('errors/'):
+            case name === 'customers/customer-portal/login':
                 return null;
+            case name.startsWith('customers/customer-portal/'):
+                return CustomerPortalLayout;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):

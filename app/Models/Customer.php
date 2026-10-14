@@ -3,15 +3,18 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 
-class Customer extends Model
+class Customer extends Authenticatable
 {
     use Auditable;
     use HasFactory;
+    use Notifiable;
 
     protected $fillable = [
         'name',
@@ -26,8 +29,30 @@ class Customer extends Model
         'secondary_phone',
         'address',
         'email',
+        'password',
+        'portal_access',
+        'last_portal_login_at',
         'active',
     ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    protected $appends = [
+        'formatted_age',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'password' => 'hashed',
+            'portal_access' => 'boolean',
+            'active' => 'boolean',
+            'last_portal_login_at' => 'datetime',
+        ];
+    }
 
     public function getFormattedAgeAttribute(): ?string
     {
@@ -64,5 +89,29 @@ class Customer extends Model
     public function priceQuotes(): HasMany
     {
         return $this->hasMany(PriceQuote::class, 'customer_id');
+    }
+
+    public function specimens(): HasMany
+    {
+        return $this->hasMany(Specimen::class, 'customer');
+    }
+
+    /**
+     * Get a query builder for all specimens accessible to this customer in the portal.
+     *
+     * Individual customers access their direct specimens.
+     * Company/Group customers access direct specimens and specimens within their groups.
+     */
+    public function accessibleSpecimens(): Builder
+    {
+        return Specimen::query()->where(function ($query) {
+            $query->where('customer', $this->id)
+                ->orWhereHas('group', function ($gq) {
+                    $gq->where('customer_id', $this->id);
+                })
+                ->orWhereHas('group.customers', function ($gq) {
+                    $gq->where('customers.id', $this->id);
+                });
+        });
     }
 }

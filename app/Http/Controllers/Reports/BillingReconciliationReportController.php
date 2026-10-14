@@ -465,10 +465,8 @@ class BillingReconciliationReportController extends Controller
         $h14StartRow = 4;
 
         foreach ($reportData['dailyTables'] as $dayTable) {
-            $dayItemIdx = 1;
-
             foreach ($dayTable['items'] as $item) {
-                if ($dayItemIdx === 1) {
+                if ($h14CurrentRow === $h14StartRow) {
                     $sheetHoja14->setCellValue('B'.$h14CurrentRow, 1);
                 } else {
                     $prevRow = $h14CurrentRow - 1;
@@ -502,7 +500,6 @@ class BillingReconciliationReportController extends Controller
 
                 $sheetHoja14->getRowDimension($h14CurrentRow)->setRowHeight(19);
 
-                $dayItemIdx++;
                 $h14CurrentRow++;
             }
         }

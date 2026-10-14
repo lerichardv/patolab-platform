@@ -171,35 +171,36 @@ export default function GroupInvoiceForm({
                     gs.custom_specimen_price || 0,
                 );
 
-                let matched = prices.find(
+                const matched = prices.find(
                     (p: any) =>
                         Math.abs(
                             parseFloat(p.amount) - parseFloat(rawSelected),
                         ) < 0.01,
                 );
 
-                if (!matched && rawSelected !== 'custom' && amount > 0) {
-                    matched = prices.find(
-                        (p: any) =>
-                            Math.abs(parseFloat(p.amount) - amount) < 0.01,
-                    );
-                }
-
                 let selPrice = '';
                 let custom_specimen_price = customPriceVal.toString();
 
                 if (matched) {
                     selPrice = matched.amount.toString();
-                } else if (rawSelected === 'custom') {
+                    custom_specimen_price = '0';
+                } else if (
+                    rawSelected === 'custom' ||
+                    (parseFloat(rawSelected) > 0 && !matched) ||
+                    customPriceVal > 0
+                ) {
                     selPrice = 'custom';
                     custom_specimen_price =
                         customPriceVal > 0
                             ? customPriceVal.toString()
-                            : amount > 0
-                              ? amount.toString()
-                              : '0';
+                            : parseFloat(rawSelected) > 0
+                              ? rawSelected
+                              : amount > 0
+                                ? amount.toString()
+                                : '0';
                 } else if (prices.length > 0) {
                     selPrice = prices[0].amount.toString();
+                    custom_specimen_price = '0';
                 } else {
                     selPrice = 'custom';
                     custom_specimen_price =
@@ -214,13 +215,15 @@ export default function GroupInvoiceForm({
                         exam.id ||
                         spec.specimen_type_examination,
                     selected_price: selPrice,
-                    custom_specimen_price:
-                        gs.custom_specimen_price?.toString() || '0',
+                    custom_specimen_price: custom_specimen_price,
                     quantity: parseInt(gs.quantity || spec.quantity || 1),
-                    additional_discount_enabled:
-                        parseFloat(gs.additional_discount || 0) > 0,
+                    additional_discount_enabled: Boolean(
+                        gs.additional_discount_enabled,
+                    ),
                     additional_discount:
-                        gs.additional_discount?.toString() || '0',
+                        gs.additional_discount != null
+                            ? gs.additional_discount.toString()
+                            : '0',
                     age_discount_type: gs.age_discount_type || null,
                     type_name:
                         spec.type?.name ||
@@ -389,10 +392,23 @@ export default function GroupInvoiceForm({
     };
 
     const handleUpdatePrice = (id: any, val: string) => {
-        updateGroupSpecimen(id, {
-            selected_price: val,
-            custom_specimen_price: val === 'custom' ? '0' : '0',
-        });
+        setData((d: any) => ({
+            ...d,
+            group_specimens: d.group_specimens.map((item: any) =>
+                item.id === id
+                    ? {
+                          ...item,
+                          selected_price: val,
+                          custom_specimen_price:
+                              val === 'custom'
+                                  ? parseFloat(item.custom_specimen_price) > 0
+                                      ? item.custom_specimen_price
+                                      : '0'
+                                  : '0',
+                      }
+                    : item,
+            ),
+        }));
     };
 
     const handleUpdateCustomPrice = (id: any, val: string) => {
@@ -404,10 +420,23 @@ export default function GroupInvoiceForm({
     };
 
     const handleToggleAdditionalDiscount = (id: any, enabled: boolean) => {
-        updateGroupSpecimen(id, {
-            additional_discount_enabled: enabled,
-            additional_discount: enabled ? '0' : '0',
-        });
+        setData((d: any) => ({
+            ...d,
+            group_specimens: d.group_specimens.map((item: any) =>
+                item.id === id
+                    ? {
+                          ...item,
+                          additional_discount_enabled: enabled,
+                          additional_discount: enabled
+                              ? item.additional_discount &&
+                                parseFloat(item.additional_discount) > 0
+                                  ? item.additional_discount
+                                  : '0'
+                              : '0',
+                      }
+                    : item,
+            ),
+        }));
     };
 
     const handleUpdateAdditionalDiscount = (id: any, val: string) => {
@@ -522,8 +551,10 @@ export default function GroupInvoiceForm({
     };
 
     const submitForm = (regenPdf: boolean) => {
+        setShowConfirm(false);
         setData('regenerate_pdf', regenPdf);
-        put(`/invoices/${invoice.id}`, {
+        put(`/invoices/${invoice.id}?regenerate_pdf=${regenPdf}`, {
+            preserveScroll: true,
             onSuccess: () => {
                 toast.success('Factura grupal actualizada correctamente.');
                 onSuccess();

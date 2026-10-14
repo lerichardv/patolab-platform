@@ -127,6 +127,8 @@ function CollaborativeEditorInner({
     onBlurRef.current = onBlur;
     const onUpdateRef = useRef(onUpdate);
     onUpdateRef.current = onUpdate;
+    const initialContentRef = useRef(initialContent);
+    initialContentRef.current = initialContent;
     const hasSeededRef = useRef(false);
     const lastEmittedHtmlRef = useRef<string | null>(null);
 
@@ -314,8 +316,36 @@ function CollaborativeEditorInner({
             // Mark as seeded so the transaction handler can start emitting updates.
             hasSeededRef.current = true;
 
+            const currentEditorHtml = removeHyperlinks(editor.getHTML());
+            const isEditorEmpty =
+                editor.isEmpty ||
+                editor.getText().trim() === '' ||
+                currentEditorHtml === '<p></p>' ||
+                currentEditorHtml === '';
+
+            const init = initialContentRef.current || '';
+            const initClean = init
+                .replace(/<[^>]*>/g, '')
+                .replace(/&nbsp;/gi, ' ')
+                .trim();
+            const initHasMediaOrTable = /<img|<table/i.test(init);
+            const hasInitialContent = initClean !== '' || initHasMediaOrTable;
+
+            // CRITICAL DEFENSE: If the server Yjs document is empty, but initialContent from Laravel
+            // database has real content, the server failed to seed (e.g. timeout or missing Yjs state).
+            // Recover by seeding the editor with initialContent instead of overwriting with blank!
+            if (isEditorEmpty && hasInitialContent) {
+                console.warn(
+                    `[CollaborativeEditor] Server synced empty doc for "${field}", recovering from initialContent.`,
+                );
+                editor.commands.setContent(init);
+                lastEmittedHtmlRef.current = init;
+
+                return;
+            }
+
             // Emit initial HTML to parent so its state reflects the server content.
-            const newHtml = removeHyperlinks(editor.getHTML());
+            const newHtml = currentEditorHtml;
 
             if (lastEmittedHtmlRef.current !== newHtml) {
                 lastEmittedHtmlRef.current = newHtml;
@@ -354,7 +384,6 @@ function CollaborativeEditorInner({
         };
         // Intentionally omit initialContent and onUpdate — using refs instead
         // so this effect never remounts on content changes.
-         
     }, [editor, provider, field]);
 
     useEffect(() => {

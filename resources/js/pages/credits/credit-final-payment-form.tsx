@@ -100,6 +100,7 @@ interface Credit {
     group?: {
         id: number;
         invoice?: Invoice;
+        specimens?: any[];
     };
     specimen?: any;
 }
@@ -203,7 +204,13 @@ interface GroupedFinalPaymentSpecimen {
 }
 
 export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
-    const remainingVal = parseFloat(String(credit.amount_remaining));
+    const parsedRemaining = parseFloat(String(credit.amount_remaining));
+    const parsedCreditAmount = parseFloat(String(credit.credit_amount));
+    const remainingVal = !isNaN(parsedRemaining)
+        ? parsedRemaining
+        : !isNaN(parsedCreditAmount)
+          ? parsedCreditAmount
+          : 0;
 
     const originalInvoice =
         credit.invoices?.find((inv) => inv.invoice_type !== 'credit payment') ||
@@ -287,12 +294,26 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
         );
     }, [groupedCreditSpecimens]);
 
-    const initialSpecimens = unpaidSpecimens.map(
-        (item: GroupedFinalPaymentSpecimen) => ({
-            id: item.specimen_id,
-            quantity: Math.max(1, item.quantity - (item.quantity_paid ?? 0)),
-        }),
-    );
+    const initialSpecimens =
+        unpaidSpecimens.length > 0
+            ? unpaidSpecimens.map((item: GroupedFinalPaymentSpecimen) => ({
+                  id: item.specimen_id,
+                  quantity: Math.max(
+                      1,
+                      item.quantity - (item.quantity_paid ?? 0),
+                  ),
+              }))
+            : groupedCreditSpecimens.length > 0
+              ? groupedCreditSpecimens.map(
+                    (item: GroupedFinalPaymentSpecimen) => ({
+                        id: item.specimen_id,
+                        quantity: Math.max(1, item.quantity),
+                    }),
+                )
+              : (credit.group?.specimens || []).map((s: any) => ({
+                    id: s.id,
+                    quantity: 1,
+                }));
 
     const singleSpecimen =
         credit.specimen ||
@@ -347,8 +368,19 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
                 onSuccess();
                 reset();
             },
-            onError: () => {
-                toast.error('Error al generar la factura final de crédito.');
+            onError: (err: any) => {
+                if (
+                    err &&
+                    typeof err === 'object' &&
+                    Object.keys(err).length > 0
+                ) {
+                    const firstError = Object.values(err)[0] as string;
+                    toast.error(firstError);
+                } else {
+                    toast.error(
+                        'Error al generar la factura final de crédito.',
+                    );
+                }
             },
         });
     };

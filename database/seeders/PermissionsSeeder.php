@@ -52,6 +52,7 @@ class PermissionsSeeder extends Seeder
             ['name' => 'Crear Pacientes', 'slug' => 'patients.create'],
             ['name' => 'Editar Pacientes', 'slug' => 'patients.edit'],
             ['name' => 'Eliminar Pacientes', 'slug' => 'patients.delete'],
+            ['name' => 'Gestionar Acceso al Portal de Pacientes', 'slug' => 'patients.portal_access'],
 
             /*
             |--------------------------------------------------------------------------
