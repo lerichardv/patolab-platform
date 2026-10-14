@@ -658,6 +658,9 @@ class InvoiceController extends Controller
             'group_specimens.*.additional_discount_enabled' => 'nullable|boolean',
             'group_specimens.*.additional_discount' => 'nullable|numeric|min:0',
             'pay_isv' => 'nullable|boolean',
+            'has_initial_payment' => 'nullable|boolean',
+            'initial_payment_amount' => 'nullable|numeric|min:0',
+            'initial_payment_type' => 'nullable|in:cash,credit card,bank transfer,check',
         ]);
 
         $isSpecimenOrGroup = (bool) ($invoice->specimen_id || $invoice->is_group || $invoice->group_id || $invoice->invoice_type === 'specimen' || $invoice->invoice_type === 'group');
@@ -693,6 +696,29 @@ class InvoiceController extends Controller
             unset($validated['proof_of_payment']);
         }
 
+        if ($validated['payment_type'] === 'credit') {
+            $initialPaymentAmount = $request->boolean('has_initial_payment')
+                ? (float) ($request->input('initial_payment_amount', 0.00))
+                : 0.00;
+            $validated['total_paid'] = $initialPaymentAmount;
+
+            if (! $request->boolean('has_initial_payment')) {
+                if (! $request->hasFile('proof_of_payment')) {
+                    $validated['proof_of_payment'] = null;
+                }
+                $validated['cash_value'] = null;
+                $validated['check_value'] = null;
+                $validated['check_number'] = null;
+                $validated['card_value_charged'] = null;
+                $validated['card_last_4'] = null;
+                $validated['card_expiration'] = null;
+                $validated['card_authorization_code'] = null;
+                $validated['transfer_bank_id'] = null;
+                $validated['transfer_value'] = null;
+                $validated['transfer_authorization_code'] = null;
+            }
+        }
+
         // Extract group_specimens to process separately
         $groupSpecimensData = $validated['group_specimens'] ?? null;
         unset($validated['group_specimens']);
@@ -725,89 +751,153 @@ class InvoiceController extends Controller
             $validated['isv_18'] = 0.00;
         }
 
-        $invoice->update($validated);
+        DB::transaction(function () use ($request, $validated, $invoice, $groupSpecimensData) {
+            $invoice->update($validated);
 
-        // Sync customer to related models
-        if (! $invoice->is_group && $invoice->specimen) {
-            $invoice->specimen->update(['customer' => $validated['customer_id']]);
-        } elseif ($invoice->is_group && $invoice->group) {
-            $invoice->group->update(['customer_id' => $validated['customer_id']]);
-            $invoice->group->customers()->sync([$validated['customer_id']]);
-        }
-
-        if ($groupSpecimensData) {
-            $settingsMap = Setting::all()->pluck('setting_value', 'setting_key')->toArray();
-            foreach ($groupSpecimensData as $item) {
-                $igs = InvoiceSpecimen::with(['examination.prices', 'specimen.examination.prices'])->findOrFail($item['id']);
-                $examination = $igs->examination ?? $igs->specimen?->examination;
-
-                $calc = InvoiceCalculationService::calculateItem($item, $examination, $settingsMap);
-
-                $igs->update([
-                    'quantity' => $calc['quantity'],
-                    'amount' => $calc['amount'],
-                    'discount' => $calc['discount'],
-                    'subtotal' => $calc['subtotal'],
-                    'exempt_amount' => $calc['exempt_amount'],
-                    'taxable_amount_15' => 0.00,
-                    'taxable_amount_18' => 0.00,
-                    'isv_15' => 0.00,
-                    'isv_18' => 0.00,
-                    'total' => $calc['total'],
-                    'selected_price' => $calc['selected_price'],
-                    'custom_specimen_price' => $calc['custom_specimen_price'],
-                    'additional_discount_enabled' => $calc['additional_discount_enabled'],
-                    'additional_discount' => $calc['additional_discount'],
-                    'age_discount_type' => $calc['age_discount_type'],
-                    'age_discount_amount' => $calc['age_discount_amount'],
-                ]);
+            // Sync customer to related models
+            if (! $invoice->is_group && $invoice->specimen) {
+                $invoice->specimen->update(['customer' => $validated['customer_id']]);
+            } elseif ($invoice->is_group && $invoice->group) {
+                $invoice->group->update(['customer_id' => $validated['customer_id']]);
+                $invoice->group->customers()->sync([$validated['customer_id']]);
             }
 
-            // Recalculate consolidated totals across all line items of this invoice
-            $allInvoiceSpecimens = InvoiceSpecimen::where('invoice_id', $invoice->id)->get();
-            $calculatedItemsForConsolidation = [];
-            foreach ($allInvoiceSpecimens as $invSpec) {
-                $calculatedItemsForConsolidation[] = [
-                    'amount' => (float) $invSpec->amount,
-                    'discount' => (float) $invSpec->discount,
-                    'quantity' => (int) $invSpec->quantity,
-                    'subtotal' => (float) $invSpec->subtotal,
-                    'exempt_amount' => (float) $invSpec->exempt_amount,
-                    'taxable_amount_15' => (float) $invSpec->taxable_amount_15,
-                    'taxable_amount_18' => (float) $invSpec->taxable_amount_18,
-                    'isv_15' => (float) $invSpec->isv_15,
-                    'isv_18' => (float) $invSpec->isv_18,
-                    'total' => (float) $invSpec->total,
-                ];
-            }
+            if ($groupSpecimensData) {
+                $settingsMap = Setting::all()->pluck('setting_value', 'setting_key')->toArray();
+                foreach ($groupSpecimensData as $item) {
+                    $igs = InvoiceSpecimen::with(['examination.prices', 'specimen.examination.prices'])->findOrFail($item['id']);
+                    $examination = $igs->examination ?? $igs->specimen?->examination;
 
-            $insumosTotal = 0.00;
-            if ($invoice->specimen) {
-                foreach ($invoice->specimen->products as $prod) {
-                    $insumosTotal += (float) ($prod->pivot->price ?? $prod->price) * (int) ($prod->pivot->quantity ?? 1);
+                    $calc = InvoiceCalculationService::calculateItem($item, $examination, $settingsMap);
+
+                    $igs->update([
+                        'quantity' => $calc['quantity'],
+                        'amount' => $calc['amount'],
+                        'discount' => $calc['discount'],
+                        'subtotal' => $calc['subtotal'],
+                        'exempt_amount' => $calc['exempt_amount'],
+                        'taxable_amount_15' => 0.00,
+                        'taxable_amount_18' => 0.00,
+                        'isv_15' => 0.00,
+                        'isv_18' => 0.00,
+                        'total' => $calc['total'],
+                        'selected_price' => $calc['selected_price'],
+                        'custom_specimen_price' => $calc['custom_specimen_price'],
+                        'additional_discount_enabled' => $calc['additional_discount_enabled'],
+                        'additional_discount' => $calc['additional_discount'],
+                        'age_discount_type' => $calc['age_discount_type'],
+                        'age_discount_amount' => $calc['age_discount_amount'],
+                    ]);
                 }
-            } elseif ($invoice->group) {
-                foreach ($invoice->group->specimens as $grpSpec) {
-                    foreach ($grpSpec->products as $prod) {
+
+                // Recalculate consolidated totals across all line items of this invoice
+                $allInvoiceSpecimens = InvoiceSpecimen::where('invoice_id', $invoice->id)->get();
+                $calculatedItemsForConsolidation = [];
+                foreach ($allInvoiceSpecimens as $invSpec) {
+                    $calculatedItemsForConsolidation[] = [
+                        'amount' => (float) $invSpec->amount,
+                        'discount' => (float) $invSpec->discount,
+                        'quantity' => (int) $invSpec->quantity,
+                        'subtotal' => (float) $invSpec->subtotal,
+                        'exempt_amount' => (float) $invSpec->exempt_amount,
+                        'taxable_amount_15' => (float) $invSpec->taxable_amount_15,
+                        'taxable_amount_18' => (float) $invSpec->taxable_amount_18,
+                        'isv_15' => (float) $invSpec->isv_15,
+                        'isv_18' => (float) $invSpec->isv_18,
+                        'total' => (float) $invSpec->total,
+                    ];
+                }
+
+                $insumosTotal = 0.00;
+                if ($invoice->specimen) {
+                    foreach ($invoice->specimen->products as $prod) {
                         $insumosTotal += (float) ($prod->pivot->price ?? $prod->price) * (int) ($prod->pivot->quantity ?? 1);
                     }
+                } elseif ($invoice->group) {
+                    foreach ($invoice->group->specimens as $grpSpec) {
+                        foreach ($grpSpec->products as $prod) {
+                            $insumosTotal += (float) ($prod->pivot->price ?? $prod->price) * (int) ($prod->pivot->quantity ?? 1);
+                        }
+                    }
                 }
+
+                $customAmountVal = ! empty($validated['custom_amount_enabled']) ? (float) ($validated['custom_amount'] ?? 0.00) : 0.00;
+                $consolidated = InvoiceCalculationService::calculateConsolidatedTotals($calculatedItemsForConsolidation, $insumosTotal, $customAmountVal);
+
+                $invoice->update(array_merge($consolidated, [
+                    'total_paid' => $invoice->payment_type !== 'credit' ? $consolidated['total'] : ($validated['total_paid'] ?? 0.00),
+                ]));
             }
 
-            $customAmountVal = ! empty($validated['custom_amount_enabled']) ? (float) ($validated['custom_amount'] ?? 0.00) : 0.00;
-            $consolidated = InvoiceCalculationService::calculateConsolidatedTotals($calculatedItemsForConsolidation, $insumosTotal, $customAmountVal);
-
-            $invoice->update(array_merge($consolidated, [
-                'total_paid' => $invoice->payment_type !== 'credit' ? $consolidated['total'] : $invoice->total_paid,
-            ]));
-        }
-
-        // Update parent Credit record if present
-        if ($invoice->credit_payment_id) {
-            $credit = Credit::find($invoice->credit_payment_id);
-            if ($credit) {
+            // Manage Credit record
+            if ($validated['payment_type'] === 'credit') {
+                $credit = $invoice->credit_payment_id ? Credit::find($invoice->credit_payment_id) : null;
                 $freshTotal = (float) $invoice->fresh()->total;
-                // If it's a single specimen credit, synchronize invoice_specimens
+                $initialPaymentAmount = $request->boolean('has_initial_payment')
+                    ? (float) ($request->input('initial_payment_amount', 0.00))
+                    : 0.00;
+
+                if (! $credit) {
+                    $isGroup = (bool) ($invoice->is_group || $invoice->group_id || $invoice->group);
+                    $groupId = $invoice->group_id ?? $invoice->group?->id;
+                    $specimenId = $invoice->specimen_id;
+                    $customerId = $validated['customer_id'] ?? $invoice->customer_id;
+
+                    $credit = Credit::create([
+                        'customer_id' => $customerId,
+                        'credit_amount' => $freshTotal,
+                        'amount_paid' => $initialPaymentAmount,
+                        'amount_remaining' => max(0.00, $freshTotal - $initialPaymentAmount),
+                        'status' => 'pending',
+                        'specimen_id' => $specimenId,
+                        'is_group' => $isGroup,
+                        'group_id' => $groupId,
+                    ]);
+
+                    $invoice->update([
+                        'credit_payment_id' => $credit->id,
+                        'total_paid' => $initialPaymentAmount,
+                    ]);
+
+                    // Actualizar los invoice_specimens vinculados con el nuevo credit_id y is_paid = false
+                    $specimenQuery = InvoiceSpecimen::where('invoice_id', $invoice->id);
+                    if ($groupId) {
+                        $specimenQuery->orWhere('group_id', $groupId);
+                    }
+                    if ($specimenId) {
+                        $specimenQuery->orWhere('specimen_id', $specimenId);
+                    }
+                    $specimenQuery->update([
+                        'credit_id' => $credit->id,
+                        'is_paid' => false,
+                        'quantity_paid' => 0,
+                    ]);
+                } else {
+                    $amountPaid = (float) $credit->amount_paid;
+                    if ($amountPaid === 0.0 && $initialPaymentAmount > 0) {
+                        $amountPaid = $initialPaymentAmount;
+                    }
+
+                    $credit->update([
+                        'customer_id' => $validated['customer_id'] ?? $invoice->customer_id,
+                        'credit_amount' => $freshTotal,
+                        'amount_paid' => $amountPaid,
+                        'amount_remaining' => max(0.0, $freshTotal - $amountPaid),
+                    ]);
+
+                    // Actualizar los invoice_specimens vinculados si no estaban vinculados al credit_id
+                    InvoiceSpecimen::where('invoice_id', $invoice->id)
+                        ->where(function ($q) use ($credit) {
+                            $q->whereNull('credit_id')->orWhere('credit_id', '!=', $credit->id);
+                        })
+                        ->update([
+                            'credit_id' => $credit->id,
+                            'is_paid' => false,
+                            'quantity_paid' => 0,
+                        ]);
+                }
+
+                // If it's a single specimen credit, synchronize invoice_specimens details
                 if (! $credit->is_group && $invoice->specimen_id) {
                     $cis = InvoiceSpecimen::where('credit_id', $credit->id)
                         ->where('invoice_id', $invoice->id)
@@ -824,17 +914,13 @@ class InvoiceController extends Controller
                             'isv_15' => 0.00,
                             'isv_18' => 0.00,
                             'total' => $freshTotal,
+                            'is_paid' => false,
+                            'quantity_paid' => 0,
                         ]);
                     }
                 }
-
-                $amountPaid = (float) $credit->amount_paid;
-                $credit->update([
-                    'credit_amount' => $freshTotal,
-                    'amount_remaining' => max(0.0, $freshTotal - $amountPaid),
-                ]);
             }
-        }
+        });
 
         if ($request->boolean('regenerate_pdf', true)) {
             try {
