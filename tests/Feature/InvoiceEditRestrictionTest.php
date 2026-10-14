@@ -370,3 +370,38 @@ test('editing a group invoice without invoice number to credit creates Credit an
     expect($igs2->is_paid)->toBeFalse();
     expect($igs2->quantity_paid)->toBe(0);
 });
+
+test('editing invoice details updates custom invoice_date successfully', function () {
+    $invoice = Invoice::create([
+        'customer_id' => $this->customer->id,
+        'created_by_id' => $this->user->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'amount' => 500.00,
+        'discount' => 0.00,
+        'subtotal' => 500.00,
+        'exempt_amount' => 500.00,
+        'tax_exempt_amount' => 500.00,
+        'total' => 500.00,
+        'total_paid' => 500.00,
+        'invoice_file' => 'invoices/test.pdf',
+        'invoice_date' => '2026-01-10 10:00:00',
+    ]);
+
+    $response = $this->put(route('invoices.update', $invoice->id), [
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'amount' => 500.00,
+        'discount' => 0.00,
+        'subtotal' => 500.00,
+        'exempt_amount' => 500.00,
+        'total' => 500.00,
+        'total_paid' => 500.00,
+        'invoice_date' => '2026-08-25',
+    ]);
+
+    $response->assertSessionHasNoErrors();
+    $invoice->refresh();
+    expect($invoice->invoice_date->format('Y-m-d'))->toBe('2026-08-25');
+});

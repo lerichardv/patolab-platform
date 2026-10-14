@@ -1,4 +1,5 @@
 import { useForm } from '@inertiajs/react';
+import { format } from 'date-fns';
 import type { FormEventHandler } from 'react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -15,6 +16,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
@@ -335,9 +337,10 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
 
     const [showConfirm, setShowConfirm] = useState(false);
 
-    const { data, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors, reset } = useForm({
         amount_paid: remainingVal.toFixed(2),
         specimens: credit.is_group ? initialSpecimens : [],
+        invoice_date: format(new Date(), 'yyyy-MM-dd'),
     });
 
     const submit: FormEventHandler = (e) => {
@@ -630,6 +633,22 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
             </div>
 
             <div className="space-y-4 pt-2">
+                {/* Invoice Date */}
+                <div className="space-y-2">
+                    <Label htmlFor="final_invoice_date">
+                        Fecha de Factura *
+                    </Label>
+                    <DatePicker
+                        value={data.invoice_date}
+                        onChange={(date) => setData('invoice_date', date)}
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                        Fecha oficial asignada a la emisión de la factura
+                        fiscal.
+                    </p>
+                    <InputError message={errors.invoice_date} />
+                </div>
+
                 {/* Amount to invoice */}
                 <div className="space-y-2">
                     <Label htmlFor="amount_paid">
@@ -702,6 +721,12 @@ export default function CreditFinalPaymentForm({ credit, onSuccess }: Props) {
                                     permanecerá pendiente hasta que se marque
                                     como pagado.
                                 </>
+                            )}
+                            {data.invoice_date && (
+                                <span className="mt-2 block rounded-md bg-muted p-2 font-mono text-xs text-foreground">
+                                    Fecha de Factura:{' '}
+                                    <strong>{data.invoice_date}</strong>
+                                </span>
                             )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>

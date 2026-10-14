@@ -749,3 +749,109 @@ test('cannot extract all specimens from group', function () {
 
     $response->assertSessionHasErrors('specimen_ids');
 });
+
+test('extracting specimen with social security and custom invoice_date saves the custom date', function () {
+    $originalInvoice = Invoice::create([
+        'customer_id' => $this->customer->id,
+        'created_by_id' => $this->user->id,
+        'payment_type' => 'credit',
+        'amount' => 500.00,
+        'discount' => 0.00,
+        'subtotal' => 500.00,
+        'exempt_amount' => 500.00,
+        'tax_exempt_amount' => 500.00,
+        'total' => 500.00,
+        'total_paid' => 0.00,
+        'invoice_file' => 'invoices/test.pdf',
+        'is_group' => true,
+        'quantity' => 2,
+    ]);
+
+    $group = SpecimenGroup::create([
+        'name' => 'Hospital San Pedro - 2 Muestras',
+        'invoice_id' => $originalInvoice->id,
+        'customer_id' => $this->customer->id,
+        'access_token' => Str::random(32),
+    ]);
+
+    $credit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 500.00,
+        'amount_paid' => 0.00,
+        'amount_remaining' => 500.00,
+        'is_group' => true,
+        'group_id' => $group->id,
+        'status' => 'pending',
+    ]);
+
+    $originalInvoice->update(['credit_payment_id' => $credit->id, 'group_id' => $group->id]);
+
+    $spec1 = Specimen::create([
+        'sequence_code' => 'BIO-0001-08-2026',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->type->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'status' => 'received',
+        'priority_id' => $this->priority->id,
+        'is_group' => true,
+        'group_id' => $group->id,
+    ]);
+
+    InvoiceSpecimen::create([
+        'credit_id' => $credit->id,
+        'invoice_id' => $originalInvoice->id,
+        'specimen_id' => $spec1->id,
+        'is_paid' => 0,
+        'quantity' => 1,
+        'amount' => 250.00,
+        'discount' => 0.00,
+        'subtotal' => 250.00,
+        'exempt_amount' => 250.00,
+        'total' => 250.00,
+    ]);
+
+    $spec2 = Specimen::create([
+        'sequence_code' => 'BIO-0002-08-2026',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->type->id,
+        'specimen_type_examination' => $this->examination->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'status' => 'received',
+        'priority_id' => $this->priority->id,
+        'is_group' => true,
+        'group_id' => $group->id,
+    ]);
+
+    InvoiceSpecimen::create([
+        'credit_id' => $credit->id,
+        'invoice_id' => $originalInvoice->id,
+        'specimen_id' => $spec2->id,
+        'is_paid' => 0,
+        'quantity' => 1,
+        'amount' => 250.00,
+        'discount' => 0.00,
+        'subtotal' => 250.00,
+        'exempt_amount' => 250.00,
+        'total' => 250.00,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->post(route('credits.extract-specimens', $credit->id), [
+            'specimen_ids' => [$spec1->id],
+            'is_social_security' => true,
+            'invoice_date' => '2026-09-15',
+        ]);
+
+    $response->assertRedirect();
+
+    $newGroup = SpecimenGroup::where('id', '!=', $group->id)->first();
+    expect($newGroup)->not->toBeNull();
+
+    $newInvoice = Invoice::where('group_id', $newGroup->id)->first();
+    expect($newInvoice)->not->toBeNull()
+        ->and($newInvoice->invoice_type)->toBe('social security')
+        ->and($newInvoice->invoice_date->format('Y-m-d'))->toBe('2026-09-15');
+});

@@ -15,6 +15,7 @@ use App\Models\SpecimenGroupCustomer;
 use App\Models\SpecimenType;
 use App\Services\DateFilterService;
 use App\Services\InvoicePdfService;
+use Carbon\Carbon;
 use Carbon\CarbonInterval;
 use Illuminate\Http\File;
 use Illuminate\Http\Request;
@@ -653,6 +654,8 @@ class CreditController extends Controller
             'specimens' => $credit->is_group ? 'required|array|min:1' : 'nullable|array',
             'specimens.*.id' => 'required|exists:specimen,id',
             'specimens.*.quantity' => 'required|integer|min:1',
+            'is_social_security' => 'nullable|boolean',
+            'invoice_date' => 'nullable|date',
         ]);
 
         $originalInvoice = Invoice::where('credit_payment_id', $credit->id)
@@ -675,11 +678,20 @@ class CreditController extends Controller
             return redirect()->back()->with('error', 'La factura final de crédito ya ha sido generada previamente.');
         }
 
-        DB::transaction(function () use ($credit, $originalInvoice) {
+        $isSocialSecurity = $request->boolean('is_social_security');
+        $customInvoiceDate = $request->filled('invoice_date')
+            ? Carbon::parse($request->input('invoice_date'))->setTimeFrom(now())
+            : null;
+
+        DB::transaction(function () use ($credit, $originalInvoice, $isSocialSecurity, $customInvoiceDate) {
             $invoiceUpdateData = [
-                'invoice_date' => $originalInvoice->invoice_date ?? $originalInvoice->created_at ?? now(),
+                'invoice_date' => $customInvoiceDate ?? $originalInvoice->invoice_date ?? $originalInvoice->created_at ?? now(),
                 'total_paid' => $originalInvoice->total,
             ];
+
+            if ($isSocialSecurity) {
+                $invoiceUpdateData['invoice_type'] = 'social security';
+            }
 
             // If the invoice does not already have an invoice number, assign one from the active CAI range; otherwise keep the existing one
             $hasExistingInvoiceNumber = ! empty($originalInvoice->full_invoice_number) || ! empty($originalInvoice->invoice_number);
@@ -704,7 +716,7 @@ class CreditController extends Controller
                 $invoiceUpdateData['cai_range_id'] = $caiRange->id;
                 $invoiceUpdateData['invoice_number'] = $invoiceNumber;
                 $invoiceUpdateData['full_invoice_number'] = $fullInvoiceNumber;
-                $invoiceUpdateData['invoice_date'] = $originalInvoice->invoice_date ?? now();
+                $invoiceUpdateData['invoice_date'] = $customInvoiceDate ?? $originalInvoice->invoice_date ?? now();
             }
 
             // Mark line items associated with this credit as paid
@@ -910,6 +922,7 @@ class CreditController extends Controller
             'specimen_ids' => 'required|array|min:1',
             'specimen_ids.*' => 'required|integer|exists:specimen,id',
             'is_social_security' => 'nullable|boolean',
+            'invoice_date' => 'nullable|date',
         ]);
 
         $isSocialSecurity = $request->boolean('is_social_security');
@@ -973,6 +986,7 @@ class CreditController extends Controller
             $originalInvoice,
             $specimenIdsToExtract,
             $isSocialSecurity,
+            $request,
             &$newInvoice,
             &$newCredit
         ) {
@@ -1013,7 +1027,9 @@ class CreditController extends Controller
                 }
 
                 $caiRangeId = $caiRange->id;
-                $invoiceDate = now();
+                $invoiceDate = $request->filled('invoice_date')
+                    ? Carbon::parse($request->input('invoice_date'))->setTimeFrom(now())
+                    : now();
                 $invoiceType = 'social security';
             }
 
