@@ -20,7 +20,8 @@ export default function SpecimenGroupMergeSheet({
     onOpenChange,
     onSuccess,
 }: Props) {
-    const [targetGroupData, setTargetGroupData] = useState<MergeGroupData | null>(null);
+    const [targetGroupData, setTargetGroupData] =
+        useState<MergeGroupData | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [retryCount, setRetryCount] = useState<number>(0);
@@ -71,8 +72,14 @@ export default function SpecimenGroupMergeSheet({
                     <SpecimenGroupMergeSkeleton />
                 ) : error ? (
                     <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
-                        <p className="text-sm font-medium text-destructive">{error}</p>
-                        <Button variant="outline" size="sm" onClick={handleRetry}>
+                        <p className="text-sm font-medium text-destructive">
+                            {error}
+                        </p>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRetry}
+                        >
                             Reintentar
                         </Button>
                     </div>

@@ -407,7 +407,155 @@ export default function SpecimenForm({
 
             return Array.from(ids);
         })(),
-        examinations: [] as Array<any>,
+        examinations: (() => {
+            if (!specimen) {
+                return [] as Array<any>;
+            }
+
+            const inv =
+                specimen.invoice_relation ||
+                specimen.invoiceRelation ||
+                specimen.group?.invoice ||
+                specimen.group_invoice ||
+                specimen.invoice;
+            const invItems = (inv?.invoice_specimens ||
+                inv?.invoiceSpecimens ||
+                specimen.invoice_specimens ||
+                specimen.invoiceSpecimens ||
+                []) as any[];
+
+            const specimenInvItems = invItems.filter(
+                (item: any) =>
+                    !item.specimen_id || item.specimen_id === specimen.id,
+            );
+
+            const initialIds = new Set<string>();
+            if (
+                Array.isArray(specimen.examinations) &&
+                specimen.examinations.length > 0
+            ) {
+                specimen.examinations.forEach((e: any) => {
+                    if (e?.id) {
+                        initialIds.add(String(e.id));
+                    }
+                });
+            }
+            if (
+                Array.isArray(specimen.specimen_examinations) &&
+                specimen.specimen_examinations.length > 0
+            ) {
+                specimen.specimen_examinations.forEach((se: any) => {
+                    const id = se.examination_id || se.id || se.examination?.id;
+                    if (id) {
+                        initialIds.add(String(id));
+                    }
+                });
+            }
+            if (
+                Array.isArray(specimen.specimenExaminations) &&
+                specimen.specimenExaminations.length > 0
+            ) {
+                specimen.specimenExaminations.forEach((se: any) => {
+                    const id = se.examination_id || se.id || se.examination?.id;
+                    if (id) {
+                        initialIds.add(String(id));
+                    }
+                });
+            }
+            if (Array.isArray(invItems) && invItems.length > 0) {
+                invItems.forEach((item: any) => {
+                    if (!item.specimen_id || item.specimen_id === specimen.id) {
+                        const id = item.examination_id || item.examination?.id;
+                        if (id) {
+                            initialIds.add(String(id));
+                        }
+                    }
+                });
+            }
+            if (initialIds.size === 0 && specimen.specimen_type_examination) {
+                initialIds.add(String(specimen.specimen_type_examination));
+            }
+
+            return Array.from(initialIds).map((idStr: string) => {
+                const examId = parseInt(idStr, 10);
+                const invSpec = specimenInvItems.find(
+                    (is: any) =>
+                        (is.examination_id || is.examination?.id) === examId,
+                );
+                const examObj = examinations.find((e: any) => e.id === examId);
+                const presetPrices = examObj?.prices || [];
+
+                if (invSpec) {
+                    let chosenPrice =
+                        invSpec.selected_price && invSpec.selected_price !== '0'
+                            ? invSpec.selected_price.toString()
+                            : parseFloat(invSpec.amount) > 0
+                              ? invSpec.amount.toString()
+                              : '';
+                    let customPrice =
+                        invSpec.custom_specimen_price != null
+                            ? invSpec.custom_specimen_price.toString()
+                            : '0';
+
+                    const matchesPreset = presetPrices.some(
+                        (p: any) =>
+                            Math.abs(
+                                parseFloat(p.amount) - parseFloat(chosenPrice),
+                            ) < 0.01,
+                    );
+
+                    if (
+                        !matchesPreset &&
+                        parseFloat(chosenPrice) > 0 &&
+                        chosenPrice !== 'custom'
+                    ) {
+                        customPrice = chosenPrice;
+                        chosenPrice = 'custom';
+                    } else if (chosenPrice === '0' && presetPrices.length > 0) {
+                        chosenPrice = presetPrices[0].amount.toString();
+                    }
+
+                    return {
+                        examination_id: examId,
+                        quantity: parseInt(invSpec.quantity || 1) || 1,
+                        selected_price:
+                            chosenPrice ||
+                            (presetPrices.length > 0
+                                ? presetPrices[0].amount.toString()
+                                : ''),
+                        custom_specimen_price: customPrice,
+                        additional_discount_enabled: Boolean(
+                            invSpec.additional_discount_enabled,
+                        ),
+                        additional_discount:
+                            invSpec.additional_discount != null
+                                ? invSpec.additional_discount.toString()
+                                : '0',
+                        age_discount_type: invSpec.age_discount_type || null,
+                        age_discount_amount:
+                            invSpec.age_discount_amount != null
+                                ? invSpec.age_discount_amount.toString()
+                                : '0',
+                    };
+                }
+
+                const defaultPrice =
+                    presetPrices.length > 0
+                        ? presetPrices[0].amount.toString()
+                        : '';
+
+                return {
+                    examination_id: examId,
+                    quantity: 1,
+                    selected_price: defaultPrice,
+                    custom_specimen_price: '0',
+                    additional_discount_enabled: false,
+                    additional_discount: '0',
+                    age_discount_type: null,
+                    age_discount_amount: '0',
+                };
+            });
+        })(),
         specimen_category: specimen?.specimen_category
             ? specimen.specimen_category.toString()
             : '',
@@ -1653,6 +1801,10 @@ export default function SpecimenForm({
         const ids = data.selected_examination_ids || [];
 
         if (ids.length === 0) {
+            if (data.examinations && data.examinations.length > 0) {
+                setData('examinations', []);
+            }
+
             return;
         }
 
@@ -1684,8 +1836,16 @@ export default function SpecimenForm({
             }
         });
 
+        const filteredExamConfigs = currentExamConfigs.filter((x: any) =>
+            ids.includes(String(x.examination_id)),
+        );
+
+        if (filteredExamConfigs.length !== currentExamConfigs.length) {
+            updated = true;
+        }
+
         if (updated) {
-            setData('examinations', currentExamConfigs);
+            setData('examinations', filteredExamConfigs);
         }
     }, [data.selected_examination_ids]);
 
@@ -1732,12 +1892,9 @@ export default function SpecimenForm({
             }));
         }
     }, [amountVal, discountVal, consolidatedTotals.quantity]);
-    const selectedPriceVal = parseFloat(data.selected_price) || 0;
+
     const customAmountVal = data.custom_amount_enabled
         ? parseFloat(data.custom_amount) || 0
-        : 0;
-    const additionalDiscountVal = data.additional_discount_enabled
-        ? parseFloat(data.additional_discount) || 0
         : 0;
 
     const selectedCustomer = selectedCustomerData;
@@ -2412,35 +2569,6 @@ export default function SpecimenForm({
                                                                       ),
                                                                   ];
 
-                                                        const examObjs =
-                                                            nextExams.map(
-                                                                (idStr) => {
-                                                                    const examObj =
-                                                                        filteredExaminations.find(
-                                                                            (
-                                                                                e,
-                                                                            ) =>
-                                                                                e.id.toString() ===
-                                                                                idStr,
-                                                                        );
-
-                                                                    return {
-                                                                        examination_id:
-                                                                            parseInt(
-                                                                                idStr,
-                                                                                10,
-                                                                            ),
-                                                                        name: examObj
-                                                                            ? examObj.name
-                                                                            : '',
-                                                                        quantity: 1,
-                                                                        amount: 0,
-                                                                        discount: 0,
-                                                                        subtotal: 0,
-                                                                    };
-                                                                },
-                                                            );
-
                                                         setData((d) => ({
                                                             ...d,
                                                             selected_examination_ids:
@@ -2448,8 +2576,6 @@ export default function SpecimenForm({
                                                             specimen_type_examination:
                                                                 nextExams[0] ||
                                                                 '',
-                                                            examinations:
-                                                                examObjs,
                                                         }));
                                                     }}
                                                     className="cursor-pointer font-medium transition-colors hover:text-primary"
@@ -2512,37 +2638,6 @@ export default function SpecimenForm({
                                                                                       examIdStr,
                                                                                   ];
 
-                                                                        const examObjs =
-                                                                            nextExams.map(
-                                                                                (
-                                                                                    idStr: string,
-                                                                                ) => {
-                                                                                    const examObj =
-                                                                                        filteredExaminations.find(
-                                                                                            (
-                                                                                                e,
-                                                                                            ) =>
-                                                                                                e.id.toString() ===
-                                                                                                idStr,
-                                                                                        );
-
-                                                                                    return {
-                                                                                        examination_id:
-                                                                                            parseInt(
-                                                                                                idStr,
-                                                                                                10,
-                                                                                            ),
-                                                                                        name: examObj
-                                                                                            ? examObj.name
-                                                                                            : '',
-                                                                                        quantity: 1,
-                                                                                        amount: 0,
-                                                                                        discount: 0,
-                                                                                        subtotal: 0,
-                                                                                    };
-                                                                                },
-                                                                            );
-
                                                                         setData(
                                                                             (
                                                                                 d,
@@ -2553,8 +2648,6 @@ export default function SpecimenForm({
                                                                                 specimen_type_examination:
                                                                                     nextExams[0] ||
                                                                                     '',
-                                                                                examinations:
-                                                                                    examObjs,
                                                                             }),
                                                                         );
                                                                     }}

@@ -96,8 +96,8 @@ class SpecimenStatusService
     {
         $currentStatus = $specimen->status;
 
-        // Terminal states cannot advance
-        if (in_array($currentStatus, ['cancelled', 'delivered'])) {
+        // Status not loaded, empty, or terminal states cannot advance
+        if (empty($currentStatus) || in_array($currentStatus, ['cancelled', 'delivered'])) {
             return null;
         }
 
@@ -486,8 +486,11 @@ class SpecimenStatusService
         }
     }
 
-    private function findFallbackNextStatus(string $currentStatus, Collection $flow): ?string
+    private function findFallbackNextStatus(?string $currentStatus, Collection $flow): ?string
     {
+        if (empty($currentStatus)) {
+            return null;
+        }
         $canonicalOrder = [
             'received' => 1,
             'macroscopic_review' => 2,

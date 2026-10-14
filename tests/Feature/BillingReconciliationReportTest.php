@@ -406,7 +406,7 @@ test('excel export returns binary xlsx file with status 200 and formatted paymen
     unlink($tempFile);
 });
 
-test('only invoices with assigned invoice number and paid status appear on the report', function () {
+test('only invoices with assigned invoice number and paid credit appear on the report', function () {
     $date = '2026-08-05 10:00:00';
 
     // 1. Direct cash invoice WITH invoice number -> MUST APPEAR
@@ -460,7 +460,7 @@ test('only invoices with assigned invoice number and paid status appear on the r
         'invoice_type' => 'standard',
     ]);
 
-    // 4. Invoice with credit in 'pending' status -> MUST BE EXCLUDED
+    // 4. Invoice with credit in 'pending' status WITH invoice number -> MUST BE EXCLUDED (money not received yet)
     $pendingCredit = Credit::create([
         'customer_id' => $this->customer->id,
         'credit_amount' => 500.0,
@@ -486,7 +486,7 @@ test('only invoices with assigned invoice number and paid status appear on the r
         'invoice_type' => 'standard',
     ]);
 
-    // 5. Invoice with credit in 'partial' status -> MUST BE EXCLUDED
+    // 5. Invoice with credit in 'partial' status WITH invoice number -> MUST BE EXCLUDED (money not received yet)
     $partialCredit = Credit::create([
         'customer_id' => $this->customer->id,
         'credit_amount' => 600.0,
@@ -542,7 +542,7 @@ test('only invoices with assigned invoice number and paid status appear on the r
     $data = $controller->calculateReportData('2026-08-05', '2026-08-05');
 
     $dayTable = $data['dailyTables'][0];
-    // Only inv1 and inv6 should appear (2 invoices)
+    // Only 2 numbered and paid invoices (inv1, inv6) should appear
     expect(count($dayTable['items']))->toBe(2);
 
     $invoiceNumbers = array_column($dayTable['items'], 'invoice_number');
@@ -550,6 +550,12 @@ test('only invoices with assigned invoice number and paid status appear on the r
         ->and($invoiceNumbers)->toContain('000-001-01-00003006')
         ->and($invoiceNumbers)->not->toContain('000-001-01-00003004')
         ->and($invoiceNumbers)->not->toContain('000-001-01-00003005');
+
+    // Settlement checks
+    expect($dayTable['settlement']['cash'])->toBe(100.0)
+        ->and($dayTable['settlement']['credit'])->toBe(700.0)
+        ->and($dayTable['settlement']['total'])->toBe(800.0)
+        ->and($dayTable['settlement']['is_balanced'])->toBeTrue();
 
     // Also assert generalInvoices contains the continuous invoice list with tax fields
     expect($data)->toHaveKey('generalInvoices')
@@ -846,6 +852,137 @@ test('excel export formulas evaluate to correct net amounts for discounted invoi
     expect($sheetResumen->getCell('F5')->getValue())->toEqual(2900.0)
         ->and($sheetResumen->getCell('G5')->getValue())->toEqual(870.0)
         ->and($sheetResumen->getCell('I5')->getCalculatedValue())->toEqual(2030.0);
+
+    unlink($tempFile);
+});
+
+test('credit invoice appears sequentially between other invoices and Excel export maintains continuous item numbers', function () {
+    $satDate = '2026-08-01 10:00:00';
+    $monDate = '2026-08-03 10:00:00';
+
+    // Day 1 (Saturday): Cash invoice 30125
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00030125',
+        'invoice_number' => '00030125',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 1940.0,
+        'discount' => 300.0,
+        'total' => 1940.0,
+        'total_paid' => 1940.0,
+        'invoice_file' => 'invoices/30125.pdf',
+        'invoice_date' => $satDate,
+        'invoice_type' => 'specimen',
+    ]);
+
+    // Day 1 (Saturday): Credit invoice 30126 (status: paid)
+    $credit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 4235.0,
+        'amount_paid' => 4235.0,
+        'amount_remaining' => 0.0,
+        'status' => 'paid',
+    ]);
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00030126',
+        'invoice_number' => '00030126',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $credit->id,
+        'quantity' => 7,
+        'amount' => 5960.0,
+        'subtotal' => 4235.0,
+        'discount' => 1725.0,
+        'total' => 4235.0,
+        'total_paid' => 4235.0,
+        'invoice_file' => 'invoices/30126.pdf',
+        'invoice_date' => '2026-08-01 10:05:00',
+        'invoice_type' => 'specimen',
+    ]);
+
+    // Day 1 (Saturday): Transfer invoice 30127
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00030127',
+        'invoice_number' => '00030127',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'transfer',
+        'quantity' => 1,
+        'subtotal' => 1000.0,
+        'discount' => 0.0,
+        'total' => 1000.0,
+        'total_paid' => 1000.0,
+        'invoice_file' => 'invoices/30127.pdf',
+        'invoice_date' => '2026-08-01 10:10:00',
+        'invoice_type' => 'specimen',
+    ]);
+
+    // Day 2 (Monday): Cash invoice 30128
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00030128',
+        'invoice_number' => '00030128',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 500.0,
+        'discount' => 0.0,
+        'total' => 500.0,
+        'total_paid' => 500.0,
+        'invoice_file' => 'invoices/30128.pdf',
+        'invoice_date' => $monDate,
+        'invoice_type' => 'specimen',
+    ]);
+
+    $controller = app(BillingReconciliationReportController::class);
+    $data = $controller->calculateReportData('2026-08-01', '2026-08-03');
+
+    // Day 1 check (Saturday)
+    $day1 = $data['dailyTables'][0];
+    expect(count($day1['items']))->toBe(3);
+
+    $invNumbers = array_column($day1['items'], 'invoice_number');
+    expect($invNumbers)->toBe([
+        '000-001-01-00030125',
+        '000-001-01-00030126',
+        '000-001-01-00030127',
+    ]);
+
+    expect($day1['items'][1]['payment_type_code'])->toBe(5)
+        ->and($day1['items'][1]['payment_type_label'])->toBe('Crédito')
+        ->and($day1['settlement']['credit'])->toBe(4235.0)
+        ->and($day1['settlement']['is_balanced'])->toBeTrue();
+
+    // Verify Excel export
+    $response = $this->actingAs($this->user)
+        ->get(route('reports.billing-reconciliation.export', [
+            'date_from' => '2026-08-01',
+            'date_to' => '2026-08-03',
+        ]));
+    $response->assertOk();
+
+    $content = $response->streamedContent();
+    $tempFile = tempnam(sys_get_temp_dir(), 'excel_seq_test');
+    file_put_contents($tempFile, $content);
+
+    $reader = new Xlsx;
+    $spreadsheet = $reader->load($tempFile);
+
+    // Sheet 2 (Liquidación): Item numbers must continue across days
+    $sheetLiquidacion = $spreadsheet->getSheet(1);
+    // Row 4: Day 1 item 1 -> 1
+    // Row 5: Day 1 item 2 -> =+B4+1
+    // Row 6: Day 1 item 3 -> =+B5+1
+    // Row 7: Day 2 item 1 -> =+B6+1 (evaluated value should be 4, NOT 1!)
+    expect($sheetLiquidacion->getCell('B4')->getValue())->toBe(1)
+        ->and($sheetLiquidacion->getCell('B5')->getValue())->toBe('=+B4+1')
+        ->and($sheetLiquidacion->getCell('B6')->getValue())->toBe('=+B5+1')
+        ->and($sheetLiquidacion->getCell('B7')->getValue())->toBe('=+B6+1')
+        ->and($sheetLiquidacion->getCell('B7')->getCalculatedValue())->toBe(4);
 
     unlink($tempFile);
 });

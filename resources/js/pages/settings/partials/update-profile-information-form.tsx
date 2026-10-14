@@ -527,7 +527,7 @@ export default function UpdateProfileInformationForm({
                                         className="mb-2 max-h-[48px] max-w-[160px] object-contain"
                                     />
                                 ) : (
-                                    <div className="mb-2 text-xs italic text-muted-foreground">
+                                    <div className="mb-2 text-xs text-muted-foreground italic">
                                         (Firma digital)
                                     </div>
                                 )}

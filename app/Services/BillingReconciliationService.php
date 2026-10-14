@@ -249,7 +249,7 @@ class BillingReconciliationService
                 ]);
             });
 
-        // Invoices must have an invoice number assigned
+        // Invoices must have an invoice number assigned (correlative CAI series)
         $query->whereNotNull('invoices.invoice_number')
             ->where('invoices.invoice_number', '!=', '');
 

@@ -146,6 +146,7 @@ class Specimen extends Model
 
     protected $appends = [
         'status_color',
+        'status_label',
         'expected_finalization_date',
         'expected_internal_finalization_date',
         'next_status',
@@ -167,6 +168,11 @@ class Specimen extends Model
     public function getStatusColorAttribute(): string
     {
         return self::STATUS_COLORS[$this->status] ?? '#cbd5e1';
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return SpecimenTypeState::ALL_STATUSES[$this->status]['label'] ?? ucfirst(str_replace('_', ' ', (string) $this->status));
     }
 
     public function getNextStatusAttribute(): ?string

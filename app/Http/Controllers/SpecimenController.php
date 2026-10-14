@@ -534,7 +534,7 @@ class SpecimenController extends Controller
                 'created_by_id' => auth()->id(),
                 'specimen_id' => $specimen->id,
                 'payment_type' => $validated['payment_type'],
-                'invoice_date' => (! $isCredit && $fullInvoiceNumber) ? now() : null,
+                'invoice_date' => $fullInvoiceNumber ? now() : null,
                 'credit_payment_id' => $creditId,
                 'quantity' => $qty,
                 'amount' => $unitPrice,
@@ -1006,8 +1006,8 @@ class SpecimenController extends Controller
                     InvoiceSpecimen::create(array_merge($calcItem, [
                         'invoice_id' => $invoice->id,
                         'specimen_id' => $specimen->id,
-                        'is_group' => false,
-                        'group_id' => null,
+                        'is_group' => (bool) $specimen->is_group,
+                        'group_id' => $specimen->is_group ? $specimen->group_id : null,
                         'credit_id' => $creditId,
                         'is_paid' => $invoice->payment_type !== 'credit',
                         'quantity_paid' => $invoice->payment_type !== 'credit' ? $calcItem['quantity'] : 0,
@@ -1025,20 +1025,47 @@ class SpecimenController extends Controller
                 $customAmountVal = $isCustomAmount ? (float) $request->input('custom_amount') : 0.00;
                 $customAmountReasonVal = $isCustomAmount ? ($request->input('custom_amount_reason') ?? null) : null;
 
-                $consolidated = InvoiceCalculationService::calculateConsolidatedTotals($calculatedItems, $insumosTotal, $customAmountVal);
+                if ($specimen->is_group && $specimen->group) {
+                    $allGroupInvoiceItems = InvoiceSpecimen::where('invoice_id', $invoice->id)->get()->map(function ($row) {
+                        return [
+                            'quantity' => $row->quantity,
+                            'amount' => (float) $row->amount,
+                            'discount' => (float) $row->discount,
+                            'subtotal' => (float) $row->subtotal,
+                        ];
+                    })->toArray();
 
-                $invoiceUpdateData = array_merge($consolidated, [
-                    'custom_amount' => $customAmountVal,
-                    'custom_amount_reason' => $customAmountReasonVal,
-                    'age_discount_type' => $request->input('age_discount_type') ?? null,
-                    'age_discount_amount' => (float) ($request->input('age_discount_amount') ?? 0.00),
-                ]);
+                    $groupInsumosTotal = 0.00;
+                    foreach ($specimen->group->specimens as $grpSpec) {
+                        foreach ($grpSpec->products as $prod) {
+                            $groupInsumosTotal += (float) ($prod->pivot->price ?? $prod->price) * (int) ($prod->pivot->quantity ?? 1);
+                        }
+                    }
 
-                if ($invoice->payment_type !== 'credit') {
-                    $invoiceUpdateData['total_paid'] = $consolidated['total'];
+                    $customAmountVal = (float) ($invoice->custom_amount ?? 0.00);
+                    $consolidated = InvoiceCalculationService::calculateConsolidatedTotals($allGroupInvoiceItems, $groupInsumosTotal, $customAmountVal);
+
+                    $invoiceUpdateData = $consolidated;
+                    if ($invoice->payment_type !== 'credit') {
+                        $invoiceUpdateData['total_paid'] = $consolidated['total'];
+                    }
+                    $invoice->update($invoiceUpdateData);
+                } else {
+                    $consolidated = InvoiceCalculationService::calculateConsolidatedTotals($calculatedItems, $insumosTotal, $customAmountVal);
+
+                    $invoiceUpdateData = array_merge($consolidated, [
+                        'custom_amount' => $customAmountVal,
+                        'custom_amount_reason' => $customAmountReasonVal,
+                        'age_discount_type' => $request->input('age_discount_type') ?? null,
+                        'age_discount_amount' => (float) ($request->input('age_discount_amount') ?? 0.00),
+                    ]);
+
+                    if ($invoice->payment_type !== 'credit') {
+                        $invoiceUpdateData['total_paid'] = $consolidated['total'];
+                    }
+
+                    $invoice->update($invoiceUpdateData);
                 }
-
-                $invoice->update($invoiceUpdateData);
 
                 if ($invoice->creditRelation) {
                     $initialPaymentAmount = (float) $invoice->creditRelation->amount_paid;

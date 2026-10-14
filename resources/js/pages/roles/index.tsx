@@ -139,13 +139,15 @@ const permissionRows: PermissionRow[] = [
     },
     {
         label: 'Pacientes',
-        description: 'Visualización y gestión de expedientes de pacientes.',
+        description:
+            'Visualización, gestión de expedientes y acceso al portal de pacientes.',
         module: 'Operaciones del Laboratorio',
         slugs: {
             view: 'patients.view',
             create: 'patients.create',
             edit: 'patients.edit',
             delete: 'patients.delete',
+            manage: 'patients.portal_access',
         },
     },
     {

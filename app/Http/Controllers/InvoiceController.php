@@ -68,9 +68,6 @@ class InvoiceController extends Controller
                 ->first();
         }
 
-        $banks = Bank::all();
-        $examinations = SpecimenTypeExamination::where('active', true)->select('id', 'name', 'specimen_type')->get();
-
         $perPage = $request->integer('per_page', 10);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 10;
@@ -86,7 +83,7 @@ class InvoiceController extends Controller
                 }),
             'filters' => array_merge(
                 $request->only([
-                    'search', 'payment_type', 'customer_id',
+                    'search', 'customer_name', 'payment_type', 'customer_id',
                     'has_credit', 'sort_field', 'sort_direction', 'group_id', 'invoice_type',
                 ]),
                 [
@@ -96,12 +93,12 @@ class InvoiceController extends Controller
                 ]
             ),
             'selectedCustomer' => $selectedCustomer,
-            'banks' => $banks,
-            'examinations' => $examinations,
-            'groups' => SpecimenGroup::select('id', 'name')->orderBy('name', 'asc')->get(),
-            'workOrderTypes' => WorkOrderType::orderBy('name')->get(),
-            'workOrderTasks' => WorkOrderTask::orderBy('name')->get(),
-            'usersList' => User::where('active', true)->orderBy('name')->get(),
+            'banks' => fn () => Bank::all(),
+            'examinations' => fn () => SpecimenTypeExamination::where('active', true)->select('id', 'name', 'specimen_type')->get(),
+            'groups' => fn () => SpecimenGroup::select('id', 'name')->orderBy('name', 'asc')->get(),
+            'workOrderTypes' => fn () => WorkOrderType::orderBy('name')->get(),
+            'workOrderTasks' => fn () => WorkOrderTask::orderBy('name')->get(),
+            'usersList' => fn () => User::where('active', true)->orderBy('name')->get(),
         ]);
     }
 
@@ -124,16 +121,31 @@ class InvoiceController extends Controller
             'creditInvoiceSpecimens.specimen.type:id,name',
             'creditInvoiceSpecimens.examination:id,name',
             'groupSpecimens.specimen.type:id,name',
-            'groupSpecimens.examination:id,name',
-            'creditRelation:id,customer_id,credit_amount,amount_paid,amount_remaining,status',
+            'creditRelation:id,customer_id,credit_amount,amount_paid,amount_remaining,status,is_group,group_id,specimen_id',
             'creditRelation.customer:id,name,id_number',
-            'creditRelation.specimen',
-            'creditRelation.group.specimens',
+            'creditRelation.specimen.customerRelation:id,name',
+            'creditRelation.specimen.type:id,name',
+            'creditRelation.specimen.examination:id,name',
+            'creditRelation.group.invoice',
+            'creditRelation.group.specimens.customerRelation:id,name',
+            'creditRelation.group.specimens.type:id,name',
+            'creditRelation.group.specimens.examination:id,name',
+            'creditRelation.invoices.caiRange:id,cai,full_prefix',
+            'creditRelation.invoices.specimen:id,sequence_code,status,specimen_type',
+            'creditRelation.creditInvoiceSpecimens.examination:id,name',
+            'creditRelation.creditInvoiceSpecimens.specimen.customerRelation:id,name',
+            'creditRelation.creditInvoiceSpecimens.specimen.type:id,name',
+            'creditRelation.creditInvoiceSpecimens.specimen.examination:id,name',
         ]);
 
-        // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
+        // Filter by regular search query (Invoice number, Customer RTN/ID, or Specimen sequence code - omits customer name)
         if ($request->filled('search')) {
             $this->applySearchFilter($query, (string) $request->get('search'));
+        }
+
+        // Filter by customer name specifically
+        if ($request->filled('customer_name')) {
+            $this->applyCustomerNameFilter($query, (string) $request->get('customer_name'));
         }
 
         // Filter by payment type
@@ -327,9 +339,14 @@ class InvoiceController extends Controller
             'creditRelation.specimen.specimenExaminations.examination',
         ]);
 
-        // Filter by search query (Invoice number, Customer name, Customer RTN/ID, or Specimen sequence code)
+        // Filter by regular search query (Invoice number, Customer RTN/ID, or Specimen sequence code - omits customer name)
         if ($request->filled('search')) {
             $this->applySearchFilter($query, (string) $request->get('search'));
+        }
+
+        // Filter by customer name specifically
+        if ($request->filled('customer_name')) {
+            $this->applyCustomerNameFilter($query, (string) $request->get('customer_name'));
         }
 
         // Filter by payment type
@@ -745,12 +762,51 @@ class InvoiceController extends Controller
                     'age_discount_amount' => $calc['age_discount_amount'],
                 ]);
             }
+
+            // Recalculate consolidated totals across all line items of this invoice
+            $allInvoiceSpecimens = InvoiceSpecimen::where('invoice_id', $invoice->id)->get();
+            $calculatedItemsForConsolidation = [];
+            foreach ($allInvoiceSpecimens as $invSpec) {
+                $calculatedItemsForConsolidation[] = [
+                    'amount' => (float) $invSpec->amount,
+                    'discount' => (float) $invSpec->discount,
+                    'quantity' => (int) $invSpec->quantity,
+                    'subtotal' => (float) $invSpec->subtotal,
+                    'exempt_amount' => (float) $invSpec->exempt_amount,
+                    'taxable_amount_15' => (float) $invSpec->taxable_amount_15,
+                    'taxable_amount_18' => (float) $invSpec->taxable_amount_18,
+                    'isv_15' => (float) $invSpec->isv_15,
+                    'isv_18' => (float) $invSpec->isv_18,
+                    'total' => (float) $invSpec->total,
+                ];
+            }
+
+            $insumosTotal = 0.00;
+            if ($invoice->specimen) {
+                foreach ($invoice->specimen->products as $prod) {
+                    $insumosTotal += (float) ($prod->pivot->price ?? $prod->price) * (int) ($prod->pivot->quantity ?? 1);
+                }
+            } elseif ($invoice->group) {
+                foreach ($invoice->group->specimens as $grpSpec) {
+                    foreach ($grpSpec->products as $prod) {
+                        $insumosTotal += (float) ($prod->pivot->price ?? $prod->price) * (int) ($prod->pivot->quantity ?? 1);
+                    }
+                }
+            }
+
+            $customAmountVal = ! empty($validated['custom_amount_enabled']) ? (float) ($validated['custom_amount'] ?? 0.00) : 0.00;
+            $consolidated = InvoiceCalculationService::calculateConsolidatedTotals($calculatedItemsForConsolidation, $insumosTotal, $customAmountVal);
+
+            $invoice->update(array_merge($consolidated, [
+                'total_paid' => $invoice->payment_type !== 'credit' ? $consolidated['total'] : $invoice->total_paid,
+            ]));
         }
 
         // Update parent Credit record if present
         if ($invoice->credit_payment_id) {
             $credit = Credit::find($invoice->credit_payment_id);
             if ($credit) {
+                $freshTotal = (float) $invoice->fresh()->total;
                 // If it's a single specimen credit, synchronize invoice_specimens
                 if (! $credit->is_group && $invoice->specimen_id) {
                     $cis = InvoiceSpecimen::where('credit_id', $credit->id)
@@ -759,24 +815,23 @@ class InvoiceController extends Controller
                         ->first();
                     if ($cis) {
                         $cis->update([
-                            'amount' => (float) $validated['amount'] - (float) ($validated['custom_amount'] ?? 0),
-                            'discount' => (float) $validated['discount'],
-                            'subtotal' => (float) $validated['subtotal'],
-                            'exempt_amount' => (float) $validated['total'],
+                            'amount' => (float) $invoice->fresh()->amount - (float) ($invoice->fresh()->custom_amount ?? 0),
+                            'discount' => (float) $invoice->fresh()->discount,
+                            'subtotal' => (float) $invoice->fresh()->subtotal,
+                            'exempt_amount' => $freshTotal,
                             'taxable_amount_15' => 0.00,
                             'taxable_amount_18' => 0.00,
                             'isv_15' => 0.00,
                             'isv_18' => 0.00,
-                            'total' => (float) $validated['total'],
+                            'total' => $freshTotal,
                         ]);
                     }
                 }
 
-                $newTotal = (float) $validated['total'];
                 $amountPaid = (float) $credit->amount_paid;
                 $credit->update([
-                    'credit_amount' => $newTotal,
-                    'amount_remaining' => max(0.0, $newTotal - $amountPaid),
+                    'credit_amount' => $freshTotal,
+                    'amount_remaining' => max(0.0, $freshTotal - $amountPaid),
                 ]);
             }
         }
@@ -977,7 +1032,8 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Apply accent-insensitive, case-insensitive, and punctuation-insensitive search filters.
+     * Apply regular search filter: Invoice number, customer RTN, or specimen sequence code.
+     * Note: Customer name search is intentionally omitted here for maximum performance and separated into applyCustomerNameFilter.
      */
     protected function applySearchFilter($query, string $search): void
     {
@@ -986,75 +1042,132 @@ class InvoiceController extends Controller
             return;
         }
 
-        $asciiSearch = Str::ascii($search);
         $alphanumeric = preg_replace('/[^a-zA-Z0-9]/', '', $search);
-        $words = array_values(array_filter(preg_split('/\s+/', preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $search))));
+
+        // 1. Customer IDs matched by RTN / ID number only
+        $customerIds = collect();
+        if ($alphanumeric !== '') {
+            $customerIds = Customer::where('id_number', 'like', "%{$search}%")
+                ->orWhereRaw("REPLACE(REPLACE(REPLACE(id_number, '-', ''), ' ', ''), '.', '') LIKE ?", ["%{$alphanumeric}%"])
+                ->pluck('id');
+        }
+
+        // 2. Specimen IDs and Specimen Group IDs matched by sequence code
+        $specimenQuery = Specimen::query();
+        $specimenQuery->where('sequence_code', 'like', "%{$search}%");
+        if ($alphanumeric !== '') {
+            $specimenQuery->orWhereRaw("REPLACE(REPLACE(sequence_code, '-', ''), ' ', '') LIKE ?", ["%{$alphanumeric}%"]);
+        }
+        $matchingSpecimens = $specimenQuery->select('id', 'group_id')->get();
+        $specimenIds = $matchingSpecimens->pluck('id');
+        $groupIds = $matchingSpecimens->pluck('group_id')->filter()->unique()->values();
+
+        // 3. Invoices linked via itemized breakdown records
+        $breakdownInvoiceIds = $specimenIds->isNotEmpty()
+            ? InvoiceSpecimen::whereIn('specimen_id', $specimenIds)->pluck('invoice_id')->filter()->unique()
+            : collect();
+
+        // 4. Credits linked to matching specimens or specimen groups
+        $creditIds = ($specimenIds->isNotEmpty() || $groupIds->isNotEmpty())
+            ? Credit::where(function ($cq) use ($specimenIds, $groupIds) {
+                if ($specimenIds->isNotEmpty()) {
+                    $cq->whereIn('specimen_id', $specimenIds);
+                }
+                if ($groupIds->isNotEmpty()) {
+                    $cq->orWhereIn('group_id', $groupIds);
+                }
+            })->pluck('id')->filter()->unique()
+            : collect();
+
+        $creditBreakdownIds = $specimenIds->isNotEmpty()
+            ? InvoiceSpecimen::whereIn('specimen_id', $specimenIds)->whereNotNull('credit_id')->pluck('credit_id')->filter()->unique()
+            : collect();
+
+        $allCreditIds = $creditIds->merge($creditBreakdownIds)->unique();
+
+        // Combine into direct indexed lookup on invoices table
+        $query->where(function ($q) use ($search, $alphanumeric, $customerIds, $specimenIds, $groupIds, $breakdownInvoiceIds, $allCreditIds) {
+            $q->where('full_invoice_number', 'like', "%{$search}%")
+                ->orWhere('invoice_number', 'like', "%{$search}%");
+
+            if ($alphanumeric !== '') {
+                $q->orWhereRaw("REPLACE(REPLACE(full_invoice_number, '-', ''), ' ', '') LIKE ?", ["%{$alphanumeric}%"])
+                    ->orWhere('invoice_number', 'like', "%{$alphanumeric}%");
+            }
+
+            if ($customerIds->isNotEmpty()) {
+                $q->orWhereIn('customer_id', $customerIds);
+            }
+
+            if ($specimenIds->isNotEmpty()) {
+                $q->orWhereIn('specimen_id', $specimenIds);
+            }
+
+            if ($groupIds->isNotEmpty()) {
+                $q->orWhereIn('group_id', $groupIds);
+            }
+
+            if ($breakdownInvoiceIds->isNotEmpty()) {
+                $q->orWhereIn('id', $breakdownInvoiceIds);
+            }
+
+            if ($allCreditIds->isNotEmpty()) {
+                $q->orWhereIn('credit_payment_id', $allCreditIds);
+            }
+        });
+    }
+
+    /**
+     * Apply accent-insensitive, case-insensitive, word-aware search specifically for customer name.
+     */
+    protected function applyCustomerNameFilter($query, string $customerName): void
+    {
+        $customerName = trim($customerName);
+        if ($customerName === '') {
+            return;
+        }
+
+        $asciiSearch = Str::ascii($customerName);
+        $words = array_values(array_filter(preg_split('/\s+/', preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $customerName))));
         $wordsAscii = array_values(array_filter(preg_split('/\s+/', preg_replace('/[^a-zA-Z0-9\s]/', ' ', $asciiSearch))));
 
-        $query->where(function ($q) use ($search, $asciiSearch, $alphanumeric, $words, $wordsAscii) {
-            // 1. Full invoice number & invoice number
-            $q->where(function ($invQ) use ($search, $alphanumeric) {
-                $invQ->where('full_invoice_number', 'like', "%{$search}%")
-                    ->orWhere('invoice_number', 'like', "%{$search}%");
+        $customerQuery = Customer::query();
+        $customerQuery->where(function ($sub) use ($customerName, $asciiSearch, $words, $wordsAscii) {
+            $sub->where('name', 'like', "%{$customerName}%");
+            if ($asciiSearch !== $customerName) {
+                $sub->orWhere('name', 'like', "%{$asciiSearch}%");
+            }
 
-                if ($alphanumeric !== '') {
-                    $invQ->orWhereRaw("REPLACE(REPLACE(full_invoice_number, '-', ''), ' ', '') LIKE ?", ["%{$alphanumeric}%"])
-                        ->orWhere('invoice_number', 'like', "%{$alphanumeric}%");
-                }
-            });
-
-            // 2. Customer name and ID number (RTN)
-            $q->orWhereHas('customer', function ($cq) use ($search, $asciiSearch, $alphanumeric, $words, $wordsAscii) {
-                $cq->where(function ($sub) use ($search, $asciiSearch, $alphanumeric, $words, $wordsAscii) {
-                    $sub->where('name', 'like', "%{$search}%");
-                    if ($asciiSearch !== $search) {
-                        $sub->orWhere('name', 'like', "%{$asciiSearch}%");
-                    }
-
-                    if (count($words) > 1) {
-                        $sub->orWhere(function ($wq) use ($words) {
-                            foreach ($words as $w) {
-                                $wq->where('name', 'like', "%{$w}%");
-                            }
-                        });
-                    }
-
-                    if (count($wordsAscii) > 1 && $wordsAscii !== $words) {
-                        $sub->orWhere(function ($wq) use ($wordsAscii) {
-                            foreach ($wordsAscii as $w) {
-                                $wq->where('name', 'like', "%{$w}%");
-                            }
-                        });
-                    }
-
-                    $sub->orWhere('id_number', 'like', "%{$search}%");
-                    if ($alphanumeric !== '') {
-                        $sub->orWhereRaw("REPLACE(REPLACE(REPLACE(id_number, '-', ''), ' ', ''), '.', '') LIKE ?", ["%{$alphanumeric}%"]);
+            if (count($words) > 1) {
+                $sub->orWhere(function ($wq) use ($words) {
+                    foreach ($words as $w) {
+                        $wq->where('name', 'like', "%{$w}%");
                     }
                 });
-            });
+            }
 
-            // 3. Specimen sequence code across all related specimens
-            $specimenRelations = [
-                'specimen',
-                'group.specimens',
-                'groupSpecimens.specimen',
-                'creditInvoiceSpecimens.specimen',
-                'creditRelation.specimen',
-                'creditRelation.group.specimens',
-                'creditRelation.creditInvoiceSpecimens.specimen',
-            ];
-
-            foreach ($specimenRelations as $relation) {
-                $q->orWhereHas($relation, function ($sq) use ($search, $alphanumeric) {
-                    $sq->where(function ($subSq) use ($search, $alphanumeric) {
-                        $subSq->where('sequence_code', 'like', "%{$search}%");
-                        if ($alphanumeric !== '') {
-                            $subSq->orWhereRaw("REPLACE(REPLACE(sequence_code, '-', ''), ' ', '') LIKE ?", ["%{$alphanumeric}%"]);
-                        }
-                    });
+            if (count($wordsAscii) > 1 && $wordsAscii !== $words) {
+                $sub->orWhere(function ($wq) use ($wordsAscii) {
+                    foreach ($wordsAscii as $w) {
+                        $wq->where('name', 'like', "%{$w}%");
+                    }
                 });
             }
         });
+
+        $customerIds = $customerQuery->pluck('id');
+
+        if ($customerIds->isNotEmpty()) {
+            $creditIds = Credit::whereIn('customer_id', $customerIds)->pluck('id');
+
+            $query->where(function ($q) use ($customerIds, $creditIds) {
+                $q->whereIn('customer_id', $customerIds);
+                if ($creditIds->isNotEmpty()) {
+                    $q->orWhereIn('credit_payment_id', $creditIds);
+                }
+            });
+        } else {
+            $query->whereRaw('1 = 0');
+        }
     }
 }

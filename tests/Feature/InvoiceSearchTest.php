@@ -315,9 +315,9 @@ test('invoice listing search by customer name with and without tildes', function
         'invoice_file' => 'invoice_4.pdf',
     ]);
 
-    // Search without tildes / accents
+    // Dedicated customer_name search without tildes / accents
     $responseWithoutAccents = $this->actingAs($this->user)->get(route('invoices.index', [
-        'search' => 'maria perez',
+        'customer_name' => 'maria perez',
     ]));
 
     $responseWithoutAccents->assertStatus(200);
@@ -327,9 +327,9 @@ test('invoice listing search by customer name with and without tildes', function
         expect($data[0]['id'])->toEqual($invoice->id);
     });
 
-    // Search with tildes
+    // Dedicated customer_name search with tildes
     $responseWithAccents = $this->actingAs($this->user)->get(route('invoices.index', [
-        'search' => 'María Pérez',
+        'customer_name' => 'María Pérez',
     ]));
 
     $responseWithAccents->assertStatus(200);
@@ -337,5 +337,16 @@ test('invoice listing search by customer name with and without tildes', function
         $data = $page->toArray()['props']['invoices']['data'];
         expect($data)->toHaveCount(1);
         expect($data[0]['id'])->toEqual($invoice->id);
+    });
+
+    // Regular search omits customer name
+    $responseRegularSearch = $this->actingAs($this->user)->get(route('invoices.index', [
+        'search' => 'maria perez',
+    ]));
+
+    $responseRegularSearch->assertStatus(200);
+    $responseRegularSearch->assertInertia(function (Assert $page) {
+        $data = $page->toArray()['props']['invoices']['data'];
+        expect($data)->toHaveCount(0);
     });
 });
