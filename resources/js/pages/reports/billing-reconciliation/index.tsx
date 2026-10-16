@@ -60,6 +60,8 @@ interface Props {
         date_to: string;
         customer_id?: string | null;
         search?: string | null;
+        sort_field?: 'invoice_number' | 'invoice_date';
+        sort_direction?: 'asc' | 'desc';
     };
     selectedCustomer?: {
         id: number;
@@ -89,6 +91,12 @@ export default function BillingReconciliationReport({
 
     const [search, setSearch] = useState(filters.search || '');
     const [customerId, setCustomerId] = useState(filters.customer_id || 'all');
+    const [sortField, setSortField] = useState<
+        'invoice_number' | 'invoice_date'
+    >(filters.sort_field || 'invoice_number');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(
+        filters.sort_direction || 'asc',
+    );
     const [dateFrom, setDateFrom] = useState(filters.date_from);
     const [dateTo, setDateTo] = useState(filters.date_to);
     const [isExporting, setIsExporting] = useState(false);
@@ -118,6 +126,8 @@ export default function BillingReconciliationReport({
                 date_to: dateTo,
                 customer_id: customerId !== 'all' ? customerId : null,
                 search: search ? search : null,
+                sort_field: sortField,
+                sort_direction: sortDirection,
                 ...newParams,
             };
 
@@ -137,6 +147,14 @@ export default function BillingReconciliationReport({
                 queryParams.set('search', current.search);
             }
 
+            if (current.sort_field) {
+                queryParams.set('sort_field', current.sort_field);
+            }
+
+            if (current.sort_direction) {
+                queryParams.set('sort_direction', current.sort_direction);
+            }
+
             setIsPending(true);
 
             router.get(
@@ -152,7 +170,7 @@ export default function BillingReconciliationReport({
                 },
             );
         },
-        [dateFrom, dateTo, customerId, search],
+        [dateFrom, dateTo, customerId, search, sortField, sortDirection],
     );
 
     // Debounced search handler without useMemo
@@ -178,6 +196,8 @@ export default function BillingReconciliationReport({
     const handleClearFilters = () => {
         setSearch('');
         setCustomerId('all');
+        setSortField('invoice_number');
+        setSortDirection('asc');
         const defaultRange = getThisMonthRange();
         setDateFrom(defaultRange.from);
         setDateTo(defaultRange.to);
@@ -198,6 +218,17 @@ export default function BillingReconciliationReport({
             {},
             { preserveState: false },
         );
+    };
+
+    // Sort change handler
+    const handleSortChange = (val: string) => {
+        const [field, direction] = val.split(':') as [
+            'invoice_number' | 'invoice_date',
+            'asc' | 'desc',
+        ];
+        setSortField(field);
+        setSortDirection(direction);
+        applyFilters({ sort_field: field, sort_direction: direction });
     };
 
     // Customer filter change
@@ -241,6 +272,14 @@ export default function BillingReconciliationReport({
 
         if (search) {
             queryParams.set('search', search);
+        }
+
+        if (sortField) {
+            queryParams.set('sort_field', sortField);
+        }
+
+        if (sortDirection) {
+            queryParams.set('sort_direction', sortDirection);
         }
 
         window.location.href = `/reports/billing-reconciliation/export?${queryParams.toString()}`;
@@ -336,7 +375,7 @@ export default function BillingReconciliationReport({
                         </div>
                     </div>
 
-                    {/* Row 2: Customer / Empresa and other filters */}
+                    {/* Row 2: Customer / Empresa and Sorting filters */}
                     <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 md:grid-cols-3">
                         <div className="flex w-full flex-col gap-1.5">
                             <span className="text-xs font-semibold text-muted-foreground">
@@ -349,6 +388,46 @@ export default function BillingReconciliationReport({
                                 initialCustomer={selectedCustomer || undefined}
                                 allowClear
                             />
+                        </div>
+
+                        <div className="flex w-full flex-col gap-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                Ordenar por
+                            </span>
+                            <Select
+                                value={`${sortField}:${sortDirection}`}
+                                onValueChange={handleSortChange}
+                            >
+                                <SelectTrigger className="h-10 text-xs">
+                                    <SelectValue placeholder="Ordenar por..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        value="invoice_number:asc"
+                                        className="text-xs"
+                                    >
+                                        Nº Factura (Ascendente)
+                                    </SelectItem>
+                                    <SelectItem
+                                        value="invoice_number:desc"
+                                        className="text-xs"
+                                    >
+                                        Nº Factura (Descendente)
+                                    </SelectItem>
+                                    <SelectItem
+                                        value="invoice_date:asc"
+                                        className="text-xs"
+                                    >
+                                        Fecha Factura (Ascendente)
+                                    </SelectItem>
+                                    <SelectItem
+                                        value="invoice_date:desc"
+                                        className="text-xs"
+                                    >
+                                        Fecha Factura (Descendente)
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
                 </div>
@@ -363,7 +442,7 @@ export default function BillingReconciliationReport({
                             className={`space-y-6 transition-opacity duration-200 ${isPending ? 'pointer-events-none opacity-60' : ''}`}
                         >
                             {/* Period Top Stats Overview */}
-                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                                 <Card className="border border-border/80 bg-card p-3.5 shadow-xs">
                                     <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                                         Total Facturado
@@ -444,6 +523,23 @@ export default function BillingReconciliationReport({
                                     </p>
                                     <p className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
                                         Bancos en línea
+                                    </p>
+                                </Card>
+
+                                <Card className="border border-border/80 bg-card p-3.5 shadow-xs">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                            5. Crédito
+                                        </p>
+                                        <div className="h-2 w-2 rounded-full bg-indigo-500" />
+                                    </div>
+                                    <p className="mt-1 font-mono text-lg font-bold text-foreground">
+                                        {formatCurrency(
+                                            reportData.periodTotals.credit,
+                                        )}
+                                    </p>
+                                    <p className="mt-0.5 text-[11px] text-indigo-600 dark:text-indigo-400">
+                                        Factura generada
                                     </p>
                                 </Card>
                             </div>
@@ -559,6 +655,16 @@ export default function BillingReconciliationReport({
                                     periodTotals={reportData.periodTotals}
                                     dateRange={reportData.dateRange}
                                     onSelectInvoice={handleSelectInvoice}
+                                    sortField={sortField}
+                                    sortDirection={sortDirection}
+                                    onSortChange={(field, direction) => {
+                                        setSortField(field);
+                                        setSortDirection(direction);
+                                        applyFilters({
+                                            sort_field: field,
+                                            sort_direction: direction,
+                                        });
+                                    }}
                                 />
                             ) : (
                                 <PeriodSummaryTable

@@ -1,4 +1,4 @@
-import { Eye, Search } from 'lucide-react';
+import { Eye, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useState } from 'react';
 import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +51,12 @@ interface Props {
         to_formatted: string;
     };
     onSelectInvoice: (invoice: any) => void;
+    sortField?: 'invoice_number' | 'invoice_date';
+    sortDirection?: 'asc' | 'desc';
+    onSortChange?: (
+        field: 'invoice_number' | 'invoice_date',
+        direction: 'asc' | 'desc',
+    ) => void;
 }
 
 const formatCurrency = (val: number): string => {
@@ -68,6 +74,9 @@ export default function GeneralSettlementTable({
     periodTotals,
     dateRange,
     onSelectInvoice,
+    sortField,
+    sortDirection,
+    onSortChange,
 }: Props) {
     const [filterQuery, setFilterQuery] = useState('');
 
@@ -85,6 +94,32 @@ export default function GeneralSettlementTable({
             inv.comment.toLowerCase().includes(q)
         );
     });
+
+    const renderSortIcon = (field: 'invoice_number' | 'invoice_date') => {
+        if (sortField !== field) {
+            return (
+                <ArrowUpDown className="ml-1 h-3 w-3 text-muted-foreground/60" />
+            );
+        }
+
+        return sortDirection === 'asc' ? (
+            <ArrowUp className="ml-1 h-3 w-3 text-primary" />
+        ) : (
+            <ArrowDown className="ml-1 h-3 w-3 text-primary" />
+        );
+    };
+
+    const handleHeaderSort = (field: 'invoice_number' | 'invoice_date') => {
+        if (!onSortChange) {
+            return;
+        }
+
+        if (sortField === field) {
+            onSortChange(field, sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            onSortChange(field, 'asc');
+        }
+    };
 
     return (
         <Card className="overflow-hidden border border-border shadow-xs">
@@ -129,11 +164,39 @@ export default function GeneralSettlementTable({
                                 <TableHead className="w-12 text-center font-bold">
                                     #
                                 </TableHead>
-                                <TableHead className="w-24 text-center font-bold">
-                                    Fecha
+                                <TableHead className="w-28 text-center font-bold">
+                                    {onSortChange ? (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleHeaderSort('invoice_date')
+                                            }
+                                            className="inline-flex cursor-pointer items-center justify-center gap-1 transition-colors hover:text-foreground"
+                                        >
+                                            <span>Fecha</span>
+                                            {renderSortIcon('invoice_date')}
+                                        </button>
+                                    ) : (
+                                        'Fecha'
+                                    )}
                                 </TableHead>
-                                <TableHead className="w-44 text-center font-bold">
-                                    No. de Factura
+                                <TableHead className="w-48 text-center font-bold">
+                                    {onSortChange ? (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleHeaderSort(
+                                                    'invoice_number',
+                                                )
+                                            }
+                                            className="inline-flex cursor-pointer items-center justify-center gap-1 transition-colors hover:text-foreground"
+                                        >
+                                            <span>No. de Factura</span>
+                                            {renderSortIcon('invoice_number')}
+                                        </button>
+                                    ) : (
+                                        'No. de Factura'
+                                    )}
                                 </TableHead>
                                 <TableHead className="min-w-[200px] font-bold">
                                     Nombre Paciente / Cliente
