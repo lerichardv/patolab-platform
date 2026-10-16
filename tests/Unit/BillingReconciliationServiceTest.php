@@ -182,3 +182,32 @@ test('calculateInvoiceRow categorizes credit with invoice generated status as pa
         ->and($row['payment_type_label'])->toBe('Crédito')
         ->and($row['net_amount'])->toEqual(1500.0);
 });
+
+test('calculateInvoiceRow categorizes credit with pending status as payment code 5 Crédito', function () {
+    $invoice = new Invoice([
+        'full_invoice_number' => '000-001-01-00055556',
+        'payment_type' => 'credit',
+        'quantity' => 1,
+        'amount' => 2200.0,
+        'discount' => 0.0,
+        'subtotal' => 2200.0,
+        'exempt_amount' => 2200.0,
+        'total' => 2200.0,
+        'total_paid' => 0.0,
+        'pay_isv' => false,
+        'invoice_type' => 'standard',
+    ]);
+    $invoice->id = 556;
+
+    $credit = new Credit([
+        'status' => 'pending',
+    ]);
+    $invoice->setRelation('creditRelation', $credit);
+
+    $row = $this->service->calculateInvoiceRow($invoice, 2, Carbon::parse('2026-09-26'));
+
+    expect($row['is_cancelled'])->toBeFalse()
+        ->and($row['payment_type_code'])->toBe(5)
+        ->and($row['payment_type_label'])->toBe('Crédito')
+        ->and($row['net_amount'])->toEqual(2200.0);
+});

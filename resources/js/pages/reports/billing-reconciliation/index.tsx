@@ -539,7 +539,7 @@ export default function BillingReconciliationReport({
                                         )}
                                     </p>
                                     <p className="mt-0.5 text-[11px] text-indigo-600 dark:text-indigo-400">
-                                        Factura generada
+                                        Facturas al crédito
                                     </p>
                                 </Card>
                             </div>
