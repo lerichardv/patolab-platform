@@ -79,7 +79,7 @@ class BillingReconciliationService
         $pmCode = self::PAYMENT_CODES[$pmKey] ?? 1;
         $pmLabel = self::PAYMENT_LABELS[$pmCode] ?? 'Efectivo';
 
-        if ($invoice->creditRelation && $invoice->creditRelation->status === 'invoice generated') {
+        if ($pmKey === 'credit' || ($invoice->creditRelation && in_array($invoice->creditRelation->status, ['invoice generated', 'pending', 'partial']))) {
             $pmCode = 5;
             $pmLabel = 'Crédito';
         }
@@ -269,26 +269,10 @@ class BillingReconciliationService
             });
 
         // Invoices must have an invoice number assigned (correlative CAI series)
+        // All invoices with a generated invoice number appear on the report (including pending credits)
+        // Cancelled invoices are retained for sequential audit trail with zero fiscal amounts
         $query->whereNotNull('invoices.invoice_number')
             ->where('invoices.invoice_number', '!=', '');
-
-        // Only include invoices that are already paid or finalized:
-        // - Cancelled invoices are retained for sequential audit trail
-        // - Invoices with a credit assigned must have their credit in 'paid' or 'invoice generated' status
-        // - Invoices without a credit assigned must not have payment_type = 'credit'
-        $query->where(function ($q) {
-            $q->where('invoices.invoice_type', 'cancelled')
-                ->orWhere(function ($sub) {
-                    $sub->whereNotNull('invoices.credit_payment_id')
-                        ->whereHas('creditRelation', function ($cq) {
-                            $cq->whereIn('status', ['paid', 'invoice generated']);
-                        });
-                })
-                ->orWhere(function ($sub) {
-                    $sub->whereNull('invoices.credit_payment_id')
-                        ->where('invoices.payment_type', '!=', 'credit');
-                });
-        });
 
         if ($customerId && $customerId !== 'all') {
             $query->where('customer_id', $customerId);

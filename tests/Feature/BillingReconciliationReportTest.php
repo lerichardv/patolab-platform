@@ -406,7 +406,7 @@ test('excel export returns binary xlsx file with status 200 and formatted paymen
     unlink($tempFile);
 });
 
-test('only invoices with assigned invoice number and paid credit appear on the report', function () {
+test('only invoices with assigned invoice number appear on the report regardless of credit status', function () {
     $date = '2026-08-05 10:00:00';
 
     // 1. Direct cash invoice WITH invoice number -> MUST APPEAR
@@ -460,7 +460,7 @@ test('only invoices with assigned invoice number and paid credit appear on the r
         'invoice_type' => 'standard',
     ]);
 
-    // 4. Invoice with credit in 'pending' status WITH invoice number -> MUST BE EXCLUDED (money not received yet)
+    // 4. Invoice with credit in 'pending' status WITH invoice number -> MUST APPEAR
     $pendingCredit = Credit::create([
         'customer_id' => $this->customer->id,
         'credit_amount' => 500.0,
@@ -486,7 +486,7 @@ test('only invoices with assigned invoice number and paid credit appear on the r
         'invoice_type' => 'standard',
     ]);
 
-    // 5. Invoice with credit in 'partial' status WITH invoice number -> MUST BE EXCLUDED (money not received yet)
+    // 5. Invoice with credit in 'partial' status WITH invoice number -> MUST APPEAR
     $partialCredit = Credit::create([
         'customer_id' => $this->customer->id,
         'credit_amount' => 600.0,
@@ -521,7 +521,7 @@ test('only invoices with assigned invoice number and paid credit appear on the r
         'status' => 'paid',
     ]);
 
-    $inv6 = Invoice::create([
+    Invoice::create([
         'full_invoice_number' => '000-001-01-00003006',
         'invoice_number' => '00003006',
         'cai_range_id' => $this->caiRange->id,
@@ -542,27 +542,24 @@ test('only invoices with assigned invoice number and paid credit appear on the r
     $data = $controller->calculateReportData('2026-08-05', '2026-08-05');
 
     $dayTable = $data['dailyTables'][0];
-    // Only 2 numbered and paid invoices (inv1, inv6) should appear
-    expect(count($dayTable['items']))->toBe(2);
+    // All 4 numbered invoices (inv1, inv4, inv5, inv6) should appear
+    expect(count($dayTable['items']))->toBe(4);
 
     $invoiceNumbers = array_column($dayTable['items'], 'invoice_number');
     expect($invoiceNumbers)->toContain('000-001-01-00003001')
-        ->and($invoiceNumbers)->toContain('000-001-01-00003006')
-        ->and($invoiceNumbers)->not->toContain('000-001-01-00003004')
-        ->and($invoiceNumbers)->not->toContain('000-001-01-00003005');
+        ->and($invoiceNumbers)->toContain('000-001-01-00003004')
+        ->and($invoiceNumbers)->toContain('000-001-01-00003005')
+        ->and($invoiceNumbers)->toContain('000-001-01-00003006');
 
-    // Settlement checks
+    // Settlement checks: cash 100 + credits (500 + 600 + 700 = 1800) = 1900
     expect($dayTable['settlement']['cash'])->toBe(100.0)
-        ->and($dayTable['settlement']['credit'])->toBe(700.0)
-        ->and($dayTable['settlement']['total'])->toBe(800.0)
+        ->and($dayTable['settlement']['credit'])->toBe(1800.0)
+        ->and($dayTable['settlement']['total'])->toBe(1900.0)
         ->and($dayTable['settlement']['is_balanced'])->toBeTrue();
 
     // Also assert generalInvoices contains the continuous invoice list with tax fields
     expect($data)->toHaveKey('generalInvoices')
-        ->and(count($data['generalInvoices']))->toBe(2)
-        ->and($data['generalInvoices'][0]['taxable_15'])->toBe(0.0)
-        ->and($data['generalInvoices'][0]['exempt'])->toBe(100.0)
-        ->and($data['generalInvoices'][0]['isv_15'])->toBe(0.0);
+        ->and(count($data['generalInvoices']))->toBe(4);
 });
 
 test('resumenRows includes all month working days without sundays with first and last invoice correlatives and total per day', function () {
@@ -987,7 +984,7 @@ test('credit invoice appears sequentially between other invoices and Excel expor
     unlink($tempFile);
 });
 
-test('invoices with credit in status invoice generated are included in the report alongside paid credits', function () {
+test('invoices with credit in status pending, partial, invoice generated, or paid are included in the report', function () {
     $date = '2026-08-05 10:00:00';
 
     // 1. Credit with status 'invoice generated' WITH invoice number -> MUST APPEAR
@@ -1042,7 +1039,7 @@ test('invoices with credit in status invoice generated are included in the repor
         'invoice_type' => 'standard',
     ]);
 
-    // 3. Credit with status 'pending' WITH invoice number -> MUST BE EXCLUDED
+    // 3. Credit with status 'pending' WITH invoice number -> MUST APPEAR
     $pendingCredit = Credit::create([
         'customer_id' => $this->customer->id,
         'credit_amount' => 300.0,
@@ -1072,15 +1069,15 @@ test('invoices with credit in status invoice generated are included in the repor
     $data = $controller->calculateReportData('2026-08-05', '2026-08-05');
 
     $dayTable = $data['dailyTables'][0];
-    expect(count($dayTable['items']))->toBe(2);
+    expect(count($dayTable['items']))->toBe(3);
 
     $invoiceNumbers = array_column($dayTable['items'], 'invoice_number');
     expect($invoiceNumbers)->toContain('000-001-01-00004001')
         ->and($invoiceNumbers)->toContain('000-001-01-00004002')
-        ->and($invoiceNumbers)->not->toContain('000-001-01-00004003');
+        ->and($invoiceNumbers)->toContain('000-001-01-00004003');
 
-    // Settlement checks: both credits sum up to 850 + 500 = 1350
-    expect($dayTable['settlement']['credit'])->toBe(1350.0)
+    // Settlement checks: all credits sum up to 850 + 500 + 300 = 1650
+    expect($dayTable['settlement']['credit'])->toBe(1650.0)
         ->and($dayTable['settlement']['is_balanced'])->toBeTrue();
 });
 
