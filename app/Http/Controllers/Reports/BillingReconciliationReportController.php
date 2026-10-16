@@ -81,6 +81,12 @@ class BillingReconciliationReportController extends Controller
 
         $customerId = $request->get('customer_id');
         $search = $request->get('search');
+        $sortField = in_array($request->get('sort_field'), ['invoice_number', 'invoice_date'])
+            ? $request->get('sort_field')
+            : 'invoice_number';
+        $sortDirection = in_array(strtolower($request->get('sort_direction')), ['asc', 'desc'])
+            ? strtolower($request->get('sort_direction'))
+            : 'asc';
 
         // Resolve customer for display label if filtered
         $selectedCustomer = null;
@@ -97,13 +103,17 @@ class BillingReconciliationReportController extends Controller
                 'date_to' => $dateTo,
                 'customer_id' => $customerId,
                 'search' => $search,
+                'sort_field' => $sortField,
+                'sort_direction' => $sortDirection,
             ],
             'selectedCustomer' => $selectedCustomer,
             'reportData' => Inertia::defer(fn () => $this->calculateReportData(
                 $dateFrom,
                 $dateTo,
                 $customerId,
-                $search
+                $search,
+                $sortField,
+                $sortDirection
             )),
         ]);
     }
@@ -111,13 +121,21 @@ class BillingReconciliationReportController extends Controller
     /**
      * Calculate all daily settlement tables, summaries and period stats.
      */
-    public function calculateReportData(string $dateFrom, string $dateTo, ?string $customerId = null, ?string $search = null): array
-    {
+    public function calculateReportData(
+        string $dateFrom,
+        string $dateTo,
+        ?string $customerId = null,
+        ?string $search = null,
+        string $sortField = 'invoice_number',
+        string $sortDirection = 'asc'
+    ): array {
         return $this->reconciliationService->calculatePeriodReport(
             $dateFrom,
             $dateTo,
             $customerId,
-            $search
+            $search,
+            $sortField,
+            $sortDirection
         );
     }
 
@@ -146,8 +164,14 @@ class BillingReconciliationReportController extends Controller
         }
         $customerId = $request->get('customer_id');
         $search = $request->get('search');
+        $sortField = in_array($request->get('sort_field'), ['invoice_number', 'invoice_date'])
+            ? $request->get('sort_field')
+            : 'invoice_number';
+        $sortDirection = in_array(strtolower($request->get('sort_direction')), ['asc', 'desc'])
+            ? strtolower($request->get('sort_direction'))
+            : 'asc';
 
-        $reportData = $this->calculateReportData($dateFrom, $dateTo, $customerId, $search);
+        $reportData = $this->calculateReportData($dateFrom, $dateTo, $customerId, $search, $sortField, $sortDirection);
 
         $spreadsheet = new Spreadsheet;
 
@@ -464,44 +488,42 @@ class BillingReconciliationReportController extends Controller
         $h14CurrentRow = 4;
         $h14StartRow = 4;
 
-        foreach ($reportData['dailyTables'] as $dayTable) {
-            foreach ($dayTable['items'] as $item) {
-                if ($h14CurrentRow === $h14StartRow) {
-                    $sheetHoja14->setCellValue('B'.$h14CurrentRow, 1);
-                } else {
-                    $prevRow = $h14CurrentRow - 1;
-                    $sheetHoja14->setCellValue('B'.$h14CurrentRow, "=+B{$prevRow}+1");
-                }
-
-                $sheetHoja14->setCellValue('C'.$h14CurrentRow, $item['date']);
-                $sheetHoja14->setCellValue('D'.$h14CurrentRow, $item['invoice_number']);
-                $sheetHoja14->setCellValue('E'.$h14CurrentRow, $item['customer_name']);
-                $sheetHoja14->setCellValue('F'.$h14CurrentRow, $item['taxable_15']);
-                $sheetHoja14->setCellValue('G'.$h14CurrentRow, $item['exempt']);
-                $sheetHoja14->setCellValue('H'.$h14CurrentRow, $item['discount']);
-                $sheetHoja14->setCellValue('I'.$h14CurrentRow, $item['isv_15']);
-                $sheetHoja14->setCellValue('J'.$h14CurrentRow, "=+F{$h14CurrentRow}+G{$h14CurrentRow}+I{$h14CurrentRow}-H{$h14CurrentRow}");
-                $sheetHoja14->setCellValue('K'.$h14CurrentRow, $item['comment']);
-
-                // Alignment
-                $sheetHoja14->getStyle('B'.$h14CurrentRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheetHoja14->getStyle('C'.$h14CurrentRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheetHoja14->getStyle('D'.$h14CurrentRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-
-                // Number formatting
-                $sheetHoja14->getStyle("F{$h14CurrentRow}:J{$h14CurrentRow}")->getNumberFormat()->setFormatCode('"L. " #,##0.00');
-
-                // Styling
-                $sheetHoja14->getStyle("B{$h14CurrentRow}:K{$h14CurrentRow}")->applyFromArray([
-                    'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'E8E8E8']]],
-                    'font' => ['name' => 'Calibri', 'size' => 9],
-                    'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
-                ]);
-
-                $sheetHoja14->getRowDimension($h14CurrentRow)->setRowHeight(19);
-
-                $h14CurrentRow++;
+        foreach ($reportData['generalInvoices'] as $item) {
+            if ($h14CurrentRow === $h14StartRow) {
+                $sheetHoja14->setCellValue('B'.$h14CurrentRow, 1);
+            } else {
+                $prevRow = $h14CurrentRow - 1;
+                $sheetHoja14->setCellValue('B'.$h14CurrentRow, "=+B{$prevRow}+1");
             }
+
+            $sheetHoja14->setCellValue('C'.$h14CurrentRow, $item['date']);
+            $sheetHoja14->setCellValue('D'.$h14CurrentRow, $item['invoice_number']);
+            $sheetHoja14->setCellValue('E'.$h14CurrentRow, $item['customer_name']);
+            $sheetHoja14->setCellValue('F'.$h14CurrentRow, $item['taxable_15']);
+            $sheetHoja14->setCellValue('G'.$h14CurrentRow, $item['exempt']);
+            $sheetHoja14->setCellValue('H'.$h14CurrentRow, $item['discount']);
+            $sheetHoja14->setCellValue('I'.$h14CurrentRow, $item['isv_15']);
+            $sheetHoja14->setCellValue('J'.$h14CurrentRow, "=+F{$h14CurrentRow}+G{$h14CurrentRow}+I{$h14CurrentRow}-H{$h14CurrentRow}");
+            $sheetHoja14->setCellValue('K'.$h14CurrentRow, $item['comment']);
+
+            // Alignment
+            $sheetHoja14->getStyle('B'.$h14CurrentRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheetHoja14->getStyle('C'.$h14CurrentRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheetHoja14->getStyle('D'.$h14CurrentRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            // Number formatting
+            $sheetHoja14->getStyle("F{$h14CurrentRow}:J{$h14CurrentRow}")->getNumberFormat()->setFormatCode('"L. " #,##0.00');
+
+            // Styling
+            $sheetHoja14->getStyle("B{$h14CurrentRow}:K{$h14CurrentRow}")->applyFromArray([
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'E8E8E8']]],
+                'font' => ['name' => 'Calibri', 'size' => 9],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+            ]);
+
+            $sheetHoja14->getRowDimension($h14CurrentRow)->setRowHeight(19);
+
+            $h14CurrentRow++;
         }
 
         $h14EndRow = $h14CurrentRow - 1;

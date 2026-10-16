@@ -986,3 +986,313 @@ test('credit invoice appears sequentially between other invoices and Excel expor
 
     unlink($tempFile);
 });
+
+test('invoices with credit in status invoice generated are included in the report alongside paid credits', function () {
+    $date = '2026-08-05 10:00:00';
+
+    // 1. Credit with status 'invoice generated' WITH invoice number -> MUST APPEAR
+    $invoiceGeneratedCredit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 850.0,
+        'amount_paid' => 850.0,
+        'amount_remaining' => 0.0,
+        'status' => 'invoice generated',
+    ]);
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00004001',
+        'invoice_number' => '00004001',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $invoiceGeneratedCredit->id,
+        'quantity' => 1,
+        'subtotal' => 850.0,
+        'discount' => 0.0,
+        'total' => 850.0,
+        'total_paid' => 850.0,
+        'invoice_file' => 'invoices/test_inv_gen.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+    ]);
+
+    // 2. Credit with status 'paid' WITH invoice number -> MUST APPEAR
+    $paidCredit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 500.0,
+        'amount_paid' => 500.0,
+        'amount_remaining' => 0.0,
+        'status' => 'paid',
+    ]);
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00004002',
+        'invoice_number' => '00004002',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $paidCredit->id,
+        'quantity' => 1,
+        'subtotal' => 500.0,
+        'discount' => 0.0,
+        'total' => 500.0,
+        'total_paid' => 500.0,
+        'invoice_file' => 'invoices/test_paid.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+    ]);
+
+    // 3. Credit with status 'pending' WITH invoice number -> MUST BE EXCLUDED
+    $pendingCredit = Credit::create([
+        'customer_id' => $this->customer->id,
+        'credit_amount' => 300.0,
+        'amount_paid' => 0.0,
+        'amount_remaining' => 300.0,
+        'status' => 'pending',
+    ]);
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00004003',
+        'invoice_number' => '00004003',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'credit',
+        'credit_payment_id' => $pendingCredit->id,
+        'quantity' => 1,
+        'subtotal' => 300.0,
+        'discount' => 0.0,
+        'total' => 300.0,
+        'total_paid' => 0.0,
+        'invoice_file' => 'invoices/test_pending.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+    ]);
+
+    $controller = app(BillingReconciliationReportController::class);
+    $data = $controller->calculateReportData('2026-08-05', '2026-08-05');
+
+    $dayTable = $data['dailyTables'][0];
+    expect(count($dayTable['items']))->toBe(2);
+
+    $invoiceNumbers = array_column($dayTable['items'], 'invoice_number');
+    expect($invoiceNumbers)->toContain('000-001-01-00004001')
+        ->and($invoiceNumbers)->toContain('000-001-01-00004002')
+        ->and($invoiceNumbers)->not->toContain('000-001-01-00004003');
+
+    // Settlement checks: both credits sum up to 850 + 500 = 1350
+    expect($dayTable['settlement']['credit'])->toBe(1350.0)
+        ->and($dayTable['settlement']['is_balanced'])->toBeTrue();
+});
+
+test('report orders by invoice_number asc by default and allows ordering by invoice_number desc', function () {
+    $date = '2026-08-05 10:00:00';
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00005030',
+        'invoice_number' => '00005030',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 100.0,
+        'total' => 100.0,
+        'total_paid' => 100.0,
+        'invoice_file' => 'invoices/5030.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+    ]);
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00005010',
+        'invoice_number' => '00005010',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 100.0,
+        'total' => 100.0,
+        'total_paid' => 100.0,
+        'invoice_file' => 'invoices/5010.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+    ]);
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00005020',
+        'invoice_number' => '00005020',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 100.0,
+        'total' => 100.0,
+        'total_paid' => 100.0,
+        'invoice_file' => 'invoices/5020.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+    ]);
+
+    $controller = app(BillingReconciliationReportController::class);
+
+    // 1. Default order: invoice_number ASC
+    $dataAsc = $controller->calculateReportData('2026-08-05', '2026-08-05');
+    $generalAscNumbers = array_column($dataAsc['generalInvoices'], 'invoice_number');
+    expect($generalAscNumbers)->toBe([
+        '000-001-01-00005010',
+        '000-001-01-00005020',
+        '000-001-01-00005030',
+    ]);
+
+    $dailyAscNumbers = array_column($dataAsc['dailyTables'][0]['items'], 'invoice_number');
+    expect($dailyAscNumbers)->toBe([
+        '000-001-01-00005010',
+        '000-001-01-00005020',
+        '000-001-01-00005030',
+    ]);
+
+    // 2. Order by invoice_number DESC
+    $dataDesc = $controller->calculateReportData('2026-08-05', '2026-08-05', null, null, 'invoice_number', 'desc');
+    $generalDescNumbers = array_column($dataDesc['generalInvoices'], 'invoice_number');
+    expect($generalDescNumbers)->toBe([
+        '000-001-01-00005030',
+        '000-001-01-00005020',
+        '000-001-01-00005010',
+    ]);
+
+    $dailyDescNumbers = array_column($dataDesc['dailyTables'][0]['items'], 'invoice_number');
+    expect($dailyDescNumbers)->toBe([
+        '000-001-01-00005030',
+        '000-001-01-00005020',
+        '000-001-01-00005010',
+    ]);
+});
+
+test('report allows ordering by invoice_date asc and desc', function () {
+    $date1 = '2026-08-05 10:00:00'; // Wednesday
+    $date2 = '2026-08-06 10:00:00'; // Thursday
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00006001',
+        'invoice_number' => '00006001',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 100.0,
+        'total' => 100.0,
+        'total_paid' => 100.0,
+        'invoice_file' => 'invoices/6001.pdf',
+        'invoice_date' => $date1,
+        'invoice_type' => 'standard',
+    ]);
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00006002',
+        'invoice_number' => '00006002',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 100.0,
+        'total' => 100.0,
+        'total_paid' => 100.0,
+        'invoice_file' => 'invoices/6002.pdf',
+        'invoice_date' => $date2,
+        'invoice_type' => 'standard',
+    ]);
+
+    $controller = app(BillingReconciliationReportController::class);
+
+    // 1. invoice_date ASC: 2026-08-05 first, 2026-08-06 second
+    $dataDateAsc = $controller->calculateReportData('2026-08-05', '2026-08-06', null, null, 'invoice_date', 'asc');
+    $ascDates = array_column($dataDateAsc['generalInvoices'], 'date');
+    expect($ascDates[0])->toBe('05/08/2026')
+        ->and($ascDates[1])->toBe('06/08/2026');
+
+    // Daily tables order
+    expect($dataDateAsc['dailyTables'][0]['date'])->toBe('2026-08-05')
+        ->and($dataDateAsc['dailyTables'][1]['date'])->toBe('2026-08-06');
+
+    // 2. invoice_date DESC: 2026-08-06 first, 2026-08-05 second
+    $dataDateDesc = $controller->calculateReportData('2026-08-05', '2026-08-06', null, null, 'invoice_date', 'desc');
+    $descDates = array_column($dataDateDesc['generalInvoices'], 'date');
+    expect($descDates[0])->toBe('06/08/2026')
+        ->and($descDates[1])->toBe('05/08/2026');
+
+    // Daily tables order remains chronological calendar order
+    expect($dataDateDesc['dailyTables'][0]['date'])->toBe('2026-08-05')
+        ->and($dataDateDesc['dailyTables'][1]['date'])->toBe('2026-08-06');
+});
+
+test('inertia request and excel export respect sort parameters', function () {
+    $date = '2026-08-05 10:00:00';
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00007002',
+        'invoice_number' => '00007002',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 100.0,
+        'total' => 100.0,
+        'total_paid' => 100.0,
+        'invoice_file' => 'invoices/7002.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+    ]);
+
+    Invoice::create([
+        'full_invoice_number' => '000-001-01-00007001',
+        'invoice_number' => '00007001',
+        'cai_range_id' => $this->caiRange->id,
+        'customer_id' => $this->customer->id,
+        'payment_type' => 'cash',
+        'quantity' => 1,
+        'subtotal' => 100.0,
+        'total' => 100.0,
+        'total_paid' => 100.0,
+        'invoice_file' => 'invoices/7001.pdf',
+        'invoice_date' => $date,
+        'invoice_type' => 'standard',
+    ]);
+
+    // Test Inertia index returns filters with sort_field and sort_direction
+    $this->actingAs($this->user)
+        ->get(route('reports.billing-reconciliation.index', [
+            'date_from' => '2026-08-05',
+            'date_to' => '2026-08-05',
+            'sort_field' => 'invoice_number',
+            'sort_direction' => 'desc',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('reports/billing-reconciliation/index')
+            ->where('filters.sort_field', 'invoice_number')
+            ->where('filters.sort_direction', 'desc')
+        );
+
+    // Test Excel export with sort_direction=desc
+    $response = $this->actingAs($this->user)
+        ->get(route('reports.billing-reconciliation.export', [
+            'date_from' => '2026-08-05',
+            'date_to' => '2026-08-05',
+            'sort_field' => 'invoice_number',
+            'sort_direction' => 'desc',
+        ]));
+    $response->assertOk();
+
+    $content = $response->streamedContent();
+    $tempFile = tempnam(sys_get_temp_dir(), 'excel_sort_test');
+    file_put_contents($tempFile, $content);
+
+    $reader = new Xlsx;
+    $spreadsheet = $reader->load($tempFile);
+    $sheetLiquidacion = $spreadsheet->getSheet(1);
+
+    // Row 4 should be 000-001-01-00007002 and Row 5 should be 000-001-01-00007001 (descending)
+    expect($sheetLiquidacion->getCell('D4')->getValue())->toBe('000-001-01-00007002')
+        ->and($sheetLiquidacion->getCell('D5')->getValue())->toBe('000-001-01-00007001');
+
+    unlink($tempFile);
+});

@@ -79,6 +79,11 @@ class BillingReconciliationService
         $pmCode = self::PAYMENT_CODES[$pmKey] ?? 1;
         $pmLabel = self::PAYMENT_LABELS[$pmCode] ?? 'Efectivo';
 
+        if ($invoice->creditRelation && $invoice->creditRelation->status === 'invoice generated') {
+            $pmCode = 5;
+            $pmLabel = 'Crédito';
+        }
+
         $discount = (float) $invoice->discount;
         $net = (float) ($invoice->total > 0
             ? $invoice->total
@@ -209,6 +214,14 @@ class BillingReconciliationService
             }
         }
 
+        $activeInvoices = array_filter($dayRows, fn ($r) => ! empty($r['invoice_number']) && $r['invoice_number'] !== '-');
+        if (! empty($activeInvoices)) {
+            $invoiceNumbers = array_values(array_column($activeInvoices, 'invoice_number'));
+            sort($invoiceNumbers);
+            $firstInvoiceNum = $invoiceNumbers[0];
+            $lastInvoiceNum = $invoiceNumbers[count($invoiceNumbers) - 1];
+        }
+
         $settlement['total'] = $settlement['cash'] + $settlement['check'] + $settlement['card'] + $settlement['transfer'] + $settlement['credit'];
         $settlement['difference'] = round($dayTotals['net'] - $settlement['total'], 2);
         $settlement['is_balanced'] = (abs($settlement['difference']) < 0.01);
@@ -239,8 +252,14 @@ class BillingReconciliationService
     /**
      * Build the query for invoices included in the billing reconciliation report.
      */
-    public function buildQuery(Carbon $startDate, Carbon $endDate, ?string $customerId = null, ?string $search = null)
-    {
+    public function buildQuery(
+        Carbon $startDate,
+        Carbon $endDate,
+        ?string $customerId = null,
+        ?string $search = null,
+        string $sortField = 'invoice_number',
+        string $sortDirection = 'asc'
+    ) {
         $query = Invoice::with(['customer', 'specimen.type', 'createdBy', 'creditRelation'])
             ->where(function ($q) use ($startDate, $endDate) {
                 $q->whereBetween(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), [
@@ -253,16 +272,16 @@ class BillingReconciliationService
         $query->whereNotNull('invoices.invoice_number')
             ->where('invoices.invoice_number', '!=', '');
 
-        // Only include invoices that are already paid:
+        // Only include invoices that are already paid or finalized:
         // - Cancelled invoices are retained for sequential audit trail
-        // - Invoices with a credit assigned must have their credit in 'paid' status
+        // - Invoices with a credit assigned must have their credit in 'paid' or 'invoice generated' status
         // - Invoices without a credit assigned must not have payment_type = 'credit'
         $query->where(function ($q) {
             $q->where('invoices.invoice_type', 'cancelled')
                 ->orWhere(function ($sub) {
                     $sub->whereNotNull('invoices.credit_payment_id')
                         ->whereHas('creditRelation', function ($cq) {
-                            $cq->where('status', 'paid');
+                            $cq->whereIn('status', ['paid', 'invoice generated']);
                         });
                 })
                 ->orWhere(function ($sub) {
@@ -289,19 +308,32 @@ class BillingReconciliationService
             });
         }
 
-        return $query->orderBy(DB::raw('COALESCE(invoices.invoice_date, invoices.created_at)'), 'asc')
-            ->orderBy('id', 'asc');
+        if ($sortField === 'invoice_date') {
+            return $query->orderByRaw('COALESCE(invoices.invoice_date, invoices.created_at) '.$sortDirection)
+                ->orderBy('invoices.invoice_number', $sortDirection)
+                ->orderBy('invoices.id', $sortDirection);
+        }
+
+        return $query->orderBy('invoices.invoice_number', $sortDirection)
+            ->orderByRaw('COALESCE(invoices.invoice_date, invoices.created_at) '.$sortDirection)
+            ->orderBy('invoices.id', $sortDirection);
     }
 
     /**
      * Calculate all daily settlement tables, general invoices, period summaries, and totals.
      */
-    public function calculatePeriodReport(string $dateFrom, string $dateTo, ?string $customerId = null, ?string $search = null): array
-    {
+    public function calculatePeriodReport(
+        string $dateFrom,
+        string $dateTo,
+        ?string $customerId = null,
+        ?string $search = null,
+        string $sortField = 'invoice_number',
+        string $sortDirection = 'asc'
+    ): array {
         $startDate = Carbon::parse($dateFrom)->startOfDay();
         $endDate = Carbon::parse($dateTo)->endOfDay();
 
-        $invoices = $this->buildQuery($startDate, $endDate, $customerId, $search)->get();
+        $invoices = $this->buildQuery($startDate, $endDate, $customerId, $search, $sortField, $sortDirection)->get();
 
         // Group invoices by date string Y-m-d
         $invoicesByDate = [];
@@ -319,6 +351,7 @@ class BillingReconciliationService
         $resumenRows = [];
 
         $period = CarbonPeriod::create($startDate->toDateString(), $endDate->toDateString());
+        $days = iterator_to_array($period);
 
         $periodTotals = [
             'gross' => 0.0,
@@ -338,7 +371,7 @@ class BillingReconciliationService
             'cancelled_count' => 0,
         ];
 
-        foreach ($period as $day) {
+        foreach ($days as $day) {
             // STRICTLY IGNORE SUNDAYS
             if ($day->isSunday()) {
                 continue;
@@ -393,11 +426,11 @@ class BillingReconciliationService
             $periodTotals['cancelled_count'] += $settlementData['cancelled_count'];
         }
 
+        // Build generalInvoices directly from sorted $invoices to preserve exact global sort order
         $generalInvoices = [];
-        foreach ($dailyTables as $dayTable) {
-            foreach ($dayTable['items'] as $item) {
-                $generalInvoices[] = $item;
-            }
+        $generalItemIdx = 1;
+        foreach ($invoices as $inv) {
+            $generalInvoices[] = $this->calculateInvoiceRow($inv, $generalItemIdx++);
         }
 
         $resumenTotals = [

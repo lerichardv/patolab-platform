@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Credit;
 use App\Models\Invoice;
 use App\Services\BillingReconciliationService;
 use Carbon\Carbon;
@@ -151,4 +152,33 @@ test('calculateDailySettlement aggregates daily invoices and calculates arqueo c
         ->and($settlement['first_invoice'])->toBe('000-001-01-00000001')
         ->and($settlement['last_invoice'])->toBe('000-001-01-00000003')
         ->and($settlement['total_sales'])->toEqual(2900.0);
+});
+
+test('calculateInvoiceRow categorizes credit with invoice generated status as payment code 5 Crédito', function () {
+    $invoice = new Invoice([
+        'full_invoice_number' => '000-001-01-00055555',
+        'payment_type' => 'credit',
+        'quantity' => 1,
+        'amount' => 1500.0,
+        'discount' => 0.0,
+        'subtotal' => 1500.0,
+        'exempt_amount' => 1500.0,
+        'total' => 1500.0,
+        'total_paid' => 1500.0,
+        'pay_isv' => false,
+        'invoice_type' => 'standard',
+    ]);
+    $invoice->id = 555;
+
+    $credit = new Credit([
+        'status' => 'invoice generated',
+    ]);
+    $invoice->setRelation('creditRelation', $credit);
+
+    $row = $this->service->calculateInvoiceRow($invoice, 1, Carbon::parse('2026-09-26'));
+
+    expect($row['is_cancelled'])->toBeFalse()
+        ->and($row['payment_type_code'])->toBe(5)
+        ->and($row['payment_type_label'])->toBe('Crédito')
+        ->and($row['net_amount'])->toEqual(1500.0);
 });
