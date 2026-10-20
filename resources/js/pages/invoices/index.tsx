@@ -122,6 +122,7 @@ import SpecimenGroupViewSheet from '../specimens/specimen-group-view-sheet';
 import SpecimenSheet from '../specimens/specimen-sheet';
 import SpecimenViewSheet from '../specimens/specimen-view-sheet';
 import InvoiceAuditSheet from './invoice-audit-sheet';
+import InvoiceExtractSpecimenSheet from './invoice-extract-specimen-sheet';
 import InvoiceSheet from './invoice-sheet';
 import InvoiceTableSkeleton from './invoice-table-skeleton';
 import InvoiceViewSheet from './invoice-view-sheet';
@@ -732,6 +733,20 @@ export default function InvoicesIndex({
 	const handleExtractSpecimenClick = (credit: any) => {
 		setSelectedCreditForExtractSpecimen(credit);
 		setIsExtractSpecimenSheetOpen(true);
+	};
+
+	const [
+		isInvoiceExtractSpecimenSheetOpen,
+		setIsInvoiceExtractSpecimenSheetOpen,
+	] = useState(false);
+	const [
+		selectedInvoiceForExtractSpecimen,
+		setSelectedInvoiceForExtractSpecimen,
+	] = useState<any | null>(null);
+
+	const handleInvoiceExtractSpecimenClick = (invoice: any) => {
+		setSelectedInvoiceForExtractSpecimen(invoice);
+		setIsInvoiceExtractSpecimenSheetOpen(true);
 	};
 	const [isCancellationReasonSheetOpen, setIsCancellationReasonSheetOpen] =
 		useState(false);
@@ -2976,6 +2991,78 @@ export default function InvoicesIndex({
 																						);
 																					})()}
 																				{canManageInvoices &&
+																					invoice.payment_type !==
+																						'credit' &&
+																					invoice.invoice_type !==
+																						'cancelled' &&
+																					(invoice.is_group ||
+																						invoice.group_id ||
+																						invoice
+																							.group
+																							?.id) &&
+																					(() => {
+																						const rawSpecimens =
+																							invoice.invoice_specimens ||
+																							invoice.invoiceSpecimens ||
+																							[];
+																						const uniqueSpecimenIds =
+																							new Set(
+																								rawSpecimens
+																									.map(
+																										(
+																											s: any,
+																										) =>
+																											s.specimen_id ||
+																											s.id,
+																									)
+																									.filter(
+																										Boolean,
+																									),
+																							);
+																						const specimensCount =
+																							uniqueSpecimenIds.size >
+																							0
+																								? uniqueSpecimenIds.size
+																								: (invoice
+																										.group
+																										?.specimens
+																										?.length ??
+																									(invoice.is_group
+																										? 2
+																										: 1));
+																						const cannotExtract =
+																							specimensCount <=
+																							1;
+
+																						return (
+																							<DropdownMenuItem
+																								onClick={() => {
+																									if (
+																										!cannotExtract
+																									) {
+																										handleInvoiceExtractSpecimenClick(
+																											invoice,
+																										);
+																									}
+																								}}
+																								disabled={
+																									cannotExtract
+																								}
+																								className={
+																									cannotExtract
+																										? 'opacity-50'
+																										: ''
+																								}
+																							>
+																								<FolderMinus className="mr-2 h-4 w-4 text-muted-foreground" />
+																								<span>
+																									Sacar
+																									muestra
+																								</span>
+																							</DropdownMenuItem>
+																						);
+																					})()}
+																				{canManageInvoices &&
 																					(invoice.is_group ||
 																						invoice.group_id ||
 																						invoice
@@ -3570,6 +3657,15 @@ export default function InvoicesIndex({
 				credit={selectedCreditForExtractSpecimen}
 				open={isExtractSpecimenSheetOpen}
 				onOpenChange={setIsExtractSpecimenSheetOpen}
+			/>
+
+			<InvoiceExtractSpecimenSheet
+				invoice={selectedInvoiceForExtractSpecimen}
+				open={isInvoiceExtractSpecimenSheetOpen}
+				onOpenChange={setIsInvoiceExtractSpecimenSheetOpen}
+				onSuccess={() => {
+					router.reload({ only: ['invoices'] });
+				}}
 			/>
 
 			{/* Specimen Sheets */}
