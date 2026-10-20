@@ -41,6 +41,7 @@ use App\Http\Controllers\ReportVerificationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SequenceController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\SpecimenBalanceController;
 use App\Http\Controllers\SpecimenCategoryController;
 use App\Http\Controllers\SpecimenController;
 use App\Http\Controllers\SpecimenFormDataController;
@@ -212,6 +213,12 @@ Route::middleware(['auth:web', 'verified'])->group(function () {
     Route::get('rentals/options', [RentalController::class, 'options'])->name('rentals.options');
     Route::resource('rentals', RentalController::class)->only(['index', 'store', 'update']);
     Route::post('rentals/{rental}/pay', [RentalController::class, 'pay'])->name('rentals.pay');
+
+    Route::get('specimens-balance', [SpecimenBalanceController::class, 'index'])->name('specimens-balance.index');
+    Route::get('specimens-balance/unassigned-list', [SpecimenBalanceController::class, 'unassignedList'])->name('specimens-balance.unassigned-list');
+    Route::get('specimens-balance/expired-list', [SpecimenBalanceController::class, 'expiredList'])->name('specimens-balance.expired-list');
+    Route::post('specimens-balance/{specimen}/reschedule', [SpecimenBalanceController::class, 'reschedule'])->name('specimens-balance.reschedule');
+    Route::post('specimens-balance/durations', [SpecimenBalanceController::class, 'saveDurations'])->name('specimens-balance.durations');
     Route::post('specimen-type-templates/upload-image', [SpecimenTypeTemplateController::class, 'uploadImage'])->name('specimen-type-templates.upload-image');
     Route::resource('specimen-type-templates', SpecimenTypeTemplateController::class);
 

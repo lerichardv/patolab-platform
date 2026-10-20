@@ -239,6 +239,14 @@ class PermissionsSeeder extends Seeder
             |--------------------------------------------------------------------------
             */
             ['name' => 'Ver Tarjetas de Resumen de Dashboard', 'slug' => 'dashboard.resume_cards.view'],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Specimens Balance Board
+            |--------------------------------------------------------------------------
+            */
+            ['name' => 'Ver Balance de Muestras', 'slug' => 'specimens_balance.view'],
+            ['name' => 'Gestionar Balance de Muestras', 'slug' => 'specimens_balance.manage'],
         ];
 
         foreach ($permissions as $permission) {
