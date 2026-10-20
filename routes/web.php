@@ -189,6 +189,7 @@ Route::middleware(['auth:web', 'verified'])->group(function () {
     Route::post('invoices/{invoice}/restore-audit-change', [InvoiceController::class, 'restoreAuditChange'])->name('invoices.restore-audit-change');
     Route::get('invoices/form-data', InvoiceFormDataController::class)->name('invoices.form-data');
     Route::resource('invoices', InvoiceController::class)->only(['index', 'update']);
+    Route::post('invoices/{invoice}/extract-specimens', [InvoiceController::class, 'extractSpecimens'])->name('invoices.extract-specimens');
     Route::get('price-quotes/form-data', PriceQuoteFormDataController::class)->name('price-quotes.form-data');
     Route::post('price-quotes/{price_quote}/send-email', [PriceQuoteController::class, 'sendEmail'])->name('price-quotes.send-email');
     Route::resource('price-quotes', PriceQuoteController::class);

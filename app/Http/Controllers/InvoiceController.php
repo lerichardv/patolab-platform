@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Bank;
+use App\Models\CaiRange;
 use App\Models\Credit;
 use App\Models\Customer;
 use App\Models\Invoice;
@@ -12,6 +13,7 @@ use App\Models\Sequence;
 use App\Models\Setting;
 use App\Models\Specimen;
 use App\Models\SpecimenGroup;
+use App\Models\SpecimenGroupCustomer;
 use App\Models\SpecimenTypeExamination;
 use App\Models\User;
 use App\Models\WorkOrderTask;
@@ -23,6 +25,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -118,6 +121,8 @@ class InvoiceController extends Controller
             'specimen.examination:id,name',
             'specimen.customerRelation:id,name',
             'invoiceSpecimens.specimen.type:id,name',
+            'invoiceSpecimens.specimen.customerRelation:id,name',
+            'invoiceSpecimens.specimen.examinations:id,name',
             'invoiceSpecimens.examination:id,name',
             'creditInvoiceSpecimens.specimen.type:id,name',
             'creditInvoiceSpecimens.examination:id,name',
@@ -1262,5 +1267,287 @@ class InvoiceController extends Controller
         } else {
             $query->whereRaw('1 = 0');
         }
+    }
+
+    /**
+     * Separate specimens from a non-credit specimen group invoice.
+     */
+    public function extractSpecimens(Request $request, Invoice $invoice)
+    {
+        Gate::authorize('invoices.manage');
+
+        $validated = $request->validate([
+            'specimen_ids' => 'required|array|min:1',
+            'specimen_ids.*' => 'required|integer|exists:specimen,id',
+            'invoice_date' => 'nullable|date',
+        ]);
+
+        $specimenIdsToExtract = array_values(array_unique(array_map('intval', $validated['specimen_ids'])));
+
+        if ($invoice->payment_type === 'credit') {
+            throw ValidationException::withMessages([
+                'specimen_ids' => ['Esta acción no está permitida en facturas a crédito. Utilice la función de extraer muestras de crédito.'],
+            ]);
+        }
+
+        if ($invoice->invoice_type === 'cancelled') {
+            throw ValidationException::withMessages([
+                'specimen_ids' => ['No se pueden separar muestras de una factura anulada.'],
+            ]);
+        }
+
+        if (! $invoice->is_group && ! $invoice->group_id) {
+            throw ValidationException::withMessages([
+                'specimen_ids' => ['Esta acción solo se puede realizar en facturas de grupos de muestras.'],
+            ]);
+        }
+
+        $group = $invoice->group
+            ?? ($invoice->group_id ? SpecimenGroup::with(['specimens', 'invoice'])->find($invoice->group_id) : null)
+            ?? SpecimenGroup::where('invoice_id', $invoice->id)->first();
+
+        if (! $group) {
+            throw ValidationException::withMessages([
+                'specimen_ids' => ['No se pudo encontrar el grupo de muestras asociado a esta factura.'],
+            ]);
+        }
+
+        $allInvoiceSpecimens = InvoiceSpecimen::where('invoice_id', $invoice->id)->get();
+        if ($allInvoiceSpecimens->isNotEmpty()) {
+            $allSpecimenIds = $allInvoiceSpecimens->pluck('specimen_id')->unique()->values()->toArray();
+        } else {
+            $allSpecimenIds = $group->specimens->pluck('id')->unique()->values()->toArray();
+        }
+
+        foreach ($specimenIdsToExtract as $id) {
+            if (! in_array($id, $allSpecimenIds)) {
+                throw ValidationException::withMessages([
+                    'specimen_ids' => ["La muestra #{$id} no pertenece a esta factura grupal."],
+                ]);
+            }
+        }
+
+        if (count($specimenIdsToExtract) >= count($allSpecimenIds)) {
+            throw ValidationException::withMessages([
+                'specimen_ids' => ['No se pueden separar todas las muestras del grupo. Debe quedar al menos una muestra en la factura original.'],
+            ]);
+        }
+
+        // Allocate next active CAI Range number for the new invoice
+        $caiRange = CaiRange::where('status', 'active')->first();
+        if (! $caiRange) {
+            throw new \Exception('No hay un rango CAI activo configurado en el sistema.');
+        }
+
+        do {
+            $nextNumber = $caiRange->last_used_number + 1;
+            $invoiceNumber = str_pad($nextNumber, 8, '0', STR_PAD_LEFT);
+            $fullInvoiceNumber = $caiRange->full_prefix.$invoiceNumber;
+
+            $exists = Invoice::where('full_invoice_number', $fullInvoiceNumber)->exists();
+            if ($exists) {
+                $caiRange->increment('last_used_number');
+                if ($caiRange->last_used_number >= $caiRange->end_number) {
+                    $caiRange->update(['status' => 'exhausted']);
+                    throw new \Exception('El rango CAI activo se ha agotado al buscar un número de factura disponible.');
+                }
+            }
+        } while ($exists);
+
+        $caiRange->increment('last_used_number');
+        if ($caiRange->last_used_number >= $caiRange->end_number) {
+            $caiRange->update(['status' => 'exhausted']);
+        }
+
+        $newInvoice = null;
+        $newGroup = null;
+
+        DB::transaction(function () use (
+            $invoice,
+            $group,
+            $allSpecimenIds,
+            $specimenIdsToExtract,
+            $request,
+            $caiRange,
+            $invoiceNumber,
+            $fullInvoiceNumber,
+            &$newInvoice,
+            &$newGroup
+        ) {
+            $extractedIgs = InvoiceSpecimen::where('invoice_id', $invoice->id)
+                ->whereIn('specimen_id', $specimenIdsToExtract)
+                ->get();
+
+            $remainingIgs = InvoiceSpecimen::where('invoice_id', $invoice->id)
+                ->whereNotIn('specimen_id', $specimenIdsToExtract)
+                ->get();
+
+            // Calculate insumos for extracted specimens
+            $extractedSpecimens = Specimen::with('products')->whereIn('id', $specimenIdsToExtract)->get();
+            $extractedInsumosTotal = 0.00;
+            foreach ($extractedSpecimens as $spec) {
+                foreach ($spec->products as $prod) {
+                    $extractedInsumosTotal += (float) ($prod->pivot->price ?? $prod->price) * (int) ($prod->pivot->quantity ?? 1);
+                }
+            }
+
+            // Calculate insumos for remaining specimens
+            $remainingSpecimenIds = array_values(array_diff($allSpecimenIds, $specimenIdsToExtract));
+            $remainingSpecimens = Specimen::with('products')->whereIn('id', $remainingSpecimenIds)->get();
+            $remainingInsumosTotal = 0.00;
+            foreach ($remainingSpecimens as $spec) {
+                foreach ($spec->products as $prod) {
+                    $remainingInsumosTotal += (float) ($prod->pivot->price ?? $prod->price) * (int) ($prod->pivot->quantity ?? 1);
+                }
+            }
+
+            // Consolidated calculations via InvoiceCalculationService
+            $extractedItemsData = $extractedIgs->map(fn ($item) => [
+                'quantity' => (int) $item->quantity,
+                'amount' => (float) $item->amount,
+                'discount' => (float) $item->discount,
+                'subtotal' => (float) $item->subtotal,
+            ])->toArray();
+
+            $payIsv = (bool) ($invoice->pay_isv ?? false);
+
+            $extractedConsolidated = InvoiceCalculationService::calculateConsolidatedTotals(
+                $extractedItemsData,
+                $extractedInsumosTotal,
+                0.00,
+                $payIsv
+            );
+
+            $targetCustomerId = $group->customer_id ?? $invoice->customer_id;
+            $targetCustomer = Customer::find($targetCustomerId) ?? $group->customer ?? $invoice->customer;
+
+            $invoiceDate = $request->filled('invoice_date')
+                ? Carbon::parse($request->input('invoice_date'))->setTimeFrom(now())
+                : now();
+
+            $extractedCount = count($specimenIdsToExtract);
+
+            $newInvoice = Invoice::create([
+                'full_invoice_number' => $fullInvoiceNumber,
+                'invoice_number' => $invoiceNumber,
+                'cai_range_id' => $caiRange->id,
+                'customer_id' => $targetCustomerId,
+                'specimen_id' => null,
+                'created_by_id' => auth()->id(),
+                'payment_type' => $invoice->payment_type,
+                'payment_method_date' => $invoice->payment_method_date,
+                'cash_value' => $invoice->payment_type === 'cash' ? $extractedConsolidated['total'] : null,
+                'card_last_4' => $invoice->card_last_4,
+                'card_value_charged' => in_array($invoice->payment_type, ['card', 'credit card']) ? $extractedConsolidated['total'] : null,
+                'card_expiration' => $invoice->card_expiration,
+                'card_authorization_code' => $invoice->card_authorization_code,
+                'transfer_bank_id' => $invoice->transfer_bank_id,
+                'transfer_value' => in_array($invoice->payment_type, ['transfer', 'bank transfer']) ? $extractedConsolidated['total'] : null,
+                'transfer_authorization_code' => $invoice->transfer_authorization_code,
+                'check_number' => $invoice->check_number,
+                'check_value' => $invoice->payment_type === 'check' ? $extractedConsolidated['total'] : null,
+                'proof_of_payment' => $invoice->proof_of_payment ?: 'Separación de grupo',
+                'invoice_date' => $invoiceDate,
+                'quantity' => $extractedConsolidated['quantity'],
+                'amount' => $extractedConsolidated['amount'],
+                'discount' => $extractedConsolidated['discount'],
+                'subtotal' => $extractedConsolidated['subtotal'],
+                'exempt_amount' => $extractedConsolidated['exempt_amount'],
+                'tax_exempt_amount' => $extractedConsolidated['tax_exempt_amount'],
+                'taxable_amount_15' => $extractedConsolidated['taxable_amount_15'],
+                'taxable_amount_18' => $extractedConsolidated['taxable_amount_18'],
+                'isv_15' => $extractedConsolidated['isv_15'],
+                'isv_18' => $extractedConsolidated['isv_18'],
+                'total' => $extractedConsolidated['total'],
+                'total_paid' => $extractedConsolidated['total'],
+                'pay_isv' => $payIsv,
+                'invoice_file' => '',
+                'is_group' => true,
+                'group_id' => null,
+                'invoice_type' => 'specimen',
+            ]);
+
+            $newGroupName = ($targetCustomer ? $targetCustomer->name : 'Grupo').' - '.$extractedCount.' '.($extractedCount === 1 ? 'Muestra' : 'Muestras');
+            $newGroup = SpecimenGroup::create([
+                'name' => $newGroupName,
+                'invoice_id' => $newInvoice->id,
+                'customer_id' => $targetCustomerId,
+                'access_token' => Str::random(32),
+            ]);
+
+            $newInvoice->update(['group_id' => $newGroup->id]);
+
+            SpecimenGroupCustomer::firstOrCreate([
+                'customer_id' => $targetCustomerId,
+                'specimen_group_id' => $newGroup->id,
+            ]);
+
+            Specimen::whereIn('id', $specimenIdsToExtract)->update([
+                'is_group' => true,
+                'group_id' => $newGroup->id,
+            ]);
+
+            InvoiceSpecimen::where('invoice_id', $invoice->id)
+                ->whereIn('specimen_id', $specimenIdsToExtract)
+                ->update([
+                    'invoice_id' => $newInvoice->id,
+                    'group_id' => $newGroup->id,
+                    'is_group' => true,
+                    'is_paid' => true,
+                    'updated_at' => now(),
+                ]);
+
+            // Consolidated calculations for remaining specimens on the original invoice
+            $remainingItemsData = $remainingIgs->map(fn ($item) => [
+                'quantity' => (int) $item->quantity,
+                'amount' => (float) $item->amount,
+                'discount' => (float) $item->discount,
+                'subtotal' => (float) $item->subtotal,
+            ])->toArray();
+
+            $remainingConsolidated = InvoiceCalculationService::calculateConsolidatedTotals(
+                $remainingItemsData,
+                $remainingInsumosTotal,
+                (float) ($invoice->custom_amount ?? 0.00),
+                $payIsv
+            );
+
+            $invoice->update(array_merge($remainingConsolidated, [
+                'total_paid' => $remainingConsolidated['total'],
+                'cash_value' => $invoice->payment_type === 'cash' ? $remainingConsolidated['total'] : $invoice->cash_value,
+                'card_value_charged' => in_array($invoice->payment_type, ['card', 'credit card']) ? $remainingConsolidated['total'] : $invoice->card_value_charged,
+                'transfer_value' => in_array($invoice->payment_type, ['transfer', 'bank transfer']) ? $remainingConsolidated['total'] : $invoice->transfer_value,
+                'check_value' => $invoice->payment_type === 'check' ? $remainingConsolidated['total'] : $invoice->check_value,
+            ]));
+
+            if ($group) {
+                $remainingCount = $remainingIgs->unique('specimen_id')->count();
+                $group->update([
+                    'name' => ($group->customer ? $group->customer->name : 'Grupo').' - '.$remainingCount.' '.($remainingCount === 1 ? 'Muestra' : 'Muestras'),
+                ]);
+            }
+        });
+
+        if ($newInvoice) {
+            try {
+                app(InvoicePdfService::class)->generateAndStoreInvoice($newInvoice);
+            } catch (\Exception $e) {
+                Log::warning('Error generating new invoice PDF: '.$e->getMessage());
+            }
+        }
+
+        if ($invoice) {
+            try {
+                app(InvoicePdfService::class)->generateAndStoreInvoice($invoice);
+            } catch (\Exception $e) {
+                Log::warning('Error regenerating original invoice PDF: '.$e->getMessage());
+            }
+        }
+
+        return redirect()->back()->with([
+            'success' => 'Muestra(s) separada(s) del grupo con éxito.',
+            'new_invoice_id' => $newInvoice?->id,
+            'new_invoice_url' => $newInvoice?->invoice_file ? asset('storage/'.$newInvoice->invoice_file) : null,
+        ]);
     }
 }
