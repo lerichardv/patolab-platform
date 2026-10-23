@@ -264,6 +264,16 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Balance de Muestras',
+        description:
+            'Tablero de balance y gestión de carga de muestras por patólogo.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            view: 'specimens_balance.view',
+            manage: 'specimens_balance.manage',
+        },
+    },
+    {
         label: 'Configuración del Sistema',
         description: 'Parámetros generales de la plataforma y del laboratorio.',
         module: 'Configuración General',

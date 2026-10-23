@@ -115,6 +115,8 @@ class Specimen extends Model
         'cancellation_reason',
         'cancelled_at',
         'cancelled_by_id',
+        'move_reason',
+        'moved_at',
         'sample_collection_date',
         'sample_collection_date_na',
         'is_manual_delivery_date_intern_enabled',
@@ -141,6 +143,7 @@ class Specimen extends Model
         'finalized_at' => 'datetime',
         'delivered_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'moved_at' => 'datetime',
         'sample_collection_date' => 'date',
     ];
 

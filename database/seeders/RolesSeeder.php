@@ -75,6 +75,10 @@ class RolesSeeder extends Seeder
             // My templates management
             'my_specimen_type_templates.view',
             'my_specimen_type_templates.manage',
+
+            // Specimens balance board
+            'specimens_balance.view',
+            'specimens_balance.manage',
         ];
 
         $permissionIds = Permission::whereIn('slug', $pathologistPermissions)->pluck('id');
@@ -115,6 +119,8 @@ class RolesSeeder extends Seeder
             'patients.view',
             'patients.create',
             'patients.edit',
+            'specimens_balance.view',
+            'specimens_balance.manage',
         ];
 
         $assistantPermissionIds = Permission::whereIn('slug', $assistantPermissions)->pluck('id');

@@ -419,21 +419,46 @@ export default function TemplateForm({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
+        const cleanField = (val: string | null | undefined): string | null => {
+            if (!val) {
+                return null;
+            }
+            const unlinked = removeHyperlinks(val);
+            const cleanText = unlinked
+                .replace(
+                    /<\s*p\b[^>]*>(?:\s|&nbsp;|\xc2\xa0|<\s*br\s*\/?>)*<\s*\/p\s*>/gi,
+                    '',
+                )
+                .replace(/&nbsp;|\xc2\xa0/gi, ' ')
+                .trim();
+            const hasMedia = /<img|<table|<figure/i.test(unlinked);
+            if (!cleanText && !hasMedia) {
+                return null;
+            }
+
+            return unlinked
+                .replace(
+                    /^(?:\s*<\s*p\b[^>]*>(?:\s|&nbsp;|\xc2\xa0|<\s*br\s*\/?>)*<\s*\/p\s*>)+/gi,
+                    '',
+                )
+                .replace(
+                    /(?:\s*<\s*p\b[^>]*>(?:\s|&nbsp;|\xc2\xa0|<\s*br\s*\/?>)*<\s*\/p\s*>)+\s*$/gi,
+                    '',
+                )
+                .trim();
+        };
+
         transform((formData) => ({
             ...formData,
-            clinical_details_html: removeHyperlinks(
-                formData.clinical_details_html || '',
-            ),
-            diagnosis_html: removeHyperlinks(formData.diagnosis_html || ''),
-            macroscopy_html: removeHyperlinks(formData.macroscopy_html || ''),
-            microscopy_html: removeHyperlinks(formData.microscopy_html || ''),
-            comments_notes_html: removeHyperlinks(
-                formData.comments_notes_html || '',
-            ),
-            protocols_html: removeHyperlinks(formData.protocols_html || ''),
-            legend_html: removeHyperlinks(formData.legend_html || ''),
-            open_text_html: removeHyperlinks(formData.open_text_html || ''),
-            addendum_html: removeHyperlinks(formData.addendum_html || ''),
+            clinical_details_html: cleanField(formData.clinical_details_html),
+            diagnosis_html: cleanField(formData.diagnosis_html),
+            macroscopy_html: cleanField(formData.macroscopy_html),
+            microscopy_html: cleanField(formData.microscopy_html),
+            comments_notes_html: cleanField(formData.comments_notes_html),
+            protocols_html: cleanField(formData.protocols_html),
+            legend_html: cleanField(formData.legend_html),
+            open_text_html: cleanField(formData.open_text_html),
+            addendum_html: cleanField(formData.addendum_html),
         }));
 
         const options = {

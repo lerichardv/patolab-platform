@@ -1,6 +1,21 @@
 import axios from 'axios';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
+} from 'react';
 import SpecimenFormDataController from '@/actions/App/Http/Controllers/SpecimenFormDataController';
+
+export const SpecimenFormDataContext = createContext<SpecimenFormData | null>(
+    null,
+);
+
+export function useSpecimenFormContext(): SpecimenFormData | null {
+    return useContext(SpecimenFormDataContext);
+}
 
 export interface SpecimenFormData {
     specimen?: any;

@@ -80,6 +80,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Obtiene las duraciones estimadas de exámenes para el patólogo.
+     */
+    public function examinationDurations(): HasMany
+    {
+        return $this->hasMany(PathologistExaminationDuration::class, 'user_id');
+    }
+
+    /**
      * Obtiene las comisiones generadas por el usuario.
      */
     public function commissions(): HasMany

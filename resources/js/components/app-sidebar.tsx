@@ -20,6 +20,7 @@ import {
     FileSpreadsheet,
     BarChart3,
     Calculator,
+    CalendarDays,
 } from 'lucide-react';
 import { index as caiRangesIndex } from '@/actions/App/Http/Controllers/CaiRangeController';
 import { index as creditsIndex } from '@/actions/App/Http/Controllers/CreditController';
@@ -48,6 +49,7 @@ import { index as deliveryReportIndex } from '@/actions/App/Http/Controllers/Rep
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
 import { index as sequencesIndex } from '@/actions/App/Http/Controllers/SequenceController';
 import { index as settingsSystemIndex } from '@/actions/App/Http/Controllers/SettingController';
+import { index as specimenBalanceIndex } from '@/actions/App/Http/Controllers/SpecimenBalanceController';
 import { index as specimenCategoriesIndex } from '@/actions/App/Http/Controllers/SpecimenCategoryController';
 import { index as specimensIndex } from '@/actions/App/Http/Controllers/SpecimenController';
 import { index as specimenTypesIndex } from '@/actions/App/Http/Controllers/SpecimenTypeController';
@@ -127,6 +129,12 @@ const mainNavItems: NavItem[] = [
         href: rentalsIndex(),
         icon: Tag,
         permission: 'rentals.view',
+    },
+    {
+        title: 'Balance de Muestras',
+        href: specimenBalanceIndex(),
+        icon: CalendarDays,
+        permission: 'specimens_balance.view',
     },
 ];
 

@@ -22,6 +22,7 @@ class SpecimenTypeExamination extends Model
         'specimen_type',
         'name',
         'description',
+        'color',
         'active',
     ];
 

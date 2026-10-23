@@ -190,3 +190,84 @@ test('save endpoint validates that open_text_label does not exceed 255 character
     $response->assertStatus(422)
         ->assertJsonValidationErrors(['open_text_label']);
 });
+
+test('save endpoint normalizes empty paragraphs to empty string and purges Yjs state', function () {
+    $this->actingAs($this->user);
+
+    $response = $this->postJson(
+        route('specimens.report-editor.save', $this->specimen->sequence_code),
+        [
+            'macroscopy_html' => '<p></p>',
+            'microscopy_html' => '<p><br></p>',
+            'diagnosis_html' => '<p>&nbsp;</p>',
+        ]
+    );
+
+    $response->assertOk()
+        ->assertJsonPath('status', 'success');
+
+    $this->report->refresh();
+
+    // HTML columns should be normalized to empty strings
+    expect($this->report->macroscopy_html)->toBe('')
+        ->and($this->report->microscopy_html)->toBe('')
+        ->and($this->report->diagnosis_html)->toBe('');
+
+    // Stale Yjs states should be purged to null because the field is empty
+    expect($this->report->yjs_macroscopy_state)->toBeNull()
+        ->and($this->report->yjs_microscopy_state)->toBeNull()
+        ->and($this->report->yjs_diagnosis_state)->toBeNull();
+});
+
+test('save endpoint trims leading and trailing empty paragraphs while preserving real content', function () {
+    $this->actingAs($this->user);
+
+    $response = $this->postJson(
+        route('specimens.report-editor.save', $this->specimen->sequence_code),
+        [
+            'macroscopy_html' => '<p></p><p>Substantive text</p><p><br></p>',
+            'microscopy_html' => '<ul><li>Item 1</li></ul><p></p>',
+        ]
+    );
+
+    $response->assertOk();
+
+    $this->report->refresh();
+
+    expect($this->report->macroscopy_html)->toBe('<p>Substantive text</p>')
+        ->and($this->report->microscopy_html)->toBe('<ul><li>Item 1</li></ul>');
+});
+
+test('collaboration webhook returns empty content and purges state for empty fields', function () {
+    // 1. Create event for empty field
+    $createResponse = $this->postJson('/api/collaboration', [
+        'event' => 'create',
+        'payload' => [
+            'documentName' => "report-{$this->report->id}-clinical_details",
+            'requestParameters' => [],
+        ],
+    ]);
+
+    $createResponse->assertOk()
+        ->assertJsonPath('content', '');
+
+    // 2. onConnect event for empty field with stale state
+    DB::table('specimen_reports')->where('id', $this->report->id)->update([
+        'clinical_details_html' => '<p></p>',
+        'yjs_clinical_details_state' => 'stale-blob',
+    ]);
+
+    $onConnectResponse = $this->postJson('/api/collaboration', [
+        'event' => 'onConnect',
+        'payload' => [
+            'documentName' => "report-{$this->report->id}-clinical_details",
+            'requestParameters' => [],
+        ],
+    ]);
+
+    $onConnectResponse->assertOk()
+        ->assertJsonPath('document', null);
+
+    $this->report->refresh();
+    expect($this->report->yjs_clinical_details_state)->toBeNull();
+});

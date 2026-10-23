@@ -88,7 +88,10 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { invalidateSpecimenCatalogsCache } from '@/hooks/use-specimen-form-data';
+import {
+    invalidateSpecimenCatalogsCache,
+    useSpecimenFormContext,
+} from '@/hooks/use-specimen-form-data';
 import { findInaccessibleFile } from '@/lib/file-utils';
 import { cn } from '@/lib/utils';
 import {
@@ -112,15 +115,15 @@ interface Props {
     specimen: any | null;
     onSuccess: () => void;
     setIsDirty?: (dirty: boolean) => void;
-    specimenTypes: any[];
-    examinations: any[];
-    categories: any[];
-    referrers: any[];
-    referrerTypes: any[];
-    priorities: any[];
-    locations: any[];
-    sequences: any[];
-    activeLocationId: number | null;
+    specimenTypes?: any[];
+    examinations?: any[];
+    categories?: any[];
+    referrers?: any[];
+    referrerTypes?: any[];
+    priorities?: any[];
+    locations?: any[];
+    sequences?: any[];
+    activeLocationId?: number | null;
     products?: any[];
     banks?: any[];
     showPaymentMethodEdition?: boolean;
@@ -131,20 +134,36 @@ export default function SpecimenForm({
     specimen,
     onSuccess,
     setIsDirty,
-    specimenTypes,
-    examinations,
-    categories,
-    referrers,
-    referrerTypes = [],
-    priorities,
-    locations = [],
-    sequences = [],
-    activeLocationId = null,
-    products = [],
-    banks = [],
+    specimenTypes: propSpecimenTypes,
+    examinations: propExaminations,
+    categories: propCategories,
+    referrers: propReferrers,
+    referrerTypes: propReferrerTypes,
+    priorities: propPriorities,
+    locations: propLocations,
+    sequences: propSequences,
+    activeLocationId: propActiveLocationId,
+    products: propProducts,
+    banks: propBanks,
     showPaymentMethodEdition = true,
     readOnlySampleCollectionDate = false,
 }: Props) {
+    const formContext = useSpecimenFormContext();
+
+    const specimenTypes = propSpecimenTypes || formContext?.specimenTypes || [];
+    const examinations = propExaminations || formContext?.examinations || [];
+    const categories = propCategories || formContext?.categories || [];
+    const referrers = propReferrers || formContext?.referrers || [];
+    const referrerTypes = propReferrerTypes || formContext?.referrerTypes || [];
+    const priorities = propPriorities || formContext?.priorities || [];
+    const locations = propLocations || formContext?.locations || [];
+    const sequences = propSequences || formContext?.sequences || [];
+    const activeLocationId =
+        propActiveLocationId !== undefined && propActiveLocationId !== null
+            ? propActiveLocationId
+            : (formContext?.activeLocationId ?? null);
+    const products = propProducts || formContext?.products || [];
+    const banks = propBanks || formContext?.banks || [];
     const { props: pageProps } = usePage<any>();
     const flash = pageProps.flash as Record<string, any> | undefined;
     const [availableTemplates, setAvailableTemplates] = React.useState<any[]>(

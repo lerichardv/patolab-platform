@@ -129,7 +129,8 @@ class SpecimenTypeTemplateController extends Controller
 
         foreach ($htmlFields as $field) {
             if (isset($validated[$field])) {
-                $validated[$field] = ReportPaginator::removeHyperlinks($validated[$field]);
+                $normalized = ReportPaginator::normalizeHtml($validated[$field]);
+                $validated[$field] = $normalized !== '' ? $normalized : null;
             }
         }
 
@@ -211,7 +212,8 @@ class SpecimenTypeTemplateController extends Controller
 
         foreach ($htmlFields as $field) {
             if (isset($validated[$field])) {
-                $validated[$field] = ReportPaginator::removeHyperlinks($validated[$field]);
+                $normalized = ReportPaginator::normalizeHtml($validated[$field]);
+                $validated[$field] = $normalized !== '' ? $normalized : null;
             }
         }
 
