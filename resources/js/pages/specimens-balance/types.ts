@@ -78,6 +78,7 @@ export interface ExaminationOption {
     name: string;
     color: string;
     specimen_type: number;
+    category_ids?: number[];
     type?: {
         id: number;
         name: string;
@@ -146,10 +147,14 @@ export interface DetailedSheetSpecimenItem {
     id: number;
     sequence_code: string;
     customer_name: string;
+    type_id?: number | null;
     type_name: string;
+    examination_ids?: number[];
     examination_name: string;
     examination_color: string;
+    category_id?: number | null;
     category_name?: string | null;
+    priority_id?: number | null;
     priority_name: string;
     priority_color: string;
     duration_minutes: number;

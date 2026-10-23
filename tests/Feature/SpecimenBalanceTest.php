@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AuditLog;
 use App\Models\CaiRange;
 use App\Models\Customer;
 use App\Models\Location;
@@ -404,6 +405,7 @@ test('reschedule horizontally reprograms internal date and shifts client deliver
     $response = $this->actingAs($this->pathologistUser1)
         ->postJson(route('specimens-balance.reschedule', $specimen), [
             'target_date' => $targetDate,
+            'reason' => 'Cambio de fecha por reprogramación de carga',
         ])
         ->assertSuccessful()
         ->assertJson([
@@ -437,6 +439,7 @@ test('reschedule vertically reassigns pathologist and unassigns when target is u
     $this->actingAs($this->pathologistUser1)
         ->postJson(route('specimens-balance.reschedule', $specimen), [
             'target_user_id' => $this->pathologistUser1->id,
+            'reason' => 'Asignación a Dr. Carlos',
         ])
         ->assertSuccessful();
 
@@ -447,6 +450,7 @@ test('reschedule vertically reassigns pathologist and unassigns when target is u
     $this->actingAs($this->pathologistUser1)
         ->postJson(route('specimens-balance.reschedule', $specimen), [
             'target_user_id' => $this->pathologistUser2->id,
+            'reason' => 'Reasignación a Dra. Ana',
         ])
         ->assertSuccessful();
 
@@ -457,6 +461,7 @@ test('reschedule vertically reassigns pathologist and unassigns when target is u
     $this->actingAs($this->pathologistUser1)
         ->postJson(route('specimens-balance.reschedule', $specimen), [
             'target_user_id' => 'unassigned',
+            'reason' => 'Mover a sin asignar',
         ])
         ->assertSuccessful();
 
@@ -480,6 +485,7 @@ test('user without specimens_balance.manage cannot reschedule or save durations'
     $this->actingAs($this->viewerUser)
         ->postJson(route('specimens-balance.reschedule', $specimen), [
             'target_date' => '2026-10-20',
+            'reason' => 'Intento sin permiso',
         ])
         ->assertForbidden();
 
@@ -520,6 +526,63 @@ test('saveDurations updates pathologist duration and examination color', functio
 
     $this->examination1->refresh();
     expect($this->examination1->color)->toBe('#8b5cf6');
+});
+
+test('index provides category_ids on examinations and saveDurations handles bulk updates', function () {
+    // Associate specimen with category and examination1
+    Specimen::create([
+        'sequence_code' => 'B-0099-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'pending',
+        'active' => true,
+        'created_at' => now(),
+    ]);
+
+    $response = $this->actingAs($this->pathologistUser1)
+        ->get(route('specimens-balance.index'));
+
+    $response->assertOk();
+    $pageProps = $response->viewData('page')['props'];
+    $examinations = collect($pageProps['filterOptions']['examinations']);
+    $targetExam = $examinations->firstWhere('id', $this->examination1->id);
+
+    expect($targetExam)->not->toBeNull();
+    expect($targetExam['category_ids'])->toContain($this->category->id);
+
+    // Bulk save durations for multiple examinations
+    $this->actingAs($this->pathologistUser1)
+        ->post(route('specimens-balance.durations'), [
+            'user_id' => $this->pathologistUser1->id,
+            'durations' => [
+                [
+                    'specimen_type_examination_id' => $this->examination1->id,
+                    'duration_minutes' => 45,
+                    'color' => '#10b981',
+                ],
+                [
+                    'specimen_type_examination_id' => $this->examination2->id,
+                    'duration_minutes' => 60,
+                    'color' => '#3b82f6',
+                ],
+            ],
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $duration1 = PathologistExaminationDuration::where('user_id', $this->pathologistUser1->id)
+        ->where('specimen_type_examination_id', $this->examination1->id)
+        ->first();
+    $duration2 = PathologistExaminationDuration::where('user_id', $this->pathologistUser1->id)
+        ->where('specimen_type_examination_id', $this->examination2->id)
+        ->first();
+
+    expect($duration1->duration_minutes)->toBe(45);
+    expect($duration2->duration_minutes)->toBe(60);
 });
 
 test('unassignedList returns JSON list of unassigned specimens and filters by search', function () {
@@ -659,6 +722,7 @@ test('rescheduling multi-assigned specimen horizontally updates date while prese
     $this->actingAs($this->pathologistUser1)
         ->postJson(route('specimens-balance.reschedule', $specimen), [
             'target_date' => '2026-10-16',
+            'reason' => 'Reprogramación horizontal multiasignada',
         ])
         ->assertSuccessful()
         ->assertJson([
@@ -713,6 +777,7 @@ test('moving multi-assigned specimen to another pathologist or unassigned is dis
     $this->actingAs($this->pathologistUser1)
         ->postJson(route('specimens-balance.reschedule', $specimen), [
             'target_user_id' => $this->pathologistUser1->id,
+            'reason' => 'Intento de reasignar',
         ])
         ->assertSuccessful();
 
@@ -728,6 +793,7 @@ test('moving multi-assigned specimen to another pathologist or unassigned is dis
     $this->actingAs($this->pathologistUser1)
         ->postJson(route('specimens-balance.reschedule', $specimen), [
             'target_user_id' => 'unassigned',
+            'reason' => 'Intento de desasignar',
         ])
         ->assertSuccessful();
 
@@ -735,4 +801,341 @@ test('moving multi-assigned specimen to another pathologist or unassigned is dis
 
     // Still both pathologists remain assigned
     expect($specimen->users()->count())->toBe(2);
+});
+
+test('reschedule requires a reason parameter', function () {
+    $specimen = Specimen::create([
+        'sequence_code' => 'B-0001-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    $this->actingAs($this->pathologistUser1)
+        ->postJson(route('specimens-balance.reschedule', $specimen), [
+            'target_date' => '2026-10-15',
+            'target_user_id' => $this->pathologistUser1->id,
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['reason']);
+});
+
+test('reschedule persists move_reason and moved_at and logs to audit_log with correct origin', function () {
+    Carbon::setTestNow('2026-10-14 11:30:00');
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'B-0002-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    $reason = 'Reasignación por alta carga de trabajo en laboratorio';
+
+    $this->actingAs($this->pathologistUser1)
+        ->postJson(route('specimens-balance.reschedule', $specimen), [
+            'target_date' => '2026-10-16',
+            'target_user_id' => $this->pathologistUser1->id,
+            'reason' => $reason,
+        ])
+        ->assertSuccessful()
+        ->assertJson(['success' => true]);
+
+    $specimen->refresh();
+
+    expect($specimen->move_reason)->toBe($reason)
+        ->and($specimen->moved_at)->not->toBeNull()
+        ->and($specimen->moved_at->toDateTimeString())->toBe('2026-10-14 11:30:00');
+
+    $auditReason = AuditLog::where('table', $specimen->getTable())
+        ->where('row_id', $specimen->id)
+        ->where('column', 'move_reason')
+        ->where('origin', 'specimens-balance-move')
+        ->first();
+
+    expect($auditReason)->not->toBeNull()
+        ->and($auditReason->new_value)->toBe($reason);
+
+    Carbon::setTestNow();
+});
+
+test('filters balance board by specimen category id', function () {
+    Carbon::setTestNow('2026-10-12 09:00:00');
+
+    $category2 = SpecimenCategory::create([
+        'name' => 'Citología General',
+        'unit' => 'days',
+        'quantity' => 2,
+        'intern_unit' => 'days',
+        'intern_quantity' => 1,
+        'active' => true,
+    ]);
+
+    $specimen1 = Specimen::create([
+        'sequence_code' => 'B-0001-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    $specimen2 = Specimen::create([
+        'sequence_code' => 'B-0002-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $category2->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    $response = $this->actingAs($this->adminUser)
+        ->get(route('specimens-balance.index', ['category_id' => $category2->id]))
+        ->assertSuccessful()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('specimens-balance/index')
+            ->where('filters.category_id', (string) $category2->id)
+            ->where('unassignedRow.total_specimens', 1)
+        );
+
+    Carbon::setTestNow();
+});
+
+test('bulk reschedule requires permission specimens_balance.manage', function () {
+    $this->actingAs($this->viewerUser)
+        ->postJson(route('specimens-balance.bulk-reschedule'), [
+            'ids' => [1],
+            'action' => 'move_date',
+            'target_date' => '2026-10-20',
+            'reason' => 'Test reason',
+        ])
+        ->assertForbidden();
+});
+
+test('bulk reschedule requires valid ids, action, and reason', function () {
+    $this->actingAs($this->pathologistUser1)
+        ->postJson(route('specimens-balance.bulk-reschedule'), [])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['ids', 'action', 'reason']);
+
+    $this->actingAs($this->pathologistUser1)
+        ->postJson(route('specimens-balance.bulk-reschedule'), [
+            'ids' => [999999],
+            'action' => 'invalid_action',
+            'reason' => 'Test reason',
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['ids.0', 'action']);
+});
+
+test('bulk reschedule shifts target date for multiple specimens and records audit log', function () {
+    Carbon::setTestNow('2026-10-14 10:00:00');
+
+    $specimen1 = Specimen::create([
+        'sequence_code' => 'B-0010-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    $specimen2 = Specimen::create([
+        'sequence_code' => 'B-0011-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    $reason = 'Reprogramación masiva por mantenimiento en laboratorio';
+
+    $this->actingAs($this->pathologistUser1)
+        ->postJson(route('specimens-balance.bulk-reschedule'), [
+            'ids' => [$specimen1->id, $specimen2->id],
+            'action' => 'move_date',
+            'target_date' => '2026-10-19',
+            'reason' => $reason,
+        ])
+        ->assertSuccessful()
+        ->assertJson([
+            'success' => true,
+            'count' => 2,
+        ]);
+
+    $specimen1->refresh();
+    $specimen2->refresh();
+
+    expect($specimen1->move_reason)->toBe($reason)
+        ->and($specimen1->moved_at)->not->toBeNull()
+        ->and($specimen2->move_reason)->toBe($reason)
+        ->and($specimen2->moved_at)->not->toBeNull();
+
+    // Verify AuditLog for each specimen with bulk move origin
+    foreach ([$specimen1, $specimen2] as $specimen) {
+        $auditLog = AuditLog::where('table', $specimen->getTable())
+            ->where('row_id', $specimen->id)
+            ->where('column', 'move_reason')
+            ->where('origin', 'specimens-balance-bulk-move')
+            ->first();
+
+        expect($auditLog)->not->toBeNull()
+            ->and($auditLog->new_value)->toBe($reason);
+    }
+
+    Carbon::setTestNow();
+});
+
+test('bulk reschedule reassigns multiple specimens to another pathologist', function () {
+    $specimen1 = Specimen::create([
+        'sequence_code' => 'B-0020-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+    $specimen1->users()->attach($this->pathologistUser1->id, [
+        'assigned_by' => $this->adminUser->id,
+        'macroscopy_access' => true,
+        'microscopy_access' => true,
+    ]);
+
+    $specimen2 = Specimen::create([
+        'sequence_code' => 'B-0021-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    $this->actingAs($this->pathologistUser1)
+        ->postJson(route('specimens-balance.bulk-reschedule'), [
+            'ids' => [$specimen1->id, $specimen2->id],
+            'action' => 'assign_pathologist',
+            'target_user_id' => $this->pathologistUser2->id,
+            'reason' => 'Reasignación en lote por guardia médica',
+        ])
+        ->assertSuccessful()
+        ->assertJson([
+            'success' => true,
+            'count' => 2,
+        ]);
+
+    $specimen1->refresh();
+    $specimen2->refresh();
+
+    expect($specimen1->users()->pluck('users.id')->toArray())->toEqual([$this->pathologistUser2->id])
+        ->and($specimen2->users()->pluck('users.id')->toArray())->toEqual([$this->pathologistUser2->id]);
+});
+
+test('bulk reschedule preserves multi-assigned specimens from reassignment', function () {
+    $specimen = Specimen::create([
+        'sequence_code' => 'B-0030-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    // Multi-assigned to both pathologists
+    $specimen->users()->attach([
+        $this->pathologistUser1->id => [
+            'assigned_by' => $this->adminUser->id,
+            'macroscopy_access' => true,
+            'microscopy_access' => true,
+        ],
+        $this->pathologistUser2->id => [
+            'assigned_by' => $this->adminUser->id,
+            'macroscopy_access' => true,
+            'microscopy_access' => true,
+        ],
+    ]);
+
+    $this->actingAs($this->pathologistUser1)
+        ->postJson(route('specimens-balance.bulk-reschedule'), [
+            'ids' => [$specimen->id],
+            'action' => 'assign_pathologist',
+            'target_user_id' => 'unassigned',
+            'reason' => 'Intento de desasignar muestra multi-patólogo en lote',
+        ])
+        ->assertSuccessful();
+
+    $specimen->refresh();
+
+    // Reassignment was skipped; both pathologists remain assigned
+    expect($specimen->users()->count())->toBe(2);
+});
+
+test('durationsData endpoint requires specimens_balance.view permission', function () {
+    $this->actingAs($this->unauthorizedUser)
+        ->getJson(route('specimens-balance.durations-data'))
+        ->assertForbidden();
+});
+
+test('durationsData endpoint returns fresh duration settings and pathologists from database', function () {
+    // Create an explicit duration in the database
+    PathologistExaminationDuration::updateOrCreate(
+        [
+            'user_id' => $this->pathologistUser1->id,
+            'specimen_type_examination_id' => $this->examination1->id,
+        ],
+        [
+            'duration_minutes' => 45,
+        ]
+    );
+
+    $response = $this->actingAs($this->pathologistUser1)
+        ->getJson(route('specimens-balance.durations-data'))
+        ->assertSuccessful()
+        ->assertJsonStructure([
+            'pathologists',
+            'durationsMap',
+            'filterOptions' => [
+                'specimenTypes',
+                'examinations',
+                'categories',
+            ],
+            'currentUserId',
+            'canManage',
+        ]);
+
+    $data = $response->json();
+    expect($data['durationsMap'][$this->pathologistUser1->id][$this->examination1->id])->toBe(45);
+    expect($data['currentUserId'])->toBe($this->pathologistUser1->id);
+    expect($data['canManage'])->toBeTrue();
 });

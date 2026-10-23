@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\PathologistExaminationDuration;
 use App\Models\Role;
@@ -358,11 +359,30 @@ class SpecimenBalanceController extends Controller
 
         // 8. Filter options
         $specimenTypes = SpecimenType::where('active', true)->orderBy('name')->get(['id', 'name']);
+
+        $categoryExams = DB::table('specimen')
+            ->whereNotNull('specimen.specimen_category')
+            ->leftJoin('specimen_examinations', 'specimen_examinations.specimen_id', '=', 'specimen.id')
+            ->select([
+                'specimen.specimen_category as category_id',
+                DB::raw('COALESCE(specimen_examinations.examination_id, specimen.specimen_type_examination) as examination_id'),
+            ])
+            ->whereNotNull(DB::raw('COALESCE(specimen_examinations.examination_id, specimen.specimen_type_examination)'))
+            ->distinct()
+            ->get()
+            ->groupBy('examination_id')
+            ->map(fn ($rows) => $rows->pluck('category_id')->unique()->values()->all());
+
         $examinations = SpecimenTypeExamination::where('active', true)
             ->with('type:id,name')
             ->orderBy('specimen_type')
             ->orderBy('name')
-            ->get(['id', 'name', 'color', 'specimen_type']);
+            ->get(['id', 'name', 'color', 'specimen_type'])
+            ->map(function ($exam) use ($categoryExams) {
+                $exam->category_ids = $categoryExams->get($exam->id, []);
+
+                return $exam;
+            });
         $categories = SpecimenCategory::where('active', true)->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('specimens-balance/index', [
@@ -451,12 +471,18 @@ class SpecimenBalanceController extends Controller
                 'id' => $specimen->id,
                 'sequence_code' => $specimen->sequence_code,
                 'customer_name' => $specimen->customerRelation?->name ?? 'N/A',
+                'type_id' => $specimen->specimen_type_id ?? $specimen->type?->id,
                 'type_name' => $specimen->type?->name ?? 'N/A',
+                'examination_ids' => $specimen->examinations->isNotEmpty()
+                    ? $specimen->examinations->pluck('id')->toArray()
+                    : ($specimen->specimen_type_examination_id ? [$specimen->specimen_type_examination_id] : []),
                 'examination_name' => $specimen->examinations->isNotEmpty()
                     ? $specimen->examinations->pluck('name')->join(', ')
                     : ($specimen->examination?->name ?? 'N/A'),
                 'examination_color' => $color,
+                'category_id' => $specimen->specimen_category_id ?? $specimen->category?->id,
                 'category_name' => $specimen->category?->name,
+                'priority_id' => $specimen->priority_id ?? $specimen->priority?->id,
                 'priority_name' => $specimen->priority?->name ?? 'Normal',
                 'priority_color' => $specimen->priority?->color ?? '#3b82f6',
                 'duration_minutes' => $durationMinutes,
@@ -545,12 +571,18 @@ class SpecimenBalanceController extends Controller
                 'id' => $specimen->id,
                 'sequence_code' => $specimen->sequence_code,
                 'customer_name' => $specimen->customerRelation?->name ?? 'N/A',
+                'type_id' => $specimen->specimen_type_id ?? $specimen->type?->id,
                 'type_name' => $specimen->type?->name ?? 'N/A',
+                'examination_ids' => $specimen->examinations->isNotEmpty()
+                    ? $specimen->examinations->pluck('id')->toArray()
+                    : ($specimen->specimen_type_examination_id ? [$specimen->specimen_type_examination_id] : []),
                 'examination_name' => $specimen->examinations->isNotEmpty()
                     ? $specimen->examinations->pluck('name')->join(', ')
                     : ($specimen->examination?->name ?? 'N/A'),
                 'examination_color' => $color,
+                'category_id' => $specimen->specimen_category_id ?? $specimen->category?->id,
                 'category_name' => $specimen->category?->name,
+                'priority_id' => $specimen->priority_id ?? $specimen->priority?->id,
                 'priority_name' => $specimen->priority?->name ?? 'Normal',
                 'priority_color' => $specimen->priority?->color ?? '#3b82f6',
                 'duration_minutes' => $durationMinutes,
@@ -584,60 +616,72 @@ class SpecimenBalanceController extends Controller
         $validated = $request->validate([
             'target_date' => 'nullable|date',
             'target_user_id' => 'nullable', // integer, 'unassigned', or null
+            'reason' => 'required|string|max:1000',
         ]);
 
-        DB::transaction(function () use ($specimen, $validated) {
-            // 1. Pathologist Reassignment (Vertical Drag)
-            // Reassignment is only allowed when specimen has at most 1 assigned pathologist.
-            // When assigned to more than one pathologist, moving to another pathologist is disabled.
-            if (array_key_exists('target_user_id', $validated)) {
-                $targetUserId = $validated['target_user_id'];
+        try {
+            AuditLog::$currentOrigin = 'specimens-balance-move';
 
-                if ($specimen->users()->count() <= 1) {
-                    if ($targetUserId === 'unassigned' || empty($targetUserId)) {
-                        $specimen->users()->detach();
-                    } else {
-                        $specimen->users()->sync([
-                            (int) $targetUserId => [
-                                'assigned_by' => auth()->id(),
-                                'macroscopy_access' => true,
-                                'microscopy_access' => true,
-                            ],
-                        ]);
+            DB::transaction(function () use ($specimen, $validated) {
+                // 1. Pathologist Reassignment (Vertical Drag)
+                // Reassignment is only allowed when specimen has at most 1 assigned pathologist.
+                // When assigned to more than one pathologist, moving to another pathologist is disabled.
+                if (array_key_exists('target_user_id', $validated)) {
+                    $targetUserId = $validated['target_user_id'];
+
+                    if ($specimen->users()->count() <= 1) {
+                        if ($targetUserId === 'unassigned' || empty($targetUserId)) {
+                            $specimen->users()->detach();
+                        } else {
+                            $specimen->users()->sync([
+                                (int) $targetUserId => [
+                                    'assigned_by' => auth()->id(),
+                                    'macroscopy_access' => true,
+                                    'microscopy_access' => true,
+                                ],
+                            ]);
+                        }
                     }
                 }
-            }
 
-            // 2. Date Rescheduling (Horizontal Drag)
-            if (! empty($validated['target_date'])) {
-                $targetDate = $validated['target_date'];
+                // 2. Date Rescheduling (Horizontal Drag) + Move Reason and Timestamp
+                $updateData = [
+                    'move_reason' => $validated['reason'],
+                    'moved_at' => now(),
+                ];
 
-                $currentInternalDate = $specimen->expected_internal_finalization_date?->format('Y-m-d')
-                    ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
-                $currentClientDate = $specimen->expected_finalization_date?->format('Y-m-d')
-                    ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+                if (! empty($validated['target_date'])) {
+                    $targetDate = $validated['target_date'];
 
-                $internWeekdays = WorkloadPressureCalculator::calculateWeekdays($specimen->created_at, $targetDate);
+                    $currentInternalDate = $specimen->expected_internal_finalization_date?->format('Y-m-d')
+                        ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+                    $currentClientDate = $specimen->expected_finalization_date?->format('Y-m-d')
+                        ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
 
-                // Calculate calendar day difference between current internal date and target date
-                $targetCarbon = Carbon::parse($targetDate)->startOfDay();
-                $currentInternalCarbon = Carbon::parse($currentInternalDate)->startOfDay();
-                $calendarDaysDiff = $currentInternalCarbon->diffInDays($targetCarbon, false);
+                    $internWeekdays = WorkloadPressureCalculator::calculateWeekdays($specimen->created_at, $targetDate);
 
-                // Shift customer date by the exact same number of calendar days
-                $newClientDate = Carbon::parse($currentClientDate)->addDays($calendarDaysDiff);
-                $clientWeekdays = WorkloadPressureCalculator::calculateWeekdays($specimen->created_at, $newClientDate);
+                    // Calculate calendar day difference between current internal date and target date
+                    $targetCarbon = Carbon::parse($targetDate)->startOfDay();
+                    $currentInternalCarbon = Carbon::parse($currentInternalDate)->startOfDay();
+                    $calendarDaysDiff = $currentInternalCarbon->diffInDays($targetCarbon, false);
 
-                $specimen->update([
-                    'is_manual_delivery_date_intern_enabled' => true,
-                    'delivery_date_intern_unit' => 'days',
-                    'delivery_date_intern_quantity' => $internWeekdays,
-                    'is_manual_delivery_date_enabled' => true,
-                    'delivery_date_unit' => 'days',
-                    'delivery_date_quantity' => $clientWeekdays,
-                ]);
-            }
-        });
+                    // Shift customer date by the exact same number of calendar days
+                    $newClientDate = Carbon::parse($currentClientDate)->addDays($calendarDaysDiff);
+                    $clientWeekdays = WorkloadPressureCalculator::calculateWeekdays($specimen->created_at, $newClientDate);
+
+                    $updateData['is_manual_delivery_date_intern_enabled'] = true;
+                    $updateData['delivery_date_intern_unit'] = 'days';
+                    $updateData['delivery_date_intern_quantity'] = $internWeekdays;
+                    $updateData['is_manual_delivery_date_enabled'] = true;
+                    $updateData['delivery_date_unit'] = 'days';
+                    $updateData['delivery_date_quantity'] = $clientWeekdays;
+                }
+
+                $specimen->update($updateData);
+            });
+        } finally {
+            AuditLog::$currentOrigin = 'system';
+        }
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -651,6 +695,179 @@ class SpecimenBalanceController extends Controller
     }
 
     /**
+     * Bulk reschedule multiple specimens to a target date and/or reassign to a pathologist.
+     */
+    public function bulkReschedule(Request $request): JsonResponse|RedirectResponse
+    {
+        Gate::authorize('specimens_balance.manage');
+
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:specimen,id',
+            'action' => 'required|string|in:move_date,assign_pathologist,both',
+            'target_date' => 'nullable|required_if:action,move_date,both|date',
+            'target_user_id' => 'nullable', // integer, 'unassigned', or null
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        $ids = $validated['ids'];
+        $action = $validated['action'];
+        $targetDate = $validated['target_date'] ?? null;
+        $targetUserId = $validated['target_user_id'] ?? null;
+        $reason = $validated['reason'];
+
+        try {
+            AuditLog::$currentOrigin = 'specimens-balance-bulk-move';
+
+            DB::transaction(function () use ($ids, $action, $targetDate, $targetUserId, $reason) {
+                $specimens = Specimen::whereIn('id', $ids)->get();
+
+                foreach ($specimens as $specimen) {
+                    // 1. Pathologist Reassignment (if action is assign_pathologist or both)
+                    if (in_array($action, ['assign_pathologist', 'both'], true)) {
+                        // Reassignment is only allowed when specimen has at most 1 assigned pathologist
+                        if ($specimen->users()->count() <= 1) {
+                            if ($targetUserId === 'unassigned' || empty($targetUserId)) {
+                                $specimen->users()->detach();
+                            } else {
+                                $specimen->users()->sync([
+                                    (int) $targetUserId => [
+                                        'assigned_by' => auth()->id(),
+                                        'macroscopy_access' => true,
+                                        'microscopy_access' => true,
+                                    ],
+                                ]);
+                            }
+                        }
+                    }
+
+                    // 2. Date Rescheduling + Move Reason and Timestamp
+                    $updateData = [
+                        'move_reason' => $reason,
+                        'moved_at' => now(),
+                    ];
+
+                    if (in_array($action, ['move_date', 'both'], true) && ! empty($targetDate)) {
+                        $currentInternalDate = $specimen->expected_internal_finalization_date?->format('Y-m-d')
+                            ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+                        $currentClientDate = $specimen->expected_finalization_date?->format('Y-m-d')
+                            ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+
+                        $internWeekdays = WorkloadPressureCalculator::calculateWeekdays($specimen->created_at, $targetDate);
+
+                        // Calculate calendar day difference between current internal date and target date
+                        $targetCarbon = Carbon::parse($targetDate)->startOfDay();
+                        $currentInternalCarbon = Carbon::parse($currentInternalDate)->startOfDay();
+                        $calendarDaysDiff = $currentInternalCarbon->diffInDays($targetCarbon, false);
+
+                        // Shift customer date by the exact same number of calendar days
+                        $newClientDate = Carbon::parse($currentClientDate)->addDays($calendarDaysDiff);
+                        $clientWeekdays = WorkloadPressureCalculator::calculateWeekdays($specimen->created_at, $newClientDate);
+
+                        $updateData['is_manual_delivery_date_intern_enabled'] = true;
+                        $updateData['delivery_date_intern_unit'] = 'days';
+                        $updateData['delivery_date_intern_quantity'] = $internWeekdays;
+                        $updateData['is_manual_delivery_date_enabled'] = true;
+                        $updateData['delivery_date_unit'] = 'days';
+                        $updateData['delivery_date_quantity'] = $clientWeekdays;
+                    }
+
+                    $specimen->update($updateData);
+                }
+            });
+        } finally {
+            AuditLog::$currentOrigin = 'system';
+        }
+
+        $count = count($ids);
+        $message = "Se han actualizado {$count} muestras exitosamente.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'count' => $count,
+            ]);
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    /**
+     * Get fresh duration settings data from the database for the duration settings sheet.
+     */
+    public function durationsData(Request $request): JsonResponse
+    {
+        Gate::authorize('specimens_balance.view');
+
+        $user = $request->user();
+        $canManage = Gate::allows('specimens_balance.manage');
+
+        // Resolve Pathologists
+        $pathologistRoleId = Setting::where('setting_key', 'pathologist_role_id')->value('setting_value');
+        if ($pathologistRoleId) {
+            $assistantRole = Role::where('slug', 'assistant_pathologist')->first();
+            $pathologistRoleIds = array_filter([(int) $pathologistRoleId, $assistantRole?->id]);
+        } else {
+            $pathologistRoleIds = Role::whereIn('slug', ['pathologist', 'assistant_pathologist'])->pluck('id')->toArray();
+        }
+
+        $pathologists = User::where('active', true)
+            ->when(! empty($pathologistRoleIds), fn ($q) => $q->whereIn('role_id', $pathologistRoleIds))
+            ->orderBy('name', 'asc')
+            ->get(['id', 'name', 'email']);
+
+        $allUserIds = $pathologists->pluck('id')->toArray();
+        if (! in_array($user->id, $allUserIds)) {
+            $allUserIds[] = $user->id;
+        }
+
+        // Durations map directly from database
+        $durationsMap = WorkloadPressureCalculator::getDurationsMap($allUserIds);
+
+        // Filter options
+        $specimenTypes = SpecimenType::where('active', true)->orderBy('name')->get(['id', 'name']);
+
+        $categoryExams = DB::table('specimen')
+            ->whereNotNull('specimen.specimen_category')
+            ->leftJoin('specimen_examinations', 'specimen_examinations.specimen_id', '=', 'specimen.id')
+            ->select([
+                'specimen.specimen_category as category_id',
+                DB::raw('COALESCE(specimen_examinations.examination_id, specimen.specimen_type_examination) as examination_id'),
+            ])
+            ->whereNotNull(DB::raw('COALESCE(specimen_examinations.examination_id, specimen.specimen_type_examination)'))
+            ->distinct()
+            ->get()
+            ->groupBy('examination_id')
+            ->map(fn ($rows) => $rows->pluck('category_id')->unique()->values()->all());
+
+        $examinations = SpecimenTypeExamination::where('active', true)
+            ->with('type:id,name')
+            ->orderBy('specimen_type')
+            ->orderBy('name')
+            ->get(['id', 'name', 'color', 'specimen_type'])
+            ->map(function ($exam) use ($categoryExams) {
+                $exam->category_ids = $categoryExams->get($exam->id, []);
+
+                return $exam;
+            });
+
+        $categories = SpecimenCategory::where('active', true)->orderBy('name')->get(['id', 'name']);
+
+        return response()->json([
+            'pathologists' => $pathologists,
+            'durationsMap' => $durationsMap,
+            'filterOptions' => [
+                'specimenTypes' => $specimenTypes,
+                'examinations' => $examinations,
+                'categories' => $categories,
+            ],
+            'currentUserId' => $user->id,
+            'canManage' => $canManage,
+        ]);
+    }
+
+    /**
      * Save estimated examination durations and colors for a pathologist.
      */
     public function saveDurations(Request $request): RedirectResponse
@@ -661,7 +878,7 @@ class SpecimenBalanceController extends Controller
             'user_id' => 'required|exists:users,id',
             'durations' => 'required|array',
             'durations.*.specimen_type_examination_id' => 'required|exists:specimen_type_examination,id',
-            'durations.*.duration_minutes' => 'required|integer|min:1|max:1440',
+            'durations.*.duration_minutes' => 'required|integer|min:1|max:43200',
             'durations.*.color' => 'nullable|string|max:7',
         ]);
 

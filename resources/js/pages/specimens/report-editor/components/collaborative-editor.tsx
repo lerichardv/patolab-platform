@@ -132,6 +132,29 @@ function CollaborativeEditorInner({
     const hasSeededRef = useRef(false);
     const lastEmittedHtmlRef = useRef<string | null>(null);
 
+    const getNormalizedEditorHtml = (currentEditor: Editor | null): string => {
+        if (!currentEditor) {
+            return '';
+        }
+
+        const rawHtml = removeHyperlinks(currentEditor.getHTML());
+        const cleanText = rawHtml
+            .replace(
+                /<\s*p\b[^>]*>(?:\s|&nbsp;|\xc2\xa0|<\s*br\s*\/?>)*<\s*\/p\s*>/gi,
+                '',
+            )
+            .replace(/&nbsp;|\xc2\xa0/gi, ' ')
+            .trim();
+        const hasMediaOrTable = /<img|<table|<figure/i.test(rawHtml);
+        const isEditorEmpty =
+            currentEditor.isEmpty ||
+            (!hasMediaOrTable && cleanText === '') ||
+            rawHtml === '<p></p>' ||
+            rawHtml === '';
+
+        return isEditorEmpty ? '' : rawHtml;
+    };
+
     const editor = useEditor({
         extensions: [
             StarterKit.configure({
@@ -195,7 +218,12 @@ function CollaborativeEditorInner({
 
             if (provider?.isSynced && hasSeededRef.current) {
                 setTimeout(() => {
-                    onUpdateRef.current?.(editor.getHTML());
+                    const newHtml = getNormalizedEditorHtml(editor);
+
+                    if (lastEmittedHtmlRef.current !== newHtml) {
+                        lastEmittedHtmlRef.current = newHtml;
+                        onUpdateRef.current?.(newHtml);
+                    }
                 }, 0);
             }
 
@@ -316,17 +344,13 @@ function CollaborativeEditorInner({
             // Mark as seeded so the transaction handler can start emitting updates.
             hasSeededRef.current = true;
 
-            const currentEditorHtml = removeHyperlinks(editor.getHTML());
-            const isEditorEmpty =
-                editor.isEmpty ||
-                editor.getText().trim() === '' ||
-                currentEditorHtml === '<p></p>' ||
-                currentEditorHtml === '';
+            const currentEditorHtml = getNormalizedEditorHtml(editor);
+            const isEditorEmpty = currentEditorHtml === '';
 
             const init = initialContentRef.current || '';
             const initClean = init
                 .replace(/<[^>]*>/g, '')
-                .replace(/&nbsp;/gi, ' ')
+                .replace(/&nbsp;|\xc2\xa0/gi, ' ')
                 .trim();
             const initHasMediaOrTable = /<img|<table/i.test(init);
             const hasInitialContent = initClean !== '' || initHasMediaOrTable;
@@ -359,7 +383,7 @@ function CollaborativeEditorInner({
                 return;
             }
 
-            const newHtml = removeHyperlinks(editor.getHTML());
+            const newHtml = getNormalizedEditorHtml(editor);
 
             // Only emit when the HTML actually changed to avoid unnecessary re-renders
             // in the parent (report-editor.tsx) that would create a new initialContent

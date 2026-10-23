@@ -535,6 +535,44 @@ class ReportPaginator
         return preg_replace('/<a\b[^>]*>(.*?)<\/a>/is', '$1', $html) ?? $html;
     }
 
+    /**
+     * Trim leading and trailing blank paragraphs from an HTML string.
+     */
+    public static function trimEmptyParagraphs(?string $html): string
+    {
+        if ($html === null || $html === '') {
+            return '';
+        }
+
+        $clean = preg_replace('/^(?:\s*<\s*p\b[^>]*>(?:\s|&nbsp;|\xc2\xa0|<\s*br\s*\/?>)*<\s*\/p\s*>)+/iu', '', $html);
+        $clean = preg_replace('/(?:\s*<\s*p\b[^>]*>(?:\s|&nbsp;|\xc2\xa0|<\s*br\s*\/?>)*<\s*\/p\s*>)+\s*$/iu', '', $clean ?? '');
+
+        return trim($clean ?? '');
+    }
+
+    /**
+     * Normalize rich text HTML: remove hyperlinks, strip leading/trailing blank paragraphs,
+     * and collapse to an empty string if there is no substantive text or media/tables.
+     */
+    public static function normalizeHtml(?string $html): string
+    {
+        if ($html === null || $html === '') {
+            return '';
+        }
+
+        $cleaned = self::removeHyperlinks($html);
+        $trimmed = self::trimEmptyParagraphs($cleaned);
+
+        $textOnly = trim(strip_tags(str_replace(['&nbsp;', "\xc2\xa0"], ' ', $trimmed)));
+        $hasMediaOrTable = (bool) preg_match('/<img|<table|<figure/i', $trimmed);
+
+        if (empty($textOnly) && ! $hasMediaOrTable) {
+            return '';
+        }
+
+        return $trimmed;
+    }
+
     public static function parseHtmlToBlocks(string $html): array
     {
         if (empty($html)) {

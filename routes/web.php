@@ -217,7 +217,9 @@ Route::middleware(['auth:web', 'verified'])->group(function () {
     Route::get('specimens-balance', [SpecimenBalanceController::class, 'index'])->name('specimens-balance.index');
     Route::get('specimens-balance/unassigned-list', [SpecimenBalanceController::class, 'unassignedList'])->name('specimens-balance.unassigned-list');
     Route::get('specimens-balance/expired-list', [SpecimenBalanceController::class, 'expiredList'])->name('specimens-balance.expired-list');
+    Route::get('specimens-balance/durations-data', [SpecimenBalanceController::class, 'durationsData'])->name('specimens-balance.durations-data');
     Route::post('specimens-balance/{specimen}/reschedule', [SpecimenBalanceController::class, 'reschedule'])->name('specimens-balance.reschedule');
+    Route::post('specimens-balance/bulk-reschedule', [SpecimenBalanceController::class, 'bulkReschedule'])->name('specimens-balance.bulk-reschedule');
     Route::post('specimens-balance/durations', [SpecimenBalanceController::class, 'saveDurations'])->name('specimens-balance.durations');
     Route::post('specimen-type-templates/upload-image', [SpecimenTypeTemplateController::class, 'uploadImage'])->name('specimen-type-templates.upload-image');
     Route::resource('specimen-type-templates', SpecimenTypeTemplateController::class);

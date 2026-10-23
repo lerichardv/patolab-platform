@@ -26,6 +26,7 @@ import type {
     UnassignedRowData,
 } from '../types';
 import { BalanceCard } from './balance-card';
+import { MoveReasonDialog } from './move-reason-dialog';
 
 // Parse droppableId: format "cell_{userId|'unassigned'}_{date}"
 function parseDroppableId(droppableId: string): {
@@ -42,12 +43,27 @@ function parseDroppableId(droppableId: string): {
     return { userId, date };
 }
 
+interface PendingMoveState {
+    specimen: SpecimenItem;
+    result: DropResult;
+    sourceParsed: { userId: string | number; date: string };
+    destParsed: { userId: string | number; date: string };
+    sourcePathologistName: string;
+    destPathologistName: string;
+    isMulti: boolean;
+    prevUnassigned: UnassignedRowData;
+    prevPathologists: PathologistRowData[];
+}
+
 interface BalanceBoardProps {
     calendarDays: CalendarDay[];
     unassignedRow: UnassignedRowData;
     pathologistRows: PathologistRowData[];
     showUnassigned?: boolean;
     canManage?: boolean;
+    isSelectionMode?: boolean;
+    selectedIds?: number[];
+    onToggleSelect?: (id: number) => void;
     onViewSpecimen: (specimen: SpecimenItem) => void;
     onEditSpecimen?: (specimen: SpecimenItem) => void;
 }
@@ -58,6 +74,9 @@ export const BalanceBoard: React.FC<BalanceBoardProps> = ({
     pathologistRows: initialPathologistRows,
     showUnassigned = false,
     canManage = true,
+    isSelectionMode = false,
+    selectedIds = [],
+    onToggleSelect,
     onViewSpecimen,
     onEditSpecimen,
 }) => {
@@ -196,6 +215,11 @@ export const BalanceBoard: React.FC<BalanceBoardProps> = ({
         sourceDate: string;
         isMultiAssigned: boolean;
     } | null>(null);
+    const [pendingMove, setPendingMove] = useState<PendingMoveState | null>(
+        null,
+    );
+    const [isMoveReasonDialogOpen, setIsMoveReasonDialogOpen] = useState(false);
+    const [isSubmittingMove, setIsSubmittingMove] = useState(false);
 
     // Sync with server props during render when props change
     if (
@@ -374,7 +398,7 @@ export const BalanceBoard: React.FC<BalanceBoardProps> = ({
         stopAutoScroll();
         setDraggingInfo(null);
 
-        const { source, destination, draggableId } = result;
+        const { source, destination } = result;
 
         if (!destination) {
             return;
@@ -387,15 +411,55 @@ export const BalanceBoard: React.FC<BalanceBoardProps> = ({
             return;
         }
 
-        const parts = draggableId.split('_');
-        const specimenId = parseInt(parts[parts.length - 1]);
         const sourceParsed = parseDroppableId(source.droppableId);
         const destParsed = parseDroppableId(destination.droppableId);
 
-        // Snapshot current state for rollback
-        const prevUnassigned = JSON.parse(JSON.stringify(unassignedRow));
-        const prevPathologists = JSON.parse(JSON.stringify(pathologistRows));
+        // Same cell reordering: keep within cell without prompting
+        if (source.droppableId === destination.droppableId) {
+            if (sourceParsed.userId === 'unassigned') {
+                setUnassignedRow((prev) => {
+                    const list = [...(prev.days[sourceParsed.date] || [])];
+                    const [item] = list.splice(source.index, 1);
+                    list.splice(destination.index, 0, item);
 
+                    return {
+                        ...prev,
+                        days: {
+                            ...prev.days,
+                            [sourceParsed.date]: list,
+                        },
+                    };
+                });
+            } else {
+                setPathologistRows((prevRows) =>
+                    prevRows.map((row) => {
+                        if (row.user.id !== sourceParsed.userId) {
+                            return row;
+                        }
+
+                        const dayData = row.days[sourceParsed.date];
+                        const list = [...(dayData?.specimens || [])];
+                        const [item] = list.splice(source.index, 1);
+                        list.splice(destination.index, 0, item);
+
+                        return {
+                            ...row,
+                            days: {
+                                ...row.days,
+                                [sourceParsed.date]: {
+                                    ...dayData,
+                                    specimens: list,
+                                },
+                            },
+                        };
+                    }),
+                );
+            }
+
+            return;
+        }
+
+        // Dropping into a DIFFERENT cell (Date or Pathologist changed)
         // Find the moved specimen
         let movedSpecimen: SpecimenItem | null = null;
 
@@ -426,97 +490,157 @@ export const BalanceBoard: React.FC<BalanceBoardProps> = ({
             return;
         }
 
-        // =========================================================================
-        // SCENARIO A: Multi-assigned specimen moved HORIZONTALLY across dates
-        // =========================================================================
-        if (isMulti) {
-            // Reordering within the exact same date and row
-            if (sourceParsed.date === destParsed.date) {
-                setPathologistRows((prevRows) =>
-                    prevRows.map((row) => {
-                        if (row.user.id !== sourceParsed.userId) {
-                            return row;
-                        }
+        // Snapshot current state for rollback
+        const prevUnassigned = JSON.parse(JSON.stringify(unassignedRow));
+        const prevPathologists = JSON.parse(JSON.stringify(pathologistRows));
 
-                        const dayData = row.days[sourceParsed.date];
-                        const list = [...(dayData?.specimens || [])];
-                        const [item] = list.splice(source.index, 1);
-                        list.splice(destination.index, 0, item);
+        const sourcePathologistName =
+            sourceParsed.userId === 'unassigned'
+                ? 'Sin Asignar'
+                : pathologistRows.find((p) => p.user.id === sourceParsed.userId)
+                      ?.user.name || 'Patólogo';
 
-                        return {
-                            ...row,
-                            days: {
-                                ...row.days,
-                                [sourceParsed.date]: {
-                                    ...dayData,
-                                    specimens: list,
-                                },
-                            },
-                        };
-                    }),
-                );
+        const destPathologistName =
+            destParsed.userId === 'unassigned'
+                ? 'Sin Asignar'
+                : pathologistRows.find((p) => p.user.id === destParsed.userId)
+                      ?.user.name || 'Patólogo';
 
+        setPendingMove({
+            specimen: movedSpecimen,
+            result,
+            sourceParsed,
+            destParsed,
+            sourcePathologistName,
+            destPathologistName,
+            isMulti,
+            prevUnassigned,
+            prevPathologists,
+        });
+        setIsMoveReasonDialogOpen(true);
+    };
+
+    const handleCancelMove = useCallback(() => {
+        setIsMoveReasonDialogOpen(false);
+        setPendingMove(null);
+        toast.info('Movimiento cancelado.');
+    }, []);
+
+    const handleConfirmMove = useCallback(
+        (reason: string) => {
+            if (!pendingMove) {
                 return;
             }
 
-            // Moving horizontally to a new date -> Move ALL N cards across all assigned pathologists!
-            const assignedIds = movedSpecimen.assigned_user_ids;
+            const {
+                specimen,
+                result,
+                sourceParsed,
+                destParsed,
+                isMulti,
+                prevUnassigned,
+                prevPathologists,
+            } = pendingMove;
+            const { source, destination, draggableId } = result;
 
-            setPathologistRows((prevRows) =>
-                prevRows.map((row) => {
-                    const pId = row.user.id;
+            if (!destination) {
+                return;
+            }
 
-                    if (!assignedIds.includes(pId)) {
-                        return row;
-                    }
+            const parts = draggableId.split('_');
+            const specimenId = parseInt(parts[parts.length - 1]);
+            let movedSpecimen: SpecimenItem = specimen;
 
-                    const updatedRow = { ...row, days: { ...row.days } };
+            setIsSubmittingMove(true);
 
-                    // 1. Remove from source date
-                    const sourceDayData = updatedRow.days[sourceParsed.date];
-                    const sourceList = [...(sourceDayData?.specimens || [])];
-                    const specIdx = sourceList.findIndex(
-                        (s) => s.id === specimenId,
-                    );
-                    let itemToMove: SpecimenItem = {
-                        ...movedSpecimen!,
-                        internal_date: destParsed.date,
-                        is_manual_internal: true,
-                        is_manual_client: true,
-                    };
+            // =========================================================================
+            // SCENARIO A: Multi-assigned specimen moved HORIZONTALLY across dates
+            // =========================================================================
+            if (isMulti) {
+                const assignedIds = movedSpecimen.assigned_user_ids;
 
-                    if (specIdx !== -1) {
-                        const [removed] = sourceList.splice(specIdx, 1);
-                        itemToMove = {
-                            ...removed,
+                setPathologistRows((prevRows) =>
+                    prevRows.map((row) => {
+                        const pId = row.user.id;
+
+                        if (!assignedIds.includes(pId)) {
+                            return row;
+                        }
+
+                        const updatedRow = { ...row, days: { ...row.days } };
+
+                        // 1. Remove from source date
+                        const sourceDayData = updatedRow.days[sourceParsed.date];
+                        const sourceList = [
+                            ...(sourceDayData?.specimens || []),
+                        ];
+                        const specIdx = sourceList.findIndex(
+                            (s) => s.id === specimenId,
+                        );
+                        let itemToMove: SpecimenItem = {
+                            ...movedSpecimen,
                             internal_date: destParsed.date,
                             is_manual_internal: true,
                             is_manual_client: true,
                         };
-                    }
 
-                    // Recalculate source day workload
-                    const durationMin = itemToMove.duration_minutes || 30;
-                    const sourceMinutes = Math.max(
-                        0,
-                        (sourceDayData?.workload?.total_minutes || 0) -
-                            durationMin,
-                    );
-                    const sourceHours =
-                        Math.round((sourceMinutes / 60) * 10) / 10;
-                    const sourcePct = Math.round((sourceHours / 8) * 100);
-                    const sourceColor =
-                        sourceHours > 8.0
-                            ? 'red'
-                            : sourceHours >= 6.0
-                              ? 'yellow'
-                              : 'green';
+                        if (specIdx !== -1) {
+                            const [removed] = sourceList.splice(specIdx, 1);
+                            itemToMove = {
+                                ...removed,
+                                internal_date: destParsed.date,
+                                is_manual_internal: true,
+                                is_manual_client: true,
+                            };
+                        }
 
-                    updatedRow.days[sourceParsed.date] = {
-                        ...sourceDayData,
-                        specimens: sourceList,
-                        workload: {
-                            ...(sourceDayData?.workload || {
+                        // Recalculate source day workload
+                        const durationMin = itemToMove.duration_minutes || 30;
+                        const sourceMinutes = Math.max(
+                            0,
+                            (sourceDayData?.workload?.total_minutes || 0) -
+                                durationMin,
+                        );
+                        const sourceHours =
+                            Math.round((sourceMinutes / 60) * 10) / 10;
+                        const sourcePct = Math.round((sourceHours / 8) * 100);
+                        const sourceColor =
+                            sourceHours > 8.0
+                                ? 'red'
+                                : sourceHours >= 6.0
+                                  ? 'yellow'
+                                  : 'green';
+
+                        updatedRow.days[sourceParsed.date] = {
+                            ...sourceDayData,
+                            specimens: sourceList,
+                            workload: {
+                                ...(sourceDayData?.workload || {
+                                    hours: 0,
+                                    percentage: 0,
+                                    color: 'green',
+                                    color_class: '',
+                                    progress_class: '',
+                                    label: '',
+                                    specimen_count: 0,
+                                    formatted_time: '',
+                                }),
+                                total_minutes: sourceMinutes,
+                                hours: sourceHours,
+                                percentage: sourcePct,
+                                color: sourceColor,
+                                formatted_time: `${sourceHours}h / 8.0h`,
+                                specimen_count: sourceList.length,
+                            },
+                        };
+
+                        // 2. Add to destination date
+                        const destDayData = updatedRow.days[
+                            destParsed.date
+                        ] || {
+                            specimens: [],
+                            workload: {
+                                total_minutes: 0,
                                 hours: 0,
                                 percentage: 0,
                                 color: 'green',
@@ -525,245 +649,240 @@ export const BalanceBoard: React.FC<BalanceBoardProps> = ({
                                 label: '',
                                 specimen_count: 0,
                                 formatted_time: '',
-                            }),
-                            total_minutes: sourceMinutes,
-                            hours: sourceHours,
-                            percentage: sourcePct,
-                            color: sourceColor,
-                            formatted_time: `${sourceHours}h / 8.0h`,
-                            specimen_count: sourceList.length,
+                            },
+                        };
+                        const destList = [...(destDayData.specimens || [])];
+
+                        if (pId === destParsed.userId) {
+                            destList.splice(destination.index, 0, itemToMove);
+                        } else {
+                            const targetIdx = Math.min(
+                                destination.index,
+                                destList.length,
+                            );
+                            destList.splice(targetIdx, 0, itemToMove);
+                        }
+
+                        // Recalculate dest day workload
+                        const destMinutes =
+                            (destDayData.workload?.total_minutes || 0) +
+                            durationMin;
+                        const destHours =
+                            Math.round((destMinutes / 60) * 10) / 10;
+                        const destPct = Math.round((destHours / 8) * 100);
+                        const destColor =
+                            destHours > 8.0
+                                ? 'red'
+                                : destHours >= 6.0
+                                  ? 'yellow'
+                                  : 'green';
+
+                        updatedRow.days[destParsed.date] = {
+                            ...destDayData,
+                            specimens: destList,
+                            workload: {
+                                ...destDayData.workload,
+                                total_minutes: destMinutes,
+                                hours: destHours,
+                                percentage: destPct,
+                                color: destColor,
+                                formatted_time: `${destHours}h / 8.0h`,
+                                specimen_count: destList.length,
+                            },
+                        };
+
+                        return updatedRow;
+                    }),
+                );
+
+                // Persist date change on backend with reason
+                router.post(
+                    rescheduleAction(specimenId).url,
+                    {
+                        target_date: destParsed.date,
+                        reason,
+                    },
+                    {
+                        preserveScroll: true,
+                        preserveState: true,
+                        onSuccess: () => {
+                            toast.success(
+                                `Muestra reprogramada para ${destParsed.date} en todos los patólogos asignados (${assignedIds.length})`,
+                            );
+                            setIsSubmittingMove(false);
+                            setIsMoveReasonDialogOpen(false);
+                            setPendingMove(null);
+                        },
+                        onError: (errors) => {
+                            setUnassignedRow(prevUnassigned);
+                            setPathologistRows(prevPathologists);
+                            const msg =
+                                Object.values(errors)[0] ||
+                                'Error al reprogramar la muestra';
+                            toast.error(String(msg));
+                            setIsSubmittingMove(false);
+                            setIsMoveReasonDialogOpen(false);
+                            setPendingMove(null);
+                        },
+                    },
+                );
+
+                return;
+            }
+
+            // =========================================================================
+            // SCENARIO B: Single-assigned or unassigned specimen
+            // =========================================================================
+            // 1. Remove from source
+            if (sourceParsed.userId === 'unassigned') {
+                const list = [...(unassignedRow.days[sourceParsed.date] || [])];
+                const [item] = list.splice(source.index, 1);
+                movedSpecimen = item;
+                setUnassignedRow((prev) => ({
+                    ...prev,
+                    total_specimens: Math.max(0, prev.total_specimens - 1),
+                    days: {
+                        ...prev.days,
+                        [sourceParsed.date]: list,
+                    },
+                }));
+            } else {
+                const pIdx = pathologistRows.findIndex(
+                    (p) => p.user.id === sourceParsed.userId,
+                );
+
+                if (pIdx !== -1) {
+                    const updatedRows = [...pathologistRows];
+                    const row = { ...updatedRows[pIdx] };
+                    const dayData = row.days[sourceParsed.date];
+                    const list = [...(dayData?.specimens || [])];
+                    const [item] = list.splice(source.index, 1);
+                    movedSpecimen = item;
+
+                    row.days = {
+                        ...row.days,
+                        [sourceParsed.date]: {
+                            ...dayData,
+                            specimens: list,
                         },
                     };
+                    row.total_specimens = Math.max(0, row.total_specimens - 1);
+                    updatedRows[pIdx] = row;
+                    setPathologistRows(updatedRows);
+                }
+            }
 
-                    // 2. Add to destination date
-                    const destDayData = updatedRow.days[destParsed.date] || {
-                        specimens: [],
-                        workload: {
-                            total_minutes: 0,
-                            hours: 0,
-                            percentage: 0,
-                            color: 'green',
-                            color_class: '',
-                            progress_class: '',
-                            label: '',
-                            specimen_count: 0,
-                            formatted_time: '',
+            if (!movedSpecimen) {
+                setIsSubmittingMove(false);
+
+                return;
+            }
+
+            // Update moved specimen metadata optimistically
+            movedSpecimen = {
+                ...movedSpecimen,
+                internal_date: destParsed.date,
+                is_manual_internal: true,
+                is_manual_client: true,
+                assigned_user_ids:
+                    destParsed.userId === 'unassigned'
+                        ? []
+                        : [destParsed.userId as number],
+            };
+
+            // 2. Insert into destination
+            if (destParsed.userId === 'unassigned') {
+                setUnassignedRow((prev) => {
+                    const list = [...(prev.days[destParsed.date] || [])];
+                    list.splice(destination.index, 0, movedSpecimen!);
+
+                    return {
+                        ...prev,
+                        total_specimens: prev.total_specimens + 1,
+                        days: {
+                            ...prev.days,
+                            [destParsed.date]: list,
                         },
                     };
-                    const destList = [...(destDayData.specimens || [])];
+                });
+            } else {
+                setPathologistRows((prevRows) => {
+                    const updatedRows = [...prevRows];
+                    const pIdx = updatedRows.findIndex(
+                        (p) => p.user.id === destParsed.userId,
+                    );
 
-                    // For the row specifically dragged, insert at destination.index; for other linked rows, insert at matching index or append
-                    if (pId === destParsed.userId) {
-                        destList.splice(destination.index, 0, itemToMove);
-                    } else {
-                        const targetIdx = Math.min(
-                            destination.index,
-                            destList.length,
-                        );
-                        destList.splice(targetIdx, 0, itemToMove);
+                    if (pIdx !== -1) {
+                        const row = { ...updatedRows[pIdx] };
+                        const dayData = row.days[destParsed.date] || {
+                            specimens: [],
+                            workload: {
+                                total_minutes: 0,
+                                hours: 0,
+                                percentage: 0,
+                                color: 'green',
+                                color_class: '',
+                                progress_class: '',
+                                label: '',
+                                specimen_count: 0,
+                                formatted_time: '',
+                            },
+                        };
+                        const list = [...(dayData.specimens || [])];
+                        list.splice(destination.index, 0, movedSpecimen!);
+
+                        row.days = {
+                            ...row.days,
+                            [destParsed.date]: {
+                                ...dayData,
+                                specimens: list,
+                            },
+                        };
+                        row.total_specimens = row.total_specimens + 1;
+                        updatedRows[pIdx] = row;
                     }
 
-                    // Recalculate dest day workload
-                    const destMinutes =
-                        (destDayData.workload?.total_minutes || 0) +
-                        durationMin;
-                    const destHours = Math.round((destMinutes / 60) * 10) / 10;
-                    const destPct = Math.round((destHours / 8) * 100);
-                    const destColor =
-                        destHours > 8.0
-                            ? 'red'
-                            : destHours >= 6.0
-                              ? 'yellow'
-                              : 'green';
+                    return updatedRows;
+                });
+            }
 
-                    updatedRow.days[destParsed.date] = {
-                        ...destDayData,
-                        specimens: destList,
-                        workload: {
-                            ...destDayData.workload,
-                            total_minutes: destMinutes,
-                            hours: destHours,
-                            percentage: destPct,
-                            color: destColor,
-                            formatted_time: `${destHours}h / 8.0h`,
-                            specimen_count: destList.length,
-                        },
-                    };
-
-                    return updatedRow;
-                }),
-            );
-
-            // Persist date change on backend without altering pathologist assignments
+            // 3. Send persist request to backend with reason
             router.post(
                 rescheduleAction(specimenId).url,
                 {
                     target_date: destParsed.date,
+                    target_user_id:
+                        destParsed.userId === 'unassigned'
+                            ? 'unassigned'
+                            : destParsed.userId,
+                    reason,
                 },
                 {
                     preserveScroll: true,
                     preserveState: true,
                     onSuccess: () => {
-                        toast.success(
-                            `Muestra reprogramada para ${destParsed.date} en todos los patólogos asignados (${assignedIds.length})`,
-                        );
+                        toast.success('Muestra reprogramada exitosamente');
+                        setIsSubmittingMove(false);
+                        setIsMoveReasonDialogOpen(false);
+                        setPendingMove(null);
                     },
                     onError: (errors) => {
+                        // Rollback optimistic update
                         setUnassignedRow(prevUnassigned);
                         setPathologistRows(prevPathologists);
                         const msg =
                             Object.values(errors)[0] ||
                             'Error al reprogramar la muestra';
                         toast.error(String(msg));
+                        setIsSubmittingMove(false);
+                        setIsMoveReasonDialogOpen(false);
+                        setPendingMove(null);
                     },
                 },
             );
-
-            return;
-        }
-
-        // =========================================================================
-        // SCENARIO B: Single-assigned or unassigned specimen
-        // =========================================================================
-        // 1. Remove from source
-        if (sourceParsed.userId === 'unassigned') {
-            const list = [...(unassignedRow.days[sourceParsed.date] || [])];
-            const [item] = list.splice(source.index, 1);
-            movedSpecimen = item;
-            setUnassignedRow((prev) => ({
-                ...prev,
-                total_specimens: Math.max(0, prev.total_specimens - 1),
-                days: {
-                    ...prev.days,
-                    [sourceParsed.date]: list,
-                },
-            }));
-        } else {
-            const pIdx = pathologistRows.findIndex(
-                (p) => p.user.id === sourceParsed.userId,
-            );
-
-            if (pIdx !== -1) {
-                const updatedRows = [...pathologistRows];
-                const row = { ...updatedRows[pIdx] };
-                const dayData = row.days[sourceParsed.date];
-                const list = [...(dayData?.specimens || [])];
-                const [item] = list.splice(source.index, 1);
-                movedSpecimen = item;
-
-                row.days = {
-                    ...row.days,
-                    [sourceParsed.date]: {
-                        ...dayData,
-                        specimens: list,
-                    },
-                };
-                row.total_specimens = Math.max(0, row.total_specimens - 1);
-                updatedRows[pIdx] = row;
-                setPathologistRows(updatedRows);
-            }
-        }
-
-        if (!movedSpecimen) {
-            return;
-        }
-
-        // Update moved specimen metadata optimistically
-        movedSpecimen = {
-            ...movedSpecimen,
-            internal_date: destParsed.date,
-            is_manual_internal: true,
-            is_manual_client: true,
-            assigned_user_ids:
-                destParsed.userId === 'unassigned'
-                    ? []
-                    : [destParsed.userId as number],
-        };
-
-        // 2. Insert into destination
-        if (destParsed.userId === 'unassigned') {
-            setUnassignedRow((prev) => {
-                const list = [...(prev.days[destParsed.date] || [])];
-                list.splice(destination.index, 0, movedSpecimen!);
-
-                return {
-                    ...prev,
-                    total_specimens: prev.total_specimens + 1,
-                    days: {
-                        ...prev.days,
-                        [destParsed.date]: list,
-                    },
-                };
-            });
-        } else {
-            setPathologistRows((prevRows) => {
-                const updatedRows = [...prevRows];
-                const pIdx = updatedRows.findIndex(
-                    (p) => p.user.id === destParsed.userId,
-                );
-
-                if (pIdx !== -1) {
-                    const row = { ...updatedRows[pIdx] };
-                    const dayData = row.days[destParsed.date] || {
-                        specimens: [],
-                        workload: {
-                            total_minutes: 0,
-                            hours: 0,
-                            percentage: 0,
-                            color: 'green',
-                            color_class: '',
-                            progress_class: '',
-                            label: '',
-                            specimen_count: 0,
-                            formatted_time: '',
-                        },
-                    };
-                    const list = [...(dayData.specimens || [])];
-                    list.splice(destination.index, 0, movedSpecimen!);
-
-                    row.days = {
-                        ...row.days,
-                        [destParsed.date]: {
-                            ...dayData,
-                            specimens: list,
-                        },
-                    };
-                    row.total_specimens = row.total_specimens + 1;
-                    updatedRows[pIdx] = row;
-                }
-
-                return updatedRows;
-            });
-        }
-
-        // 3. Send persist request to backend
-        router.post(
-            rescheduleAction(specimenId).url,
-            {
-                target_date: destParsed.date,
-                target_user_id:
-                    destParsed.userId === 'unassigned'
-                        ? 'unassigned'
-                        : destParsed.userId,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: () => {
-                    toast.success('Muestra reprogramada exitosamente');
-                },
-                onError: (errors) => {
-                    // Rollback optimistic update
-                    setUnassignedRow(prevUnassigned);
-                    setPathologistRows(prevPathologists);
-                    const msg =
-                        Object.values(errors)[0] ||
-                        'Error al reprogramar la muestra';
-                    toast.error(String(msg));
-                },
-            },
-        );
-    };
+        },
+        [pendingMove, unassignedRow, pathologistRows],
+    );
 
     return (
         <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -952,6 +1071,15 @@ export const BalanceBoard: React.FC<BalanceBoardProps> = ({
                                                                             }
                                                                             canEdit={
                                                                                 canManage
+                                                                            }
+                                                                            isSelectionMode={
+                                                                                isSelectionMode
+                                                                            }
+                                                                            isSelected={selectedIds.includes(
+                                                                                specimen.id,
+                                                                            )}
+                                                                            onToggleSelect={
+                                                                                onToggleSelect
                                                                             }
                                                                             isLinkedDrag={Boolean(
                                                                                 draggingInfo?.isMultiAssigned &&
@@ -1202,6 +1330,15 @@ export const BalanceBoard: React.FC<BalanceBoardProps> = ({
                                                                                 canEdit={
                                                                                     canManage
                                                                                 }
+                                                                                isSelectionMode={
+                                                                                    isSelectionMode
+                                                                                }
+                                                                                isSelected={selectedIds.includes(
+                                                                                    specimen.id,
+                                                                                )}
+                                                                                onToggleSelect={
+                                                                                    onToggleSelect
+                                                                                }
                                                                                 isLinkedDrag={Boolean(
                                                                                     draggingInfo?.isMultiAssigned &&
                                                                                     draggingInfo.specimenId ===
@@ -1249,6 +1386,26 @@ export const BalanceBoard: React.FC<BalanceBoardProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Modal de confirmación de motivo de movimiento */}
+            <MoveReasonDialog
+                open={isMoveReasonDialogOpen}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen && !isSubmittingMove) {
+                        handleCancelMove();
+                    } else {
+                        setIsMoveReasonDialogOpen(isOpen);
+                    }
+                }}
+                specimen={pendingMove?.specimen || null}
+                sourceDate={pendingMove?.sourceParsed.date}
+                targetDate={pendingMove?.destParsed.date}
+                sourcePathologistName={pendingMove?.sourcePathologistName}
+                targetPathologistName={pendingMove?.destPathologistName}
+                onConfirm={handleConfirmMove}
+                onCancel={handleCancelMove}
+                isSubmitting={isSubmittingMove}
+            />
         </DragDropContext>
     );
 };

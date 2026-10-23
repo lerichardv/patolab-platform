@@ -3,6 +3,7 @@ import { CalendarClock, Edit2, Eye, MoreVertical, Users } from 'lucide-react';
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,6 +24,9 @@ interface BalanceCardProps {
     canEdit?: boolean;
     draggableId?: string;
     isLinkedDrag?: boolean;
+    isSelectionMode?: boolean;
+    isSelected?: boolean;
+    onToggleSelect?: (id: number) => void;
     onView?: (specimen: SpecimenItem) => void;
     onEdit?: (specimen: SpecimenItem) => void;
 }
@@ -33,6 +37,9 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
     canEdit = true,
     draggableId,
     isLinkedDrag = false,
+    isSelectionMode = false,
+    isSelected = false,
+    onToggleSelect,
     onView,
     onEdit,
 }) => {
@@ -57,14 +64,20 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
         <Draggable
             draggableId={draggableId || specimen.id.toString()}
             index={index}
-            isDragDisabled={!canEdit}
+            isDragDisabled={!canEdit || isSelectionMode}
         >
             {(provided, snapshot) => (
                 <div
                     ref={provided.innerRef}
                     {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                    onClick={() => onView?.(specimen)}
+                    {...(isSelectionMode ? {} : provided.dragHandleProps)}
+                    onClick={() => {
+                        if (isSelectionMode) {
+                            onToggleSelect?.(specimen.id);
+                        } else {
+                            onView?.(specimen);
+                        }
+                    }}
                     style={{
                         ...provided.draggableProps.style,
                         borderColor: specimen.examination_color || '#3b82f6',
@@ -74,14 +87,30 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
                     className={`group relative flex h-full min-h-[105px] w-[270px] min-w-[270px] shrink-0 cursor-pointer flex-col justify-between gap-1.5 rounded-md bg-card p-2 shadow-xs transition-all duration-150 select-none hover:shadow-md hover:ring-1 hover:ring-foreground/15 dark:hover:ring-foreground/25 ${
                         snapshot.isDragging
                             ? 'z-50 scale-[1.02] rotate-1 opacity-95 shadow-xl ring-2 ring-primary/40'
-                            : isLinkedDrag
-                              ? 'animate-pulse border-sky-400 bg-sky-50/20 ring-2 ring-sky-400 dark:bg-sky-950/20'
-                              : ''
+                            : isSelected
+                              ? 'border-primary bg-primary/[0.04] ring-2 ring-primary/50 dark:bg-primary/[0.08]'
+                              : isLinkedDrag
+                                ? 'animate-pulse border-sky-400 bg-sky-50/20 ring-2 ring-sky-400 dark:bg-sky-950/20'
+                                : ''
                     }`}
                 >
                     {/* Header: Code, Badges & Action Menu */}
                     <div className="flex items-start justify-between gap-1">
                         <div className="flex flex-wrap items-center gap-1">
+                            {isSelectionMode && (
+                                <div
+                                    className="mr-1 flex-shrink-0 pt-0.5"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={() =>
+                                            onToggleSelect?.(specimen.id)
+                                        }
+                                        aria-label={`Seleccionar muestra ${specimen.sequence_code}`}
+                                    />
+                                </div>
+                            )}
                             {specimen.sequence_code && (
                                 <span className="rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
                                     {specimen.sequence_code}

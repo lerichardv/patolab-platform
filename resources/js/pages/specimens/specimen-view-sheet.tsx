@@ -1,11 +1,12 @@
 import { router, usePage } from '@inertiajs/react';
-import { format, add, isPast, isToday } from 'date-fns';
+import { format, isPast, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
     Microscope,
     User,
     FileText,
     Calendar,
+    CalendarClock,
     Clock,
     Tag,
     AlertCircle,
@@ -30,13 +31,7 @@ import HeadingSheet from '@/components/heading-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetDescription,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
@@ -76,11 +71,12 @@ export default function SpecimenViewSheet({
     const targetId = initialSpecimenId || initialSpecimen?.id;
 
     const [fetchedSpecimen, setFetchedSpecimen] = useState<any | null>(null);
-    const [loading, setLoading] = useState<boolean>(false);
+    const loading = Boolean(open && targetId && !fetchedSpecimen);
 
     useEffect(() => {
+        let isMounted = true;
+
         if (open && targetId) {
-            setLoading(true);
             fetch(`/specimens/${targetId}`, {
                 headers: {
                     Accept: 'application/json',
@@ -95,18 +91,21 @@ export default function SpecimenViewSheet({
                     return res.json();
                 })
                 .then((data) => {
-                    setFetchedSpecimen(data);
+                    if (isMounted) {
+                        setFetchedSpecimen(data);
+                    }
                 })
                 .catch((err) => {
-                    console.error('Error fetching specimen details:', err);
-                })
-                .finally(() => {
-                    setLoading(false);
+                    if (isMounted) {
+                        console.error('Error fetching specimen details:', err);
+                    }
                 });
-        } else if (!open) {
-            setFetchedSpecimen(null);
-            setLoading(false);
         }
+
+        return () => {
+            isMounted = false;
+            setFetchedSpecimen(null);
+        };
     }, [open, targetId]);
 
     const specimen = useMemo(() => {
@@ -339,6 +338,29 @@ export default function SpecimenViewSheet({
               locale: es,
           })
         : null;
+
+    const formattedMovedDate = (() => {
+        if (!specimen.moved_at) {
+            return null;
+        }
+
+        try {
+            const date = new Date(specimen.moved_at);
+
+            if (isNaN(date.getTime())) {
+                return null;
+            }
+
+            return format(date, "dd 'de' MMMM, yyyy - HH:mm", { locale: es });
+        } catch {
+            return null;
+        }
+    })();
+
+    const hasMovementDetails = Boolean(
+        (specimen.move_reason && specimen.move_reason.trim() !== '') ||
+        formattedMovedDate,
+    );
 
     const internalDuration = getInternalDeliveryDuration(specimen);
     const clientDuration = getClientDeliveryDuration(specimen);
@@ -671,6 +693,43 @@ export default function SpecimenViewSheet({
                                             >
                                                 {formattedEstimatedDate}
                                             </p>
+                                        </div>
+                                    )}
+                                    {hasMovementDetails && (
+                                        <div className="flex animate-in flex-col gap-2 rounded-md border border-dashed border-amber-500/30 bg-amber-500/5 p-3 duration-200 fade-in-50 sm:col-span-2 dark:border-amber-500/20 dark:bg-amber-500/10">
+                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                                                <CalendarClock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                                <span>
+                                                    Detalles de Movimiento /
+                                                    Reprogramación
+                                                </span>
+                                            </div>
+                                            <div className="space-y-1.5 text-xs">
+                                                {formattedMovedDate && (
+                                                    <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
+                                                        <span className="font-semibold text-foreground">
+                                                            Fecha de movimiento:
+                                                        </span>
+                                                        <span className="text-foreground">
+                                                            {formattedMovedDate}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {specimen.move_reason &&
+                                                    specimen.move_reason.trim() !==
+                                                        '' && (
+                                                        <div className="space-y-1 text-muted-foreground">
+                                                            <span className="font-semibold text-foreground">
+                                                                Motivo:
+                                                            </span>
+                                                            <p className="rounded border border-amber-500/20 bg-background/80 p-2.5 text-xs whitespace-pre-wrap text-foreground dark:bg-background/40">
+                                                                {
+                                                                    specimen.move_reason
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                            </div>
                                         </div>
                                     )}
                                     <div className="space-y-1">

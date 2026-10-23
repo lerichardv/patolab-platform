@@ -1,10 +1,12 @@
 import {
+    CalendarDays,
     Check,
     ChevronDown,
     FileText,
     Microscope,
     RotateCcw,
     Search,
+    Tag,
     UserCheck,
 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
@@ -34,10 +36,13 @@ interface BalanceFiltersProps {
     pathologists: { id: number; name: string }[];
     showUnassigned: boolean;
     unassignedCount: number;
+    isSelectionMode?: boolean;
+    onToggleSelectionMode?: (enabled: boolean) => void;
     onToggleUnassigned: (show: boolean) => void;
     onFilterChange: (key: keyof BalanceFilters, value: any) => void;
     onTypesAndExaminationsChange: (typeParam: any, examParam: any) => void;
     onResetFilters: () => void;
+    onScrollToToday?: () => void;
 }
 
 export const BalanceFiltersBar: React.FC<BalanceFiltersProps> = ({
@@ -46,10 +51,13 @@ export const BalanceFiltersBar: React.FC<BalanceFiltersProps> = ({
     pathologists,
     showUnassigned,
     unassignedCount,
+    isSelectionMode = false,
+    onToggleSelectionMode,
     onToggleUnassigned,
     onFilterChange,
     onTypesAndExaminationsChange,
     onResetFilters,
+    onScrollToToday,
 }) => {
     // Track previous filters to adjust local state during render without useEffect
     const [prevFilters, setPrevFilters] = useState(filters);
@@ -236,6 +244,21 @@ export const BalanceFiltersBar: React.FC<BalanceFiltersProps> = ({
         return p ? p.name : 'Patólogo';
     }, [filters.pathologist_id, pathologists]);
 
+    // 4. Category Popover state
+    const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
+
+    const selectedCategoryLabel = useMemo(() => {
+        if (!filters.category_id || filters.category_id === 'all') {
+            return 'Todas las categorías';
+        }
+
+        const cat = filterOptions.categories.find(
+            (c) => c.id.toString() === filters.category_id?.toString(),
+        );
+
+        return cat ? cat.name : 'Categoría';
+    }, [filters.category_id, filterOptions.categories]);
+
     // Active filters indicator
     const isTypesFiltered =
         selectedSpecimenTypeIds.length !== filterOptions.specimenTypes.length;
@@ -244,12 +267,16 @@ export const BalanceFiltersBar: React.FC<BalanceFiltersProps> = ({
     const isPathologistFiltered = Boolean(
         filters.pathologist_id && filters.pathologist_id !== 'all',
     );
+    const isCategoryFiltered = Boolean(
+        filters.category_id && filters.category_id !== 'all',
+    );
     const isSearchFiltered = Boolean(filters.search);
 
     const hasActiveFilters =
         isTypesFiltered ||
         isExamsFiltered ||
         isPathologistFiltered ||
+        isCategoryFiltered ||
         isSearchFiltered;
 
     return (
@@ -555,6 +582,90 @@ export const BalanceFiltersBar: React.FC<BalanceFiltersProps> = ({
                 </PopoverContent>
             </Popover>
 
+            {/* Filtro de Categoría (Combobox con Búsqueda) */}
+            <Popover
+                open={isCategoryFilterOpen}
+                onOpenChange={setIsCategoryFilterOpen}
+            >
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={isCategoryFilterOpen}
+                        className={cn(
+                            'h-10 justify-between gap-2 border bg-card text-sm font-medium transition-colors hover:bg-accent/50',
+                            isCategoryFiltered && 'border-primary/50 text-primary',
+                        )}
+                    >
+                        <div className="flex items-center gap-2 truncate">
+                            <Tag className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <span className="max-w-[150px] truncate">
+                                {selectedCategoryLabel}
+                            </span>
+                        </div>
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-0" align="start">
+                    <Command
+                        filter={(value, search) =>
+                            matchesSearch(value, search) ? 1 : 0
+                        }
+                    >
+                        <CommandInput placeholder="Buscar categoría..." />
+                        <CommandList>
+                            <CommandEmpty>
+                                No se encontraron categorías.
+                            </CommandEmpty>
+                            <CommandGroup>
+                                <CommandItem
+                                    value="todas las categorias"
+                                    onSelect={() => {
+                                        onFilterChange('category_id', 'all');
+                                        setIsCategoryFilterOpen(false);
+                                    }}
+                                >
+                                    <Check
+                                        className={cn(
+                                            'mr-2 h-4 w-4',
+                                            !filters.category_id ||
+                                                filters.category_id === 'all'
+                                                ? 'opacity-100'
+                                                : 'opacity-0',
+                                        )}
+                                    />
+                                    Todas las categorías
+                                </CommandItem>
+                                {filterOptions.categories.map((c) => (
+                                    <CommandItem
+                                        key={c.id}
+                                        value={c.name}
+                                        onSelect={() => {
+                                            onFilterChange(
+                                                'category_id',
+                                                c.id.toString(),
+                                            );
+                                            setIsCategoryFilterOpen(false);
+                                        }}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                'mr-2 h-4 w-4',
+                                                filters.category_id?.toString() ===
+                                                    c.id.toString()
+                                                    ? 'opacity-100'
+                                                    : 'opacity-0',
+                                            )}
+                                        />
+                                        {c.name}
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
+
             {/* Switch Mostrar Sin Asignar */}
             <div
                 className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-between gap-2 rounded-md border bg-card px-3 transition-colors select-none hover:bg-accent/50 sm:w-auto sm:justify-start"
@@ -574,6 +685,32 @@ export const BalanceFiltersBar: React.FC<BalanceFiltersProps> = ({
                     onClick={(e) => e.stopPropagation()}
                 />
             </div>
+
+            {/* Switch Modo Selección */}
+            <div
+                className="flex h-10 w-full shrink-0 cursor-pointer items-center justify-between gap-2 rounded-md border bg-card px-3 transition-colors select-none hover:bg-accent/50 sm:w-auto sm:justify-start"
+                onClick={() => onToggleSelectionMode?.(!isSelectionMode)}
+            >
+                <span className="text-sm font-medium">Seleccionar</span>
+                <Switch
+                    checked={isSelectionMode}
+                    onCheckedChange={onToggleSelectionMode}
+                    onClick={(e) => e.stopPropagation()}
+                />
+            </div>
+
+            {/* Botón Ir a Hoy */}
+            {onScrollToToday && (
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 w-full shrink-0 gap-2 border bg-card px-3 text-sm font-medium transition-colors hover:bg-accent/50 sm:w-auto"
+                    onClick={onScrollToToday}
+                >
+                    <CalendarDays className="h-4 w-4 text-primary" />
+                    <span>Ir a Hoy</span>
+                </Button>
+            )}
 
             {/* Limpiar filtros */}
             {hasActiveFilters && (

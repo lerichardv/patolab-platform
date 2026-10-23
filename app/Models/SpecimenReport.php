@@ -71,6 +71,16 @@ class SpecimenReport extends Model
         'sections_order',
         'headings_toggles',
         'report_file',
+        'yjs_macroscopy_state',
+        'yjs_microscopy_state',
+        'yjs_diagnosis_state',
+        'yjs_report_date_state',
+        'yjs_clinical_details_state',
+        'yjs_comments_notes_state',
+        'yjs_protocols_state',
+        'yjs_legend_state',
+        'yjs_open_text_state',
+        'yjs_addendum_state',
     ];
 
     protected static function booted(): void

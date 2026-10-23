@@ -283,11 +283,10 @@ class ReportEditorController extends Controller
         // SCENARIO A: User opens an editor workspace window (Initialization phase)
         if ($event === 'onConnect') {
             $htmlVal = $report->$htmlColumn ?? '';
-            $cleanText = trim(strip_tags(str_replace(['&nbsp;', "\xc2\xa0"], ' ', $htmlVal)));
-            $hasMediaOrTable = (bool) preg_match('/<img|<table/i', $htmlVal);
+            $normalized = ReportPaginator::normalizeHtml($htmlVal);
 
             // If the field is empty, purge any stale Yjs binary state and return null document
-            if (empty($cleanText) && ! $hasMediaOrTable && $htmlColumn !== 'report_date') {
+            if ($normalized === '' && $htmlColumn !== 'report_date') {
                 if ($report->$stateColumn) {
                     DB::table('specimen_reports')
                         ->where('id', $reportId)
@@ -307,31 +306,30 @@ class ReportEditorController extends Controller
         // SCENARIO C: Document initialization/load (called when room is created on server)
         if ($event === 'create') {
             return response()->json([
-                'content' => ReportPaginator::removeHyperlinks($report->$htmlColumn ?? ''),
+                'content' => ReportPaginator::normalizeHtml($report->$htmlColumn ?? ''),
             ]);
         }
 
         // SCENARIO B: Typing pause threshold reached (Background automatic save process)
         if ($event === 'onChange') {
-            $htmlValue = ReportPaginator::removeHyperlinks($payload['html'] ?? '');
-            $cleanText = trim(strip_tags(str_replace(['&nbsp;', "\xc2\xa0"], ' ', $htmlValue)));
-            $hasMediaOrTable = (bool) preg_match('/<img|<table/i', $htmlValue);
+            $rawHtml = $payload['html'] ?? '';
 
             $updateData = [
                 'updated_at' => now(),
             ];
 
             if ($htmlColumn === 'report_date') {
-                if (! empty($htmlValue) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $htmlValue)) {
-                    $updateData[$htmlColumn] = $htmlValue;
+                if (! empty($rawHtml) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawHtml)) {
+                    $updateData[$htmlColumn] = $rawHtml;
                     $updateData[$stateColumn] = $payload['document'] ?? null;
                 }
             } else {
-                if (empty($cleanText) && ! $hasMediaOrTable) {
+                $normalized = ReportPaginator::normalizeHtml($rawHtml);
+                if ($normalized === '') {
                     $updateData[$htmlColumn] = '';
                     $updateData[$stateColumn] = null; // Clear binary state so no ghost info persists
                 } else {
-                    $updateData[$htmlColumn] = $htmlValue;
+                    $updateData[$htmlColumn] = $normalized;
                     $updateData[$stateColumn] = $payload['document'] ?? null;
                 }
             }
@@ -637,8 +635,8 @@ class ReportEditorController extends Controller
             $concatHtml = function ($templates, $field) {
                 $parts = [];
                 foreach ($templates as $t) {
-                    $content = trim($t->{$field} ?? '');
-                    if ($content !== '' && $content !== '<p></p>' && $content !== '<p></p><p></p>') {
+                    $content = ReportPaginator::normalizeHtml($t->{$field} ?? '');
+                    if ($content !== '') {
                         $parts[] = $content;
                     }
                 }
@@ -800,7 +798,7 @@ class ReportEditorController extends Controller
             return response()->json(['error' => 'Las plantillas seleccionadas no son válidas o no tienes permisos para usarlas.'], 422);
         }
 
-        $cleanTemplateHtml = function (string $html): string {
+        $cleanTemplateHtml = function (?string $html): string {
             if (empty($html)) {
                 return '';
             }
@@ -811,14 +809,7 @@ class ReportEditorController extends Controller
             $clean = preg_replace('/<style[\s\S]*?<\/style>/i', '', $clean);
             $clean = preg_replace('/<script[\s\S]*?<\/script>/i', '', $clean);
 
-            $textOnly = trim(strip_tags(str_replace(['&nbsp;', "\xc2\xa0"], ' ', $clean)));
-            $hasMediaOrTable = (bool) preg_match('/<img|<table/i', $clean);
-
-            if (empty($textOnly) && ! $hasMediaOrTable) {
-                return '';
-            }
-
-            return trim($clean);
+            return ReportPaginator::normalizeHtml($clean);
         };
 
         $concatHtml = function ($templates, $field) use ($cleanTemplateHtml) {
@@ -1023,39 +1014,34 @@ class ReportEditorController extends Controller
             $updateData['auto_finalization_date'] = $request->boolean('auto_finalization_date');
         }
 
-        if ($request->has('macroscopy_html') && $hasMacroAccess) {
-            $updateData['macroscopy_html'] = $request->input('macroscopy_html') ?? '';
+        $richTextFields = [
+            'macroscopy_html' => ['access' => $hasMacroAccess, 'state' => 'yjs_macroscopy_state'],
+            'microscopy_html' => ['access' => $hasMicroAccess, 'state' => 'yjs_microscopy_state'],
+            'diagnosis_html' => ['access' => $hasGeneralAccess, 'state' => 'yjs_diagnosis_state'],
+            'clinical_details_html' => ['access' => $hasGeneralAccess, 'state' => 'yjs_clinical_details_state'],
+            'comments_notes_html' => ['access' => $hasGeneralAccess, 'state' => 'yjs_comments_notes_state'],
+            'protocols_html' => ['access' => $hasGeneralAccess, 'state' => 'yjs_protocols_state'],
+            'legend_html' => ['access' => $hasGeneralAccess, 'state' => 'yjs_legend_state'],
+            'open_text_html' => ['access' => $hasGeneralAccess, 'state' => 'yjs_open_text_state'],
+            'addendum_html' => ['access' => $hasGeneralAccess, 'state' => 'yjs_addendum_state'],
+        ];
+
+        foreach ($richTextFields as $fieldName => $config) {
+            if ($request->has($fieldName) && $config['access']) {
+                $normalized = ReportPaginator::normalizeHtml($request->input($fieldName));
+                $updateData[$fieldName] = $normalized;
+                if ($normalized === '') {
+                    $updateData[$config['state']] = null;
+                }
+            }
         }
-        if ($request->has('microscopy_html') && $hasMicroAccess) {
-            $updateData['microscopy_html'] = $request->input('microscopy_html') ?? '';
-        }
-        if ($request->has('diagnosis_html') && $hasGeneralAccess) {
-            $updateData['diagnosis_html'] = $request->input('diagnosis_html') ?? '';
-        }
-        if ($request->has('clinical_details_html') && $hasGeneralAccess) {
-            $updateData['clinical_details_html'] = $request->input('clinical_details_html') ?? '';
-        }
-        if ($request->has('comments_notes_html') && $hasGeneralAccess) {
-            $updateData['comments_notes_html'] = $request->input('comments_notes_html') ?? '';
-        }
-        if ($request->has('protocols_html') && $hasGeneralAccess) {
-            $updateData['protocols_html'] = $request->input('protocols_html') ?? '';
-        }
-        if ($request->has('legend_html') && $hasGeneralAccess) {
-            $updateData['legend_html'] = $request->input('legend_html') ?? '';
-        }
-        if ($request->has('open_text_html') && $hasGeneralAccess) {
-            $updateData['open_text_html'] = $request->input('open_text_html') ?? '';
-        }
+
         if ($request->has('open_text_label') && $hasGeneralAccess) {
             $rawLabel = $request->input('open_text_label') ?? '';
             if (preg_match('/^(Texto\s*Libre){2,}$/i', trim($rawLabel))) {
                 $rawLabel = 'Texto Libre';
             }
             $updateData['open_text_label'] = $rawLabel;
-        }
-        if ($request->has('addendum_html') && $hasGeneralAccess) {
-            $updateData['addendum_html'] = $request->input('addendum_html') ?? '';
         }
         if ($request->has('sections_order') && $hasGeneralAccess) {
             $updateData['sections_order'] = $request->input('sections_order');

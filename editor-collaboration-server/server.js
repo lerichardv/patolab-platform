@@ -600,11 +600,10 @@ const customWebhookExtension = {
             const htmlContent = resData.content;
 
             if (htmlContent) {
-                console.log(
-                    `[webhook:onLoadDocument] Seeding document with initial content`,
-                );
-
                 if (isPlainText) {
+                    console.log(
+                        `[webhook:onLoadDocument] Seeding document with initial content`,
+                    );
                     const ytext = data.document.getText('content');
                     data.document.transact(() => {
                         if (ytext.length > 0) {
@@ -614,23 +613,43 @@ const customWebhookExtension = {
                         ytext.insert(0, htmlContent);
                     });
                 } else {
-                    // Parse HTML into ProseMirror JSON using Tiptap
-                    const docJson = generateJSON(htmlContent, extensions);
-                    // Convert ProseMirror JSON to Yjs Ydoc update
-                    const initialYdoc = TiptapTransformer.toYdoc(
-                        docJson,
-                        'content',
-                        extensions,
-                    );
-                    // Clear previous empty nodes atomically within transact and apply new update
-                    data.document.transact(() => {
-                        const yxml = data.document.getXmlFragment('content');
-                        if (yxml.length > 0) {
-                            yxml.delete(0, yxml.length);
-                        }
-                        const update = Y.encodeStateAsUpdate(initialYdoc);
-                        Y.applyUpdate(data.document, update);
-                    });
+                    const cleanContent = (htmlContent || '')
+                        .replace(
+                            /<\s*p\b[^>]*>(?:\s|&nbsp;|\xc2\xa0|<\s*br\s*\/?>)*<\s*\/p\s*>/gi,
+                            '',
+                        )
+                        .replace(/&nbsp;|\xc2\xa0/gi, ' ')
+                        .trim();
+                    const hasSubstance =
+                        cleanContent.length > 0 ||
+                        /<img|<table|<figure/i.test(htmlContent || '');
+
+                    if (hasSubstance) {
+                        console.log(
+                            `[webhook:onLoadDocument] Seeding document with initial content`,
+                        );
+                        // Parse HTML into ProseMirror JSON using Tiptap
+                        const docJson = generateJSON(htmlContent, extensions);
+                        // Convert ProseMirror JSON to Yjs Ydoc update
+                        const initialYdoc = TiptapTransformer.toYdoc(
+                            docJson,
+                            'content',
+                            extensions,
+                        );
+                        // Clear previous empty nodes atomically within transact and apply new update
+                        data.document.transact(() => {
+                            const yxml = data.document.getXmlFragment('content');
+                            if (yxml.length > 0) {
+                                yxml.delete(0, yxml.length);
+                            }
+                            const update = Y.encodeStateAsUpdate(initialYdoc);
+                            Y.applyUpdate(data.document, update);
+                        });
+                    } else {
+                        console.log(
+                            `[webhook:onLoadDocument] Document content has no substance, leaving empty`,
+                        );
+                    }
                 }
             } else {
                 console.log(`[webhook:onLoadDocument] Document starts empty`);
