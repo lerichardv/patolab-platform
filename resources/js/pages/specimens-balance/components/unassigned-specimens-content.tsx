@@ -5,6 +5,8 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
+    ChevronUp,
+    ChevronsUpDown,
     Clock,
     FileText,
     Inbox,
@@ -219,6 +221,47 @@ export const UnassignedSpecimensContent: React.FC<
 
     // Popover states
     const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
+
+    // Sort states (pattern from Cuttings Report / Hoja de Relación de Biopsias)
+    const [sortField, setSortField] = useState<string>('internal_date');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    const handleSort = (field: string) => {
+        const isCurrentField = sortField === field;
+        const direction =
+            isCurrentField && sortDirection === 'asc' ? 'desc' : 'asc';
+        setSortField(field);
+        setSortDirection(direction);
+    };
+
+    const renderSortHeader = (
+        field: string,
+        label: string,
+        className?: string,
+    ) => {
+        const isSorted = sortField === field;
+        const direction = isSorted ? sortDirection : null;
+
+        return (
+            <button
+                type="button"
+                onClick={() => handleSort(field)}
+                className={cn(
+                    'group/btn inline-flex cursor-pointer items-center gap-1.5 text-left font-semibold transition-colors select-none hover:text-foreground',
+                    className,
+                )}
+            >
+                <span>{label}</span>
+                {direction === 'asc' ? (
+                    <ChevronUp className="h-3.5 w-3.5 shrink-0 text-primary" />
+                ) : direction === 'desc' ? (
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-primary" />
+                ) : (
+                    <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover/btn:opacity-100" />
+                )}
+            </button>
+        );
+    };
 
     // Multi-selection
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -490,9 +533,72 @@ export const UnassignedSpecimensContent: React.FC<
         effectiveCategories,
     ]);
 
+    // Client-side sorting (asc / desc) matching Cuttings Report pattern
+    const sortedSpecimens = useMemo(() => {
+        if (!sortField) {
+            return filteredSpecimens;
+        }
+
+        return [...filteredSpecimens].sort((a, b) => {
+            let comparison = 0;
+
+            switch (sortField) {
+                case 'sequence_code':
+                    comparison = (a.sequence_code || '').localeCompare(
+                        b.sequence_code || '',
+                        undefined,
+                        { numeric: true, sensitivity: 'base' },
+                    );
+                    break;
+                case 'customer_name':
+                    comparison = (a.customer_name || '').localeCompare(
+                        b.customer_name || '',
+                        undefined,
+                        { sensitivity: 'base' },
+                    );
+                    break;
+                case 'examination_name':
+                    comparison = (a.examination_name || '').localeCompare(
+                        b.examination_name || '',
+                        undefined,
+                        { sensitivity: 'base' },
+                    );
+                    break;
+                case 'category_name':
+                    comparison = (a.category_name || '').localeCompare(
+                        b.category_name || '',
+                        undefined,
+                        { sensitivity: 'base' },
+                    );
+                    break;
+                case 'priority_name':
+                    comparison = (a.priority_name || '').localeCompare(
+                        b.priority_name || '',
+                        undefined,
+                        { sensitivity: 'base' },
+                    );
+                    break;
+                case 'internal_date': {
+                    const dateA = a.internal_date
+                        ? new Date(a.internal_date).getTime()
+                        : 0;
+                    const dateB = b.internal_date
+                        ? new Date(b.internal_date).getTime()
+                        : 0;
+                    comparison = dateA - dateB;
+                    break;
+                }
+                default:
+                    comparison = 0;
+            }
+
+            return sortDirection === 'asc' ? comparison : -comparison;
+        });
+    }, [filteredSpecimens, sortField, sortDirection]);
+
     // Adjust page to 1 during render when filters or page size change
     const [prevFiltersKey, setPrevFiltersKey] = useState('');
-    const currentFiltersKey = `${search}|${selectedSpecimenTypeIds.join(',')}|${selectedExaminationIds.join(',')}|${selectedCategory}|${pageSize}`;
+    const currentFiltersKey = `${search}|${selectedSpecimenTypeIds.join(',')}|${selectedExaminationIds.join(',')}|${selectedCategory}|${sortField}|${sortDirection}|${pageSize}`;
 
     if (prevFiltersKey !== currentFiltersKey) {
         setPrevFiltersKey(currentFiltersKey);
@@ -502,13 +608,13 @@ export const UnassignedSpecimensContent: React.FC<
     // Pagination calculations
     const totalPages = Math.max(
         1,
-        Math.ceil(filteredSpecimens.length / pageSize),
+        Math.ceil(sortedSpecimens.length / pageSize),
     );
     const paginatedSpecimens = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
 
-        return filteredSpecimens.slice(start, start + pageSize);
-    }, [filteredSpecimens, currentPage, pageSize]);
+        return sortedSpecimens.slice(start, start + pageSize);
+    }, [sortedSpecimens, currentPage, pageSize]);
 
     // Selection logic
     const isAllFilteredSelected = useMemo(() => {
@@ -1122,23 +1228,41 @@ export const UnassignedSpecimensContent: React.FC<
                                             aria-label="Seleccionar todas"
                                         />
                                     </TableHead>
-                                    <TableHead className="w-36 min-w-[140px] font-semibold whitespace-nowrap">
-                                        Código
+                                    <TableHead className="w-36 min-w-[140px] whitespace-nowrap">
+                                        {renderSortHeader(
+                                            'sequence_code',
+                                            'Código',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="min-w-[160px] font-semibold">
-                                        Paciente
+                                    <TableHead className="min-w-[160px]">
+                                        {renderSortHeader(
+                                            'customer_name',
+                                            'Paciente',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="min-w-[180px] font-semibold">
-                                        Estudio / Examen
+                                    <TableHead className="min-w-[180px]">
+                                        {renderSortHeader(
+                                            'examination_name',
+                                            'Estudio / Examen',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="w-28 font-semibold">
-                                        Categoría
+                                    <TableHead className="w-28">
+                                        {renderSortHeader(
+                                            'category_name',
+                                            'Categoría',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="w-24 font-semibold">
-                                        Prioridad
+                                    <TableHead className="w-24">
+                                        {renderSortHeader(
+                                            'priority_name',
+                                            'Prioridad',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="w-32 font-semibold">
-                                        Fecha Entrega
+                                    <TableHead className="w-32">
+                                        {renderSortHeader(
+                                            'internal_date',
+                                            'Fecha Entrega',
+                                        )}
                                     </TableHead>
                                     <TableHead className="w-28 text-right font-semibold">
                                         Acción

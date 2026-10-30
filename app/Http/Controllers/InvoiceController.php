@@ -110,6 +110,7 @@ class InvoiceController extends Controller
     {
         $query = Invoice::with([
             'customer:id,name,id_number',
+            'individualCustomer:id,name,id_number',
             'caiRange:id,cai,full_prefix',
             'rental:id,name,description',
             'group:id,name',
@@ -156,7 +157,11 @@ class InvoiceController extends Controller
 
         // Filter by customer
         if ($request->filled('customer_id') && $request->get('customer_id') !== 'all') {
-            $query->where('customer_id', $request->get('customer_id'));
+            $customerId = $request->get('customer_id');
+            $query->where(function ($q) use ($customerId) {
+                $q->where('customer_id', $customerId)
+                    ->orWhere('individual_customer_id', $customerId);
+            });
         }
 
         // Filter by credit status
@@ -357,7 +362,11 @@ class InvoiceController extends Controller
 
         // Filter by customer
         if ($request->filled('customer_id') && $request->get('customer_id') !== 'all') {
-            $query->where('customer_id', $request->get('customer_id'));
+            $customerId = $request->get('customer_id');
+            $query->where(function ($q) use ($customerId) {
+                $q->where('customer_id', $customerId)
+                    ->orWhere('individual_customer_id', $customerId);
+            });
         }
 
         // Filter by credit status
@@ -622,6 +631,8 @@ class InvoiceController extends Controller
         Gate::authorize('invoices.manage');
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
+            'has_individual_customer' => 'nullable|boolean',
+            'individual_customer_id' => 'nullable|exists:customers,id',
             'payment_type' => 'required|in:cash,credit card,bank transfer,check,credit',
             'quantity' => 'required|integer|min:1',
             'amount' => 'required|numeric|min:0',
@@ -756,6 +767,12 @@ class InvoiceController extends Controller
         if ($request->filled('invoice_date')) {
             $validated['invoice_date'] = Carbon::parse($request->input('invoice_date'))
                 ->setTimeFrom($invoice->invoice_date ?? now());
+        }
+
+        if (! $invoice->is_group) {
+            $validated['individual_customer_id'] = ($request->boolean('has_individual_customer') && $request->filled('individual_customer_id'))
+                ? (int) $request->input('individual_customer_id')
+                : (int) $validated['customer_id'];
         }
 
         DB::transaction(function () use ($request, $validated, $invoice, $groupSpecimensData) {
@@ -1189,7 +1206,10 @@ class InvoiceController extends Controller
             }
 
             if ($customerIds->isNotEmpty()) {
-                $q->orWhereIn('customer_id', $customerIds);
+                $q->where(function ($cq) use ($customerIds) {
+                    $cq->whereIn('customer_id', $customerIds)
+                        ->orWhereIn('individual_customer_id', $customerIds);
+                });
             }
 
             if ($specimenIds->isNotEmpty()) {
@@ -1254,7 +1274,10 @@ class InvoiceController extends Controller
             $creditIds = Credit::whereIn('customer_id', $customerIds)->pluck('id');
 
             $query->where(function ($q) use ($customerIds, $creditIds) {
-                $q->whereIn('customer_id', $customerIds);
+                $q->where(function ($cq) use ($customerIds) {
+                    $cq->whereIn('customer_id', $customerIds)
+                        ->orWhereIn('individual_customer_id', $customerIds);
+                });
                 if ($creditIds->isNotEmpty()) {
                     $q->orWhereIn('credit_payment_id', $creditIds);
                 }

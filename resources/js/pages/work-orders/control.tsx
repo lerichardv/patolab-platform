@@ -62,7 +62,6 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
     Table,
@@ -330,37 +329,7 @@ export default function HistotechnologistWorkOrdersControl({
     const canManageDeliveryNotes = Boolean(
         props.auth?.permissions?.includes('delivery_notes.manage'),
     );
-    const [isLoading, setIsLoading] = useState(false);
     const [isReloading, setIsReloading] = useState(false);
-
-    useEffect(() => {
-        const removeStart = router.on('start', () => {
-            setIsLoading(true);
-        });
-        const removeFinish = router.on('finish', () => {
-            setIsLoading(false);
-        });
-
-        const handlePopState = () => {
-            router.reload();
-        };
-
-        const handlePageShow = (event: PageTransitionEvent) => {
-            if (event.persisted) {
-                router.reload();
-            }
-        };
-
-        window.addEventListener('popstate', handlePopState);
-        window.addEventListener('pageshow', handlePageShow);
-
-        return () => {
-            removeStart();
-            removeFinish();
-            window.removeEventListener('popstate', handlePopState);
-            window.removeEventListener('pageshow', handlePageShow);
-        };
-    }, []);
     const [selectedWorkOrder, setSelectedWorkOrder] =
         useState<WorkOrder | null>(null);
     const [openAssignWorkOrderId, setOpenAssignWorkOrderId] = useState<
@@ -485,7 +454,12 @@ export default function HistotechnologistWorkOrdersControl({
     // Fullscreen event listener to sync state with native ESC button exits
     useEffect(() => {
         const handleFullscreenChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
+            const isFull = !!document.fullscreenElement;
+            setIsFullscreen(isFull);
+
+            if (isFull) {
+                setIsDark(document.documentElement.classList.contains('dark'));
+            }
         };
         document.addEventListener('fullscreenchange', handleFullscreenChange);
 
@@ -497,33 +471,13 @@ export default function HistotechnologistWorkOrdersControl({
         };
     }, []);
 
-    // Sync dark mode state client-side and react to mutations (theme changes)
-    useEffect(() => {
-        if (typeof window === 'undefined') {
-            return;
-        }
-
-        const updateDark = () => {
-            setIsDark(document.documentElement.classList.contains('dark'));
-        };
-
-        updateDark();
-
-        const observer = new MutationObserver(updateDark);
-        observer.observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ['class'],
-        });
-
-        return () => observer.disconnect();
-    }, []);
-
     const toggleFullscreen = () => {
         if (!containerRef.current) {
             return;
         }
 
         if (!document.fullscreenElement) {
+            setIsDark(document.documentElement.classList.contains('dark'));
             containerRef.current.requestFullscreen().catch((err) => {
                 toast.error('Error al intentar activar pantalla completa');
                 console.error(err);
@@ -599,6 +553,12 @@ export default function HistotechnologistWorkOrdersControl({
             updateStatus(workOrderId).url,
             { status: nextStatus },
             {
+                onError: (errors) => {
+                    const message =
+                        errors.status ||
+                        'Error al actualizar el estado de la orden';
+                    toast.error(message);
+                },
                 onSuccess: () => {
                     toast.success(
                         'Estado de la orden actualizado correctamente',
@@ -638,11 +598,11 @@ export default function HistotechnologistWorkOrdersControl({
             <Head title="Control de Órdenes (Histotecnólogo)" />
             <div
                 ref={containerRef}
-                className={`flex flex-col gap-4 bg-background transition-all ${
+                className={`flex flex-col gap-4 bg-background ${
                     isFullscreen
                         ? 'h-screen w-screen overflow-y-auto p-6'
                         : 'h-full flex-1 p-4'
-                } ${isDark ? 'dark' : ''}`}
+                } ${isFullscreen && isDark ? 'dark' : ''}`}
             >
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-2">
@@ -965,13 +925,13 @@ export default function HistotechnologistWorkOrdersControl({
                         <Button
                             variant="default"
                             size="icon"
-                            disabled={isReloading || isLoading}
+                            disabled={isReloading}
                             onClick={handleReload}
                             className="h-10 w-10 shrink-0 bg-emerald-600 text-white transition-transform hover:bg-emerald-700 active:scale-95 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                             title="Recargar órdenes"
                         >
                             <RefreshCw
-                                className={`h-4 w-4 ${isReloading || isLoading ? 'animate-spin' : ''}`}
+                                className={`h-4 w-4 ${isReloading ? 'animate-spin' : ''}`}
                             />
                         </Button>
                     </div>
@@ -1062,88 +1022,7 @@ export default function HistotechnologistWorkOrdersControl({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {isLoading || isReloading ? (
-                                    Array.from({ length: 6 }).map(
-                                        (_, index) => (
-                                            <TableRow
-                                                key={`skeleton-row-${index}`}
-                                                className="border-border/40"
-                                            >
-                                                {/* N° Orden */}
-                                                <TableCell className="w-[80px] py-3.5">
-                                                    <Skeleton className="h-4 w-12" />
-                                                </TableCell>
-
-                                                {/* Técnicos Asignados */}
-                                                <TableCell className="min-w-[180px] py-3.5">
-                                                    <div className="flex flex-wrap items-center gap-1.5">
-                                                        <Skeleton className="h-5 w-20 rounded-md" />
-                                                        <Skeleton className="h-5 w-16 rounded-md" />
-                                                    </div>
-                                                </TableCell>
-
-                                                {/* Estado */}
-                                                <TableCell className="w-[110px] py-3.5 text-center">
-                                                    <Skeleton className="mx-auto h-6 w-20 rounded-full" />
-                                                </TableCell>
-
-                                                {/* Prioridad */}
-                                                <TableCell className="w-[100px] py-3.5 text-center">
-                                                    <Skeleton className="mx-auto h-6 w-16 rounded-md" />
-                                                </TableCell>
-
-                                                {/* Vencimiento */}
-                                                <TableCell className="min-w-[170px] py-3.5">
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <Skeleton className="h-12 w-14 rounded-md" />
-                                                        <div className="flex flex-col gap-1">
-                                                            <Skeleton className="h-3 w-16" />
-                                                            <Skeleton className="h-3 w-12" />
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-
-                                                {/* Muestra */}
-                                                <TableCell className="w-[100px] py-3.5">
-                                                    <Skeleton className="h-4 w-16 font-mono" />
-                                                </TableCell>
-
-                                                {/* Tarea */}
-                                                <TableCell className="min-w-[120px] py-3.5">
-                                                    <Skeleton className="h-4 w-24" />
-                                                </TableCell>
-
-                                                {/* Tipo de Orden */}
-                                                <TableCell className="min-w-[120px] py-3.5">
-                                                    <Skeleton className="h-4 w-20" />
-                                                </TableCell>
-
-                                                {/* Cantidad */}
-                                                <TableCell className="w-[80px] py-3.5 text-center">
-                                                    <Skeleton className="mx-auto h-4 w-6" />
-                                                </TableCell>
-
-                                                {/* Creado por */}
-                                                <TableCell className="w-[120px] py-3.5">
-                                                    <Skeleton className="h-4 w-20" />
-                                                </TableCell>
-
-                                                {/* Comentarios */}
-                                                <TableCell className="w-[400px] max-w-[400px] py-3.5">
-                                                    <Skeleton className="h-4 w-3/4" />
-                                                </TableCell>
-
-                                                {/* Acción */}
-                                                <TableCell className="sticky right-0 z-10 w-[150px] min-w-[150px] border-l border-border bg-card py-3.5 text-right">
-                                                    <div className="flex items-center justify-end gap-1.5">
-                                                        <Skeleton className="h-8 w-8 rounded-md" />
-                                                        <Skeleton className="h-8 w-16 rounded-md" />
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ),
-                                    )
-                                ) : filteredWorkOrders.length > 0 ? (
+                                {filteredWorkOrders.length > 0 ? (
                                     filteredWorkOrders.map((wo) => {
                                         const pMeta =
                                             PRIORITY_METADATA[wo.priority] ||
@@ -1168,6 +1047,11 @@ export default function HistotechnologistWorkOrdersControl({
                                                             t.id,
                                                     ),
                                             );
+
+                                        const hasAssignedTechnicians = Boolean(
+                                            (wo.users && wo.users.length > 0) ||
+                                            wo.user_id,
+                                        );
 
                                         return (
                                             <TableRow
@@ -1545,7 +1429,20 @@ export default function HistotechnologistWorkOrdersControl({
                                                                 size="sm"
                                                                 variant="outline"
                                                                 className="h-8 gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:border-emerald-500/20 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
-                                                                onClick={() =>
+                                                                onClick={() => {
+                                                                    if (
+                                                                        !hasAssignedTechnicians
+                                                                    ) {
+                                                                        toast.error(
+                                                                            'Debe asignar al menos un técnico antes de iniciar la orden de trabajo.',
+                                                                        );
+                                                                        setOpenAssignWorkOrderId(
+                                                                            wo.id,
+                                                                        );
+
+                                                                        return;
+                                                                    }
+
                                                                     setConfirmAction(
                                                                         {
                                                                             workOrderId:
@@ -1553,8 +1450,8 @@ export default function HistotechnologistWorkOrdersControl({
                                                                             nextStatus:
                                                                                 'En Proceso',
                                                                         },
-                                                                    )
-                                                                }
+                                                                    );
+                                                                }}
                                                             >
                                                                 <Play className="h-3 w-3" />
                                                                 <span>

@@ -499,6 +499,27 @@ class SpecimenBalanceController extends Controller
             ];
         });
 
+        $sortField = $request->get('sort_field');
+        $sortDirection = $request->get('sort_direction', 'asc');
+        if (! in_array(strtolower((string) $sortDirection), ['asc', 'desc'])) {
+            $sortDirection = 'asc';
+        }
+
+        if ($sortField) {
+            $isDesc = strtolower((string) $sortDirection) === 'desc';
+            $items = $items->sortBy(function ($item) use ($sortField) {
+                return match ($sortField) {
+                    'sequence_code' => $item['sequence_code'],
+                    'customer_name' => mb_strtolower($item['customer_name'] ?? ''),
+                    'examination_name' => mb_strtolower($item['examination_name'] ?? ''),
+                    'category_name' => mb_strtolower($item['category_name'] ?? ''),
+                    'priority_name' => mb_strtolower($item['priority_name'] ?? ''),
+                    'internal_date' => $item['internal_date'],
+                    default => $item['created_at'],
+                };
+            }, SORT_REGULAR, $isDesc)->values();
+        }
+
         return response()->json([
             'specimens' => $items,
             'total' => $items->count(),
@@ -534,6 +555,15 @@ class SpecimenBalanceController extends Controller
                 $q->where('specimen.sequence_code', 'like', "%{$search}%")
                     ->orWhereHas('customerRelation', fn ($cq) => $cq->where('name', 'like', "%{$search}%"));
             });
+        }
+
+        if ($request->filled('pathologist_id') && $request->get('pathologist_id') !== 'all') {
+            $pathologistId = $request->get('pathologist_id');
+            if ($pathologistId === 'unassigned') {
+                $query->doesntHave('users');
+            } else {
+                $query->whereHas('users', fn ($uq) => $uq->where('users.id', $pathologistId));
+            }
         }
 
         $allSpecimens = $query->get();
@@ -598,7 +628,31 @@ class SpecimenBalanceController extends Controller
                 'status_color' => $specimen->status_color,
                 'created_at' => $specimen->created_at?->format('d/m/Y H:i'),
             ];
-        })->sortByDesc('days_overdue')->values();
+        });
+
+        $sortField = $request->get('sort_field');
+        $sortDirection = $request->get('sort_direction', 'asc');
+        if (! in_array(strtolower((string) $sortDirection), ['asc', 'desc'])) {
+            $sortDirection = 'asc';
+        }
+
+        if ($sortField) {
+            $isDesc = strtolower((string) $sortDirection) === 'desc';
+            $items = $items->sortBy(function ($item) use ($sortField) {
+                return match ($sortField) {
+                    'sequence_code' => $item['sequence_code'],
+                    'customer_name' => mb_strtolower($item['customer_name'] ?? ''),
+                    'examination_name' => mb_strtolower($item['examination_name'] ?? ''),
+                    'category_name' => mb_strtolower($item['category_name'] ?? ''),
+                    'priority_name' => mb_strtolower($item['priority_name'] ?? ''),
+                    'internal_date' => $item['internal_date'],
+                    'assigned_to' => mb_strtolower($item['assigned_users'][0]['name'] ?? ''),
+                    default => $item['days_overdue'],
+                };
+            }, SORT_REGULAR, $isDesc)->values();
+        } else {
+            $items = $items->sortByDesc('days_overdue')->values();
+        }
 
         return response()->json([
             'specimens' => $items,

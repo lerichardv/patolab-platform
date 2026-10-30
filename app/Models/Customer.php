@@ -99,7 +99,7 @@ class Customer extends Authenticatable
     /**
      * Get a query builder for all specimens accessible to this customer in the portal.
      *
-     * Individual customers access their direct specimens.
+     * Individual customers access their direct specimens and invoices where they are the billing or individual customer.
      * Company/Group customers access direct specimens and specimens within their groups.
      */
     public function accessibleSpecimens(): Builder
@@ -111,6 +111,13 @@ class Customer extends Authenticatable
                 })
                 ->orWhereHas('group.customers', function ($gq) {
                     $gq->where('customers.id', $this->id);
+                })
+                ->orWhereHas('invoiceRelation', function ($iq) {
+                    $iq->where('customer_id', $this->id)
+                        ->orWhere('individual_customer_id', $this->id);
+                })
+                ->orWhereHas('group.invoice', function ($iq) {
+                    $iq->where('customer_id', $this->id);
                 });
         });
     }

@@ -178,7 +178,8 @@ class SpecimenController extends Controller
                 'category:id,name,unit,quantity,intern_unit,intern_quantity',
                 'group:id,name',
                 'group.invoice:id,specimen_group_id,full_invoice_number,invoice_number',
-                'invoiceRelation:id,specimen_id,full_invoice_number,invoice_number',
+                'invoiceRelation:id,specimen_id,full_invoice_number,invoice_number,individual_customer_id',
+                'invoiceRelation.individualCustomer:id,name,id_number',
                 'users:users.id,name',
                 'collaborators:users.id,name',
             ])
@@ -208,6 +209,8 @@ class SpecimenController extends Controller
         Gate::authorize('specimens.create');
         $validated = $request->validate([
             'customer' => 'required|exists:customers,id',
+            'has_individual_customer' => 'nullable|boolean',
+            'individual_customer_id' => 'nullable|exists:customers,id',
             'specimen_type' => 'required|exists:specimen_type,id',
             'reserved_code' => 'nullable|string|unique:specimen,sequence_code',
             'specimen_type_examination' => 'required|exists:specimen_type_examination,id',
@@ -526,11 +529,16 @@ class SpecimenController extends Controller
             $basePriceTotal = $amount - $customAmountVal;
             $unitPrice = $qty > 0 ? ($basePriceTotal / $qty) : $basePriceTotal;
 
+            $individualCustomerId = ($request->boolean('has_individual_customer') && $request->filled('individual_customer_id'))
+                ? (int) $request->input('individual_customer_id')
+                : (int) $specimen->customer;
+
             $invoice = Invoice::create([
                 'full_invoice_number' => $fullInvoiceNumber,
                 'invoice_number' => $invoiceNumber,
                 'cai_range_id' => $caiRangeId,
                 'customer_id' => $specimen->customer,
+                'individual_customer_id' => $individualCustomerId,
                 'created_by_id' => auth()->id(),
                 'specimen_id' => $specimen->id,
                 'payment_type' => $validated['payment_type'],
@@ -698,6 +706,8 @@ class SpecimenController extends Controller
         Gate::authorize('specimens.edit');
         $validated = $request->validate([
             'customer' => 'required|exists:customers,id',
+            'has_individual_customer' => 'nullable|boolean',
+            'individual_customer_id' => 'nullable|exists:customers,id',
             'specimen_type' => 'required|exists:specimen_type,id',
             'reserved_code' => 'nullable|string|unique:specimen,sequence_code,'.$specimen->id,
             'specimen_type_examination' => 'required|exists:specimen_type_examination,id',
@@ -1205,6 +1215,16 @@ class SpecimenController extends Controller
                         $credit->update(['customer_id' => $validated['customer']]);
                     }
                 }
+            }
+
+            if ($invoice && ! $specimen->is_group) {
+                $individualCustomerId = ($request->boolean('has_individual_customer') && $request->filled('individual_customer_id'))
+                    ? (int) $request->input('individual_customer_id')
+                    : (int) $validated['customer'];
+
+                $invoice->update([
+                    'individual_customer_id' => $individualCustomerId,
+                ]);
             }
         });
 

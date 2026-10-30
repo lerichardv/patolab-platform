@@ -6,6 +6,8 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
+    ChevronUp,
+    ChevronsUpDown,
     Clock,
     FileText,
     Microscope,
@@ -109,6 +111,7 @@ const toSpecimenItem = (d: DetailedSheetSpecimenItem): SpecimenItem => ({
 export const ExpiredSpecimensContent: React.FC<
     ExpiredSpecimensContentProps
 > = ({
+    pathologists: propPathologists,
     canManage: propCanManage,
     filterOptions: propFilterOptions,
     onReprogramSpecimen,
@@ -119,6 +122,11 @@ export const ExpiredSpecimensContent: React.FC<
         pathologists?: { id: number; name: string; email: string }[];
         filterOptions?: FilterOptions;
     }>().props;
+
+    const pathologists = useMemo(
+        () => propPathologists || pageProps.pathologists || [],
+        [propPathologists, pageProps.pathologists],
+    );
 
     const permissions: string[] = pageProps.auth?.permissions || [];
     const canManage: boolean =
@@ -201,7 +209,27 @@ export const ExpiredSpecimensContent: React.FC<
         return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
     }, [filterOptions.categories, specimens]);
 
-    // Filters: specimen type, examination, category, search
+    const effectivePathologists = useMemo(() => {
+        if (pathologists && pathologists.length > 0) {
+            return pathologists;
+        }
+
+        const map = new Map<
+            number,
+            { id: number; name: string; email?: string }
+        >();
+        specimens.forEach((s) => {
+            s.assigned_users?.forEach((u) => {
+                if (!map.has(u.id)) {
+                    map.set(u.id, { id: u.id, name: u.name });
+                }
+            });
+        });
+
+        return Array.from(map.values());
+    }, [pathologists, specimens]);
+
+    // Filters: specimen type, examination, category, pathologist, search
     const [search, setSearch] = useState('');
     const [selectedSpecimenTypeIds, setSelectedSpecimenTypeIds] = useState<
         string[]
@@ -210,9 +238,54 @@ export const ExpiredSpecimensContent: React.FC<
         string[]
     >(() => filterOptions.examinations.map((e) => e.id.toString()));
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [selectedPathologistId, setSelectedPathologistId] =
+        useState<string>('all');
 
     // Popover states
     const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
+    const [isPathologistFilterOpen, setIsPathologistFilterOpen] =
+        useState(false);
+
+    // Sort states (pattern from Cuttings Report / Hoja de Relación de Biopsias)
+    const [sortField, setSortField] = useState<string>('internal_date');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    const handleSort = (field: string) => {
+        const isCurrentField = sortField === field;
+        const direction =
+            isCurrentField && sortDirection === 'asc' ? 'desc' : 'asc';
+        setSortField(field);
+        setSortDirection(direction);
+    };
+
+    const renderSortHeader = (
+        field: string,
+        label: string,
+        className?: string,
+    ) => {
+        const isSorted = sortField === field;
+        const direction = isSorted ? sortDirection : null;
+
+        return (
+            <button
+                type="button"
+                onClick={() => handleSort(field)}
+                className={cn(
+                    'group/btn inline-flex cursor-pointer items-center gap-1.5 text-left font-semibold transition-colors select-none hover:text-foreground',
+                    className,
+                )}
+            >
+                <span>{label}</span>
+                {direction === 'asc' ? (
+                    <ChevronUp className="h-3.5 w-3.5 shrink-0 text-primary" />
+                ) : direction === 'desc' ? (
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-primary" />
+                ) : (
+                    <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover/btn:opacity-100" />
+                )}
+            </button>
+        );
+    };
 
     // Multi-selection
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -375,6 +448,22 @@ export const ExpiredSpecimensContent: React.FC<
         return c ? c.name : 'Categoría';
     }, [selectedCategory, effectiveCategories]);
 
+    const selectedPathologistLabel = useMemo(() => {
+        if (selectedPathologistId === 'all') {
+            return 'Todos los patólogos';
+        }
+
+        if (selectedPathologistId === 'unassigned') {
+            return 'Sin Asignar';
+        }
+
+        const p = effectivePathologists.find(
+            (p) => p.id.toString() === selectedPathologistId,
+        );
+
+        return p ? p.name : 'Patólogo';
+    }, [selectedPathologistId, effectivePathologists]);
+
     const isTypesFiltered =
         effectiveSpecimenTypes.length > 0 &&
         selectedSpecimenTypeIds.length !== effectiveSpecimenTypes.length;
@@ -382,12 +471,14 @@ export const ExpiredSpecimensContent: React.FC<
         effectiveExaminations.length > 0 &&
         selectedExaminationIds.length !== effectiveExaminations.length;
     const isCategoryFiltered = selectedCategory !== 'all';
+    const isPathologistFiltered = selectedPathologistId !== 'all';
     const isSearchFiltered = Boolean(search.trim());
 
     const isFiltersActive =
         isTypesFiltered ||
         isExamsFiltered ||
         isCategoryFiltered ||
+        isPathologistFiltered ||
         isSearchFiltered;
 
     const handleClearFilters = () => {
@@ -398,6 +489,7 @@ export const ExpiredSpecimensContent: React.FC<
             effectiveExaminations.map((e) => e.id.toString()),
         );
         setSelectedCategory('all');
+        setSelectedPathologistId('all');
         setSearch('');
     };
 
@@ -467,6 +559,23 @@ export const ExpiredSpecimensContent: React.FC<
                 }
             }
 
+            // Pathologist filter
+            if (isPathologistFiltered) {
+                if (selectedPathologistId === 'unassigned') {
+                    if (s.assigned_users && s.assigned_users.length > 0) {
+                        return false;
+                    }
+                } else {
+                    const hasUser = s.assigned_users?.some(
+                        (u) => u.id.toString() === selectedPathologistId,
+                    );
+
+                    if (!hasUser) {
+                        return false;
+                    }
+                }
+            }
+
             return true;
         });
     }, [
@@ -480,11 +589,84 @@ export const ExpiredSpecimensContent: React.FC<
         effectiveExaminations,
         selectedCategory,
         effectiveCategories,
+        isPathologistFiltered,
+        selectedPathologistId,
     ]);
+
+    // Client-side sorting (asc / desc) matching Cuttings Report pattern
+    const sortedSpecimens = useMemo(() => {
+        if (!sortField) {
+            return filteredSpecimens;
+        }
+
+        return [...filteredSpecimens].sort((a, b) => {
+            let comparison = 0;
+
+            switch (sortField) {
+                case 'sequence_code':
+                    comparison = (a.sequence_code || '').localeCompare(
+                        b.sequence_code || '',
+                        undefined,
+                        { numeric: true, sensitivity: 'base' },
+                    );
+                    break;
+                case 'customer_name':
+                    comparison = (a.customer_name || '').localeCompare(
+                        b.customer_name || '',
+                        undefined,
+                        { sensitivity: 'base' },
+                    );
+                    break;
+                case 'examination_name':
+                    comparison = (a.examination_name || '').localeCompare(
+                        b.examination_name || '',
+                        undefined,
+                        { sensitivity: 'base' },
+                    );
+                    break;
+                case 'category_name':
+                    comparison = (a.category_name || '').localeCompare(
+                        b.category_name || '',
+                        undefined,
+                        { sensitivity: 'base' },
+                    );
+                    break;
+                case 'priority_name':
+                    comparison = (a.priority_name || '').localeCompare(
+                        b.priority_name || '',
+                        undefined,
+                        { sensitivity: 'base' },
+                    );
+                    break;
+                case 'internal_date': {
+                    const dateA = a.internal_date
+                        ? new Date(a.internal_date).getTime()
+                        : 0;
+                    const dateB = b.internal_date
+                        ? new Date(b.internal_date).getTime()
+                        : 0;
+                    comparison = dateA - dateB;
+                    break;
+                }
+                case 'assigned_to': {
+                    const nameA = a.assigned_users?.[0]?.name || '';
+                    const nameB = b.assigned_users?.[0]?.name || '';
+                    comparison = nameA.localeCompare(nameB, undefined, {
+                        sensitivity: 'base',
+                    });
+                    break;
+                }
+                default:
+                    comparison = 0;
+            }
+
+            return sortDirection === 'asc' ? comparison : -comparison;
+        });
+    }, [filteredSpecimens, sortField, sortDirection]);
 
     // Adjust page to 1 during render when filters or page size change
     const [prevFiltersKey, setPrevFiltersKey] = useState('');
-    const currentFiltersKey = `${search}|${selectedSpecimenTypeIds.join(',')}|${selectedExaminationIds.join(',')}|${selectedCategory}|${pageSize}`;
+    const currentFiltersKey = `${search}|${selectedSpecimenTypeIds.join(',')}|${selectedExaminationIds.join(',')}|${selectedCategory}|${selectedPathologistId}|${sortField}|${sortDirection}|${pageSize}`;
 
     if (prevFiltersKey !== currentFiltersKey) {
         setPrevFiltersKey(currentFiltersKey);
@@ -494,13 +676,13 @@ export const ExpiredSpecimensContent: React.FC<
     // Pagination calculations
     const totalPages = Math.max(
         1,
-        Math.ceil(filteredSpecimens.length / pageSize),
+        Math.ceil(sortedSpecimens.length / pageSize),
     );
     const paginatedSpecimens = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
 
-        return filteredSpecimens.slice(start, start + pageSize);
-    }, [filteredSpecimens, currentPage, pageSize]);
+        return sortedSpecimens.slice(start, start + pageSize);
+    }, [sortedSpecimens, currentPage, pageSize]);
 
     // Selection logic
     const isAllFilteredSelected = useMemo(() => {
@@ -862,6 +1044,113 @@ export const ExpiredSpecimensContent: React.FC<
                     </Popover>
                 )}
 
+                {/* Filtro de Patólogo (Popover Combobox) */}
+                <Popover
+                    open={isPathologistFilterOpen}
+                    onOpenChange={setIsPathologistFilterOpen}
+                >
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={isPathologistFilterOpen}
+                            className={cn(
+                                'h-9 justify-between gap-2 border bg-card text-xs font-medium transition-colors hover:bg-accent/50',
+                                isPathologistFiltered &&
+                                    'border-primary/50 text-primary',
+                            )}
+                        >
+                            <div className="flex items-center gap-2 truncate">
+                                <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <span className="truncate">
+                                    {selectedPathologistLabel}
+                                </span>
+                            </div>
+                            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-0" align="start">
+                        <Command
+                            filter={(value, search) =>
+                                matchesSearch(value, search) ? 1 : 0
+                            }
+                        >
+                            <CommandInput placeholder="Buscar patólogo..." />
+                            <CommandList>
+                                <CommandEmpty>
+                                    No se encontraron patólogos.
+                                </CommandEmpty>
+                                <CommandGroup>
+                                    <CommandItem
+                                        value="todos los patologos"
+                                        onSelect={() => {
+                                            setSelectedPathologistId('all');
+                                            setIsPathologistFilterOpen(false);
+                                        }}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                'mr-2 h-4 w-4',
+                                                selectedPathologistId === 'all'
+                                                    ? 'opacity-100'
+                                                    : 'opacity-0',
+                                            )}
+                                        />
+                                        Todos los patólogos
+                                    </CommandItem>
+                                    <CommandItem
+                                        value="sin asignar"
+                                        onSelect={() => {
+                                            setSelectedPathologistId(
+                                                'unassigned',
+                                            );
+                                            setIsPathologistFilterOpen(false);
+                                        }}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                'mr-2 h-4 w-4',
+                                                selectedPathologistId ===
+                                                    'unassigned'
+                                                    ? 'opacity-100'
+                                                    : 'opacity-0',
+                                            )}
+                                        />
+                                        <span className="font-medium text-amber-600 dark:text-amber-400">
+                                            • Sin Asignar
+                                        </span>
+                                    </CommandItem>
+                                    {effectivePathologists.map((p) => (
+                                        <CommandItem
+                                            key={p.id}
+                                            value={p.name}
+                                            onSelect={() => {
+                                                setSelectedPathologistId(
+                                                    p.id.toString(),
+                                                );
+                                                setIsPathologistFilterOpen(
+                                                    false,
+                                                );
+                                            }}
+                                        >
+                                            <Check
+                                                className={cn(
+                                                    'mr-2 h-4 w-4',
+                                                    selectedPathologistId ===
+                                                        p.id.toString()
+                                                        ? 'opacity-100'
+                                                        : 'opacity-0',
+                                                )}
+                                            />
+                                            {p.name}
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
+
                 {/* Botón Limpiar filtros */}
                 {isFiltersActive && (
                     <Button
@@ -1049,26 +1338,47 @@ export const ExpiredSpecimensContent: React.FC<
                                             aria-label="Seleccionar todas"
                                         />
                                     </TableHead>
-                                    <TableHead className="w-36 min-w-[140px] font-semibold whitespace-nowrap">
-                                        Código
+                                    <TableHead className="w-36 min-w-[140px] whitespace-nowrap">
+                                        {renderSortHeader(
+                                            'sequence_code',
+                                            'Código',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="min-w-[160px] font-semibold">
-                                        Paciente
+                                    <TableHead className="min-w-[160px]">
+                                        {renderSortHeader(
+                                            'customer_name',
+                                            'Paciente',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="min-w-[180px] font-semibold">
-                                        Estudio / Examen
+                                    <TableHead className="min-w-[180px]">
+                                        {renderSortHeader(
+                                            'examination_name',
+                                            'Estudio / Examen',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="w-28 font-semibold whitespace-nowrap">
-                                        Categoría
+                                    <TableHead className="w-28 whitespace-nowrap">
+                                        {renderSortHeader(
+                                            'category_name',
+                                            'Categoría',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="w-24 font-semibold whitespace-nowrap">
-                                        Prioridad
+                                    <TableHead className="w-24 whitespace-nowrap">
+                                        {renderSortHeader(
+                                            'priority_name',
+                                            'Prioridad',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="w-40 font-semibold whitespace-nowrap">
-                                        Fecha Vencimiento
+                                    <TableHead className="w-40 whitespace-nowrap">
+                                        {renderSortHeader(
+                                            'internal_date',
+                                            'Fecha Vencimiento',
+                                        )}
                                     </TableHead>
-                                    <TableHead className="min-w-[140px] font-semibold">
-                                        Asignado a
+                                    <TableHead className="min-w-[140px]">
+                                        {renderSortHeader(
+                                            'assigned_to',
+                                            'Asignado a',
+                                        )}
                                     </TableHead>
                                     <TableHead className="w-28 text-right font-semibold whitespace-nowrap">
                                         Acción
