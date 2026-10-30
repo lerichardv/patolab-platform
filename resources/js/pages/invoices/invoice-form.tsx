@@ -190,6 +190,23 @@ export default function InvoiceForm({
                 : null,
         );
 
+    const initialIndividualCustomer =
+        invoice?.individual_customer || invoice?.individualCustomer;
+    const [selectedIndividualCustomerData, setSelectedIndividualCustomerData] =
+        useState<CustomerOption | null>(
+            initialIndividualCustomer
+                ? {
+                      id: initialIndividualCustomer.id,
+                      name: initialIndividualCustomer.name,
+                      id_number: initialIndividualCustomer.id_number,
+                      phone: initialIndividualCustomer.phone,
+                      gender: initialIndividualCustomer.gender,
+                      type: initialIndividualCustomer.type,
+                      age: initialIndividualCustomer.age,
+                  }
+                : null,
+        );
+
     const {
         data,
         setData,
@@ -202,6 +219,14 @@ export default function InvoiceForm({
     } = useForm({
         _method: 'PUT',
         customer_id: invoice?.customer_id ? invoice.customer_id.toString() : '',
+        has_individual_customer: Boolean(
+            invoice?.individual_customer_id &&
+            String(invoice.individual_customer_id) !==
+                String(invoice?.customer_id),
+        ),
+        individual_customer_id: invoice?.individual_customer_id
+            ? invoice.individual_customer_id.toString()
+            : '',
         payment_type: invoice?.payment_type || '',
         quantity: invoice?.quantity ? invoice.quantity : 1,
         selected_price: '',
@@ -941,6 +966,11 @@ export default function InvoiceForm({
             localErrors.customer_id = 'El cliente es requerido.';
         }
 
+        if (data.has_individual_customer && !data.individual_customer_id) {
+            localErrors.individual_customer_id =
+                'Debe seleccionar un cliente para la factura y el portal.';
+        }
+
         if (!data.payment_type) {
             localErrors.payment_type = 'El método de pago es requerido.';
         }
@@ -1281,6 +1311,103 @@ export default function InvoiceForm({
                             )}
                         </div>
                     </div>
+
+                    {/* Switch para asignar cliente individual diferente para portal / factura */}
+                    {!isGroupInvoice && (
+                        <div className="flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/30 p-3.5">
+                            <div className="flex items-center justify-between">
+                                <div className="flex flex-col gap-0.5">
+                                    <Label
+                                        htmlFor="invoice-individual-customer-toggle"
+                                        className="cursor-pointer text-xs font-semibold"
+                                    >
+                                        Asignar cliente diferente para portal /
+                                        factura
+                                    </Label>
+                                    <span className="text-[10px] text-muted-foreground">
+                                        Habilite esta opción si la factura
+                                        individual y el acceso al portal
+                                        corresponden a otro cliente (por defecto
+                                        es el paciente).
+                                    </span>
+                                </div>
+                                <Switch
+                                    id="invoice-individual-customer-toggle"
+                                    checked={data.has_individual_customer}
+                                    onCheckedChange={(checked) => {
+                                        setData((d) => ({
+                                            ...d,
+                                            has_individual_customer: checked,
+                                            individual_customer_id: checked
+                                                ? d.individual_customer_id || ''
+                                                : '',
+                                        }));
+
+                                        if (!checked) {
+                                            setSelectedIndividualCustomerData(
+                                                null,
+                                            );
+                                        }
+                                    }}
+                                />
+                            </div>
+
+                            {data.has_individual_customer && (
+                                <div className="flex flex-col gap-2 border-t border-border/50 pt-3 transition-all duration-200">
+                                    <div className="grid gap-1.5">
+                                        <Label
+                                            htmlFor="invoice_individual_customer_id"
+                                            className="text-xs font-semibold"
+                                        >
+                                            Cliente para Portal / Factura{' '}
+                                            <span className="text-destructive">
+                                                *
+                                            </span>
+                                        </Label>
+                                        <AsyncCustomerCombobox
+                                            placeholder="Seleccione el cliente para portal y factura"
+                                            value={data.individual_customer_id}
+                                            initialCustomer={
+                                                selectedIndividualCustomerData
+                                            }
+                                            onChange={(val, customer) => {
+                                                setData(
+                                                    'individual_customer_id',
+                                                    val,
+                                                );
+                                                setSelectedIndividualCustomerData(
+                                                    customer ?? null,
+                                                );
+                                            }}
+                                        />
+                                    </div>
+                                    {errors.individual_customer_id && (
+                                        <p className="text-xs text-destructive">
+                                            {errors.individual_customer_id}
+                                        </p>
+                                    )}
+
+                                    {selectedIndividualCustomerData && (
+                                        <div className="flex items-center gap-3 rounded-md bg-background px-2.5 py-1.5 text-xs text-muted-foreground">
+                                            <span className="font-medium text-foreground">
+                                                {
+                                                    selectedIndividualCustomerData.name
+                                                }
+                                            </span>
+                                            {selectedIndividualCustomerData.id_number && (
+                                                <span className="font-mono text-[11px]">
+                                                    ID:{' '}
+                                                    {
+                                                        selectedIndividualCustomerData.id_number
+                                                    }
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Billing configuration inputs based on specimen or group */}
                     {data.group_specimens && data.group_specimens.length > 0 ? (

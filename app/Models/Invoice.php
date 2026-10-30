@@ -19,6 +19,7 @@ class Invoice extends Model
         'invoice_number',
         'cai_range_id',
         'customer_id',
+        'individual_customer_id',
         'specimen_id',
         'payment_type',
         'credit_payment_id',
@@ -94,6 +95,11 @@ class Invoice extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id');
+    }
+
+    public function individualCustomer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'individual_customer_id');
     }
 
     public function specimen(): BelongsTo

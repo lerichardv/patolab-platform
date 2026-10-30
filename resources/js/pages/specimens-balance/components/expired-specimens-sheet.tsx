@@ -89,7 +89,7 @@ export const ExpiredSpecimensSheet: React.FC<ExpiredSpecimensSheetProps> = ({
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="right"
-                className="flex h-full w-full flex-col p-0 sm:max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl"
+                className="flex h-full w-full flex-col p-0 sm:max-w-[94vw] lg:max-w-[92vw] xl:max-w-[94vw] 2xl:max-w-[1750px]"
             >
                 {/* Persistent Header */}
                 <SheetHeader className="border-b px-6 py-4 text-left">

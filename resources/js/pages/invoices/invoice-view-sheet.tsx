@@ -227,6 +227,42 @@ export default function InvoiceViewSheet({
                                             )}
                                         </div>
                                     </div>
+                                    {Boolean(
+                                        (invoice.individual_customer ||
+                                            invoice.individualCustomer) &&
+                                        (invoice.individual_customer?.id ||
+                                            invoice.individualCustomer?.id) !==
+                                            invoice.customer_id,
+                                    ) && (
+                                        <div className="mt-2 space-y-1 border-t pt-2 sm:col-span-2">
+                                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                <User className="h-3.5 w-3.5" />{' '}
+                                                Cliente para Portal
+                                            </span>
+                                            <div className="flex flex-col">
+                                                <p className="text-sm font-medium">
+                                                    {(
+                                                        invoice.individual_customer ||
+                                                        invoice.individualCustomer
+                                                    )?.name || 'N/A'}
+                                                </p>
+                                                {(
+                                                    invoice.individual_customer ||
+                                                    invoice.individualCustomer
+                                                )?.id_number && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        ID/RTN:{' '}
+                                                        {
+                                                            (
+                                                                invoice.individual_customer ||
+                                                                invoice.individualCustomer
+                                                            ).id_number
+                                                        }
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

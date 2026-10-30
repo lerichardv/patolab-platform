@@ -47,6 +47,15 @@ Wayfinder generates `resources/js/{actions,routes,wayfinder}/` — gitignored, r
 - Suites: `tests/Unit/`, `tests/Feature/`
 - CI runs `./vendor/bin/pest` on PHP 8.3/8.4/8.5
 
+## UI Guidelines & Design System (MANDATORY)
+- **CRITICAL**: Every time a UI element, component, page, view, filter bar, table, modal, drawer (`Sheet`), card, or form needs to be generated, modified, or refactored, **YOU MUST READ `DESIGN.md` FIRST** (`/DESIGN.md` at the project root).
+- Adhere strictly to the design tokens, spacing (`p-4`, `gap-4`), border radius (`rounded-md`, `rounded-lg`), typography hierarchy, and OKLCH color definitions documented in `DESIGN.md`.
+- **Never reinvent existing components**: Always reuse shadcn primitives in `resources/js/components/ui/` and shared business components in `resources/js/components/` (such as `Pagination`, `DateRangePicker`, `FormCombobox`, `AsyncCustomerCombobox`, `Heading`, `HeadingSheet`, etc.).
+- Follow the established page archetypes and filter organization patterns:
+  - **Kanban Board**: `resources/js/pages/specimens/index.tsx`
+  - **Advanced Faceted Data Table**: `resources/js/pages/invoices/index.tsx`
+  - **Standard CRUD Management Table**: `resources/js/pages/referrers/index.tsx`
+
 ## Code style
 - **PHP**: Laravel Pint (default preset)
 - **JS/TS**: ESLint (import order enforced, `consistent-type-imports` with separate type imports preferred at top level) + Prettier (4-space indent, single quotes, semicolons, `prettier-plugin-tailwindcss`)

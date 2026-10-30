@@ -117,3 +117,39 @@ test('cannot assign or unassign technician when work order status is Finalizada'
     $response->assertSessionHasErrors(['status']);
     $this->assertTrue($workOrder->users()->where('user_id', $this->technician->id)->exists());
 });
+
+test('cannot change status to En Proceso without assigned technicians', function () {
+    $workOrder = WorkOrder::create([
+        'specimen_id' => $this->specimen->id,
+        'status' => 'Enviada',
+        'priority' => 3,
+        'quantity' => 1,
+    ]);
+
+    $response = $this->actingAs($this->user)
+        ->put(route('histotechnologist-work-orders.update-status', $workOrder->id), [
+            'status' => 'En Proceso',
+        ]);
+
+    $response->assertSessionHasErrors(['status']);
+    $this->assertEquals('Enviada', $workOrder->fresh()->status);
+});
+
+test('can change status to En Proceso when technician is assigned', function () {
+    $workOrder = WorkOrder::create([
+        'specimen_id' => $this->specimen->id,
+        'status' => 'Enviada',
+        'priority' => 3,
+        'quantity' => 1,
+    ]);
+
+    $workOrder->users()->attach($this->technician->id);
+
+    $response = $this->actingAs($this->user)
+        ->put(route('histotechnologist-work-orders.update-status', $workOrder->id), [
+            'status' => 'En Proceso',
+        ]);
+
+    $response->assertRedirect();
+    $this->assertEquals('En Proceso', $workOrder->fresh()->status);
+});

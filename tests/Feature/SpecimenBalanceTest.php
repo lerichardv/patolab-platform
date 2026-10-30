@@ -1139,3 +1139,106 @@ test('durationsData endpoint returns fresh duration settings and pathologists fr
     expect($data['currentUserId'])->toBe($this->pathologistUser1->id);
     expect($data['canManage'])->toBeTrue();
 });
+
+test('expiredList endpoint filters by pathologist_id and unassigned', function () {
+    Carbon::setTestNow('2026-10-01 09:00:00');
+
+    $specimenAssigned = Specimen::create([
+        'sequence_code' => 'B-0991-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+    $specimenAssigned->users()->attach($this->pathologistUser1->id);
+
+    $specimenUnassigned = Specimen::create([
+        'sequence_code' => 'B-0992-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    Carbon::setTestNow('2026-10-15 09:00:00');
+
+    // Filter by pathologistUser1
+    $responseAssigned = $this->actingAs($this->viewerUser)
+        ->getJson(route('specimens-balance.expired-list', ['pathologist_id' => $this->pathologistUser1->id]))
+        ->assertSuccessful();
+
+    $codesAssigned = collect($responseAssigned->json('specimens'))->pluck('sequence_code')->toArray();
+    expect($codesAssigned)->toContain('B-0991-10-26');
+    expect($codesAssigned)->not->toContain('B-0992-10-26');
+
+    // Filter by unassigned
+    $responseUnassigned = $this->actingAs($this->viewerUser)
+        ->getJson(route('specimens-balance.expired-list', ['pathologist_id' => 'unassigned']))
+        ->assertSuccessful();
+
+    $codesUnassigned = collect($responseUnassigned->json('specimens'))->pluck('sequence_code')->toArray();
+    expect($codesUnassigned)->toContain('B-0992-10-26');
+    expect($codesUnassigned)->not->toContain('B-0991-10-26');
+
+    Carbon::setTestNow();
+});
+
+test('expiredList and unassignedList support sort_field and sort_direction', function () {
+    Carbon::setTestNow('2026-10-01 09:00:00');
+
+    Specimen::create([
+        'sequence_code' => 'B-0001-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    Specimen::create([
+        'sequence_code' => 'B-0002-10-26',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    Carbon::setTestNow('2026-10-15 09:00:00');
+
+    // Unassigned list sorted by sequence_code asc
+    $respUnassignedAsc = $this->actingAs($this->viewerUser)
+        ->getJson(route('specimens-balance.unassigned-list', ['sort_field' => 'sequence_code', 'sort_direction' => 'asc']))
+        ->assertSuccessful();
+
+    $codesAsc = collect($respUnassignedAsc->json('specimens'))->pluck('sequence_code')->values()->toArray();
+    $firstIdx = array_search('B-0001-10-26', $codesAsc);
+    $secondIdx = array_search('B-0002-10-26', $codesAsc);
+    expect($firstIdx)->toBeLessThan($secondIdx);
+
+    // Unassigned list sorted by sequence_code desc
+    $respUnassignedDesc = $this->actingAs($this->viewerUser)
+        ->getJson(route('specimens-balance.unassigned-list', ['sort_field' => 'sequence_code', 'sort_direction' => 'desc']))
+        ->assertSuccessful();
+
+    $codesDesc = collect($respUnassignedDesc->json('specimens'))->pluck('sequence_code')->values()->toArray();
+    $firstIdxDesc = array_search('B-0001-10-26', $codesDesc);
+    $secondIdxDesc = array_search('B-0002-10-26', $codesDesc);
+    expect($firstIdxDesc)->toBeGreaterThan($secondIdxDesc);
+
+    Carbon::setTestNow();
+});

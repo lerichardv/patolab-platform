@@ -94,6 +94,7 @@ class SpecimenFormDataController extends Controller
                 'referrerRelation',
                 'invoiceRelation.creditRelation',
                 'invoiceRelation.transferBank',
+                'invoiceRelation.individualCustomer:id,name,id_number,type',
                 'invoiceRelation.invoiceSpecimens.examination.prices',
                 'group.invoice.creditRelation',
                 'group.invoice.transferBank',

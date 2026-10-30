@@ -221,6 +221,16 @@ class HistotechnologistWorkOrderController extends Controller
             'status' => 'required|in:En Proceso,Finalizada',
         ]);
 
+        if ($validated['status'] === 'En Proceso') {
+            $hasTechnicians = $workOrder->users()->exists() || ! is_null($workOrder->user_id);
+
+            if (! $hasTechnicians) {
+                throw ValidationException::withMessages([
+                    'status' => 'No se puede iniciar una orden de trabajo sin al menos un técnico asignado.',
+                ]);
+            }
+        }
+
         $updateData = [
             'status' => $validated['status'],
         ];
