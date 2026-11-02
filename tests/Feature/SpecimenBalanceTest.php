@@ -684,6 +684,114 @@ test('expiredList returns JSON list of overdue specimens', function () {
     $codes = collect($response->json('specimens'))->pluck('sequence_code')->toArray();
     expect($codes)->toContain('B-0090-10-26');
 
+    $item = collect($response->json('specimens'))->firstWhere('sequence_code', 'B-0090-10-26');
+    // Ensure internal_date is the expected delivery date (2026-10-06), NOT created_at (2026-10-01)
+    expect($item['internal_date'])->toBe('2026-10-06');
+
+    Carbon::setTestNow();
+});
+
+test('expiredList uses expected_internal_finalization_date and does not flag non-overdue specimens as expired', function () {
+    Carbon::setTestNow('2026-10-05 09:00:00'); // Monday
+
+    // Specimen 1: Created Oct 5, Category 3 business days -> Due Oct 8 (Thursday)
+    $overdueSpecimen = Specimen::create([
+        'sequence_code' => 'B-EXP-001',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    // Specimen 2: Created Oct 14 (Wednesday), Category 3 business days -> Due Oct 19 (Monday)
+    Carbon::setTestNow('2026-10-14 09:00:00');
+    $validSpecimen = Specimen::create([
+        'sequence_code' => 'B-VALID-002',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    // Current date: Friday Oct 16
+    // Specimen 1 was due Oct 8 -> Overdue!
+    // Specimen 2 is due Oct 19 -> NOT overdue! (Even though created_at Oct 14 is before Oct 16)
+    Carbon::setTestNow('2026-10-16 09:00:00');
+
+    $response = $this->actingAs($this->viewerUser)
+        ->getJson(route('specimens-balance.expired-list'))
+        ->assertSuccessful()
+        ->json();
+
+    $specimens = collect($response['specimens']);
+    $codes = $specimens->pluck('sequence_code')->toArray();
+
+    expect($codes)->toContain('B-EXP-001')
+        ->and($codes)->not->toContain('B-VALID-002');
+
+    $expItem = $specimens->firstWhere('sequence_code', 'B-EXP-001');
+    expect($expItem['internal_date'])->toBe('2026-10-08');
+
+    Carbon::setTestNow();
+});
+
+test('unassignedList returns internal_date as expected internal finalization date rather than creation date', function () {
+    Carbon::setTestNow('2026-10-05 09:00:00'); // Monday
+
+    // Created on Monday Oct 5, category 3 internal days -> Due Thursday Oct 8
+    $unassignedSpecimen = Specimen::create([
+        'sequence_code' => 'B-UNASS-001',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    $response = $this->actingAs($this->viewerUser)
+        ->getJson(route('specimens-balance.unassigned-list'))
+        ->assertSuccessful()
+        ->json();
+
+    $item = collect($response['specimens'])->firstWhere('sequence_code', 'B-UNASS-001');
+    expect($item)->not->toBeNull()
+        ->and($item['internal_date'])->toBe('2026-10-08');
+
+    Carbon::setTestNow();
+});
+
+test('specimen expected_internal_finalization_date accessor self-heals when category is loaded with partial columns', function () {
+    Carbon::setTestNow('2026-10-05 09:00:00'); // Monday
+
+    $specimen = Specimen::create([
+        'sequence_code' => 'B-HEAL-001',
+        'customer' => $this->customer->id,
+        'specimen_type' => $this->specimenType->id,
+        'specimen_type_examination' => $this->examination1->id,
+        'specimen_category' => $this->category->id,
+        'referrer' => $this->referrer->id,
+        'priority_id' => $this->priority->id,
+        'status' => 'received',
+        'active' => true,
+    ]);
+
+    // Query with partial category columns (omitting intern_unit / intern_quantity)
+    $loaded = Specimen::with('category:id,name')->find($specimen->id);
+
+    expect($loaded->expected_internal_finalization_date)->not->toBeNull()
+        ->and($loaded->expected_internal_finalization_date->format('Y-m-d'))->toBe('2026-10-08');
+
     Carbon::setTestNow();
 });
 

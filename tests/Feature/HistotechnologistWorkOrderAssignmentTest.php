@@ -153,3 +153,106 @@ test('can change status to En Proceso when technician is assigned', function () 
     $response->assertRedirect();
     $this->assertEquals('En Proceso', $workOrder->fresh()->status);
 });
+
+test('work orders index defaults to created_at desc ordering', function () {
+    $wo1 = WorkOrder::create([
+        'specimen_id' => $this->specimen->id,
+        'status' => 'Enviada',
+        'priority' => 3,
+        'quantity' => 1,
+    ]);
+    $wo1->created_at = now()->subDays(2);
+    $wo1->save();
+
+    $wo2 = WorkOrder::create([
+        'specimen_id' => $this->specimen->id,
+        'status' => 'Enviada',
+        'priority' => 1,
+        'quantity' => 1,
+    ]);
+    $wo2->created_at = now();
+    $wo2->save();
+
+    $response = $this->actingAs($this->user)
+        ->get(route('histotechnologist-work-orders.index'));
+
+    $response->assertOk();
+    $workOrders = $response->viewData('page')['props']['workOrders'];
+
+    expect($workOrders[0]['id'])->toBe($wo2->id)
+        ->and($workOrders[1]['id'])->toBe($wo1->id);
+});
+
+test('work orders index can sort by created_at asc', function () {
+    $wo1 = WorkOrder::create([
+        'specimen_id' => $this->specimen->id,
+        'status' => 'Enviada',
+        'priority' => 3,
+        'quantity' => 1,
+    ]);
+    $wo1->created_at = now()->subDays(2);
+    $wo1->save();
+
+    $wo2 = WorkOrder::create([
+        'specimen_id' => $this->specimen->id,
+        'status' => 'Enviada',
+        'priority' => 1,
+        'quantity' => 1,
+    ]);
+    $wo2->created_at = now();
+    $wo2->save();
+
+    $response = $this->actingAs($this->user)
+        ->get(route('histotechnologist-work-orders.index', [
+            'sort_field' => 'created_at',
+            'sort_direction' => 'asc',
+        ]));
+
+    $response->assertOk();
+    $workOrders = $response->viewData('page')['props']['workOrders'];
+
+    expect($workOrders[0]['id'])->toBe($wo1->id)
+        ->and($workOrders[1]['id'])->toBe($wo2->id);
+});
+
+test('work orders index can sort by due_date asc and desc', function () {
+    $wo1 = WorkOrder::create([
+        'specimen_id' => $this->specimen->id,
+        'status' => 'Enviada',
+        'priority' => 3,
+        'quantity' => 1,
+        'due_date' => now()->addDays(5),
+    ]);
+
+    $wo2 = WorkOrder::create([
+        'specimen_id' => $this->specimen->id,
+        'status' => 'Enviada',
+        'priority' => 1,
+        'quantity' => 1,
+        'due_date' => now()->addDays(1),
+    ]);
+
+    // Test ASC (soonest first: wo2, then wo1)
+    $responseAsc = $this->actingAs($this->user)
+        ->get(route('histotechnologist-work-orders.index', [
+            'sort_field' => 'due_date',
+            'sort_direction' => 'asc',
+        ]));
+
+    $responseAsc->assertOk();
+    $workOrdersAsc = $responseAsc->viewData('page')['props']['workOrders'];
+    expect($workOrdersAsc[0]['id'])->toBe($wo2->id)
+        ->and($workOrdersAsc[1]['id'])->toBe($wo1->id);
+
+    // Test DESC (latest first: wo1, then wo2)
+    $responseDesc = $this->actingAs($this->user)
+        ->get(route('histotechnologist-work-orders.index', [
+            'sort_field' => 'due_date',
+            'sort_direction' => 'desc',
+        ]));
+
+    $responseDesc->assertOk();
+    $workOrdersDesc = $responseDesc->viewData('page')['props']['workOrders'];
+    expect($workOrdersDesc[0]['id'])->toBe($wo1->id)
+        ->and($workOrdersDesc[1]['id'])->toBe($wo2->id);
+});

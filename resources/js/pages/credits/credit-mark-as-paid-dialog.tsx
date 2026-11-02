@@ -1,3 +1,16 @@
+import { useForm } from '@inertiajs/react';
+import {
+    CheckCircle2,
+    CreditCard,
+    FileText,
+    Landmark,
+    Receipt,
+    Upload,
+    Wallet,
+    X,
+} from 'lucide-react';
+import React, { useEffect } from 'react';
+import { toast } from 'sonner';
 import {
     AlertDialog,
     AlertDialogContent,
@@ -17,19 +30,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { useForm } from '@inertiajs/react';
-import {
-    CheckCircle2,
-    CreditCard,
-    FileText,
-    Landmark,
-    Receipt,
-    Upload,
-    Wallet,
-    X,
-} from 'lucide-react';
-import React, { useEffect } from 'react';
-import { toast } from 'sonner';
 
 interface Customer {
     id: number;
@@ -172,6 +172,7 @@ export default function CreditMarkAsPaidDialog({
 
         if (data.payment_type !== 'cash' && !data.proof_of_payment) {
             toast.error('El comprobante de pago es requerido.');
+
             return;
         }
 
@@ -186,6 +187,7 @@ export default function CreditMarkAsPaidDialog({
             },
             onError: (err: any) => {
                 const firstMsg = Object.values(err)[0];
+
                 if (typeof firstMsg === 'string') {
                     toast.error(firstMsg);
                 } else {
@@ -203,6 +205,7 @@ export default function CreditMarkAsPaidDialog({
             onOpenChange={(nextOpen) => {
                 if (!processing) {
                     onOpenChange(nextOpen);
+
                     if (!nextOpen) {
                         reset();
                     }

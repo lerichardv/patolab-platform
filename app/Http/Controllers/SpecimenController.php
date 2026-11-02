@@ -967,6 +967,17 @@ class SpecimenController extends Controller
                 }
             }
 
+            if (isset($validated['status']) && $validated['status'] !== $specimen->status) {
+                if ($request->user() && $request->user()->can('specimens.manage_status')) {
+                    $statusService = app(SpecimenStatusService::class);
+                    $statusService->transition($specimen, $validated['status'], [
+                        'user' => $request->user(),
+                        'cancellation_reason' => $request->input('cancellation_reason') ?? null,
+                    ]);
+                }
+            }
+            unset($validated['status']);
+
             $specimen->update($validated);
 
             if ($request->has('examinations') && is_array($request->input('examinations')) && count($request->input('examinations')) > 0) {
@@ -1722,15 +1733,19 @@ class SpecimenController extends Controller
             Gate::authorize('specimens.delete');
         }
 
-        DB::transaction(function () use ($ids, $action, $value, $cancellationReason) {
+        DB::transaction(function () use ($ids, $action, $value, $cancellationReason, $request) {
             if ($action === 'change_status') {
                 $statusService = app(SpecimenStatusService::class);
+                $user = $request->user();
                 foreach ($ids as $id) {
                     $specimen = Specimen::find($id);
-                    if ($specimen) {
+                    if ($specimen && $statusService->canTransitionTo($specimen, $value)) {
+                        if (in_array($specimen->status, ['finalized', 'delivered']) && $user && ! $user->can('specimens.manage_status')) {
+                            continue;
+                        }
                         $statusService->transition($specimen, $value, [
                             'cancellation_reason' => $cancellationReason,
-                            'bypass_validation' => true,
+                            'user' => $user,
                         ]);
                     }
                 }
@@ -2063,6 +2078,17 @@ class SpecimenController extends Controller
                     }
                 }
             }
+
+            if (isset($validated['status']) && $validated['status'] !== $specimen->status) {
+                if ($request->user() && $request->user()->can('specimens.manage_status')) {
+                    $statusService = app(SpecimenStatusService::class);
+                    $statusService->transition($specimen, $validated['status'], [
+                        'user' => $request->user(),
+                        'cancellation_reason' => $request->input('cancellation_reason') ?? null,
+                    ]);
+                }
+            }
+            unset($validated['status']);
 
             $specimen->update($validated);
 

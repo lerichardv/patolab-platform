@@ -191,6 +191,15 @@ const permissionRows: PermissionRow[] = [
         },
     },
     {
+        label: 'Gestionar Estado de Muestras',
+        description:
+            'Permite cambiar manualmente el estado de las muestras en los formularios, incluyendo muestras finalizadas o entregadas.',
+        module: 'Operaciones del Laboratorio',
+        slugs: {
+            manage: 'specimens.manage_status',
+        },
+    },
+    {
         label: 'Gestionar Cortes',
         description:
             'Permite gestionar los bloques de casetes, cortes generados y láminas de las muestras.',

@@ -552,6 +552,32 @@ test('report paginator sorts image grid images by data-order attribute', functio
     expect($pos2)->toBeLessThan($pos3);
 });
 
+test('report paginator preserves original document order when data-order is missing or equal', function () {
+    $gridHtml = '<div data-columns="3" data-align="center" data-type="image-grid" class="align-center">'
+        .'<img src="http://localhost:8000/storage/first.jpg" data-caption="First">'
+        .'<img src="http://localhost:8000/storage/second.jpg" data-caption="Second">'
+        .'<img src="http://localhost:8000/storage/third.jpg" data-caption="Third">'
+        .'</div>';
+
+    $classified = ReportPaginator::classifyBlock($gridHtml, 144);
+
+    expect($classified['type'])->toBe('image-grid');
+    expect($classified['images'])->toHaveCount(3);
+    expect($classified['images'][0])->toContain('first.jpg');
+    expect($classified['images'][1])->toContain('second.jpg');
+    expect($classified['images'][2])->toContain('third.jpg');
+
+    $pages = ReportPaginator::paginateBlocks([$classified], 210.0, 3.53, 144);
+    $gridBlock = $pages[0][0];
+
+    $posFirst = strpos($gridBlock['html'], 'first.jpg');
+    $posSecond = strpos($gridBlock['html'], 'second.jpg');
+    $posThird = strpos($gridBlock['html'], 'third.jpg');
+
+    expect($posFirst)->toBeLessThan($posSecond);
+    expect($posSecond)->toBeLessThan($posThird);
+});
+
 test('report paginator removes hyperlinks while preserving inner text and markup', function () {
     $htmlWithLinks = '<p>Visite nuestro <a href="https://patolab.org" target="_blank" style="color: blue;"><strong>portal web</strong></a> para más información o escriba a <a href="mailto:info@patolab.org">soporte</a>.</p>';
 

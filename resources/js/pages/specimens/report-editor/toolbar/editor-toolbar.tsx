@@ -62,6 +62,22 @@ import { LineHeightDropdown } from './line-height-dropdown';
 import { ToolbarBtn, ToolbarDivider } from './toolbar-btn';
 import { ToolbarContext } from './toolbar-context';
 
+interface SavedSelectionInfo {
+    from: number;
+    to: number;
+    originalText: string;
+    isInline: boolean;
+    isEntireBlock: boolean;
+    blockType: string;
+}
+
+function escapeHtml(text: string): string {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 export interface EditorToolbarProps {
     editor: Editor | null;
     specimenSequenceCode?: string;
@@ -148,6 +164,8 @@ export function EditorToolbar({
 
     const [selectedText, setSelectedText] = useState('');
     const hasReplacedRef = useRef(false);
+    const savedSelectionRef = useRef<SavedSelectionInfo | null>(null);
+    const targetEditorRef = useRef<Editor | null>(null);
 
     const activeSelectionText = (() => {
         if (!editor) {
@@ -253,6 +271,8 @@ export function EditorToolbar({
             return;
         }
 
+        targetEditorRef.current = editor;
+
         let selected = activeSelectionText;
 
         if (!selected.trim()) {
@@ -267,54 +287,239 @@ export function EditorToolbar({
             return;
         }
 
+        const { from, to } = editor.state.selection;
+        const { $from, $to } = editor.state.selection;
+        const isInline = $from.sameParent($to) && $from.parent.isTextblock;
+        const isEntireBlock =
+            isInline && from === $from.start() && to === $from.end();
+        const blockType = $from.parent.type.name;
+
+        savedSelectionRef.current = {
+            from,
+            to,
+            originalText: selected,
+            isInline,
+            isEntireBlock,
+            blockType,
+        };
+
         setSelectedText(selected);
         hasReplacedRef.current = false;
         setIsSheetOpen(true);
     };
 
     const handleReplace = (correctedText: string, originalText?: string) => {
-        if (!editor || !correctedText) {
+        const targetEditor = targetEditorRef.current || editor;
+
+        if (!targetEditor || !correctedText) {
             return;
         }
 
         hasReplacedRef.current = true;
 
-        // Convert plain text with newlines into HTML paragraphs to ensure TipTap structures them correctly.
-        // Split by double newlines for paragraphs, and replace single newlines with <br />.
-        const htmlContent = correctedText
-            .split(/\n\s*\n/)
-            .map((para) => {
-                const cleanPara = para.trim();
+        const textToMatch =
+            originalText || savedSelectionRef.current?.originalText || '';
 
-                if (!cleanPara) {
-                    return '';
+        // Strip leading/trailing newlines to prevent unwanted empty paragraphs/lines
+        let cleanCorrected = correctedText.replace(/^\n+|\n+$/g, '');
+
+        if (!cleanCorrected) {
+            toast.error('El texto corregido está vacío.');
+            setIsSheetOpen(false);
+
+            return;
+        }
+
+        // Adjust boundary whitespace to match original selection
+        if (!/^\s/.test(textToMatch) && /^\s/.test(cleanCorrected)) {
+            cleanCorrected = cleanCorrected.trimStart();
+        }
+
+        if (!/\s$/.test(textToMatch) && /\s$/.test(cleanCorrected)) {
+            cleanCorrected = cleanCorrected.trimEnd();
+        }
+
+        if (/\s$/.test(textToMatch) && !/\s$/.test(cleanCorrected)) {
+            cleanCorrected += ' ';
+        }
+
+        const saved = savedSelectionRef.current;
+        let replaceFrom = saved?.from ?? targetEditor.state.selection.from;
+        let replaceTo = saved?.to ?? targetEditor.state.selection.to;
+
+        // Verify that the text at [replaceFrom, replaceTo] matches textToMatch
+        if (textToMatch) {
+            const currentRangeText = targetEditor.state.doc.textBetween(
+                Math.min(replaceFrom, targetEditor.state.doc.content.size),
+                Math.min(replaceTo, targetEditor.state.doc.content.size),
+                '\n',
+            );
+
+            if (currentRangeText !== textToMatch) {
+                // Check if active selection in editor matches
+                const activeSel = targetEditor.state.selection;
+                const activeText = targetEditor.state.doc.textBetween(
+                    activeSel.from,
+                    activeSel.to,
+                    '\n',
+                );
+
+                if (activeText === textToMatch) {
+                    replaceFrom = activeSel.from;
+                    replaceTo = activeSel.to;
+                } else {
+                    // Search for textToMatch in doc
+                    let foundPos: { from: number; to: number } | null = null;
+
+                    targetEditor.state.doc.descendants((node, pos) => {
+                        if (foundPos) {
+                            return false;
+                        }
+
+                        if (node.isText && node.text) {
+                            const idx = node.text.indexOf(textToMatch);
+
+                            if (idx !== -1) {
+                                foundPos = {
+                                    from: pos + idx,
+                                    to: pos + idx + textToMatch.length,
+                                };
+
+                                return false;
+                            }
+                        }
+
+                        return true;
+                    });
+
+                    if (!foundPos) {
+                        const fullDocText = targetEditor.state.doc.textBetween(
+                            0,
+                            targetEditor.state.doc.content.size,
+                            '\n',
+                        );
+                        const matchIdx = fullDocText.indexOf(textToMatch);
+
+                        if (matchIdx !== -1) {
+                            let textOffset = 0;
+
+                            targetEditor.state.doc.descendants((node, pos) => {
+                                if (foundPos) {
+                                    return false;
+                                }
+
+                                if (node.isText && node.text) {
+                                    const nodeStart = textOffset;
+                                    const nodeEnd =
+                                        textOffset + node.text.length;
+
+                                    if (
+                                        matchIdx >= nodeStart &&
+                                        matchIdx < nodeEnd
+                                    ) {
+                                        const offsetInNode =
+                                            matchIdx - nodeStart;
+
+                                        foundPos = {
+                                            from: pos + offsetInNode,
+                                            to:
+                                                pos +
+                                                offsetInNode +
+                                                textToMatch.length,
+                                        };
+
+                                        return false;
+                                    }
+
+                                    textOffset += node.text.length;
+                                } else if (node.isBlock && textOffset > 0) {
+                                    textOffset += 1;
+                                }
+
+                                return true;
+                            });
+                        }
+                    }
+
+                    if (foundPos) {
+                        replaceFrom = (
+                            foundPos as { from: number; to: number }
+                        ).from;
+                        replaceTo = (
+                            foundPos as { from: number; to: number }
+                        ).to;
+                    }
                 }
-
-                const withBreaks = cleanPara.replace(/\n/g, '<br />');
-
-                return `<p>${withBreaks}</p>`;
-            })
-            .filter(Boolean)
-            .join('');
-
-        let chain = editor.chain().focus();
-
-        if (originalText) {
-            const { from, to } = editor.state.selection;
-            const selected = editor.state.doc.textBetween(from, to, '\n');
-            const index = selected.indexOf(originalText);
-
-            if (index !== -1) {
-                const replaceFrom = from + index;
-                const replaceTo = replaceFrom + originalText.length;
-                chain = chain.setTextSelection({
-                    from: replaceFrom,
-                    to: replaceTo,
-                });
             }
         }
 
-        chain.insertContent(htmlContent || correctedText).run();
+        const docSize = targetEditor.state.doc.content.size;
+        const boundedFrom = Math.min(Math.max(0, replaceFrom), docSize);
+        const boundedTo = Math.min(Math.max(boundedFrom, replaceTo), docSize);
+
+        const $from = targetEditor.state.doc.resolve(boundedFrom);
+        const $to = targetEditor.state.doc.resolve(boundedTo);
+        const isInlineSelection =
+            (saved?.isInline ?? false) ||
+            ($from.sameParent($to) && $from.parent.isTextblock);
+        const hasMultipleParagraphs = cleanCorrected.includes('\n\n');
+
+        let chain = targetEditor.chain().focus();
+
+        if (isInlineSelection && !hasMultipleParagraphs) {
+            // INLINE REPLACEMENT:
+            // Never wrap in <p>. Replace single newlines with <br /> if any.
+            // TipTap replaces within the existing block without splitting.
+            if (boundedFrom < boundedTo) {
+                chain = chain.setTextSelection({
+                    from: boundedFrom,
+                    to: boundedTo,
+                });
+            }
+
+            const safeInline = escapeHtml(cleanCorrected).replace(
+                /\n/g,
+                '<br />',
+            );
+
+            chain.insertContent(safeInline).run();
+        } else {
+            // MULTI-PARAGRAPH OR MULTI-BLOCK REPLACEMENT:
+            let finalFrom = boundedFrom;
+            let finalTo = boundedTo;
+
+            // If the user had selected the whole block, expand to block boundaries
+            // so ProseMirror replaces the entire block node instead of leaving empty <p></p>
+            if (saved?.isEntireBlock && $from.depth > 0) {
+                finalFrom = $from.before();
+                finalTo = $to.after();
+            }
+
+            if (finalFrom < finalTo) {
+                chain = chain.setTextSelection({
+                    from: finalFrom,
+                    to: finalTo,
+                });
+            }
+
+            const htmlContent = cleanCorrected
+                .split(/\n\s*\n/)
+                .map((para) => {
+                    const cleanPara = para.trim();
+
+                    if (!cleanPara) {
+                        return '';
+                    }
+
+                    return `<p>${escapeHtml(cleanPara).replace(/\n/g, '<br />')}</p>`;
+                })
+                .filter(Boolean)
+                .join('');
+
+            chain.insertContent(htmlContent || cleanCorrected).run();
+        }
+
+        savedSelectionRef.current = null;
         toast.success('El texto fue reemplazado con éxito.');
         setIsSheetOpen(false);
     };
@@ -322,8 +527,12 @@ export function EditorToolbar({
     const handleOpenChange = (open: boolean) => {
         setIsSheetOpen(open);
 
-        if (!open && !hasReplacedRef.current) {
-            toast.info('El texto no fue reemplazado.');
+        if (!open) {
+            if (!hasReplacedRef.current) {
+                toast.info('El texto no fue reemplazado.');
+            }
+
+            savedSelectionRef.current = null;
         }
     };
 
@@ -332,21 +541,35 @@ export function EditorToolbar({
             return;
         }
 
-        const htmlContent = text
-            .split('\n\n')
-            .map((p) => {
-                const clean = p.trim();
+        const clean = text.trim();
 
-                if (!clean) {
-                    return '';
-                }
+        if (!clean) {
+            return;
+        }
 
-                return `<p>${clean.replace(/\n/g, '<br>')}</p>`;
-            })
-            .filter(Boolean)
-            .join('');
+        if (!clean.includes('\n\n')) {
+            // Single paragraph or inline dictation: insert directly without creating extra paragraph block splits
+            const safeInline = escapeHtml(clean).replace(/\n/g, '<br />');
 
-        editor.chain().focus().insertContent(htmlContent).run();
+            editor.chain().focus().insertContent(safeInline).run();
+        } else {
+            const htmlContent = clean
+                .split(/\n\s*\n/)
+                .map((p) => {
+                    const cleanP = p.trim();
+
+                    if (!cleanP) {
+                        return '';
+                    }
+
+                    return `<p>${escapeHtml(cleanP).replace(/\n/g, '<br />')}</p>`;
+                })
+                .filter(Boolean)
+                .join('');
+
+            editor.chain().focus().insertContent(htmlContent).run();
+        }
+
         toast.success('El texto dictado fue insertado con éxito.');
     };
 

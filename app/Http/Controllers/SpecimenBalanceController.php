@@ -138,9 +138,11 @@ class SpecimenBalanceController extends Controller
 
         foreach ($specimens as $specimen) {
             $internalDate = $specimen->expected_internal_finalization_date?->format('Y-m-d')
+                ?? $specimen->expected_finalization_date?->format('Y-m-d')
+                ?? ($specimen->received_at ? Carbon::parse($specimen->received_at)->format('Y-m-d') : null)
                 ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
             $clientDate = $specimen->expected_finalization_date?->format('Y-m-d')
-                ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+                ?? $internalDate;
 
             if ($internalDate < $minDateStr) {
                 $minDateStr = $internalDate;
@@ -427,7 +429,7 @@ class SpecimenBalanceController extends Controller
                 'type:id,name',
                 'examination:id,name,color,specimen_type',
                 'examinations:id,name,color,specimen_type',
-                'category:id,name',
+                'category:id,name,unit,quantity,intern_unit,intern_quantity',
                 'priority:id,name,color',
             ]);
 
@@ -444,9 +446,11 @@ class SpecimenBalanceController extends Controller
 
         $items = $specimens->map(function ($specimen) use ($today) {
             $internalDate = $specimen->expected_internal_finalization_date?->format('Y-m-d')
+                ?? $specimen->expected_finalization_date?->format('Y-m-d')
+                ?? ($specimen->received_at ? Carbon::parse($specimen->received_at)->format('Y-m-d') : null)
                 ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
             $clientDate = $specimen->expected_finalization_date?->format('Y-m-d')
-                ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+                ?? $internalDate;
 
             $color = '#3b82f6';
             if ($specimen->examinations->isNotEmpty() && $specimen->examinations->first()->color) {
@@ -544,7 +548,7 @@ class SpecimenBalanceController extends Controller
                 'type:id,name',
                 'examination:id,name,color,specimen_type',
                 'examinations:id,name,color,specimen_type',
-                'category:id,name',
+                'category:id,name,unit,quantity,intern_unit,intern_quantity',
                 'priority:id,name,color',
                 'users:users.id,name,email',
             ]);
@@ -570,16 +574,18 @@ class SpecimenBalanceController extends Controller
 
         $expiredSpecimens = $allSpecimens->filter(function ($specimen) use ($todayStr) {
             $internalDate = $specimen->expected_internal_finalization_date?->format('Y-m-d')
-                ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+                ?? $specimen->expected_finalization_date?->format('Y-m-d');
 
-            return $internalDate < $todayStr;
+            return $internalDate && $internalDate < $todayStr;
         })->values();
 
         $items = $expiredSpecimens->map(function ($specimen) use ($today) {
             $internalDate = $specimen->expected_internal_finalization_date?->format('Y-m-d')
+                ?? $specimen->expected_finalization_date?->format('Y-m-d')
+                ?? ($specimen->received_at ? Carbon::parse($specimen->received_at)->format('Y-m-d') : null)
                 ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
             $clientDate = $specimen->expected_finalization_date?->format('Y-m-d')
-                ?? Carbon::parse($specimen->created_at)->format('Y-m-d');
+                ?? $internalDate;
 
             $color = '#3b82f6';
             if ($specimen->examinations->isNotEmpty() && $specimen->examinations->first()->color) {
@@ -774,7 +780,9 @@ class SpecimenBalanceController extends Controller
             AuditLog::$currentOrigin = 'specimens-balance-bulk-move';
 
             DB::transaction(function () use ($ids, $action, $targetDate, $targetUserId, $reason) {
-                $specimens = Specimen::whereIn('id', $ids)->get();
+                $specimens = Specimen::with('category:id,name,unit,quantity,intern_unit,intern_quantity')
+                    ->whereIn('id', $ids)
+                    ->get();
 
                 foreach ($specimens as $specimen) {
                     // 1. Pathologist Reassignment (if action is assign_pathologist or both)

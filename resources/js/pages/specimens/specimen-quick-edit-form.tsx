@@ -179,6 +179,10 @@ export default function SpecimenQuickEditForm({
     const { props: pageProps } = usePage<any>();
     const canManageInvoices =
         pageProps.auth?.permissions?.includes('invoices.manage');
+    const canManageStatus = Boolean(
+        pageProps.auth?.user?.role?.slug === 'admin' ||
+        pageProps.auth?.permissions?.includes('specimens.manage_status'),
+    );
 
     const { data, setData, post, processing, errors, isDirty } = useForm({
         referrer: specimen?.referrer ? specimen.referrer.toString() : '',
@@ -595,6 +599,7 @@ export default function SpecimenQuickEditForm({
                         <Select
                             value={data.status}
                             onValueChange={(val) => setData('status', val)}
+                            disabled={!canManageStatus}
                         >
                             <SelectTrigger id="status" className="w-full">
                                 <SelectValue placeholder="Seleccionar estado" />
@@ -682,6 +687,10 @@ export default function SpecimenQuickEditForm({
                                         <SelectItem
                                             key={opt.value}
                                             value={opt.value}
+                                            disabled={
+                                                !canManageStatus &&
+                                                opt.value !== data.status
+                                            }
                                         >
                                             {opt.label}
                                         </SelectItem>
@@ -689,6 +698,12 @@ export default function SpecimenQuickEditForm({
                                 })()}
                             </SelectContent>
                         </Select>
+                        {!canManageStatus && (
+                            <p className="text-xs text-muted-foreground">
+                                El estado solo puede ser modificado por roles
+                                autorizados.
+                            </p>
+                        )}
                         {errors.status && (
                             <p className="text-xs text-destructive">
                                 {errors.status}

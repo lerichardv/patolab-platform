@@ -165,24 +165,25 @@ class DeliveryNotePaginator
 
             preg_match_all('/<img[^>]+>/i', $blockHtml, $imgMatches);
             $imgTags = $imgMatches[0] ?? [];
-            usort($imgTags, function ($a, $b) {
-                preg_match('/data-order=["\'](\d+)["\']/i', $a, $matchA);
-                preg_match('/data-order=["\'](\d+)["\']/i', $b, $matchB);
-                $orderA = isset($matchA[1]) ? (int) $matchA[1] : null;
-                $orderB = isset($matchB[1]) ? (int) $matchB[1] : null;
+            $indexed = [];
+            foreach ($imgTags as $idx => $tag) {
+                preg_match('/data-order=["\'](\d+)["\']/i', $tag, $m);
+                $indexed[] = [
+                    'tag' => $tag,
+                    'originalIndex' => $idx,
+                    'order' => isset($m[1]) ? (int) $m[1] : null,
+                ];
+            }
+            usort($indexed, function ($a, $b) {
+                if ($a['order'] !== null && $b['order'] !== null) {
+                    if ($a['order'] !== $b['order']) {
+                        return $a['order'] <=> $b['order'];
+                    }
+                }
 
-                if ($orderA !== null && $orderB !== null) {
-                    return $orderA <=> $orderB;
-                }
-                if ($orderA !== null) {
-                    return -1;
-                }
-                if ($orderB !== null) {
-                    return 1;
-                }
-
-                return 0;
+                return $a['originalIndex'] <=> $b['originalIndex'];
             });
+            $imgTags = array_column($indexed, 'tag');
             $imgTags = array_slice($imgTags, 0, 4);
             $columns = max(1, count($imgTags));
 
@@ -510,25 +511,25 @@ class DeliveryNotePaginator
                 $width = $block['width'] ?? null;
                 $usableWidth = $width ? (185.9 * ($width / 704.0)) : 185.9;
                 $gap = 1.50; // mm
-                $sortedImages = $images;
-                usort($sortedImages, function ($a, $b) {
-                    preg_match('/data-order=["\'](\d+)["\']/i', $a, $matchA);
-                    preg_match('/data-order=["\'](\d+)["\']/i', $b, $matchB);
-                    $orderA = isset($matchA[1]) ? (int) $matchA[1] : null;
-                    $orderB = isset($matchB[1]) ? (int) $matchB[1] : null;
+                $indexed = [];
+                foreach ($images as $idx => $tag) {
+                    preg_match('/data-order=["\'](\d+)["\']/i', $tag, $m);
+                    $indexed[] = [
+                        'tag' => $tag,
+                        'originalIndex' => $idx,
+                        'order' => isset($m[1]) ? (int) $m[1] : null,
+                    ];
+                }
+                usort($indexed, function ($a, $b) {
+                    if ($a['order'] !== null && $b['order'] !== null) {
+                        if ($a['order'] !== $b['order']) {
+                            return $a['order'] <=> $b['order'];
+                        }
+                    }
 
-                    if ($orderA !== null && $orderB !== null) {
-                        return $orderA <=> $orderB;
-                    }
-                    if ($orderA !== null) {
-                        return -1;
-                    }
-                    if ($orderB !== null) {
-                        return 1;
-                    }
-
-                    return 0;
+                    return $a['originalIndex'] <=> $b['originalIndex'];
                 });
+                $sortedImages = array_column($indexed, 'tag');
                 $slicedImages = array_slice($sortedImages, 0, 4);
                 $columns = max(1, count($slicedImages));
                 $rowsRemaining = [$slicedImages];

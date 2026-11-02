@@ -639,9 +639,11 @@ const customWebhookExtension = {
                         // Clear previous empty nodes atomically within transact and apply new update
                         data.document.transact(() => {
                             const yxml = data.document.getXmlFragment('content');
+
                             if (yxml.length > 0) {
                                 yxml.delete(0, yxml.length);
                             }
+
                             const update = Y.encodeStateAsUpdate(initialYdoc);
                             Y.applyUpdate(data.document, update);
                         });
