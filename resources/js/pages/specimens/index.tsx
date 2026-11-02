@@ -29,11 +29,12 @@ import {
     Ban,
     AlertCircle,
     RotateCcw,
+    RotateCw,
     ArrowUp,
     ArrowDown,
     Loader2,
 } from 'lucide-react';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { destroy as destroySpecimen } from '@/actions/App/Http/Controllers/SpecimenController';
 import CancelSpecimenDialog from '@/components/cancel-specimen-dialog';
@@ -235,6 +236,17 @@ export default function SpecimensIndex({
     const [priorities, setPriorities] = useState<Priority[]>(() =>
         deduplicateSpecimens(initialPriorities || []),
     );
+    const [isReloading, setIsReloading] = useState(false);
+    const lastReloadTimeRef = useRef<number>(Date.now());
+
+    const handleReload = useCallback(() => {
+        setIsReloading(true);
+        lastReloadTimeRef.current = Date.now();
+        router.reload({
+            only: ['priorities'],
+            onFinish: () => setIsReloading(false),
+        });
+    }, []);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
     const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
@@ -694,6 +706,70 @@ export default function SpecimensIndex({
         }
     }, [initialPriorities]);
 
+    // Cross-tab auto-refresh when specimens are finalized or updated in other tabs (e.g., report editor)
+    useEffect(() => {
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === 'patolab_specimens_updated_at') {
+                handleReload();
+            }
+        };
+
+        window.addEventListener('storage', handleStorage);
+
+        return () => {
+            window.removeEventListener('storage', handleStorage);
+        };
+    }, [handleReload]);
+
+    // Auto-refresh when returning to this tab (debounced by 3 seconds)
+    useEffect(() => {
+        const handleAutoRefresh = () => {
+            const now = Date.now();
+
+            if (now - lastReloadTimeRef.current > 3000) {
+                handleReload();
+            }
+        };
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                handleAutoRefresh();
+            }
+        };
+
+        window.addEventListener('focus', handleAutoRefresh);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        return () => {
+            window.removeEventListener('focus', handleAutoRefresh);
+            document.removeEventListener(
+                'visibilitychange',
+                onVisibilityChange,
+            );
+        };
+    }, [handleReload]);
+
+    // Force reload on browser back/forward history traversal (popstate & bfcache pageshow)
+    useEffect(() => {
+        const handlePopState = () => {
+            handleReload();
+        };
+
+        const handlePageShow = (e: PageTransitionEvent) => {
+            if (e.persisted) {
+                handleReload();
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        window.addEventListener('pageshow', handlePageShow);
+
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            window.removeEventListener('pageshow', handlePageShow);
+        };
+    }, [handleReload]);
+
     useEffect(() => {
         if (filters.status) {
             setSelectedStatuses(filters.status);
@@ -768,6 +844,7 @@ export default function SpecimensIndex({
                     toast.success('Estados de muestras actualizados');
                     setSelectedIds([]);
                     setIsSelectionMode(false);
+                    handleReload();
                 },
                 onError: () => {
                     toast.error('Error al actualizar los estados');
@@ -791,6 +868,7 @@ export default function SpecimensIndex({
                     toast.success('Prioridades de muestras actualizadas');
                     setSelectedIds([]);
                     setIsSelectionMode(false);
+                    handleReload();
                 },
                 onError: () => {
                     toast.error('Error al actualizar las prioridades');
@@ -824,6 +902,7 @@ export default function SpecimensIndex({
                     setSelectedIds([]);
                     setIsSelectionMode(false);
                     setIsBulkDeleteDialogOpen(false);
+                    handleReload();
                 },
                 onError: () => {
                     toast.error('Error al desactivar las muestras');
@@ -1011,6 +1090,7 @@ export default function SpecimensIndex({
                 onSuccess: () => {
                     toast.success('Muestra eliminada correctamente');
                     setIsDeleteDialogOpen(false);
+                    handleReload();
                 },
             });
         }
@@ -1322,6 +1402,22 @@ export default function SpecimensIndex({
                             }}
                         >
                             Limpiar filtros
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            className="h-10 w-full gap-2 px-4 text-sm md:w-auto"
+                            onClick={handleReload}
+                            disabled={isReloading}
+                            title="Recargar tablero de muestras"
+                        >
+                            <RotateCw
+                                className={cn(
+                                    'h-4 w-4',
+                                    isReloading && 'animate-spin',
+                                )}
+                            />
+                            <span>Recargar</span>
                         </Button>
 
                         {auth.permissions?.includes('specimens.create') && (
@@ -1932,6 +2028,7 @@ export default function SpecimensIndex({
                 }
                 open={isSheetOpen}
                 onOpenChange={setIsSheetOpen}
+                onSuccess={handleReload}
             />
 
             <SpecimenGroupSheet
@@ -1944,6 +2041,7 @@ export default function SpecimensIndex({
                     }
                 }}
                 group={selectedGroup}
+                onSuccess={handleReload}
             />
 
             <SelectSpecimenGroupDialog
